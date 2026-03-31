@@ -9,18 +9,9 @@ export const DEFAULT_FILTERS = {
   destination: "",
   route: "",
   aircraftFamily: "ALL",
-  aircraftProfile: "",
-  matchStatus: "ALL",
-  localDepartureStart: "",
-  localDepartureEnd: "",
-  utcDepartureStart: "",
-  utcDepartureEnd: "",
-  minPax: "",
-  maxPax: "",
-  minMtow: "",
-  maxMtow: "",
-  minMlw: "",
-  maxMlw: "",
+  equipment: [],
+  utcDeparture: "",
+  utcArrival: "",
   search: ""
 };
 
@@ -28,5 +19,3 @@ export const DEFAULT_SORT = {
   key: "stdUtcMillis",
   direction: "asc"
 };
-
-export const MATCH_STATUS_ORDER = ["resolved", "ambiguous"];

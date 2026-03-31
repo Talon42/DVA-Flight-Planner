@@ -16,13 +16,12 @@ const COLUMNS = [
   { key: "staLocal", label: "STA Local", width: 110, render: formatDateTime },
   { key: "localDepartureClock", label: "Local", width: 72, render: formatTimeOnly },
   { key: "utcDepartureClock", label: "UTC", width: 72 },
-  { key: "aircraftProfile", label: "Aircraft", width: 188 },
-  { key: "aircraftFamily", label: "Family", width: 84 },
+  { key: "compatibleFamiliesLabel", label: "Compatible Families", width: 220 },
+  { key: "compatibilityCount", label: "Equip", width: 78, render: formatCompactNumber },
   { key: "maxPax", label: "Pax", width: 78, render: formatCompactNumber },
   { key: "mtow", label: "MTOW", width: 100, render: formatCompactNumber },
   { key: "mlw", label: "MLW", width: 100, render: formatCompactNumber },
-  { key: "distanceNm", label: "Distance", width: 110, render: formatDistanceNm },
-  { key: "matchStatus", label: "Status", width: 108 }
+  { key: "distanceNm", label: "Distance", width: 110, render: formatDistanceNm }
 ];
 
 function SortButton({ label, sortKey, sort, onSort }) {
@@ -79,13 +78,7 @@ function Row({ index, style, data }) {
             onClick={() => data.onSelectFlight(flight.flightId)}
             title={typeof content === "string" ? content : String(value ?? "")}
           >
-            {column.key === "matchStatus" ? (
-              <span className={`status-chip status-chip--${flight.matchStatus}`}>
-                {flight.matchStatus}
-              </span>
-            ) : (
-              content
-            )}
+            {content}
           </button>
         );
       })}

@@ -2,7 +2,7 @@ import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import FilterBar from "./components/FilterBar";
 import FlightTable from "./components/FlightTable";
 import DetailsPanel from "./components/DetailsPanel";
-import { DEFAULT_FILTERS, DEFAULT_SORT, MATCH_STATUS_ORDER } from "./lib/constants";
+import { DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
 import { formatNumber } from "./lib/formatters";
 import { runScheduleImport } from "./lib/importClient";
 import {
@@ -36,19 +36,14 @@ function sortFlights(flights, sort) {
 
 function normalizeSortValue(value, key) {
   if (value === null || value === undefined || value === "") {
-    return key === "matchStatus" ? 999 : "";
-  }
-
-  if (key === "matchStatus") {
-    const index = MATCH_STATUS_ORDER.indexOf(value);
-    return index === -1 ? 999 : index;
+    return "";
   }
 
   return typeof value === "string" ? value.toUpperCase() : value;
 }
 
-function inTimeWindow(clockValue, startValue, endValue) {
-  if (!startValue && !endValue) {
+function matchesTime(clockValue, filterValue) {
+  if (!filterValue) {
     return true;
   }
 
@@ -56,30 +51,7 @@ function inTimeWindow(clockValue, startValue, endValue) {
     return false;
   }
 
-  if (startValue && clockValue < startValue) {
-    return false;
-  }
-
-  if (endValue && clockValue > endValue) {
-    return false;
-  }
-
-  return true;
-}
-
-function inNumericWindow(value, minValue, maxValue) {
-  const parsedMin = minValue ? Number(minValue) : null;
-  const parsedMax = maxValue ? Number(maxValue) : null;
-
-  if (parsedMin !== null && value < parsedMin) {
-    return false;
-  }
-
-  if (parsedMax !== null && value > parsedMax) {
-    return false;
-  }
-
-  return true;
+  return clockValue === filterValue;
 }
 
 function matchesSearch(flight, query) {
@@ -90,8 +62,8 @@ function matchesSearch(flight, query) {
   const haystack = [
     flight.flightCode,
     flight.airlineName,
-    flight.aircraftProfile,
-    flight.aircraftFamily,
+    flight.compatibleEquipmentLabel,
+    flight.compatibleFamiliesLabel,
     flight.from,
     flight.to,
     flight.route,
@@ -115,6 +87,19 @@ function buildSavedSchedule(schedule, uiState) {
       .map((flight) => flight.flightId),
     uiState
   };
+}
+
+function normalizeFilters(savedFilters) {
+  const nextFilters = {
+    ...DEFAULT_FILTERS,
+    ...(savedFilters || {})
+  };
+
+  if (!Array.isArray(nextFilters.equipment)) {
+    nextFilters.equipment = nextFilters.equipment ? [nextFilters.equipment] : [];
+  }
+
+  return nextFilters;
 }
 
 export default function App() {
@@ -144,7 +129,7 @@ export default function App() {
           flights: savedSchedule.flights,
           importSummary: savedSchedule.importSummary
         });
-        setFilters(savedSchedule.uiState?.filters || DEFAULT_FILTERS);
+        setFilters(normalizeFilters(savedSchedule.uiState?.filters));
         setSort(savedSchedule.uiState?.sort || DEFAULT_SORT);
         setSelectedFlightId(
           savedSchedule.uiState?.selectedFlightId ||
@@ -197,7 +182,13 @@ export default function App() {
     : [];
 
   const aircraftFamilies = schedule
-    ? [...new Set(schedule.flights.map((flight) => flight.aircraftFamily))]
+    ? [...new Set(schedule.flights.flatMap((flight) => flight.compatibleFamilies || []))]
+        .filter(Boolean)
+        .sort()
+    : [];
+
+  const equipmentOptions = schedule
+    ? [...new Set(schedule.flights.flatMap((flight) => flight.compatibleEquipment || []))]
         .filter(Boolean)
         .sort()
     : [];
@@ -213,14 +204,7 @@ export default function App() {
 
         if (
           deferredFilters.aircraftFamily !== "ALL" &&
-          flight.aircraftFamily !== deferredFilters.aircraftFamily
-        ) {
-          return false;
-        }
-
-        if (
-          deferredFilters.matchStatus !== "ALL" &&
-          flight.matchStatus !== deferredFilters.matchStatus
+          !(flight.compatibleFamilies || []).includes(deferredFilters.aircraftFamily)
         ) {
           return false;
         }
@@ -247,59 +231,27 @@ export default function App() {
         }
 
         if (
-          deferredFilters.aircraftProfile &&
-          !flight.aircraftProfile
-            .toUpperCase()
-            .includes(deferredFilters.aircraftProfile.trim().toUpperCase())
-        ) {
-          return false;
-        }
-
-        if (
-          !inTimeWindow(
-            flight.localDepartureClock,
-            deferredFilters.localDepartureStart,
-            deferredFilters.localDepartureEnd
+          deferredFilters.equipment.length &&
+          !deferredFilters.equipment.some((equipment) =>
+            (flight.compatibleEquipment || []).includes(equipment)
           )
         ) {
           return false;
         }
 
         if (
-          !inTimeWindow(
+          !matchesTime(
             flight.utcDepartureClock,
-            deferredFilters.utcDepartureStart,
-            deferredFilters.utcDepartureEnd
+            deferredFilters.utcDeparture
           )
         ) {
           return false;
         }
 
         if (
-          !inNumericWindow(
-            flight.maxPax,
-            deferredFilters.minPax,
-            deferredFilters.maxPax
-          )
-        ) {
-          return false;
-        }
-
-        if (
-          !inNumericWindow(
-            flight.mtow,
-            deferredFilters.minMtow,
-            deferredFilters.maxMtow
-          )
-        ) {
-          return false;
-        }
-
-        if (
-          !inNumericWindow(
-            flight.mlw,
-            deferredFilters.minMlw,
-            deferredFilters.maxMlw
+          !matchesTime(
+            flight.staUtc ? flight.staUtc.slice(11, 16) : "",
+            deferredFilters.utcArrival
           )
         ) {
           return false;
@@ -509,6 +461,7 @@ export default function App() {
             filters={filters}
             airlines={airlines}
             aircraftFamilies={aircraftFamilies}
+            equipmentOptions={equipmentOptions}
             onFilterChange={handleFilterChange}
             onReset={handleResetFilters}
           />
@@ -528,8 +481,8 @@ export default function App() {
               <h2>Import a PFPX XML file to start planning.</h2>
               <p>
                 The app validates airport coverage, converts local schedule times to
-                UTC, matches aircraft profiles by weights and capacity, and keeps one
-                saved schedule snapshot on disk.
+                UTC, calculates route distance, and filters routes by compatible
+                aircraft families and equipment based on weight, capacity, and range.
               </p>
             </section>
           )}

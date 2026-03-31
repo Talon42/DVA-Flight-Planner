@@ -64,7 +64,7 @@ const equipmentMatcherRows = equipmentTypes
   }))
   .sort((left, right) => right.normalized.length - left.normalized.length);
 
-const profileIndex = buildProfileIndex();
+const aircraftCatalog = buildAircraftCatalog();
 
 export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
   debug(`parse:start file=${fileName} chars=${xmlText?.length || 0}`);
@@ -127,7 +127,6 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         continue;
       }
 
-      const profileMatch = resolveAircraftProfile(rawFlight);
       const airlineName =
         airlineMap.get(rawFlight.airline) || `${rawFlight.airline} (not in airline map)`;
       const blockMinutes = Math.max(
@@ -140,6 +139,7 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         toAirport.latitude,
         toAirport.longitude
       );
+      const compatibility = resolveRouteCompatibility(rawFlight, distanceNm);
 
       flights.push({
         flightId: buildFlightId(rawFlight, index),
@@ -164,12 +164,15 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         mtow: rawFlight.mtow,
         mlw: rawFlight.mlw,
         maxPax: rawFlight.maxPax,
-        aircraftProfile: profileMatch.aircraftProfile,
-        aircraftFamily: profileMatch.aircraftFamily,
-        matchStatus: profileMatch.matchStatus,
-        matchReason: profileMatch.matchReason,
         blockMinutes,
         distanceNm,
+        compatibleEquipment: compatibility.compatibleEquipment,
+        compatibleEquipmentLabel: compatibility.compatibleEquipmentLabel,
+        compatibleFamilies: compatibility.compatibleFamilies,
+        compatibleFamiliesLabel: compatibility.compatibleFamiliesLabel,
+        compatibilityCount: compatibility.compatibilityCount,
+        compatibilityStatus: compatibility.compatibilityStatus,
+        compatibilityReason: compatibility.compatibilityReason,
         isShortlisted: false,
         notes: rawFlight.notes
       });
@@ -182,8 +185,8 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
     }
   }
 
-  const ambiguousAircraftRows = flights.filter(
-    (flight) => flight.matchStatus === "ambiguous"
+  const incompatibleRoutes = flights.filter(
+    (flight) => flight.compatibilityStatus === "none"
   ).length;
   const importLog = buildImportLog(importedAt, fileName, importIssues);
 
@@ -197,7 +200,7 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
       totalRows: flightBlocks.length,
       importedRows: flights.length,
       omittedRows: importIssues.length,
-      ambiguousAircraftRows,
+      incompatibleRoutes,
       errorLogPath: importIssues.length ? "pending-write" : null
     }
   };
@@ -258,67 +261,70 @@ function parseCoordinate(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function buildProfileIndex() {
-  const index = new Map();
+function buildAircraftCatalog() {
+  const catalog = [];
 
   for (const row of aircraftProfileRows) {
-    const key = buildProfileKey({
-      mtow: parseNumeric(row["Maximum Takeoff Weight"]),
-      mlw: parseNumeric(row["Maximum Landing Weight"]),
-      maxPax: parseNumeric(row["Passenger Capacity"])
-    });
-
     const profile = {
       aircraftProfile: row["Aircraft Profile"],
-      fullAircraftName: row["Full Aircraft Name"],
-      iataCodes: String(row["IATA Equipment Code(s)"] || "")
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean)
+      equipmentType: row["Aircraft Profile"],
+      family: deriveAircraftFamily({
+        aircraftProfile: row["Aircraft Profile"],
+        fullAircraftName: row["Full Aircraft Name"],
+        iataCodes: String(row["IATA Equipment Code(s)"] || "")
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      }),
+      passengerCapacity: parseNumeric(row["Passenger Capacity"]),
+      maximumTakeoffWeight: parseNumeric(row["Maximum Takeoff Weight"]),
+      maximumLandingWeight: parseNumeric(row["Maximum Landing Weight"]),
+      maximumRangeNm: convertStatuteMilesToNm(parseNumeric(row["Maximum Range"]))
     };
 
-    if (!index.has(key)) {
-      index.set(key, []);
-    }
-
-    index.get(key).push(profile);
+    catalog.push(profile);
   }
 
-  return index;
+  return catalog;
 }
 
-function resolveAircraftProfile(rawFlight) {
-  const key = buildProfileKey(rawFlight);
-  const matches = profileIndex.get(key) || [];
+function resolveRouteCompatibility(rawFlight, distanceNm) {
+  const compatibleProfiles = aircraftCatalog.filter((profile) => {
+    const capacityOk =
+      !Number.isFinite(profile.passengerCapacity) ||
+      !Number.isFinite(rawFlight.maxPax) ||
+      profile.passengerCapacity <= rawFlight.maxPax;
+    const mtowOk =
+      !Number.isFinite(profile.maximumTakeoffWeight) ||
+      !Number.isFinite(rawFlight.mtow) ||
+      profile.maximumTakeoffWeight <= rawFlight.mtow;
+    const mlwOk =
+      !Number.isFinite(profile.maximumLandingWeight) ||
+      !Number.isFinite(rawFlight.mlw) ||
+      profile.maximumLandingWeight <= rawFlight.mlw;
+    const rangeOk =
+      !Number.isFinite(profile.maximumRangeNm) ||
+      !Number.isFinite(distanceNm) ||
+      profile.maximumRangeNm >= distanceNm;
 
-  if (matches.length === 1) {
-    const match = matches[0];
-    return {
-      aircraftProfile: match.aircraftProfile,
-      aircraftFamily: deriveAircraftFamily(match),
-      matchStatus: "resolved",
-      matchReason: "Exact MTOW, MLW, and passenger capacity match."
-    };
-  }
+    return capacityOk && mtowOk && mlwOk && rangeOk;
+  });
 
-  if (matches.length > 1) {
-    const profiles = matches.map((match) => match.aircraftProfile);
-    const uniqueFamilies = [...new Set(matches.map(deriveAircraftFamily).filter(Boolean))];
-
-    return {
-      aircraftProfile: profiles.join(" / "),
-      aircraftFamily:
-        uniqueFamilies.length === 1 ? uniqueFamilies[0] : uniqueFamilies.join(" / "),
-      matchStatus: "ambiguous",
-      matchReason: `Matched multiple aircraft profiles: ${profiles.join(", ")}.`
-    };
-  }
+  const compatibleEquipment = [...new Set(compatibleProfiles.map((profile) => profile.equipmentType))].sort();
+  const compatibleFamilies = [...new Set(compatibleProfiles.map((profile) => profile.family))]
+    .filter(Boolean)
+    .sort();
 
   return {
-    aircraftProfile: "Unknown profile",
-    aircraftFamily: "Unknown",
-    matchStatus: "ambiguous",
-    matchReason: "No exact aircraft profile match was found."
+    compatibleEquipment,
+    compatibleEquipmentLabel: buildCompactLabel(compatibleEquipment, 3),
+    compatibleFamilies,
+    compatibleFamiliesLabel: buildCompactLabel(compatibleFamilies, 3),
+    compatibilityCount: compatibleEquipment.length,
+    compatibilityStatus: compatibleEquipment.length ? "compatible" : "none",
+    compatibilityReason: compatibleEquipment.length
+      ? `${compatibleEquipment.length} equipment profiles satisfy passenger, MTOW, MLW, and range limits.`
+      : "No aircraft profiles satisfy passenger, MTOW, MLW, and range limits."
   };
 }
 
@@ -355,8 +361,12 @@ function deriveAircraftFamily(profile) {
   return "Unknown";
 }
 
-function buildProfileKey({ mtow, mlw, maxPax }) {
-  return `${mtow || 0}|${mlw || 0}|${maxPax || 0}`;
+function convertStatuteMilesToNm(value) {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.round(value * 0.868976);
 }
 
 function calculateGreatCircleNm(fromLatitude, fromLongitude, toLatitude, toLongitude) {
@@ -386,6 +396,18 @@ function calculateGreatCircleNm(fromLatitude, fromLongitude, toLatitude, toLongi
 
 function degreesToRadians(value) {
   return (value * Math.PI) / 180;
+}
+
+function buildCompactLabel(values, visibleCount) {
+  if (!values.length) {
+    return "None";
+  }
+
+  if (values.length <= visibleCount) {
+    return values.join(", ");
+  }
+
+  return `${values.slice(0, visibleCount).join(", ")} +${values.length - visibleCount}`;
 }
 
 function normalizeAlphaNumeric(value) {

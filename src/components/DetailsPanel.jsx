@@ -50,9 +50,18 @@ export default function DetailsPanel({
 
             <div className="details-grid">
               <DetailRow label="Airline" value={selectedFlight.airlineName} />
-              <DetailRow label="Aircraft" value={selectedFlight.aircraftProfile} />
-              <DetailRow label="Family" value={selectedFlight.aircraftFamily} />
-              <DetailRow label="Match" value={selectedFlight.matchReason} />
+              <DetailRow
+                label="Compatible Families"
+                value={selectedFlight.compatibleFamiliesLabel}
+              />
+              <DetailRow
+                label="Compatible Equipment"
+                value={selectedFlight.compatibleEquipmentLabel}
+              />
+              <DetailRow
+                label="Compatibility"
+                value={selectedFlight.compatibilityReason}
+              />
               <DetailRow
                 label="STD Local"
                 value={`${formatDateTime(selectedFlight.stdLocal)} (${formatZoneLabel(
@@ -114,8 +123,8 @@ export default function DetailsPanel({
             value={formatNumber(importSummary?.omittedRows ?? 0)}
           />
           <DetailRow
-            label="Ambiguous Aircraft"
-            value={formatNumber(importSummary?.ambiguousAircraftRows ?? 0)}
+            label="No Compatible Equipment"
+            value={formatNumber(importSummary?.incompatibleRoutes ?? 0)}
           />
         </div>
 

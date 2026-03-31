@@ -1,53 +1,154 @@
-const STATUS_OPTIONS = [
-  { value: "ALL", label: "All matches" },
-  { value: "resolved", label: "Resolved" },
-  { value: "ambiguous", label: "Ambiguous" }
-];
+import { useEffect, useMemo, useRef, useState } from "react";
 
-function NumericFilter({ label, minKey, maxKey, filters, onFilterChange }) {
+function TimeFilter({ label, filterKey, filters, onFilterChange }) {
   return (
-    <div className="filter-pair">
-      <label>
-        <span>{label} Min</span>
-        <input
-          type="number"
-          value={filters[minKey]}
-          onChange={(event) => onFilterChange(minKey, event.target.value)}
-          placeholder="0"
-        />
-      </label>
-      <label>
-        <span>{label} Max</span>
-        <input
-          type="number"
-          value={filters[maxKey]}
-          onChange={(event) => onFilterChange(maxKey, event.target.value)}
-          placeholder="Any"
-        />
-      </label>
-    </div>
+    <label className="filter-block">
+      <span>{label}</span>
+      <input
+        type="time"
+        value={filters[filterKey]}
+        onChange={(event) => onFilterChange(filterKey, event.target.value)}
+      />
+    </label>
   );
 }
 
-function TimeFilter({ label, startKey, endKey, filters, onFilterChange }) {
+function EquipmentMultiSelect({
+  options,
+  selectedValues,
+  onChange
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!rootRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toUpperCase();
+
+    if (!normalizedQuery) {
+      return options;
+    }
+
+    return options.filter((option) =>
+      option.toUpperCase().includes(normalizedQuery)
+    );
+  }, [options, query]);
+
+  const selectionLabel = selectedValues.length
+    ? `${selectedValues.length} selected`
+    : "All equipment";
+
+  function toggleValue(value) {
+    if (selectedValues.includes(value)) {
+      onChange(selectedValues.filter((entry) => entry !== value));
+      return;
+    }
+
+    onChange([...selectedValues, value].sort());
+  }
+
+  function removeValue(value) {
+    onChange(selectedValues.filter((entry) => entry !== value));
+  }
+
   return (
-    <div className="filter-pair">
-      <label>
-        <span>{label} Start</span>
-        <input
-          type="time"
-          value={filters[startKey]}
-          onChange={(event) => onFilterChange(startKey, event.target.value)}
-        />
-      </label>
-      <label>
-        <span>{label} End</span>
-        <input
-          type="time"
-          value={filters[endKey]}
-          onChange={(event) => onFilterChange(endKey, event.target.value)}
-        />
-      </label>
+    <div className="filter-block filter-block--wide" ref={rootRef}>
+      <span>Equipment</span>
+      <div className={`multi-select ${isOpen ? "multi-select--open" : ""}`}>
+        <button
+          className="multi-select__trigger"
+          type="button"
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <span className="multi-select__value">{selectionLabel}</span>
+          <span className="multi-select__chevron">{isOpen ? "^" : "v"}</span>
+        </button>
+
+        {selectedValues.length ? (
+          <div className="multi-select__chips">
+            {selectedValues.map((value) => (
+              <button
+                key={value}
+                className="multi-select__chip"
+                type="button"
+                onClick={() => removeValue(value)}
+                title={`Remove ${value}`}
+              >
+                <span>{value}</span>
+                <span>x</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {isOpen ? (
+          <div className="multi-select__menu">
+            <input
+              className="multi-select__search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search equipment"
+            />
+
+            <div className="multi-select__actions">
+              <button
+                className="multi-select__action"
+                type="button"
+                onClick={() => onChange(options)}
+              >
+                Select all
+              </button>
+              <button
+                className="multi-select__action"
+                type="button"
+                onClick={() => onChange([])}
+              >
+                Clear
+              </button>
+            </div>
+
+            <div className="multi-select__options">
+              {filteredOptions.map((option) => {
+                const selected = selectedValues.includes(option);
+
+                return (
+                  <button
+                    key={option}
+                    className={`multi-select__option ${
+                      selected ? "multi-select__option--selected" : ""
+                    }`}
+                    type="button"
+                    onClick={() => toggleValue(option)}
+                  >
+                    <span>{option}</span>
+                    <span className="multi-select__option-mark">
+                      {selected ? "Selected" : "Add"}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {!filteredOptions.length ? (
+                <div className="multi-select__empty">No matching equipment</div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -56,6 +157,7 @@ export default function FilterBar({
   filters,
   airlines,
   aircraftFamilies,
+  equipmentOptions,
   onFilterChange,
   onReset
 }) {
@@ -115,22 +217,6 @@ export default function FilterBar({
         </label>
 
         <label className="filter-block">
-          <span>Match Status</span>
-          <select
-            value={filters.matchStatus}
-            onChange={(event) =>
-              onFilterChange("matchStatus", event.target.value)
-            }
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="filter-block">
           <span>Origin ICAO</span>
           <input
             type="text"
@@ -162,54 +248,22 @@ export default function FilterBar({
           />
         </label>
 
-        <label className="filter-block">
-          <span>Aircraft Profile</span>
-          <input
-            type="text"
-            value={filters.aircraftProfile}
-            onChange={(event) =>
-              onFilterChange("aircraftProfile", event.target.value)
-            }
-            placeholder="A321neo"
-          />
-        </label>
-
-        <TimeFilter
-          label="Local Departure"
-          startKey="localDepartureStart"
-          endKey="localDepartureEnd"
-          filters={filters}
-          onFilterChange={onFilterChange}
+        <EquipmentMultiSelect
+          options={equipmentOptions}
+          selectedValues={filters.equipment}
+          onChange={(value) => onFilterChange("equipment", value)}
         />
 
         <TimeFilter
           label="UTC Departure"
-          startKey="utcDepartureStart"
-          endKey="utcDepartureEnd"
+          filterKey="utcDeparture"
           filters={filters}
           onFilterChange={onFilterChange}
         />
 
-        <NumericFilter
-          label="Pax"
-          minKey="minPax"
-          maxKey="maxPax"
-          filters={filters}
-          onFilterChange={onFilterChange}
-        />
-
-        <NumericFilter
-          label="MTOW"
-          minKey="minMtow"
-          maxKey="maxMtow"
-          filters={filters}
-          onFilterChange={onFilterChange}
-        />
-
-        <NumericFilter
-          label="MLW"
-          minKey="minMlw"
-          maxKey="maxMlw"
+        <TimeFilter
+          label="UTC Arrival"
+          filterKey="utcArrival"
           filters={filters}
           onFilterChange={onFilterChange}
         />
@@ -217,4 +271,3 @@ export default function FilterBar({
     </section>
   );
 }
-
