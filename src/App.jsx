@@ -3,6 +3,7 @@ import FilterBar from "./components/FilterBar";
 import FlightTable from "./components/FlightTable";
 import DetailsPanel from "./components/DetailsPanel";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
+import { syncScheduleFromDeltaVirtual } from "./lib/deltaVirtualSync";
 import { formatNumber } from "./lib/formatters";
 import { runScheduleImport } from "./lib/importClient";
 import {
@@ -157,27 +158,33 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
 
   const defaultFlightLengthMax = bounds.maxBlockMinutes;
   const defaultDistanceMax = bounds.maxDistanceNm;
+  const toOptionalNumber = (value) => {
+    if (value === null || value === undefined || value === "") {
+      return Number.NaN;
+    }
+    return Number(value);
+  };
 
   nextFilters.flightLengthMin = clampRange(
-    Number(nextFilters.flightLengthMin),
+    toOptionalNumber(nextFilters.flightLengthMin),
     0,
     defaultFlightLengthMax,
     0
   );
   nextFilters.flightLengthMax = clampRange(
-    Number(nextFilters.flightLengthMax),
+    toOptionalNumber(nextFilters.flightLengthMax),
     nextFilters.flightLengthMin,
     defaultFlightLengthMax,
     defaultFlightLengthMax
   );
   nextFilters.distanceMin = clampRange(
-    Number(nextFilters.distanceMin),
+    toOptionalNumber(nextFilters.distanceMin),
     0,
     defaultDistanceMax,
     0
   );
   nextFilters.distanceMax = clampRange(
-    Number(nextFilters.distanceMax),
+    toOptionalNumber(nextFilters.distanceMax),
     nextFilters.distanceMin,
     defaultDistanceMax,
     defaultDistanceMax
@@ -190,8 +197,10 @@ export default function App() {
   const [schedule, setSchedule] = useState(null);
   const [selectedFlightId, setSelectedFlightId] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filterUiVersion, setFilterUiVersion] = useState(0);
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [isImporting, setIsImporting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
   const [statusMessage, setStatusMessage] = useState("Ready");
   const [importTracePath, setImportTracePath] = useState("");
@@ -382,29 +391,17 @@ export default function App() {
     ? schedule.flights.filter((flight) => flight.isShortlisted)
     : [];
 
-  async function handleImport() {
+  async function processImportedSchedule(pickedFile, sourceLabel) {
     const debugLines = [];
     const appendDebug = (message) => {
       const line = `[${new Date().toISOString()}] ${message}`;
       debugLines.push(line);
     };
 
-    if (schedule?.flights?.length) {
-      const confirmed = await confirmOverwriteSchedule();
-      if (!confirmed) {
-        return;
-      }
-    }
-
-    const pickedFile = await pickXmlScheduleFile();
-    if (!pickedFile) {
-      return;
-    }
-
     setIsImporting(true);
     setImportTracePath("");
     setStatusMessage(`Importing ${pickedFile.fileName}...`);
-    appendDebug(`ui:selected file=${pickedFile.fileName}`);
+    appendDebug(`ui:${sourceLabel}:selected file=${pickedFile.fileName}`);
 
     try {
       const imported = await runScheduleImport(
@@ -413,14 +410,15 @@ export default function App() {
         appendDebug
       );
       appendDebug(
-        `ui:import result imported=${imported.flights.length} omitted=${imported.importSummary.omittedRows}`
+        `ui:${sourceLabel}:import result imported=${imported.flights.length} omitted=${imported.importSummary.omittedRows}`
       );
       const errorLogPath = imported.importLog
         ? await appendImportErrors(imported.importLog)
         : null;
-      appendDebug(`ui:error-log path=${errorLogPath || "none"}`);
+      appendDebug(`ui:${sourceLabel}:error-log path=${errorLogPath || "none"}`);
 
       startTransition(() => {
+        const nextBounds = buildFilterBounds(imported.flights);
         setSchedule({
           importedAt: imported.importedAt,
           flights: imported.flights,
@@ -429,16 +427,17 @@ export default function App() {
             errorLogPath
           }
         });
-        setFilters(normalizeFilters(DEFAULT_FILTERS, buildFilterBounds(imported.flights)));
+        setFilters(normalizeFilters(DEFAULT_FILTERS, nextBounds));
         setSort(DEFAULT_SORT);
         setSelectedFlightId(imported.flights[0]?.flightId || null);
+        setFilterUiVersion((current) => current + 1);
       });
 
       setStatusMessage(
         `Imported ${formatNumber(imported.flights.length)} flights from ${pickedFile.fileName}.`
       );
     } catch (error) {
-      appendDebug(`ui:error ${error.message || "Import failed."}`);
+      appendDebug(`ui:${sourceLabel}:error ${error.message || "Import failed."}`);
       setStatusMessage(error.message || "Import failed.");
     } finally {
       try {
@@ -448,6 +447,53 @@ export default function App() {
         setStatusMessage(error.message || "Unable to persist the import trace log.");
       }
       setIsImporting(false);
+    }
+  }
+
+  async function confirmScheduleReplacement() {
+    if (!schedule?.flights?.length) {
+      return true;
+    }
+
+    return confirmOverwriteSchedule();
+  }
+
+  async function handleImport() {
+    const confirmed = await confirmScheduleReplacement();
+    if (!confirmed) {
+      return;
+    }
+
+    const pickedFile = await pickXmlScheduleFile();
+    if (!pickedFile) {
+      return;
+    }
+
+    await processImportedSchedule(pickedFile, "manual");
+  }
+
+  async function handleDeltaVirtualSync() {
+    const confirmed = await confirmScheduleReplacement();
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSyncing(true);
+    setStatusMessage("Opening Delta Virtual login...");
+
+    try {
+      setStatusMessage("Waiting for Delta Virtual login and schedule download...");
+      const syncedFile = await syncScheduleFromDeltaVirtual();
+      setStatusMessage("Processing Delta Virtual schedule...");
+      await processImportedSchedule(syncedFile, "deltava-sync");
+    } catch (error) {
+      if (error?.kind === "cancelled") {
+        setStatusMessage("Delta Virtual sync canceled.");
+      } else {
+        setStatusMessage(error.message || "Delta Virtual sync failed.");
+      }
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -530,9 +576,17 @@ export default function App() {
             className="primary-button"
             type="button"
             onClick={handleImport}
-            disabled={isImporting}
+            disabled={isImporting || isSyncing}
           >
             {isImporting ? "Importing..." : schedule ? "Replace Schedule" : "Import Schedule XML"}
+          </button>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={handleDeltaVirtualSync}
+            disabled={isImporting || isSyncing}
+          >
+            {isSyncing ? "Syncing..." : "Sync from Delta Virtual"}
           </button>
         </div>
       </header>
@@ -568,6 +622,7 @@ export default function App() {
       <main className="workspace">
         <div className="workspace__main">
           <FilterBar
+            key={`filters-${filterUiVersion}`}
             filters={normalizeFilters(filters, filterBounds)}
             airlines={airlines}
             aircraftFamilies={aircraftFamilies}

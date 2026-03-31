@@ -3,3 +3,5 @@ dist/
 src-tauri/target/
 *.log
 test-data/pfpxsched.xml
+deltava-pfpxsched-*.xml
+src-tauri/deltava-pfpxsched-*.xml

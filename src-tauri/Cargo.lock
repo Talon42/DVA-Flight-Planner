@@ -970,11 +970,15 @@ dependencies = [
 name = "flight-planner-app"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-opener",
+ "tokio",
+ "webview2-com",
+ "windows",
 ]
 
 [[package]]

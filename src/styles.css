@@ -58,6 +58,12 @@ button {
   max-width: 720px;
 }
 
+.topbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .brand-lockup h1 {
   margin: 0;
   font-size: clamp(2rem, 3vw, 3.6rem);
