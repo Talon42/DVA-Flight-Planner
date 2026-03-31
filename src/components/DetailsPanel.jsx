@@ -1,5 +1,6 @@
 import {
   formatDateTime,
+  formatDistanceNm,
   formatDuration,
   formatNumber,
   formatUtc,
@@ -70,6 +71,7 @@ export default function DetailsPanel({
                 label="Block Time"
                 value={formatDuration(selectedFlight.blockMinutes)}
               />
+              <DetailRow label="Distance" value={formatDistanceNm(selectedFlight.distanceNm)} />
               <DetailRow label="Max Pax" value={formatNumber(selectedFlight.maxPax)} />
               <DetailRow label="MTOW" value={formatNumber(selectedFlight.mtow)} />
               <DetailRow label="MLW" value={formatNumber(selectedFlight.mlw)} />

@@ -250,7 +250,7 @@ select:focus {
 .table-header,
 .table-row {
   display: grid;
-  grid-template-columns: 64px repeat(14, auto);
+  grid-template-columns: 64px repeat(15, auto);
   align-items: center;
 }
 

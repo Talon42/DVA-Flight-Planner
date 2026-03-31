@@ -3,6 +3,7 @@ import { FixedSizeList as List } from "react-window";
 import {
   formatCompactNumber,
   formatDateTime,
+  formatDistanceNm,
   formatTimeOnly
 } from "../lib/formatters";
 
@@ -20,6 +21,7 @@ const COLUMNS = [
   { key: "maxPax", label: "Pax", width: 78, render: formatCompactNumber },
   { key: "mtow", label: "MTOW", width: 100, render: formatCompactNumber },
   { key: "mlw", label: "MLW", width: 100, render: formatCompactNumber },
+  { key: "distanceNm", label: "Distance", width: 110, render: formatDistanceNm },
   { key: "matchStatus", label: "Status", width: 108 }
 ];
 

@@ -75,3 +75,10 @@ export function formatDuration(minutes) {
   return `${hours}h ${mins}m`;
 }
 
+export function formatDistanceNm(value) {
+  if (!Number.isFinite(value)) {
+    return "N/A";
+  }
+
+  return `${formatNumber(value)} nm`;
+}

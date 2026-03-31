@@ -43,7 +43,9 @@ const airportMap = new Map(
       name: row.Name,
       country: row.Country,
       state: row["State/Territory"],
-      timezone: row.Timezone
+      timezone: row.Timezone,
+      latitude: parseCoordinate(row.Latitude),
+      longitude: parseCoordinate(row.Longitude)
     }
   ])
 );
@@ -132,6 +134,12 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         0,
         Math.round(staLocal.toUTC().diff(stdLocal.toUTC(), "minutes").minutes)
       );
+      const distanceNm = calculateGreatCircleNm(
+        fromAirport.latitude,
+        fromAirport.longitude,
+        toAirport.latitude,
+        toAirport.longitude
+      );
 
       flights.push({
         flightId: buildFlightId(rawFlight, index),
@@ -161,6 +169,7 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         matchStatus: profileMatch.matchStatus,
         matchReason: profileMatch.matchReason,
         blockMinutes,
+        distanceNm,
         isShortlisted: false,
         notes: rawFlight.notes
       });
@@ -242,6 +251,11 @@ function decodeXmlEntities(value) {
 function parseNumeric(value) {
   const normalized = String(value || "").replace(/[^0-9-]/g, "");
   return normalized ? Number(normalized) : null;
+}
+
+function parseCoordinate(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function buildProfileIndex() {
@@ -343,6 +357,35 @@ function deriveAircraftFamily(profile) {
 
 function buildProfileKey({ mtow, mlw, maxPax }) {
   return `${mtow || 0}|${mlw || 0}|${maxPax || 0}`;
+}
+
+function calculateGreatCircleNm(fromLatitude, fromLongitude, toLatitude, toLongitude) {
+  if (
+    !Number.isFinite(fromLatitude) ||
+    !Number.isFinite(fromLongitude) ||
+    !Number.isFinite(toLatitude) ||
+    !Number.isFinite(toLongitude)
+  ) {
+    return null;
+  }
+
+  const earthRadiusNm = 3440.065;
+  const lat1 = degreesToRadians(fromLatitude);
+  const lon1 = degreesToRadians(fromLongitude);
+  const lat2 = degreesToRadians(toLatitude);
+  const lon2 = degreesToRadians(toLongitude);
+  const deltaLat = lat2 - lat1;
+  const deltaLon = lon2 - lon1;
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return Math.round(earthRadiusNm * c);
+}
+
+function degreesToRadians(value) {
+  return (value * Math.PI) / 180;
 }
 
 function normalizeAlphaNumeric(value) {
