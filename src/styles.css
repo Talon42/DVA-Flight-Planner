@@ -3,17 +3,103 @@
   --delta-blue: #003a70;
   --delta-blue-deep: #0b1f36;
   --delta-red: #c8102e;
-  --ink: #102136;
-  --muted: #64758a;
-  --line: rgba(10, 25, 46, 0.08);
-  --surface: rgba(255, 255, 255, 0.8);
-  --shadow: 0 24px 54px rgba(10, 24, 43, 0.12);
-  font-family: "Segoe UI Variable Display", "Bahnschrift", "Segoe UI", sans-serif;
-  background:
+  --app-bg:
     radial-gradient(circle at top left, rgba(200, 16, 46, 0.14), transparent 26%),
     radial-gradient(circle at top right, rgba(0, 58, 112, 0.18), transparent 28%),
     linear-gradient(155deg, #f2f6fb 0%, #fbfcff 48%, #edf2f9 100%);
-  color: var(--ink);
+  --text-primary: #102136;
+  --text-heading: var(--delta-blue-deep);
+  --text-muted: #64758a;
+  --line: rgba(10, 25, 46, 0.08);
+  --line-strong: rgba(16, 33, 54, 0.14);
+  --surface: rgba(255, 255, 255, 0.8);
+  --surface-border: rgba(255, 255, 255, 0.6);
+  --surface-raised: rgba(255, 255, 255, 0.84);
+  --surface-soft: rgba(255, 255, 255, 0.72);
+  --surface-panel: rgba(245, 248, 252, 0.88);
+  --surface-table-row: rgba(255, 255, 255, 0.4);
+  --surface-table-row-selected:
+    linear-gradient(90deg, rgba(200, 16, 46, 0.08), rgba(0, 58, 112, 0.08)),
+    rgba(255, 255, 255, 0.84);
+  --surface-option: rgba(246, 249, 252, 0.9);
+  --surface-option-selected: rgba(0, 58, 112, 0.08);
+  --input-bg: rgba(255, 255, 255, 0.84);
+  --button-ghost-bg: rgba(255, 255, 255, 0.7);
+  --button-ghost-border: rgba(16, 33, 54, 0.1);
+  --button-ghost-text: var(--text-primary);
+  --button-ghost-hover-border: rgba(0, 58, 112, 0.25);
+  --button-ghost-hover-bg: rgba(255, 255, 255, 0.9);
+  --chip-bg: rgba(0, 58, 112, 0.08);
+  --chip-border: rgba(0, 58, 112, 0.14);
+  --chip-text: var(--delta-blue);
+  --action-bg: rgba(16, 33, 54, 0.06);
+  --slider-track: rgba(16, 33, 54, 0.1);
+  --shadow: 0 24px 54px rgba(10, 24, 43, 0.12);
+  --menu-shadow: 0 24px 54px rgba(10, 24, 43, 0.18);
+  --focus-outline: rgba(0, 58, 112, 0.18);
+  --focus-border: rgba(0, 58, 112, 0.28);
+  --route-banner:
+    linear-gradient(140deg, rgba(0, 58, 112, 0.96), rgba(11, 31, 54, 0.94)),
+    var(--delta-blue);
+  --route-banner-muted: rgba(255, 255, 255, 0.72);
+  --status-resolved-bg: rgba(18, 104, 53, 0.12);
+  --status-resolved-text: #126835;
+  --status-ambiguous-bg: rgba(200, 16, 46, 0.12);
+  --theme-toggle-bg: rgba(255, 255, 255, 0.76);
+  --theme-toggle-border: rgba(16, 33, 54, 0.12);
+  --theme-toggle-text: var(--delta-blue-deep);
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Segoe UI", sans-serif;
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg:
+    radial-gradient(circle at top left, rgba(200, 16, 46, 0.18), transparent 24%),
+    radial-gradient(circle at top right, rgba(31, 94, 160, 0.2), transparent 26%),
+    linear-gradient(155deg, #07111d 0%, #0a1626 45%, #0f2033 100%);
+  --text-primary: #ecf3fb;
+  --text-heading: #f4f8fc;
+  --text-muted: #99afc7;
+  --line: rgba(182, 204, 229, 0.14);
+  --line-strong: rgba(221, 233, 245, 0.18);
+  --surface: rgba(10, 24, 43, 0.78);
+  --surface-border: rgba(186, 209, 234, 0.14);
+  --surface-raised: rgba(10, 24, 43, 0.88);
+  --surface-soft: rgba(10, 24, 43, 0.74);
+  --surface-panel: rgba(15, 33, 54, 0.84);
+  --surface-table-row: rgba(8, 20, 36, 0.52);
+  --surface-table-row-selected:
+    linear-gradient(90deg, rgba(200, 16, 46, 0.18), rgba(0, 58, 112, 0.28)),
+    rgba(10, 24, 43, 0.9);
+  --surface-option: rgba(12, 27, 45, 0.94);
+  --surface-option-selected: rgba(0, 58, 112, 0.32);
+  --input-bg: rgba(7, 18, 31, 0.88);
+  --button-ghost-bg: rgba(8, 20, 36, 0.78);
+  --button-ghost-border: rgba(186, 209, 234, 0.16);
+  --button-ghost-text: #f0f5fb;
+  --button-ghost-hover-border: rgba(214, 228, 244, 0.28);
+  --button-ghost-hover-bg: rgba(13, 30, 50, 0.94);
+  --chip-bg: rgba(0, 58, 112, 0.28);
+  --chip-border: rgba(120, 166, 214, 0.28);
+  --chip-text: #d4e6fb;
+  --action-bg: rgba(236, 243, 251, 0.08);
+  --slider-track: rgba(186, 209, 234, 0.2);
+  --shadow: 0 26px 60px rgba(0, 0, 0, 0.34);
+  --menu-shadow: 0 28px 64px rgba(0, 0, 0, 0.38);
+  --focus-outline: rgba(120, 166, 214, 0.28);
+  --focus-border: rgba(150, 192, 235, 0.36);
+  --route-banner:
+    linear-gradient(140deg, rgba(0, 58, 112, 0.94), rgba(17, 34, 58, 0.97)),
+    var(--delta-blue);
+  --route-banner-muted: rgba(244, 248, 252, 0.74);
+  --status-resolved-bg: rgba(60, 173, 111, 0.18);
+  --status-resolved-text: #9de4bc;
+  --status-ambiguous-bg: rgba(200, 16, 46, 0.2);
+  --theme-toggle-bg: rgba(10, 24, 43, 0.88);
+  --theme-toggle-border: rgba(186, 209, 234, 0.18);
+  --theme-toggle-text: #ffffff;
 }
 
 * {
@@ -29,6 +115,11 @@ body,
 
 body {
   min-height: 100vh;
+  background: var(--app-bg);
+  color: var(--text-primary);
+  transition:
+    background 180ms ease,
+    color 180ms ease;
 }
 
 button,
@@ -82,7 +173,8 @@ button {
   font-size: clamp(2rem, 3vw, 3.6rem);
   line-height: 0.96;
   letter-spacing: -0.06em;
-  color: var(--delta-blue-deep);
+  color: var(--text-heading);
+  white-space: nowrap;
 }
 
 .eyebrow {
@@ -106,7 +198,7 @@ button {
 .table-shell,
 .details-card,
 .empty-state {
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--surface-border);
   background: var(--surface);
   backdrop-filter: blur(18px);
   box-shadow: var(--shadow);
@@ -120,7 +212,7 @@ button {
 .summary-card span {
   display: block;
   margin-bottom: 10px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.82rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -136,21 +228,33 @@ button {
   justify-content: space-between;
   gap: 24px;
   padding: 14px 4px 18px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.92rem;
 }
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(360px, 0.9fr);
+  grid-template-columns: 1fr;
   gap: 18px;
   align-items: start;
+  justify-items: center;
 }
 
 .workspace__main {
   display: grid;
   gap: 18px;
   position: relative;
+  width: min(1360px, 100%);
+}
+
+.filter-bar,
+.table-shell {
+  width: min(1360px, 100%);
+  margin-inline: auto;
+}
+
+.details-panel {
+  width: min(1360px, 100%);
 }
 
 .filter-bar,
@@ -210,7 +314,7 @@ button {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .filter-label {
@@ -219,13 +323,14 @@ button {
   gap: 8px;
 }
 
-.time-mode-toggle {
+.time-mode-toggle,
+.theme-toggle {
   width: 20px;
   height: 20px;
-  border: 1px solid rgba(16, 33, 54, 0.14);
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.85);
-  color: var(--muted);
+  background: var(--input-bg);
+  color: var(--text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -234,25 +339,42 @@ button {
     transform 160ms ease,
     color 160ms ease,
     border-color 160ms ease,
-    background 160ms ease;
+    background 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.time-mode-toggle svg {
+.time-mode-toggle svg,
+.theme-toggle svg {
   width: 12px;
   height: 12px;
   display: block;
 }
 
-.time-mode-toggle:hover {
+.time-mode-toggle:hover,
+.theme-toggle:hover {
   transform: translateY(-1px);
-  color: var(--delta-blue-deep);
-  border-color: rgba(0, 58, 112, 0.25);
+  color: var(--text-heading);
+  border-color: var(--button-ghost-hover-border);
 }
 
 .time-mode-toggle--local {
-  color: var(--delta-blue-deep);
+  color: var(--text-heading);
   border-color: rgba(0, 58, 112, 0.25);
-  background: rgba(0, 58, 112, 0.08);
+  background: var(--chip-bg);
+}
+
+.theme-toggle {
+  width: 46px;
+  height: 46px;
+  background: var(--theme-toggle-bg);
+  border-color: var(--theme-toggle-border);
+  color: var(--theme-toggle-text);
+  box-shadow: var(--shadow);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
 }
 
 input,
@@ -260,15 +382,20 @@ select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.84);
+  background: var(--input-bg);
   padding: 12px 14px;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 input:focus,
-select:focus {
-  outline: 2px solid rgba(0, 58, 112, 0.18);
-  border-color: rgba(0, 58, 112, 0.28);
+select:focus,
+.multi-select__trigger:focus,
+.theme-toggle:focus,
+.primary-button:focus,
+.ghost-button:focus {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 0;
+  border-color: var(--focus-border);
 }
 
 .multi-select {
@@ -292,14 +419,14 @@ select:focus {
   gap: 12px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.84);
+  background: var(--input-bg);
   padding: 12px 14px;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .multi-select--open .multi-select__trigger {
-  outline: 2px solid rgba(0, 58, 112, 0.18);
-  border-color: rgba(0, 58, 112, 0.28);
+  outline: 2px solid var(--focus-outline);
+  border-color: var(--focus-border);
 }
 
 .multi-select__value {
@@ -314,7 +441,7 @@ select:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--muted);
+  color: var(--text-muted);
   transform: rotate(0deg);
   transition:
     transform 180ms ease,
@@ -329,7 +456,7 @@ select:focus {
 
 .multi-select--open .multi-select__chevron {
   transform: rotate(180deg);
-  color: var(--delta-blue-deep);
+  color: var(--text-heading);
 }
 
 .multi-select__chips {
@@ -343,10 +470,10 @@ select:focus {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(0, 58, 112, 0.14);
+  border: 1px solid var(--chip-border);
   border-radius: 999px;
-  background: rgba(0, 58, 112, 0.08);
-  color: var(--delta-blue);
+  background: var(--chip-bg);
+  color: var(--chip-text);
   padding: 7px 10px;
 }
 
@@ -358,11 +485,11 @@ select:focus {
   right: 0;
   display: grid;
   gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--surface-border);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--surface-raised);
   backdrop-filter: blur(18px);
-  box-shadow: 0 24px 54px rgba(10, 24, 43, 0.18);
+  box-shadow: var(--menu-shadow);
   padding: 12px;
 }
 
@@ -378,8 +505,8 @@ select:focus {
 .multi-select__action {
   border: 0;
   border-radius: 999px;
-  background: rgba(16, 33, 54, 0.06);
-  color: var(--ink);
+  background: var(--action-bg);
+  color: var(--text-primary);
   padding: 7px 10px;
 }
 
@@ -397,19 +524,19 @@ select:focus {
   gap: 12px;
   border: 1px solid transparent;
   border-radius: 12px;
-  background: rgba(246, 249, 252, 0.9);
+  background: var(--surface-option);
   padding: 10px 12px;
   text-align: left;
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .multi-select__option--selected {
-  border-color: rgba(0, 58, 112, 0.14);
-  background: rgba(0, 58, 112, 0.08);
+  border-color: var(--chip-border);
+  background: var(--surface-option-selected);
 }
 
 .multi-select__option-mark {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -417,9 +544,9 @@ select:focus {
 
 .multi-select__empty {
   border-radius: 12px;
-  background: rgba(246, 249, 252, 0.9);
+  background: var(--surface-option);
   padding: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .range-slider {
@@ -427,7 +554,7 @@ select:focus {
   gap: 12px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.84);
+  background: var(--input-bg);
   padding: 14px;
 }
 
@@ -441,7 +568,7 @@ select:focus {
 .range-slider__values strong {
   font-size: 0.9rem;
   letter-spacing: -0.02em;
-  color: var(--delta-blue-deep);
+  color: var(--text-heading);
 }
 
 .range-slider__track-shell {
@@ -457,7 +584,7 @@ select:focus {
   right: 0;
   height: 6px;
   border-radius: 999px;
-  background: rgba(16, 33, 54, 0.1);
+  background: var(--slider-track);
 }
 
 .range-slider__track--active {
@@ -539,9 +666,14 @@ select:focus {
 }
 
 .ghost-button {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(16, 33, 54, 0.1);
-  color: var(--ink);
+  background: var(--button-ghost-bg);
+  border-color: var(--button-ghost-border);
+  color: var(--button-ghost-text);
+}
+
+.ghost-button:hover {
+  border-color: var(--button-ghost-hover-border);
+  background: var(--button-ghost-hover-bg);
 }
 
 .primary-button:hover,
@@ -549,6 +681,12 @@ select:focus {
 .pin-button:hover,
 .shortlist-item:hover {
   transform: translateY(-1px);
+}
+
+.primary-button:disabled,
+.ghost-button:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
 }
 
 .table-shell {
@@ -571,7 +709,7 @@ select:focus {
 
 .table-header {
   border-bottom: 1px solid var(--line);
-  background: rgba(245, 248, 252, 0.88);
+  background: var(--surface-panel);
 }
 
 .table-header__pin {
@@ -580,7 +718,7 @@ select:focus {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .table-sort {
@@ -591,7 +729,7 @@ select:focus {
   padding: 14px 12px;
   border: 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -599,7 +737,39 @@ select:focus {
 }
 
 .table-sort--active {
-  color: var(--delta-blue);
+  color: var(--chip-text);
+}
+
+.table-sort__icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 50% 50%;
+  transition:
+    transform 140ms ease,
+    opacity 140ms ease;
+}
+
+.table-sort__icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.table-sort__icon--none {
+  opacity: 0.45;
+}
+
+.table-sort__icon--desc {
+  opacity: 1;
+  transform: rotate(0deg);
+}
+
+.table-sort__icon--asc {
+  opacity: 1;
+  transform: rotate(180deg);
 }
 
 .table-body {
@@ -612,13 +782,11 @@ select:focus {
 
 .table-row {
   border-bottom: 1px solid rgba(10, 25, 46, 0.05);
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--surface-table-row);
 }
 
 .table-row--selected {
-  background:
-    linear-gradient(90deg, rgba(200, 16, 46, 0.08), rgba(0, 58, 112, 0.08)),
-    rgba(255, 255, 255, 0.84);
+  background: var(--surface-table-row-selected);
 }
 
 .pin-button,
@@ -632,7 +800,7 @@ select:focus {
 
 .pin-button {
   font-size: 1.08rem;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .pin-button--active {
@@ -662,12 +830,12 @@ select:focus {
 }
 
 .status-chip--resolved {
-  background: rgba(18, 104, 53, 0.12);
-  color: #126835;
+  background: var(--status-resolved-bg);
+  color: var(--status-resolved-text);
 }
 
 .status-chip--ambiguous {
-  background: rgba(200, 16, 46, 0.12);
+  background: var(--status-ambiguous-bg);
   color: var(--delta-red);
 }
 
@@ -684,9 +852,7 @@ select:focus {
   padding: 18px;
   margin-bottom: 18px;
   border-radius: 22px;
-  background:
-    linear-gradient(140deg, rgba(0, 58, 112, 0.96), rgba(11, 31, 54, 0.94)),
-    var(--delta-blue);
+  background: var(--route-banner);
   color: white;
 }
 
@@ -705,8 +871,21 @@ select:focus {
   letter-spacing: -0.04em;
 }
 
+.route-banner__direction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.route-banner__plane {
+  width: 80px;
+  height: 36px;
+  display: block;
+  object-fit: contain;
+}
+
 .route-banner small {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--route-banner-muted);
 }
 
 .details-grid {
@@ -724,7 +903,7 @@ select:focus {
 }
 
 .detail-row span {
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .detail-row strong {
@@ -743,20 +922,42 @@ select:focus {
 
 .shortlist-item {
   display: grid;
-  gap: 4px;
+  gap: 10px;
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--surface-soft);
   text-align: left;
 }
 
-.shortlist-item span {
+.shortlist-item__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shortlist-item__meta span {
   font-weight: 700;
 }
 
-.shortlist-item small {
-  color: var(--muted);
+.shortlist-item__meta small {
+  color: var(--text-muted);
+}
+
+.route-banner--compact {
+  margin-bottom: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+
+.route-banner--compact span {
+  font-size: 1.02rem;
+}
+
+.route-banner--compact .route-banner__plane {
+  width: 58px;
+  height: 26px;
 }
 
 .empty-state {
@@ -769,7 +970,7 @@ select:focus {
 .empty-state p,
 .empty-note {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.6;
 }
 
@@ -802,7 +1003,7 @@ select:focus {
   }
 
   .brand-lockup__title {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 10px;
   }
 

@@ -1,11 +1,8 @@
 import {
-  formatDateTime,
-  formatDistanceNm,
-  formatDuration,
   formatNumber,
   formatUtc,
-  formatZoneLabel
 } from "../lib/formatters";
+import planeLight from "../data/images/plane_light.png";
 
 function DetailRow({ label, value }) {
   return (
@@ -17,93 +14,13 @@ function DetailRow({ label, value }) {
 }
 
 export default function DetailsPanel({
-  selectedFlight,
   shortlist,
   onSelectFlight,
-  onToggleShortlist,
   onOpenLogFile,
   importSummary
 }) {
   return (
     <aside className="details-panel">
-      <section className="details-card">
-        <div className="details-card__header">
-          <p className="eyebrow">Selected Flight</p>
-          <h2>{selectedFlight ? selectedFlight.flightCode : "No flight selected"}</h2>
-        </div>
-
-        {selectedFlight ? (
-          <>
-            <div className="route-banner">
-              <div>
-                <span>{selectedFlight.from}</span>
-                <small>{selectedFlight.fromAirport}</small>
-              </div>
-              <strong>{selectedFlight.route}</strong>
-              <div>
-                <span>{selectedFlight.to}</span>
-                <small>{selectedFlight.toAirport}</small>
-              </div>
-            </div>
-
-            <div className="details-grid">
-              <DetailRow label="Airline" value={selectedFlight.airlineName} />
-              <DetailRow
-                label="Compatible Families"
-                value={selectedFlight.compatibleFamiliesLabel}
-              />
-              <DetailRow
-                label="Compatible Equipment"
-                value={selectedFlight.compatibleEquipmentLabel}
-              />
-              <DetailRow
-                label="Compatibility"
-                value={selectedFlight.compatibilityReason}
-              />
-              <DetailRow
-                label="STD Local"
-                value={`${formatDateTime(selectedFlight.stdLocal)} (${formatZoneLabel(
-                  selectedFlight.fromTimezone
-                )})`}
-              />
-              <DetailRow
-                label="STA Local"
-                value={`${formatDateTime(selectedFlight.staLocal)} (${formatZoneLabel(
-                  selectedFlight.toTimezone
-                )})`}
-              />
-              <DetailRow label="STD UTC" value={formatUtc(selectedFlight.stdUtc)} />
-              <DetailRow label="STA UTC" value={formatUtc(selectedFlight.staUtc)} />
-              <DetailRow
-                label="Block Time"
-                value={formatDuration(selectedFlight.blockMinutes)}
-              />
-              <DetailRow label="Distance" value={formatDistanceNm(selectedFlight.distanceNm)} />
-              <DetailRow label="Max Pax" value={formatNumber(selectedFlight.maxPax)} />
-              <DetailRow label="MTOW" value={formatNumber(selectedFlight.mtow)} />
-              <DetailRow label="MLW" value={formatNumber(selectedFlight.mlw)} />
-            </div>
-
-            <button
-              className={`primary-button ${
-                selectedFlight.isShortlisted ? "primary-button--active" : ""
-              }`}
-              type="button"
-              onClick={() => onToggleShortlist(selectedFlight.flightId)}
-            >
-              {selectedFlight.isShortlisted
-                ? "Remove From Shortlist"
-                : "Add To Shortlist"}
-            </button>
-          </>
-        ) : (
-          <p className="empty-note">
-            Import a schedule and select a row to inspect times, aircraft data, and
-            shortlist status.
-          </p>
-        )}
-      </section>
-
       <section className="details-card">
         <div className="details-card__header">
           <p className="eyebrow">Import Health</p>
@@ -139,8 +56,8 @@ export default function DetailsPanel({
 
       <section className="details-card">
         <div className="details-card__header">
-          <p className="eyebrow">Pinned Flights</p>
-          <h2>{shortlist.length} in shortlist</h2>
+          <p className="eyebrow">Flight Board</p>
+          <h2>{shortlist.length} on board</h2>
         </div>
 
         {shortlist.length ? (
@@ -152,16 +69,29 @@ export default function DetailsPanel({
                 type="button"
                 onClick={() => onSelectFlight(flight.flightId)}
               >
-                <span>{flight.flightCode}</span>
-                <small>
-                  {flight.route} - {formatUtc(flight.stdUtc)}
-                </small>
+                <div className="shortlist-item__meta">
+                  <span>{flight.flightCode}</span>
+                  <small>{formatUtc(flight.stdUtc)}</small>
+                </div>
+                <div className="route-banner route-banner--compact">
+                  <div>
+                    <span>{flight.from}</span>
+                    <small>{flight.fromAirport}</small>
+                  </div>
+                  <span className="route-banner__direction" aria-hidden="true">
+                    <img src={planeLight} alt="" className="route-banner__plane" />
+                  </span>
+                  <div>
+                    <span>{flight.to}</span>
+                    <small>{flight.toAirport}</small>
+                  </div>
+                </div>
               </button>
             ))}
           </div>
         ) : (
           <p className="empty-note">
-            Pin flights from the table to keep a working shortlist for the session.
+            Double-click flights in the table to add them to the Flight Board.
           </p>
         )}
       </section>

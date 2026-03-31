@@ -6,13 +6,50 @@ import {
   formatTimeOnly
 } from "../lib/formatters";
 
-function buildColumns(timeDisplayMode) {
+function formatFlightNumber(value) {
+  if (typeof value !== "string") {
+    return value ?? "";
+  }
+
+  const stripped = value.replace(/^[^\d]+/, "");
+  return stripped || value;
+}
+
+function formatFlightIcao(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.match(/^[^\d]+/)?.[0] || "";
+}
+
+function resolveAirlineColumnWidth(flights) {
+  if (!Array.isArray(flights) || !flights.length) {
+    return 180;
+  }
+
+  let longestLength = 0;
+
+  for (const flight of flights) {
+    const nameLength = (flight?.airlineName || "").length;
+    if (nameLength > longestLength) {
+      longestLength = nameLength;
+    }
+  }
+
+  return Math.max(180, Math.min(360, longestLength * 9 + 24));
+}
+
+function buildColumns(timeDisplayMode, flights) {
   const isLocalMode = timeDisplayMode === "local";
+  const airlineColumnWidth = resolveAirlineColumnWidth(flights);
 
   return [
-    { key: "flightCode", label: "Flight", width: 118 },
-    { key: "airlineName", label: "Airline", width: 180 },
-    { key: "route", label: "Route", width: 124 },
+    { key: "flightIcao", label: "ICAO", width: 82, sortKey: "flightCode", render: (_, flight) => formatFlightIcao(flight?.flightCode) },
+    { key: "flightCode", label: "Flight #", width: 118, render: formatFlightNumber },
+    { key: "airlineName", label: "Airline", width: airlineColumnWidth },
+    { key: "from", label: "Origin", width: 92 },
+    { key: "to", label: "Destination", width: 104 },
     {
       key: isLocalMode ? "stdLocal" : "stdUtc",
       label: isLocalMode ? "Departure (Local)" : "Departure (UTC)",
@@ -41,7 +78,11 @@ const RIGHT_ALIGNED_COLUMN_KEYS = new Set([
 
 function SortButton({ label, sortKey, sort, onSort }) {
   const isActive = sort.key === sortKey;
-  const direction = isActive ? sort.direction : "none";
+  const directionClass = isActive
+    ? sort.direction === "asc"
+      ? "table-sort__icon--asc"
+      : "table-sort__icon--desc"
+    : "table-sort__icon--none";
 
   return (
     <button
@@ -50,8 +91,17 @@ function SortButton({ label, sortKey, sort, onSort }) {
       onClick={() => onSort(sortKey)}
     >
       <span>{label}</span>
-      <span className="table-sort__icon">
-        {direction === "asc" ? "^" : direction === "desc" ? "v" : "-"}
+      <span className={`table-sort__icon ${directionClass}`} aria-hidden="true">
+        <svg viewBox="0 0 16 16" focusable="false">
+          <path
+            d="M4 6.5 8 10.5 12 6.5"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.75"
+          />
+        </svg>
       </span>
     </button>
   );
@@ -73,7 +123,7 @@ function Row({ index, style, data }) {
     >
       {data.columns.map((column) => {
         const value = flight[column.key];
-        const content = column.render ? column.render(value) : value;
+        const content = column.render ? column.render(value, flight) : value;
 
         return (
           <button
@@ -84,6 +134,7 @@ function Row({ index, style, data }) {
             }`}
             style={{ width: `${column.width}px` }}
             onClick={() => data.onSelectFlight(flight.flightId)}
+            onDoubleClick={() => data.onAddToFlightBoard(flight.flightId)}
             title={typeof content === "string" ? content : String(value ?? "")}
           >
             {content}
@@ -100,9 +151,10 @@ export default function FlightTable({
   sort,
   timeDisplayMode,
   onSort,
-  onSelectFlight
+  onSelectFlight,
+  onAddToFlightBoard
 }) {
-  const columns = buildColumns(timeDisplayMode);
+  const columns = buildColumns(timeDisplayMode, flights);
   const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
   const headerScrollRef = useRef(null);
   const listOuterRef = useRef(null);
@@ -132,7 +184,8 @@ export default function FlightTable({
     columns,
     flights,
     selectedFlightId,
-    onSelectFlight
+    onSelectFlight,
+    onAddToFlightBoard
   };
 
   return (
@@ -143,7 +196,7 @@ export default function FlightTable({
             <div key={column.key} style={{ width: `${column.width}px` }}>
               <SortButton
                 label={column.label}
-                sortKey={column.key}
+                sortKey={column.sortKey || column.key}
                 sort={sort}
                 onSort={onSort}
               />

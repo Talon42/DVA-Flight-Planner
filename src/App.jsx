@@ -20,6 +20,46 @@ import {
   writeSavedSchedule
 } from "./lib/storage";
 
+const THEME_STORAGE_KEY = "flight-planner.theme";
+
+function readSavedTheme() {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+}
+
+function ThemeToggleIcon({ theme }) {
+  if (theme === "dark") {
+    return (
+      <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
+        <circle cx="8" cy="8" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path
+          d="M8 1.5v2M8 12.5v2M14.5 8h-2M3.5 8h-2M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4M12.6 12.6l-1.4-1.4M4.8 4.8 3.4 3.4"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.5"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
+      <path
+        d="M10.9 1.8a5.9 5.9 0 1 0 3.3 10.7A6.4 6.4 0 0 1 10.9 1.8Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
 function sortFlights(flights, sort) {
   const direction = sort.direction === "asc" ? 1 : -1;
   return [...flights].sort((left, right) => {
@@ -205,11 +245,18 @@ export default function App() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [filterUiVersion, setFilterUiVersion] = useState(0);
   const [sort, setSort] = useState(DEFAULT_SORT);
+  const [theme, setTheme] = useState(readSavedTheme);
   const [isImporting, setIsImporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
   const [statusMessage, setStatusMessage] = useState("Ready");
   const deferredFilters = useDeferredValue(filters);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     let cancelled = false;
@@ -385,11 +432,6 @@ export default function App() {
     : [];
 
   const sortedFlights = sortFlights(filteredFlights, sort);
-
-  const selectedFlight =
-    sortedFlights.find((flight) => flight.flightId === selectedFlightId) ||
-    schedule?.flights?.find((flight) => flight.flightId === selectedFlightId) ||
-    null;
 
   const shortlist = schedule
     ? schedule.flights.filter((flight) => flight.isShortlisted)
@@ -578,20 +620,28 @@ export default function App() {
     setSelectedFlightId(flightId);
   }
 
-  function handleToggleShortlist(flightId) {
+  function handleAddToFlightBoard(flightId) {
     setSchedule((current) => {
       if (!current) {
         return current;
       }
 
-      return {
-        ...current,
-        flights: current.flights.map((flight) =>
-          flight.flightId === flightId
-            ? { ...flight, isShortlisted: !flight.isShortlisted }
-            : flight
-        )
-      };
+      let changed = false;
+      const nextFlights = current.flights.map((flight) => {
+        if (flight.flightId !== flightId || flight.isShortlisted) {
+          return flight;
+        }
+
+        changed = true;
+        return { ...flight, isShortlisted: true };
+      });
+
+      return changed
+        ? {
+            ...current,
+            flights: nextFlights
+          }
+        : current;
     });
   }
 
@@ -603,6 +653,10 @@ export default function App() {
       setStatusMessage(error.message || "Unable to open the log file.");
       await logAppError("log-open-failed", error);
     }
+  }
+
+  function handleToggleTheme() {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
   return (
@@ -633,6 +687,15 @@ export default function App() {
           >
             {isSyncing ? "Syncing..." : "Sync from Delta Virtual"}
           </button>
+          <button
+            className="theme-toggle"
+            type="button"
+            onClick={handleToggleTheme}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            <ThemeToggleIcon theme={theme} />
+          </button>
         </div>
       </header>
 
@@ -646,7 +709,7 @@ export default function App() {
           <strong>{formatNumber(sortedFlights.length)}</strong>
         </div>
         <div className="summary-card">
-          <span>Shortlist</span>
+          <span>Flight Board</span>
           <strong>{formatNumber(shortlist.length)}</strong>
         </div>
         <div className="summary-card">
@@ -675,6 +738,7 @@ export default function App() {
               timeDisplayMode={normalizedDeferredFilters.timeDisplayMode}
               onSort={handleSort}
               onSelectFlight={handleSelectFlight}
+              onAddToFlightBoard={handleAddToFlightBoard}
             />
           ) : (
             <section className="empty-state">
@@ -690,10 +754,8 @@ export default function App() {
         </div>
 
         <DetailsPanel
-          selectedFlight={selectedFlight}
           shortlist={shortlist}
           onSelectFlight={handleSelectFlight}
-          onToggleShortlist={handleToggleShortlist}
           onOpenLogFile={handleOpenLogFile}
           importSummary={schedule?.importSummary}
         />
