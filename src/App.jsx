@@ -89,7 +89,63 @@ function buildSavedSchedule(schedule, uiState) {
   };
 }
 
-function normalizeFilters(savedFilters) {
+function roundUpToStep(value, step) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return Math.ceil(value / step) * step;
+}
+
+function buildFilterBounds(flights) {
+  if (!flights?.length) {
+    return {
+      maxBlockMinutes: 0,
+      maxDistanceNm: 0
+    };
+  }
+
+  let maxBlockMinutes = 0;
+  let maxDistanceNm = 0;
+
+  for (const flight of flights) {
+    if (Number.isFinite(flight.blockMinutes) && flight.blockMinutes > maxBlockMinutes) {
+      maxBlockMinutes = flight.blockMinutes;
+    }
+
+    if (Number.isFinite(flight.distanceNm) && flight.distanceNm > maxDistanceNm) {
+      maxDistanceNm = flight.distanceNm;
+    }
+  }
+
+  return {
+    maxBlockMinutes: roundUpToStep(maxBlockMinutes, 60),
+    maxDistanceNm: roundUpToStep(maxDistanceNm, 100)
+  };
+}
+
+function clampRange(value, min, max, fallback) {
+  if (!Number.isFinite(max) || max <= min) {
+    return fallback;
+  }
+
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
+
+function buildRangeDefaults(bounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }) {
+  return {
+    flightLengthMin: 0,
+    flightLengthMax: bounds.maxBlockMinutes,
+    distanceMin: 0,
+    distanceMax: bounds.maxDistanceNm
+  };
+}
+
+function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }) {
   const nextFilters = {
     ...DEFAULT_FILTERS,
     ...(savedFilters || {})
@@ -98,6 +154,34 @@ function normalizeFilters(savedFilters) {
   if (!Array.isArray(nextFilters.equipment)) {
     nextFilters.equipment = nextFilters.equipment ? [nextFilters.equipment] : [];
   }
+
+  const defaultFlightLengthMax = bounds.maxBlockMinutes;
+  const defaultDistanceMax = bounds.maxDistanceNm;
+
+  nextFilters.flightLengthMin = clampRange(
+    Number(nextFilters.flightLengthMin),
+    0,
+    defaultFlightLengthMax,
+    0
+  );
+  nextFilters.flightLengthMax = clampRange(
+    Number(nextFilters.flightLengthMax),
+    nextFilters.flightLengthMin,
+    defaultFlightLengthMax,
+    defaultFlightLengthMax
+  );
+  nextFilters.distanceMin = clampRange(
+    Number(nextFilters.distanceMin),
+    0,
+    defaultDistanceMax,
+    0
+  );
+  nextFilters.distanceMax = clampRange(
+    Number(nextFilters.distanceMax),
+    nextFilters.distanceMin,
+    defaultDistanceMax,
+    defaultDistanceMax
+  );
 
   return nextFilters;
 }
@@ -129,7 +213,16 @@ export default function App() {
           flights: savedSchedule.flights,
           importSummary: savedSchedule.importSummary
         });
-        setFilters(normalizeFilters(savedSchedule.uiState?.filters));
+        const savedBounds = buildFilterBounds(savedSchedule.flights);
+        setFilters(
+          normalizeFilters(
+            {
+              ...savedSchedule.uiState?.filters,
+              ...buildRangeDefaults(savedBounds)
+            },
+            savedBounds
+          )
+        );
         setSort(savedSchedule.uiState?.sort || DEFAULT_SORT);
         setSelectedFlightId(
           savedSchedule.uiState?.selectedFlightId ||
@@ -193,46 +286,49 @@ export default function App() {
         .sort()
     : [];
 
+  const filterBounds = buildFilterBounds(schedule?.flights || []);
+  const normalizedDeferredFilters = normalizeFilters(deferredFilters, filterBounds);
+
   const filteredFlights = schedule
     ? schedule.flights.filter((flight) => {
         if (
-          deferredFilters.airline !== "ALL" &&
-          flight.airlineName !== deferredFilters.airline
+          normalizedDeferredFilters.airline !== "ALL" &&
+          flight.airlineName !== normalizedDeferredFilters.airline
         ) {
           return false;
         }
 
         if (
-          deferredFilters.aircraftFamily !== "ALL" &&
-          !(flight.compatibleFamilies || []).includes(deferredFilters.aircraftFamily)
+          normalizedDeferredFilters.aircraftFamily !== "ALL" &&
+          !(flight.compatibleFamilies || []).includes(normalizedDeferredFilters.aircraftFamily)
         ) {
           return false;
         }
 
         if (
-          deferredFilters.origin &&
-          !flight.from.includes(deferredFilters.origin.trim().toUpperCase())
+          normalizedDeferredFilters.origin &&
+          !flight.from.includes(normalizedDeferredFilters.origin.trim().toUpperCase())
         ) {
           return false;
         }
 
         if (
-          deferredFilters.destination &&
-          !flight.to.includes(deferredFilters.destination.trim().toUpperCase())
+          normalizedDeferredFilters.destination &&
+          !flight.to.includes(normalizedDeferredFilters.destination.trim().toUpperCase())
         ) {
           return false;
         }
 
         if (
-          deferredFilters.route &&
-          !flight.route.includes(deferredFilters.route.trim().toUpperCase())
+          normalizedDeferredFilters.route &&
+          !flight.route.includes(normalizedDeferredFilters.route.trim().toUpperCase())
         ) {
           return false;
         }
 
         if (
-          deferredFilters.equipment.length &&
-          !deferredFilters.equipment.some((equipment) =>
+          normalizedDeferredFilters.equipment.length &&
+          !normalizedDeferredFilters.equipment.some((equipment) =>
             (flight.compatibleEquipment || []).includes(equipment)
           )
         ) {
@@ -240,9 +336,23 @@ export default function App() {
         }
 
         if (
+          flight.blockMinutes < normalizedDeferredFilters.flightLengthMin ||
+          flight.blockMinutes > normalizedDeferredFilters.flightLengthMax
+        ) {
+          return false;
+        }
+
+        if (
+          flight.distanceNm < normalizedDeferredFilters.distanceMin ||
+          flight.distanceNm > normalizedDeferredFilters.distanceMax
+        ) {
+          return false;
+        }
+
+        if (
           !matchesTime(
             flight.utcDepartureClock,
-            deferredFilters.utcDeparture
+            normalizedDeferredFilters.utcDeparture
           )
         ) {
           return false;
@@ -251,13 +361,13 @@ export default function App() {
         if (
           !matchesTime(
             flight.staUtc ? flight.staUtc.slice(11, 16) : "",
-            deferredFilters.utcArrival
+            normalizedDeferredFilters.utcArrival
           )
         ) {
           return false;
         }
 
-        return matchesSearch(flight, deferredFilters.search.trim());
+        return matchesSearch(flight, normalizedDeferredFilters.search.trim());
       })
     : [];
 
@@ -319,7 +429,7 @@ export default function App() {
             errorLogPath
           }
         });
-        setFilters(DEFAULT_FILTERS);
+        setFilters(normalizeFilters(DEFAULT_FILTERS, buildFilterBounds(imported.flights)));
         setSort(DEFAULT_SORT);
         setSelectedFlightId(imported.flights[0]?.flightId || null);
       });
@@ -351,7 +461,7 @@ export default function App() {
   }
 
   function handleResetFilters() {
-    setFilters(DEFAULT_FILTERS);
+    setFilters(normalizeFilters(DEFAULT_FILTERS, filterBounds));
   }
 
   function handleSort(sortKey) {
@@ -458,10 +568,11 @@ export default function App() {
       <main className="workspace">
         <div className="workspace__main">
           <FilterBar
-            filters={filters}
+            filters={normalizeFilters(filters, filterBounds)}
             airlines={airlines}
             aircraftFamilies={aircraftFamilies}
             equipmentOptions={equipmentOptions}
+            filterBounds={filterBounds}
             onFilterChange={handleFilterChange}
             onReset={handleResetFilters}
           />

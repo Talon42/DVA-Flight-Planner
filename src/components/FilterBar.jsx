@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatDistanceNm, formatDuration } from "../lib/formatters";
 
 function TimeFilter({ label, filterKey, filters, onFilterChange }) {
   return (
@@ -10,6 +11,75 @@ function TimeFilter({ label, filterKey, filters, onFilterChange }) {
         onChange={(event) => onFilterChange(filterKey, event.target.value)}
       />
     </label>
+  );
+}
+
+function RangeSlider({
+  label,
+  min,
+  max,
+  step,
+  lowValue,
+  highValue,
+  onChange,
+  formatValue
+}) {
+  const safeHighValue = Math.max(lowValue, highValue);
+  const range = Math.max(max - min, 1);
+  const lowPercent = ((lowValue - min) / range) * 100;
+  const highPercent = ((safeHighValue - min) / range) * 100;
+
+  function handleLowChange(event) {
+    const nextValue = Math.min(Number(event.target.value), safeHighValue);
+    onChange([nextValue, safeHighValue]);
+  }
+
+  function handleHighChange(event) {
+    const nextValue = Math.max(Number(event.target.value), lowValue);
+    onChange([lowValue, nextValue]);
+  }
+
+  return (
+    <div className="filter-block filter-block--wide">
+      <span>{label}</span>
+      <div className="range-slider">
+        <div className="range-slider__values">
+          <strong>{formatValue(lowValue)}</strong>
+          <strong>{formatValue(safeHighValue)}</strong>
+        </div>
+
+        <div className="range-slider__track-shell">
+          <div className="range-slider__track" />
+          <div
+            className="range-slider__track range-slider__track--active"
+            style={{
+              left: `${lowPercent}%`,
+              width: `${Math.max(highPercent - lowPercent, 0)}%`
+            }}
+          />
+          <input
+            className="range-slider__input"
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={lowValue}
+            onChange={handleLowChange}
+            aria-label={`${label} minimum`}
+          />
+          <input
+            className="range-slider__input"
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={safeHighValue}
+            onChange={handleHighChange}
+            aria-label={`${label} maximum`}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -158,6 +228,7 @@ export default function FilterBar({
   airlines,
   aircraftFamilies,
   equipmentOptions,
+  filterBounds,
   onFilterChange,
   onReset
 }) {
@@ -252,6 +323,34 @@ export default function FilterBar({
           options={equipmentOptions}
           selectedValues={filters.equipment}
           onChange={(value) => onFilterChange("equipment", value)}
+        />
+
+        <RangeSlider
+          label="Flight Length"
+          min={0}
+          max={filterBounds.maxBlockMinutes}
+          step={5}
+          lowValue={filters.flightLengthMin}
+          highValue={filters.flightLengthMax}
+          onChange={([minValue, maxValue]) => {
+            onFilterChange("flightLengthMin", minValue);
+            onFilterChange("flightLengthMax", maxValue);
+          }}
+          formatValue={formatDuration}
+        />
+
+        <RangeSlider
+          label="Distance"
+          min={0}
+          max={filterBounds.maxDistanceNm}
+          step={25}
+          lowValue={filters.distanceMin}
+          highValue={filters.distanceMax}
+          onChange={([minValue, maxValue]) => {
+            onFilterChange("distanceMin", minValue);
+            onFilterChange("distanceMax", maxValue);
+          }}
+          formatValue={formatDistanceNm}
         />
 
         <TimeFilter

@@ -111,11 +111,17 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
       const stdLocal = DateTime.fromFormat(rawFlight.std, DATE_FORMAT, {
         zone: fromAirport.timezone
       });
-      const staLocal = DateTime.fromFormat(rawFlight.sta, DATE_FORMAT, {
+      const rawStaLocal = DateTime.fromFormat(rawFlight.sta, DATE_FORMAT, {
         zone: toAirport.timezone
       });
+      const distanceNm = calculateGreatCircleNm(
+        fromAirport.latitude,
+        fromAirport.longitude,
+        toAirport.latitude,
+        toAirport.longitude
+      );
 
-      if (!stdLocal.isValid || !staLocal.isValid) {
+      if (!stdLocal.isValid || !rawStaLocal.isValid) {
         importIssues.push({
           severity: "error",
           kind: "invalid-time",
@@ -127,17 +133,13 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         continue;
       }
 
+      const staLocal = normalizeArrivalDate(stdLocal, rawStaLocal, distanceNm);
+
       const airlineName =
         airlineMap.get(rawFlight.airline) || `${rawFlight.airline} (not in airline map)`;
       const blockMinutes = Math.max(
         0,
         Math.round(staLocal.toUTC().diff(stdLocal.toUTC(), "minutes").minutes)
-      );
-      const distanceNm = calculateGreatCircleNm(
-        fromAirport.latitude,
-        fromAirport.longitude,
-        toAirport.latitude,
-        toAirport.longitude
       );
       const compatibility = resolveRouteCompatibility(rawFlight, distanceNm);
 
@@ -392,6 +394,88 @@ function calculateGreatCircleNm(fromLatitude, fromLongitude, toLatitude, toLongi
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return Math.round(earthRadiusNm * c);
+}
+
+function normalizeArrivalDate(stdLocal, staLocal, distanceNm) {
+  const candidates = [];
+  const estimatedMinutes = estimateBlockMinutes(distanceNm);
+
+  for (let dayOffset = -2; dayOffset <= 2; dayOffset += 1) {
+    const candidate = staLocal.plus({ days: dayOffset });
+    const diffMinutes = candidate.toUTC().diff(stdLocal.toUTC(), "minutes").minutes;
+
+    if (diffMinutes >= 0) {
+      candidates.push({
+        dateTime: candidate,
+        diffMinutes,
+        source: "timezone-normalized"
+      });
+    }
+  }
+
+  const shortestClockGap = calculateShortestClockGapMinutes(stdLocal, staLocal);
+
+  if (Number.isFinite(shortestClockGap) && shortestClockGap > 0) {
+    candidates.push({
+      dateTime: stdLocal.plus({ minutes: shortestClockGap }),
+      diffMinutes: shortestClockGap,
+      source: "clock-gap"
+    });
+  }
+
+  if (!candidates.length) {
+    let candidate = staLocal;
+
+    while (candidate.toUTC() < stdLocal.toUTC()) {
+      candidate = candidate.plus({ days: 1 });
+    }
+
+    return candidate;
+  }
+
+  candidates.sort((left, right) => {
+    const leftScore = scoreArrivalCandidate(left, estimatedMinutes);
+    const rightScore = scoreArrivalCandidate(right, estimatedMinutes);
+
+    if (leftScore !== rightScore) {
+      return leftScore - rightScore;
+    }
+
+    return left.diffMinutes - right.diffMinutes;
+  });
+
+  return candidates[0].dateTime;
+}
+
+function estimateBlockMinutes(distanceNm) {
+  if (!Number.isFinite(distanceNm) || distanceNm <= 0) {
+    return null;
+  }
+
+  return Math.max(30, Math.round((distanceNm / 430) * 60 + 25));
+}
+
+function calculateShortestClockGapMinutes(stdLocal, staLocal) {
+  const departureClockMinutes = stdLocal.hour * 60 + stdLocal.minute;
+  const arrivalClockMinutes = staLocal.hour * 60 + staLocal.minute;
+  const absoluteGap = Math.abs(arrivalClockMinutes - departureClockMinutes);
+
+  return Math.min(absoluteGap, 1440 - absoluteGap);
+}
+
+function scoreArrivalCandidate(candidate, estimatedMinutes) {
+  if (!Number.isFinite(estimatedMinutes)) {
+    return candidate.diffMinutes;
+  }
+
+  const deviation = Math.abs(candidate.diffMinutes - estimatedMinutes);
+  const inflationPenalty =
+    candidate.source === "timezone-normalized" &&
+    candidate.diffMinutes > estimatedMinutes * 2
+      ? candidate.diffMinutes - estimatedMinutes * 2
+      : 0;
+
+  return deviation + inflationPenalty;
 }
 
 function degreesToRadians(value) {

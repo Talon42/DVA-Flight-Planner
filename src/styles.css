@@ -131,6 +131,7 @@ button {
 .workspace__main {
   display: grid;
   gap: 18px;
+  position: relative;
 }
 
 .filter-bar,
@@ -138,6 +139,11 @@ button {
 .empty-state {
   border-radius: 26px;
   padding: 20px;
+}
+
+.filter-bar {
+  position: relative;
+  z-index: 3;
 }
 
 .filter-heading,
@@ -206,6 +212,7 @@ select:focus {
 
 .multi-select {
   position: relative;
+  z-index: 4;
 }
 
 .multi-select__trigger,
@@ -330,6 +337,101 @@ select:focus {
   color: var(--muted);
 }
 
+.range-slider {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 14px;
+}
+
+.range-slider__values {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.range-slider__values strong {
+  font-size: 0.9rem;
+  letter-spacing: -0.02em;
+  color: var(--delta-blue-deep);
+}
+
+.range-slider__track-shell {
+  position: relative;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.range-slider__track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(16, 33, 54, 0.1);
+}
+
+.range-slider__track--active {
+  right: auto;
+  background: linear-gradient(90deg, var(--delta-blue) 0%, var(--delta-red) 100%);
+}
+
+.range-slider__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+}
+
+.range-slider__input::-webkit-slider-runnable-track {
+  height: 6px;
+  background: transparent;
+}
+
+.range-slider__input::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: var(--delta-blue-deep);
+  box-shadow: 0 8px 20px rgba(11, 31, 54, 0.2);
+  pointer-events: auto;
+}
+
+.range-slider__input:last-child::-webkit-slider-thumb {
+  background: var(--delta-red);
+}
+
+.range-slider__input::-moz-range-track {
+  height: 6px;
+  background: transparent;
+}
+
+.range-slider__input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: var(--delta-blue-deep);
+  box-shadow: 0 8px 20px rgba(11, 31, 54, 0.2);
+  pointer-events: auto;
+}
+
+.range-slider__input:last-child::-moz-range-thumb {
+  background: var(--delta-red);
+}
+
 .primary-button,
 .ghost-button {
   border-radius: 999px;
@@ -367,6 +469,8 @@ select:focus {
 .table-shell {
   overflow: hidden;
   border-radius: 26px;
+  position: relative;
+  z-index: 1;
 }
 
 .table-header-scroll {

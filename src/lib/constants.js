@@ -12,6 +12,10 @@ export const DEFAULT_FILTERS = {
   equipment: [],
   utcDeparture: "",
   utcArrival: "",
+  flightLengthMin: null,
+  flightLengthMax: null,
+  distanceMin: null,
+  distanceMax: null,
   search: ""
 };
 
