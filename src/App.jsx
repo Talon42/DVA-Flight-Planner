@@ -9,12 +9,10 @@ import {
 } from "./lib/deltaVirtualSync";
 import { formatNumber } from "./lib/formatters";
 import { runScheduleImport } from "./lib/importClient";
+import { logAppError, logAppEvent, openAppLogFile } from "./lib/appLog";
 import {
-  appendImportErrors,
-  appendImportTrace,
+  appendImportLog,
   confirmOverwriteSchedule,
-  openImportErrors,
-  openImportTrace,
   pickXmlScheduleFile,
   readSavedSchedule,
   writeSavedSchedule
@@ -206,17 +204,20 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
   const [statusMessage, setStatusMessage] = useState("Ready");
-  const [importTracePath, setImportTracePath] = useState("");
   const deferredFilters = useDeferredValue(filters);
 
   useEffect(() => {
     let cancelled = false;
+    logAppEvent("app-start").catch(() => {});
 
     async function hydrate() {
       try {
         const savedSchedule = await readSavedSchedule();
 
         if (cancelled || !savedSchedule?.flights?.length) {
+          if (!cancelled) {
+            await logAppEvent("hydrate-empty");
+          }
           return;
         }
 
@@ -244,8 +245,13 @@ export default function App() {
         setStatusMessage(
           `Loaded saved schedule with ${formatNumber(savedSchedule.flights.length)} flights.`
         );
+        await logAppEvent("hydrate-loaded", {
+          flights: savedSchedule.flights.length,
+          source: savedSchedule.importSummary?.sourceFileName || "unknown"
+        });
       } catch (error) {
         setStatusMessage(error.message || "Unable to load saved schedule.");
+        await logAppError("hydrate-failed", error);
       } finally {
         if (!cancelled) {
           setIsHydrating(false);
@@ -274,6 +280,7 @@ export default function App() {
         })
       ).catch((error) => {
         setStatusMessage(error.message || "Unable to persist the current schedule.");
+        logAppError("persist-schedule-failed", error).catch(() => {});
       });
     }, 200);
 
@@ -395,16 +402,28 @@ export default function App() {
     : [];
 
   async function processImportedSchedule(pickedFile, sourceLabel) {
-    const debugLines = [];
+    const logStartedAt = new Date().toISOString();
+    const startedAtMs = Date.now();
+    let importIssuesText = "";
+    const importerErrors = [];
     const appendDebug = (message) => {
-      const line = `[${new Date().toISOString()}] ${message}`;
-      debugLines.push(line);
+      const text = String(message || "");
+      const normalized = text.toLowerCase();
+      if (
+        normalized.includes("error") ||
+        normalized.includes("crash") ||
+        normalized.includes("fallback")
+      ) {
+        importerErrors.push(text);
+      }
     };
 
     setIsImporting(true);
-    setImportTracePath("");
     setStatusMessage(`Importing ${pickedFile.fileName}...`);
-    appendDebug(`ui:${sourceLabel}:selected file=${pickedFile.fileName}`);
+    await logAppEvent("import-start", {
+      source: sourceLabel,
+      file: pickedFile.fileName
+    });
 
     try {
       const imported = await runScheduleImport(
@@ -412,23 +431,14 @@ export default function App() {
         pickedFile.xmlText,
         appendDebug
       );
-      appendDebug(
-        `ui:${sourceLabel}:import result imported=${imported.flights.length} omitted=${imported.importSummary.omittedRows}`
-      );
-      const errorLogPath = imported.importLog
-        ? await appendImportErrors(imported.importLog)
-        : null;
-      appendDebug(`ui:${sourceLabel}:error-log path=${errorLogPath || "none"}`);
+      importIssuesText = imported.importLog || "";
 
       startTransition(() => {
         const nextBounds = buildFilterBounds(imported.flights);
         setSchedule({
           importedAt: imported.importedAt,
           flights: imported.flights,
-          importSummary: {
-            ...imported.importSummary,
-            errorLogPath
-          }
+          importSummary: imported.importSummary
         });
         setFilters(normalizeFilters(DEFAULT_FILTERS, nextBounds));
         setSort(DEFAULT_SORT);
@@ -439,15 +449,36 @@ export default function App() {
       setStatusMessage(
         `Imported ${formatNumber(imported.flights.length)} flights from ${pickedFile.fileName}.`
       );
+      await logAppEvent("import-success", {
+        source: sourceLabel,
+        file: pickedFile.fileName,
+        importedRows: imported.importSummary?.importedRows ?? imported.flights.length,
+        omittedRows: imported.importSummary?.omittedRows ?? 0,
+        incompatibleRoutes: imported.importSummary?.incompatibleRoutes ?? 0,
+        durationMs: Date.now() - startedAtMs
+      });
     } catch (error) {
-      appendDebug(`ui:${sourceLabel}:error ${error.message || "Import failed."}`);
       setStatusMessage(error.message || "Import failed.");
+      await logAppError("import-failed", error, {
+        source: sourceLabel,
+        file: pickedFile.fileName,
+        durationMs: Date.now() - startedAtMs
+      });
     } finally {
       try {
-        const tracePath = await appendImportTrace(debugLines.join("\n"));
-        setImportTracePath(tracePath || "");
+        const sessionEndedAt = new Date().toISOString();
+        const logSections = [
+          `=== Import Session (${sourceLabel}) ===\nStart: ${logStartedAt}\nEnd: ${sessionEndedAt}\nSource: ${pickedFile.fileName}`
+        ];
+        if (importIssuesText) {
+          logSections.push(`--- Import Issues ---\n${importIssuesText.trim()}`);
+        }
+        if (importerErrors.length) {
+          logSections.push(`--- Import Diagnostics ---\n${importerErrors.join("\n")}`);
+        }
+        await appendImportLog(logSections.join("\n\n"));
       } catch (error) {
-        setStatusMessage(error.message || "Unable to persist the import trace log.");
+        setStatusMessage(error.message || "Unable to persist the log file.");
       }
       setIsImporting(false);
     }
@@ -462,13 +493,16 @@ export default function App() {
   }
 
   async function handleImport() {
+    await logAppEvent("manual-import-requested");
     const confirmed = await confirmScheduleReplacement();
     if (!confirmed) {
+      await logAppEvent("manual-import-cancelled-overwrite");
       return;
     }
 
     const pickedFile = await pickXmlScheduleFile();
     if (!pickedFile) {
+      await logAppEvent("manual-import-cancelled-file-picker");
       return;
     }
 
@@ -476,8 +510,10 @@ export default function App() {
   }
 
   async function handleDeltaVirtualSync() {
+    await logAppEvent("deltava-sync-requested");
     const confirmed = await confirmScheduleReplacement();
     if (!confirmed) {
+      await logAppEvent("deltava-sync-cancelled-overwrite");
       return;
     }
 
@@ -489,17 +525,24 @@ export default function App() {
       setStatusMessage("Waiting for Delta Virtual login and schedule download...");
       const syncedFile = await syncScheduleFromDeltaVirtual();
       shouldCloseSyncWindow = true;
+      await logAppEvent("deltava-sync-download-complete", {
+        file: syncedFile.fileName,
+        bytes: syncedFile.xmlText?.length || 0
+      });
       setStatusMessage("Processing Delta Virtual schedule...");
       await processImportedSchedule(syncedFile, "deltava-sync");
     } catch (error) {
       if (error?.kind === "cancelled") {
         setStatusMessage("Delta Virtual sync canceled.");
+        await logAppEvent("deltava-sync-cancelled-window");
       } else {
         setStatusMessage(error.message || "Delta Virtual sync failed.");
+        await logAppError("deltava-sync-failed", error);
       }
     } finally {
       if (shouldCloseSyncWindow) {
         await closeDeltaVirtualSyncWindow();
+        await logAppEvent("deltava-sync-window-closed");
       }
       setIsSyncing(false);
     }
@@ -555,19 +598,13 @@ export default function App() {
     });
   }
 
-  async function handleOpenImportErrorLog() {
+  async function handleOpenLogFile() {
     try {
-      await openImportErrors();
+      await openAppLogFile();
+      await logAppEvent("log-opened");
     } catch (error) {
-      setStatusMessage(error.message || "Unable to open the import error log.");
-    }
-  }
-
-  async function handleOpenImportTraceLog() {
-    try {
-      await openImportTrace();
-    } catch (error) {
-      setStatusMessage(error.message || "Unable to open the import trace log.");
+      setStatusMessage(error.message || "Unable to open the log file.");
+      await logAppError("log-open-failed", error);
     }
   }
 
@@ -667,9 +704,7 @@ export default function App() {
           shortlist={shortlist}
           onSelectFlight={handleSelectFlight}
           onToggleShortlist={handleToggleShortlist}
-          onOpenImportErrorLog={handleOpenImportErrorLog}
-          onOpenImportTraceLog={handleOpenImportTraceLog}
-          importTracePath={importTracePath}
+          onOpenLogFile={handleOpenLogFile}
           importSummary={schedule?.importSummary}
         />
       </main>

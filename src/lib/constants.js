@@ -1,7 +1,6 @@
 export const STORAGE_DIR = "flight-planner";
 export const SAVED_SCHEDULE_FILE = `${STORAGE_DIR}/saved-schedule.json`;
-export const IMPORT_ERRORS_FILE = `${STORAGE_DIR}/import_errors.txt`;
-export const IMPORT_TRACE_FILE = `${STORAGE_DIR}/import_trace.txt`;
+export const IMPORT_LOG_FILE = `${STORAGE_DIR}/log.txt`;
 
 export const DEFAULT_FILTERS = {
   airline: "ALL",

@@ -10,6 +10,8 @@
     "dialog:default",
     "fs:default",
     "opener:default",
+    "opener:allow-open-path",
+    "opener:allow-reveal-item-in-dir",
     "fs:allow-exists",
     "fs:allow-mkdir",
     "fs:allow-read-text-file",
@@ -21,6 +23,17 @@
       "allow": [
         {
           "path": "$APPDATA/flight-planner"
+        },
+        {
+          "path": "$APPDATA/flight-planner/*"
+        }
+      ]
+    },
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        {
+          "path": "$APPDATA/flight-planner/log.txt"
         },
         {
           "path": "$APPDATA/flight-planner/*"

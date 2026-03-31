@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::{
     fs,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Mutex, OnceLock},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -12,10 +12,11 @@ use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowE
 use tokio::sync::oneshot;
 #[cfg(windows)]
 use webview2_com::{
+    Microsoft::Web::WebView2::Win32::ICoreWebView2Settings4,
     CoTaskMemPWSTR, WebMessageReceivedEventHandler,
 };
 #[cfg(windows)]
-use windows::core::PWSTR;
+use windows::core::{Interface, PWSTR};
 
 const DELTAVA_LOGIN_URL: &str = "https://www.deltava.org/login.do";
 const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
@@ -23,7 +24,7 @@ const DELTAVA_SYNC_TIMEOUT_SECONDS: u64 = 300;
 const DELTAVA_XML_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_PFPX_XML__";
 const DELTAVA_DEBUG_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_DEBUG__";
 const APP_STORAGE_DIR: &str = "flight-planner";
-const IMPORT_ERRORS_LOG_FILE: &str = "import_errors.txt";
+const APP_LOG_FILE: &str = "log.txt";
 static DELTAVA_SYNC_LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
@@ -282,6 +283,26 @@ fn should_probe_for_schedule(url: &tauri::webview::Url) -> bool {
     is_allowed_deltava_url(url) && url.path() != "/pfpxsched.ws"
 }
 
+fn is_legacy_download_file(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| {
+            name.starts_with("deltava-pfpxsched-") && name.to_ascii_lowercase().ends_with(".xml")
+        })
+        .unwrap_or(false)
+}
+
+fn prune_legacy_downloads(directory: &Path) {
+    if let Ok(entries) = fs::read_dir(directory) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && is_legacy_download_file(&path) {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+}
+
 fn build_download_path(app: &AppHandle) -> Result<PathBuf, String> {
     let base_dir = app
         .path()
@@ -290,19 +311,19 @@ fn build_download_path(app: &AppHandle) -> Result<PathBuf, String> {
     let download_dir = base_dir.join("deltava-sync").join("downloads");
     fs::create_dir_all(&download_dir)
         .map_err(|error| format!("download_failed: Unable to create sync directory: {error}"))?;
+    prune_legacy_downloads(&download_dir);
 
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis())
-        .unwrap_or(0);
+    if let Ok(current_dir) = std::env::current_dir() {
+        prune_legacy_downloads(&current_dir);
+    }
 
-    Ok(download_dir.join(format!("deltava-pfpxsched-{timestamp}.xml")))
+    Ok(download_dir.join("deltava-pfpxsched.xml"))
 }
 
 fn resolve_default_log_path() -> Option<PathBuf> {
     let storage_dir = std::env::temp_dir().join(APP_STORAGE_DIR);
     let _ = fs::create_dir_all(&storage_dir);
-    Some(storage_dir.join(IMPORT_ERRORS_LOG_FILE))
+    Some(storage_dir.join(APP_LOG_FILE))
 }
 
 fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
@@ -310,11 +331,11 @@ fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
         return Some(existing.clone());
     }
 
-    let resolved = match app.path().app_local_data_dir() {
+    let resolved = match app.path().app_data_dir() {
         Ok(base_dir) => {
             let storage_dir = base_dir.join(APP_STORAGE_DIR);
             if fs::create_dir_all(&storage_dir).is_ok() {
-                Some(storage_dir.join(IMPORT_ERRORS_LOG_FILE))
+                Some(storage_dir.join(APP_LOG_FILE))
             } else {
                 resolve_default_log_path()
             }
@@ -391,6 +412,16 @@ fn attach_windows_xml_message_handler(
                     .controller()
                     .CoreWebView2()
                     .map_err(|error| format!("download_failed: Unable to access WebView2 instance: {error}"))?;
+                let settings = webview
+                    .Settings()
+                    .map_err(|error| format!("download_failed: Unable to access WebView2 settings: {error}"))?;
+                if let Ok(settings4) = settings.cast::<ICoreWebView2Settings4>() {
+                    let _ = settings4.SetIsPasswordAutosaveEnabled(true);
+                    let _ = settings4.SetIsGeneralAutofillEnabled(true);
+                    append_sync_log("webview:settings4-autofill-enabled");
+                } else {
+                    append_sync_log("webview:settings4-unavailable");
+                }
 
                 let app_handle = app.clone();
                 let xml_path = download_path.clone();

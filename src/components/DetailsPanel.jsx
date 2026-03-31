@@ -21,9 +21,7 @@ export default function DetailsPanel({
   shortlist,
   onSelectFlight,
   onToggleShortlist,
-  onOpenImportErrorLog,
-  onOpenImportTraceLog,
-  importTracePath,
+  onOpenLogFile,
   importSummary
 }) {
   return (
@@ -132,18 +130,9 @@ export default function DetailsPanel({
           <button
             className="ghost-button"
             type="button"
-            onClick={onOpenImportErrorLog}
-            disabled={!importSummary?.errorLogPath && !importSummary?.omittedRows}
+            onClick={onOpenLogFile}
           >
-            Open Import Error Log
-          </button>
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={onOpenImportTraceLog}
-            disabled={!importTracePath}
-          >
-            Open Import Trace Log
+            Open Log File
           </button>
         </div>
       </section>

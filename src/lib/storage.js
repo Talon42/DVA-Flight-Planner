@@ -1,6 +1,5 @@
 import {
-  IMPORT_ERRORS_FILE,
-  IMPORT_TRACE_FILE,
+  IMPORT_LOG_FILE,
   SAVED_SCHEDULE_FILE,
   STORAGE_DIR
 } from "./constants";
@@ -112,42 +111,67 @@ async function appendLogFile(relativePath, storageKey, logText) {
   return "browser-local-storage";
 }
 
-async function openLogFile(relativePath, storageKey) {
+async function ensureLogFile(relativePath, storageKey) {
+  const header = `[${new Date().toISOString()}] [App] log-file-created`;
+
   if (isTauriRuntime()) {
-    const { openPath } = await import("@tauri-apps/plugin-opener");
-    const fullPath = await resolveAppDataPath(relativePath);
-    await openPath(fullPath);
-    return;
+    const { mkdir, exists, writeTextFile, BaseDirectory } = await loadFsModule();
+    await mkdir(STORAGE_DIR, {
+      baseDir: BaseDirectory.AppData,
+      recursive: true
+    });
+
+    const hasFile = await exists(relativePath, {
+      baseDir: BaseDirectory.AppData
+    });
+
+    if (!hasFile) {
+      await writeTextFile(relativePath, `${header}\n`, {
+        baseDir: BaseDirectory.AppData
+      });
+    }
+
+    return resolveAppDataPath(relativePath);
   }
 
+  const existing = window.localStorage.getItem(storageKey);
+  if (!existing) {
+    window.localStorage.setItem(storageKey, `${header}\n`);
+  }
+  return "browser-local-storage";
+}
+
+async function openLogFile(relativePath, storageKey) {
+  if (isTauriRuntime()) {
+    const { openPath, revealItemInDir } = await import("@tauri-apps/plugin-opener");
+    const fullPath = await ensureLogFile(relativePath, storageKey);
+    try {
+      await openPath(fullPath);
+      return;
+    } catch (error) {
+      try {
+        await revealItemInDir(fullPath);
+      } catch {
+        // no-op: we'll throw the original open error below
+      }
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Unable to open log file: ${fullPath} (${reason})`);
+    }
+  }
+
+  await ensureLogFile(relativePath, storageKey);
   const text = window.localStorage.getItem(storageKey);
   if (text) {
     window.alert(text);
   }
 }
 
-export async function appendImportErrors(logText) {
-  return appendLogFile(
-    IMPORT_ERRORS_FILE,
-    "flight-planner.import-errors",
-    logText
-  );
+export async function appendImportLog(logText) {
+  return appendLogFile(IMPORT_LOG_FILE, "flight-planner.import-log", logText);
 }
 
-export async function appendImportTrace(logText) {
-  return appendLogFile(
-    IMPORT_TRACE_FILE,
-    "flight-planner.import-trace",
-    logText
-  );
-}
-
-export async function openImportErrors() {
-  return openLogFile(IMPORT_ERRORS_FILE, "flight-planner.import-errors");
-}
-
-export async function openImportTrace() {
-  return openLogFile(IMPORT_TRACE_FILE, "flight-planner.import-trace");
+export async function openImportLog() {
+  return openLogFile(IMPORT_LOG_FILE, "flight-planner.import-log");
 }
 
 export async function confirmOverwriteSchedule() {
