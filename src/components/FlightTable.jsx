@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FixedSizeList as List } from "react-window";
 import {
   formatDistanceNm,
@@ -75,6 +75,10 @@ const RIGHT_ALIGNED_COLUMN_KEYS = new Set([
   "blockMinutes",
   "distanceNm"
 ]);
+
+const INITIAL_VISIBLE_FLIGHTS = 100;
+const VISIBLE_FLIGHT_PAGE = 100;
+const VISIBLE_FLIGHT_THRESHOLD = 20;
 
 function SortButton({ label, sortKey, sort, onSort }) {
   const isActive = sort.key === sortKey;
@@ -158,6 +162,15 @@ export default function FlightTable({
   const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
   const headerScrollRef = useRef(null);
   const listOuterRef = useRef(null);
+  const firstFlightId = flights[0]?.flightId || "";
+  const lastFlightId = flights[flights.length - 1]?.flightId || "";
+  const [visibleFlightCount, setVisibleFlightCount] = useState(() =>
+    Math.min(flights.length, INITIAL_VISIBLE_FLIGHTS)
+  );
+
+  useEffect(() => {
+    setVisibleFlightCount(Math.min(flights.length, INITIAL_VISIBLE_FLIGHTS));
+  }, [flights.length, firstFlightId, lastFlightId]);
 
   useEffect(() => {
     const outerNode = listOuterRef.current;
@@ -180,9 +193,22 @@ export default function FlightTable({
     };
   }, [flights.length]);
 
+  function handleItemsRendered({ visibleStopIndex }) {
+    if (
+      visibleStopIndex < visibleFlightCount - VISIBLE_FLIGHT_THRESHOLD ||
+      visibleFlightCount >= flights.length
+    ) {
+      return;
+    }
+
+    setVisibleFlightCount((current) =>
+      Math.min(flights.length, current + VISIBLE_FLIGHT_PAGE)
+    );
+  }
+
   const itemData = {
     columns,
-    flights,
+    flights: flights.slice(0, visibleFlightCount),
     selectedFlightId,
     onSelectFlight,
     onAddToFlightBoard
@@ -209,9 +235,10 @@ export default function FlightTable({
         <List
           className="flight-list"
           height={560}
-          itemCount={flights.length}
+          itemCount={visibleFlightCount}
           itemData={itemData}
           itemSize={46}
+          onItemsRendered={handleItemsRendered}
           outerRef={listOuterRef}
           width="100%"
         >
