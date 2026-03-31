@@ -4,9 +4,9 @@
   --delta-blue-deep: #0b1f36;
   --delta-red: #c8102e;
   --app-bg:
-    radial-gradient(circle at top left, rgba(200, 16, 46, 0.14), transparent 26%),
-    radial-gradient(circle at top right, rgba(0, 58, 112, 0.18), transparent 28%),
-    linear-gradient(155deg, #f2f6fb 0%, #fbfcff 48%, #edf2f9 100%);
+    radial-gradient(circle at top left, rgba(200, 16, 46, 0.24), transparent 30%),
+    radial-gradient(circle at top right, rgba(0, 58, 112, 0.12), transparent 32%),
+    linear-gradient(155deg, #f5f8fc 0%, #fdf8fa 52%, #eef3f9 100%);
   --text-primary: #102136;
   --text-heading: var(--delta-blue-deep);
   --text-muted: #64758a;
@@ -19,7 +19,7 @@
   --surface-panel: rgba(245, 248, 252, 0.88);
   --surface-table-row: rgba(255, 255, 255, 0.4);
   --surface-table-row-selected:
-    linear-gradient(90deg, rgba(200, 16, 46, 0.08), rgba(0, 58, 112, 0.08)),
+    linear-gradient(90deg, rgba(200, 16, 46, 0.16), rgba(0, 58, 112, 0.06)),
     rgba(255, 255, 255, 0.84);
   --surface-option: rgba(246, 249, 252, 0.9);
   --surface-option-selected: rgba(0, 58, 112, 0.08);
@@ -56,9 +56,9 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --app-bg:
-    radial-gradient(circle at top left, rgba(200, 16, 46, 0.18), transparent 24%),
-    radial-gradient(circle at top right, rgba(31, 94, 160, 0.2), transparent 26%),
-    linear-gradient(155deg, #07111d 0%, #0a1626 45%, #0f2033 100%);
+    radial-gradient(circle at top left, rgba(200, 16, 46, 0.3), transparent 28%),
+    radial-gradient(circle at top right, rgba(0, 58, 112, 0.16), transparent 30%),
+    linear-gradient(155deg, #070f1b 0%, #121528 48%, #0f2135 100%);
   --text-primary: #ecf3fb;
   --text-heading: #f4f8fc;
   --text-muted: #99afc7;
@@ -71,7 +71,7 @@
   --surface-panel: rgba(15, 33, 54, 0.84);
   --surface-table-row: rgba(8, 20, 36, 0.52);
   --surface-table-row-selected:
-    linear-gradient(90deg, rgba(200, 16, 46, 0.18), rgba(0, 58, 112, 0.28)),
+    linear-gradient(90deg, rgba(200, 16, 46, 0.3), rgba(0, 58, 112, 0.2)),
     rgba(10, 24, 43, 0.9);
   --surface-option: rgba(12, 27, 45, 0.94);
   --surface-option-selected: rgba(0, 58, 112, 0.32);
@@ -237,24 +237,32 @@ button {
   grid-template-columns: 1fr;
   gap: 18px;
   align-items: start;
-  justify-items: center;
+  width: 100%;
 }
 
 .workspace__main {
   display: grid;
   gap: 18px;
   position: relative;
-  width: min(1360px, 100%);
+  width: 100%;
+}
+
+.table-board-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
 }
 
 .filter-bar,
-.table-shell {
-  width: min(1360px, 100%);
+.table-shell,
+.empty-state {
+  width: 100%;
   margin-inline: auto;
 }
 
 .details-panel {
-  width: min(1360px, 100%);
+  width: 100%;
 }
 
 .filter-bar,
@@ -921,34 +929,40 @@ select:focus,
 }
 
 .shortlist-item {
-  display: grid;
-  gap: 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface-soft);
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
   text-align: left;
 }
 
-.shortlist-item__meta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.shortlist-item__meta span {
-  font-weight: 700;
-}
-
-.shortlist-item__meta small {
-  color: var(--text-muted);
-}
-
 .route-banner--compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   margin-bottom: 0;
   padding: 12px 14px;
   border-radius: 16px;
+}
+
+.route-banner__meta {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.route-banner__meta span {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.route-banner__meta small {
+  color: var(--route-banner-muted);
+  font-size: 0.86rem;
 }
 
 .route-banner--compact span {
@@ -977,6 +991,7 @@ select:focus,
 @media (max-width: 1180px) {
   .summary-strip,
   .workspace,
+  .table-board-layout,
   .filter-grid {
     grid-template-columns: 1fr;
   }

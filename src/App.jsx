@@ -645,6 +645,31 @@ export default function App() {
     });
   }
 
+  function handleRemoveFromFlightBoard(flightId) {
+    setSchedule((current) => {
+      if (!current) {
+        return current;
+      }
+
+      let changed = false;
+      const nextFlights = current.flights.map((flight) => {
+        if (flight.flightId !== flightId || !flight.isShortlisted) {
+          return flight;
+        }
+
+        changed = true;
+        return { ...flight, isShortlisted: false };
+      });
+
+      return changed
+        ? {
+            ...current,
+            flights: nextFlights
+          }
+        : current;
+    });
+  }
+
   async function handleOpenLogFile() {
     try {
       await openAppLogFile();
@@ -730,35 +755,48 @@ export default function App() {
             onReset={handleResetFilters}
           />
 
-          {schedule ? (
-            <FlightTable
-              flights={sortedFlights}
-              selectedFlightId={selectedFlightId}
-              sort={sort}
-              timeDisplayMode={normalizedDeferredFilters.timeDisplayMode}
-              onSort={handleSort}
-              onSelectFlight={handleSelectFlight}
-              onAddToFlightBoard={handleAddToFlightBoard}
-            />
-          ) : (
-            <section className="empty-state">
-              <p className="eyebrow">No Active Schedule</p>
-              <h2>Import a PFPX XML file to start planning.</h2>
-              <p>
-                The app validates airport coverage, converts local schedule times to
-                UTC, calculates route distance, and filters routes by compatible
-                aircraft families and equipment based on weight, capacity, and range.
-              </p>
-            </section>
-          )}
-        </div>
+          <div className="table-board-layout">
+            {schedule ? (
+              <FlightTable
+                flights={sortedFlights}
+                selectedFlightId={selectedFlightId}
+                sort={sort}
+                timeDisplayMode={normalizedDeferredFilters.timeDisplayMode}
+                onSort={handleSort}
+                onSelectFlight={handleSelectFlight}
+                onAddToFlightBoard={handleAddToFlightBoard}
+              />
+            ) : (
+              <section className="empty-state">
+                <p className="eyebrow">No Active Schedule</p>
+                <h2>Import a PFPX XML file to start planning.</h2>
+                <p>
+                  The app validates airport coverage, converts local schedule times to
+                  UTC, calculates route distance, and filters routes by compatible
+                  aircraft families and equipment based on weight, capacity, and range.
+                </p>
+              </section>
+            )}
 
-        <DetailsPanel
-          shortlist={shortlist}
-          onSelectFlight={handleSelectFlight}
-          onOpenLogFile={handleOpenLogFile}
-          importSummary={schedule?.importSummary}
-        />
+            <DetailsPanel
+              shortlist={shortlist}
+              onSelectFlight={handleSelectFlight}
+              onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
+              onOpenLogFile={handleOpenLogFile}
+              importSummary={schedule?.importSummary}
+              showImportHealth={false}
+            />
+          </div>
+
+          <DetailsPanel
+            shortlist={shortlist}
+            onSelectFlight={handleSelectFlight}
+            onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
+            onOpenLogFile={handleOpenLogFile}
+            importSummary={schedule?.importSummary}
+            showFlightBoard={false}
+          />
+        </div>
       </main>
     </div>
   );
