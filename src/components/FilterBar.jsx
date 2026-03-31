@@ -276,6 +276,7 @@ function EquipmentMultiSelect({
 export default function FilterBar({
   filters,
   airlines,
+  airportOptions,
   equipmentOptions,
   filterBounds,
   onFilterChange,
@@ -293,7 +294,7 @@ export default function FilterBar({
         </button>
       </div>
 
-      <div className="filter-grid">
+      <div className="filter-grid filter-grid--routing">
         <label className="filter-block">
           <span>Airline</span>
           <select
@@ -310,6 +311,21 @@ export default function FilterBar({
         </label>
 
         <label className="filter-block">
+          <span>Origin Airport</span>
+          <select
+            value={filters.origin}
+            onChange={(event) => onFilterChange("originAirport", event.target.value)}
+          >
+            <option value="">All origin airports</option>
+            {airportOptions.map((airport) => (
+              <option key={`origin-${airport.icao}`} value={airport.icao}>
+                {airport.name} ({airport.icao})
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="filter-block filter-block--icao">
           <span>Origin ICAO</span>
           <input
             type="text"
@@ -320,6 +336,21 @@ export default function FilterBar({
         </label>
 
         <label className="filter-block">
+          <span>Destination Airport</span>
+          <select
+            value={filters.destination}
+            onChange={(event) => onFilterChange("destinationAirport", event.target.value)}
+          >
+            <option value="">All destination airports</option>
+            {airportOptions.map((airport) => (
+              <option key={`destination-${airport.icao}`} value={airport.icao}>
+                {airport.name} ({airport.icao})
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="filter-block filter-block--icao">
           <span>Destination ICAO</span>
           <input
             type="text"
@@ -330,7 +361,9 @@ export default function FilterBar({
             placeholder="KLAX"
           />
         </label>
+      </div>
 
+      <div className="filter-grid filter-grid--advanced">
         <RangeSlider
           label="Flight Length"
           min={0}

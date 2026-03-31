@@ -296,8 +296,22 @@ button {
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+.filter-grid--routing {
+  grid-template-columns:
+    minmax(220px, 1.35fr)
+    minmax(220px, 1.35fr)
+    minmax(96px, 0.45fr)
+    minmax(220px, 1.35fr)
+    minmax(96px, 0.45fr);
+  align-items: end;
+}
+
+.filter-grid--advanced {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
 }
 
 .filter-block,
@@ -308,6 +322,15 @@ button {
 
 .filter-block--wide {
   grid-column: span 2;
+}
+
+.filter-block--icao {
+  min-width: 0;
+}
+
+.filter-block--icao input {
+  width: 100%;
+  min-width: 0;
 }
 
 .filter-pair {
@@ -992,7 +1015,8 @@ select:focus,
   .summary-strip,
   .workspace,
   .table-board-layout,
-  .filter-grid {
+  .filter-grid--routing,
+  .filter-grid--advanced {
     grid-template-columns: 1fr;
   }
 

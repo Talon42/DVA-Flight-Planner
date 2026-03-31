@@ -3,6 +3,7 @@ import FilterBar from "./components/FilterBar";
 import FlightTable from "./components/FlightTable";
 import DetailsPanel from "./components/DetailsPanel";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
+import { buildAirportOptions, getAirportByIcao } from "./lib/airportCatalog";
 import dalLogo from "./data/images/DAL.png";
 import {
   closeDeltaVirtualSyncWindow,
@@ -195,6 +196,19 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
     ...(savedFilters || {})
   };
 
+  nextFilters.origin = String(nextFilters.origin || "").trim().toUpperCase();
+  nextFilters.destination = String(nextFilters.destination || "").trim().toUpperCase();
+  nextFilters.originAirport = String(nextFilters.originAirport || "").trim();
+  nextFilters.destinationAirport = String(nextFilters.destinationAirport || "").trim();
+
+  if (nextFilters.origin && !nextFilters.originAirport) {
+    nextFilters.originAirport = getAirportByIcao(nextFilters.origin)?.name || "";
+  }
+
+  if (nextFilters.destination && !nextFilters.destinationAirport) {
+    nextFilters.destinationAirport = getAirportByIcao(nextFilters.destination)?.name || "";
+  }
+
   if (!Array.isArray(nextFilters.equipment)) {
     nextFilters.equipment = nextFilters.equipment ? [nextFilters.equipment] : [];
   }
@@ -348,6 +362,7 @@ export default function App() {
         .filter(Boolean)
         .sort()
     : [];
+  const airportOptions = buildAirportOptions(schedule?.flights || []);
 
   const filterBounds = buildFilterBounds(schedule?.flights || []);
   const normalizedDeferredFilters = normalizeFilters(deferredFilters, filterBounds);
@@ -589,10 +604,56 @@ export default function App() {
 
   function handleFilterChange(key, value) {
     startTransition(() => {
-      setFilters((current) => ({
-        ...current,
-        [key]: value
-      }));
+      setFilters((current) => {
+        if (key === "origin") {
+          const icao = String(value || "").trim().toUpperCase();
+          const airport = getAirportByIcao(icao);
+
+          return {
+            ...current,
+            origin: icao,
+            originAirport: airport?.name || ""
+          };
+        }
+
+        if (key === "destination") {
+          const icao = String(value || "").trim().toUpperCase();
+          const airport = getAirportByIcao(icao);
+
+          return {
+            ...current,
+            destination: icao,
+            destinationAirport: airport?.name || ""
+          };
+        }
+
+        if (key === "originAirport") {
+          const selectedIcao = String(value || "").trim().toUpperCase();
+          const airport = getAirportByIcao(selectedIcao);
+
+          return {
+            ...current,
+            originAirport: airport?.name || "",
+            origin: airport?.icao || ""
+          };
+        }
+
+        if (key === "destinationAirport") {
+          const selectedIcao = String(value || "").trim().toUpperCase();
+          const airport = getAirportByIcao(selectedIcao);
+
+          return {
+            ...current,
+            destinationAirport: airport?.name || "",
+            destination: airport?.icao || ""
+          };
+        }
+
+        return {
+          ...current,
+          [key]: value
+        };
+      });
     });
   }
 
@@ -749,6 +810,7 @@ export default function App() {
             key={`filters-${filterUiVersion}`}
             filters={normalizeFilters(filters, filterBounds)}
             airlines={airlines}
+            airportOptions={airportOptions}
             equipmentOptions={equipmentOptions}
             filterBounds={filterBounds}
             onFilterChange={handleFilterChange}

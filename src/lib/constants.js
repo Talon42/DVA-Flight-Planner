@@ -4,7 +4,9 @@ export const IMPORT_LOG_FILE = `${STORAGE_DIR}/log.txt`;
 
 export const DEFAULT_FILTERS = {
   airline: "ALL",
+  originAirport: "",
   origin: "",
+  destinationAirport: "",
   destination: "",
   route: "",
   aircraftFamily: "ALL",
