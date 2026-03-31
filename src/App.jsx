@@ -3,6 +3,7 @@ import FilterBar from "./components/FilterBar";
 import FlightTable from "./components/FlightTable";
 import DetailsPanel from "./components/DetailsPanel";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
+import dalLogo from "./data/images/DAL.png";
 import {
   closeDeltaVirtualSyncWindow,
   pruneDeltaVirtualStorage,
@@ -158,6 +159,9 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
     nextFilters.equipment = nextFilters.equipment ? [nextFilters.equipment] : [];
   }
 
+  nextFilters.timeDisplayMode =
+    nextFilters.timeDisplayMode === "local" ? "local" : "utc";
+
   const defaultFlightLengthMax = bounds.maxBlockMinutes;
   const defaultDistanceMax = bounds.maxDistanceNm;
   const toOptionalNumber = (value) => {
@@ -243,9 +247,7 @@ export default function App() {
             savedSchedule.flights[0]?.flightId ||
             null
         );
-        setStatusMessage(
-          `Loaded saved schedule with ${formatNumber(savedSchedule.flights.length)} flights.`
-        );
+        setStatusMessage("");
         await logAppEvent("hydrate-loaded", {
           flights: savedSchedule.flights.length,
           source: savedSchedule.importSummary?.sourceFileName || "unknown"
@@ -294,12 +296,6 @@ export default function App() {
     ? [...new Set(schedule.flights.map((flight) => flight.airlineName))].sort()
     : [];
 
-  const aircraftFamilies = schedule
-    ? [...new Set(schedule.flights.flatMap((flight) => flight.compatibleFamilies || []))]
-        .filter(Boolean)
-        .sort()
-    : [];
-
   const equipmentOptions = schedule
     ? [...new Set(schedule.flights.flatMap((flight) => flight.compatibleEquipment || []))]
         .filter(Boolean)
@@ -314,13 +310,6 @@ export default function App() {
         if (
           normalizedDeferredFilters.airline !== "ALL" &&
           flight.airlineName !== normalizedDeferredFilters.airline
-        ) {
-          return false;
-        }
-
-        if (
-          normalizedDeferredFilters.aircraftFamily !== "ALL" &&
-          !(flight.compatibleFamilies || []).includes(normalizedDeferredFilters.aircraftFamily)
         ) {
           return false;
         }
@@ -371,7 +360,9 @@ export default function App() {
 
         if (
           !matchesTime(
-            flight.utcDepartureClock,
+            normalizedDeferredFilters.timeDisplayMode === "local"
+              ? flight.localDepartureClock
+              : flight.utcDepartureClock,
             normalizedDeferredFilters.utcDeparture
           )
         ) {
@@ -380,7 +371,9 @@ export default function App() {
 
         if (
           !matchesTime(
-            flight.staUtc ? flight.staUtc.slice(11, 16) : "",
+            normalizedDeferredFilters.timeDisplayMode === "local"
+              ? flight.staLocal?.slice(11, 16) || ""
+              : flight.staUtc?.slice(11, 16) || "",
             normalizedDeferredFilters.utcArrival
           )
         ) {
@@ -617,7 +610,10 @@ export default function App() {
       <header className="topbar">
         <div className="brand-lockup">
           <p className="eyebrow">Flight Planner</p>
-          <h1>Daily schedule planning for desktop simulation ops.</h1>
+          <div className="brand-lockup__title">
+            <img src={dalLogo} alt="Delta Virtual Airlines logo" className="brand-lockup__logo" />
+            <h1>Delta Virtual Airlines Flight Planner</h1>
+          </div>
         </div>
 
         <div className="topbar__actions">
@@ -659,22 +655,12 @@ export default function App() {
         </div>
       </section>
 
-      <div className="status-line">
-        <span>{isHydrating ? "Loading saved schedule..." : statusMessage}</span>
-        <span>
-          {schedule?.importSummary?.sourceFileName
-            ? `Current source: ${schedule.importSummary.sourceFileName}`
-            : "No schedule imported yet"}
-        </span>
-      </div>
-
       <main className="workspace">
         <div className="workspace__main">
           <FilterBar
             key={`filters-${filterUiVersion}`}
             filters={normalizeFilters(filters, filterBounds)}
             airlines={airlines}
-            aircraftFamilies={aircraftFamilies}
             equipmentOptions={equipmentOptions}
             filterBounds={filterBounds}
             onFilterChange={handleFilterChange}
@@ -686,9 +672,9 @@ export default function App() {
               flights={sortedFlights}
               selectedFlightId={selectedFlightId}
               sort={sort}
+              timeDisplayMode={normalizedDeferredFilters.timeDisplayMode}
               onSort={handleSort}
               onSelectFlight={handleSelectFlight}
-              onToggleShortlist={handleToggleShortlist}
             />
           ) : (
             <section className="empty-state">

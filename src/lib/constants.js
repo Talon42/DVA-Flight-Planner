@@ -9,6 +9,7 @@ export const DEFAULT_FILTERS = {
   route: "",
   aircraftFamily: "ALL",
   equipment: [],
+  timeDisplayMode: "utc",
   utcDeparture: "",
   utcArrival: "",
   flightLengthMin: null,

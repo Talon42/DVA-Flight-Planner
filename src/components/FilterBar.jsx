@@ -1,10 +1,49 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDistanceNm, formatDuration } from "../lib/formatters";
 
-function TimeFilter({ label, filterKey, filters, onFilterChange }) {
+function TimeFilter({
+  label,
+  filterKey,
+  filters,
+  onFilterChange,
+  timeDisplayMode,
+  onToggleTimeDisplayMode
+}) {
+  const isLocalMode = timeDisplayMode === "local";
+
   return (
     <label className="filter-block">
-      <span>{label}</span>
+      <span className="filter-label">
+        <span>{label}</span>
+        <button
+          className={`time-mode-toggle ${
+            isLocalMode ? "time-mode-toggle--local" : "time-mode-toggle--utc"
+          }`}
+          type="button"
+          onClick={onToggleTimeDisplayMode}
+          title={isLocalMode ? "Switch to UTC time" : "Switch to local time"}
+          aria-label={isLocalMode ? "Switch to UTC time" : "Switch to local time"}
+        >
+          <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
+            <path
+              d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9M13.5 8a5.5 5.5 0 0 1-9.4 3.9"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M11.3 2.8v2.6H8.7M4.7 13.2V10.6h2.6"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.5"
+            />
+          </svg>
+        </button>
+      </span>
       <input
         type="time"
         value={filters[filterKey]}
@@ -119,7 +158,7 @@ function EquipmentMultiSelect({
 
   const selectionLabel = selectedValues.length
     ? `${selectedValues.length} selected`
-    : "All equipment";
+    : "All aircraft";
 
   function toggleValue(value) {
     if (selectedValues.includes(value)) {
@@ -136,7 +175,7 @@ function EquipmentMultiSelect({
 
   return (
     <div className="filter-block filter-block--wide" ref={rootRef}>
-      <span>Equipment</span>
+      <span>Aircraft</span>
       <div className={`multi-select ${isOpen ? "multi-select--open" : ""}`}>
         <button
           className="multi-select__trigger"
@@ -144,7 +183,18 @@ function EquipmentMultiSelect({
           onClick={() => setIsOpen((current) => !current)}
         >
           <span className="multi-select__value">{selectionLabel}</span>
-          <span className="multi-select__chevron">{isOpen ? "^" : "v"}</span>
+          <span className="multi-select__chevron" aria-hidden="true">
+            <svg viewBox="0 0 16 16" focusable="false">
+              <path
+                d="M4 6.5 8 10.5 12 6.5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.75"
+              />
+            </svg>
+          </span>
         </button>
 
         {selectedValues.length ? (
@@ -171,7 +221,7 @@ function EquipmentMultiSelect({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search equipment"
+              placeholder="Search aircraft"
             />
 
             <div className="multi-select__actions">
@@ -213,7 +263,7 @@ function EquipmentMultiSelect({
               })}
 
               {!filteredOptions.length ? (
-                <div className="multi-select__empty">No matching equipment</div>
+                <div className="multi-select__empty">No matching aircraft</div>
               ) : null}
             </div>
           </div>
@@ -226,7 +276,6 @@ function EquipmentMultiSelect({
 export default function FilterBar({
   filters,
   airlines,
-  aircraftFamilies,
   equipmentOptions,
   filterBounds,
   onFilterChange,
@@ -245,16 +294,6 @@ export default function FilterBar({
       </div>
 
       <div className="filter-grid">
-        <label className="filter-block filter-block--wide">
-          <span>Search</span>
-          <input
-            type="search"
-            value={filters.search}
-            onChange={(event) => onFilterChange("search", event.target.value)}
-            placeholder="Flight number, airport, airline, or aircraft"
-          />
-        </label>
-
         <label className="filter-block">
           <span>Airline</span>
           <select
@@ -265,23 +304,6 @@ export default function FilterBar({
             {airlines.map((airline) => (
               <option key={airline} value={airline}>
                 {airline}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="filter-block">
-          <span>Aircraft Family</span>
-          <select
-            value={filters.aircraftFamily}
-            onChange={(event) =>
-              onFilterChange("aircraftFamily", event.target.value)
-            }
-          >
-            <option value="ALL">All families</option>
-            {aircraftFamilies.map((family) => (
-              <option key={family} value={family}>
-                {family}
               </option>
             ))}
           </select>
@@ -308,22 +330,6 @@ export default function FilterBar({
             placeholder="KLAX"
           />
         </label>
-
-        <label className="filter-block">
-          <span>Route</span>
-          <input
-            type="text"
-            value={filters.route}
-            onChange={(event) => onFilterChange("route", event.target.value)}
-            placeholder="KATL-KLAX"
-          />
-        </label>
-
-        <EquipmentMultiSelect
-          options={equipmentOptions}
-          selectedValues={filters.equipment}
-          onChange={(value) => onFilterChange("equipment", value)}
-        />
 
         <RangeSlider
           label="Flight Length"
@@ -353,18 +359,38 @@ export default function FilterBar({
           formatValue={formatDistanceNm}
         />
 
-        <TimeFilter
-          label="UTC Departure"
-          filterKey="utcDeparture"
-          filters={filters}
-          onFilterChange={onFilterChange}
+        <EquipmentMultiSelect
+          options={equipmentOptions}
+          selectedValues={filters.equipment}
+          onChange={(value) => onFilterChange("equipment", value)}
         />
 
         <TimeFilter
-          label="UTC Arrival"
+          label={filters.timeDisplayMode === "local" ? "Local Departure" : "UTC Departure"}
+          filterKey="utcDeparture"
+          filters={filters}
+          onFilterChange={onFilterChange}
+          timeDisplayMode={filters.timeDisplayMode}
+          onToggleTimeDisplayMode={() =>
+            onFilterChange(
+              "timeDisplayMode",
+              filters.timeDisplayMode === "local" ? "utc" : "local"
+            )
+          }
+        />
+
+        <TimeFilter
+          label={filters.timeDisplayMode === "local" ? "Local Arrival" : "UTC Arrival"}
           filterKey="utcArrival"
           filters={filters}
           onFilterChange={onFilterChange}
+          timeDisplayMode={filters.timeDisplayMode}
+          onToggleTimeDisplayMode={() =>
+            onFilterChange(
+              "timeDisplayMode",
+              filters.timeDisplayMode === "local" ? "utc" : "local"
+            )
+          }
         />
       </div>
     </section>

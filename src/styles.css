@@ -58,6 +58,19 @@ button {
   max-width: 720px;
 }
 
+.brand-lockup__title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-lockup__logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
 .topbar__actions {
   display: flex;
   flex-wrap: wrap;
@@ -200,6 +213,48 @@ button {
   color: var(--muted);
 }
 
+.filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-mode-toggle {
+  width: 20px;
+  height: 20px;
+  border: 1px solid rgba(16, 33, 54, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition:
+    transform 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.time-mode-toggle svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.time-mode-toggle:hover {
+  transform: translateY(-1px);
+  color: var(--delta-blue-deep);
+  border-color: rgba(0, 58, 112, 0.25);
+}
+
+.time-mode-toggle--local {
+  color: var(--delta-blue-deep);
+  border-color: rgba(0, 58, 112, 0.25);
+  background: rgba(0, 58, 112, 0.08);
+}
+
 input,
 select {
   width: 100%;
@@ -251,6 +306,30 @@ select:focus {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.multi-select__chevron {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  transform: rotate(0deg);
+  transition:
+    transform 180ms ease,
+    color 160ms ease;
+}
+
+.multi-select__chevron svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.multi-select--open .multi-select__chevron {
+  transform: rotate(180deg);
+  color: var(--delta-blue-deep);
 }
 
 .multi-select__chips {
@@ -567,6 +646,10 @@ select:focus {
   text-overflow: ellipsis;
 }
 
+.table-cell--right {
+  text-align: right;
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;
@@ -716,5 +799,15 @@ select:focus {
 
   .route-banner div:last-child {
     text-align: left;
+  }
+
+  .brand-lockup__title {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .brand-lockup__logo {
+    width: 44px;
+    height: 44px;
   }
 }

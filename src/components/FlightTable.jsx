@@ -1,28 +1,43 @@
 import { useEffect, useRef } from "react";
 import { FixedSizeList as List } from "react-window";
 import {
-  formatCompactNumber,
-  formatDateTime,
   formatDistanceNm,
+  formatDuration,
   formatTimeOnly
 } from "../lib/formatters";
 
-const COLUMNS = [
-  { key: "flightCode", label: "Flight", width: 118 },
-  { key: "airlineName", label: "Airline", width: 180 },
-  { key: "route", label: "Route", width: 124 },
-  { key: "stdLocal", label: "STD Local", width: 110, render: formatDateTime },
-  { key: "stdUtc", label: "STD UTC", width: 110, render: formatDateTime },
-  { key: "staLocal", label: "STA Local", width: 110, render: formatDateTime },
-  { key: "localDepartureClock", label: "Local", width: 72, render: formatTimeOnly },
-  { key: "utcDepartureClock", label: "UTC", width: 72 },
-  { key: "compatibleFamiliesLabel", label: "Compatible Families", width: 220 },
-  { key: "compatibilityCount", label: "Equip", width: 78, render: formatCompactNumber },
-  { key: "maxPax", label: "Pax", width: 78, render: formatCompactNumber },
-  { key: "mtow", label: "MTOW", width: 100, render: formatCompactNumber },
-  { key: "mlw", label: "MLW", width: 100, render: formatCompactNumber },
-  { key: "distanceNm", label: "Distance", width: 110, render: formatDistanceNm }
-];
+function buildColumns(timeDisplayMode) {
+  const isLocalMode = timeDisplayMode === "local";
+
+  return [
+    { key: "flightCode", label: "Flight", width: 118 },
+    { key: "airlineName", label: "Airline", width: 180 },
+    { key: "route", label: "Route", width: 124 },
+    {
+      key: isLocalMode ? "stdLocal" : "stdUtc",
+      label: isLocalMode ? "Departure (Local)" : "Departure (UTC)",
+      width: 140,
+      render: formatTimeOnly
+    },
+    {
+      key: isLocalMode ? "staLocal" : "staUtc",
+      label: isLocalMode ? "Arrival (Local)" : "Arrival (UTC)",
+      width: 140,
+      render: formatTimeOnly
+    },
+    { key: "blockMinutes", label: "Block Time", width: 100, render: formatDuration },
+    { key: "distanceNm", label: "Distance", width: 110, render: formatDistanceNm }
+  ];
+}
+
+const RIGHT_ALIGNED_COLUMN_KEYS = new Set([
+  "stdUtc",
+  "staUtc",
+  "stdLocal",
+  "staLocal",
+  "blockMinutes",
+  "distanceNm"
+]);
 
 function SortButton({ label, sortKey, sort, onSort }) {
   const isActive = sort.key === sortKey;
@@ -56,16 +71,7 @@ function Row({ index, style, data }) {
       }`}
       style={style}
     >
-      <button
-        className={`pin-button ${flight.isShortlisted ? "pin-button--active" : ""}`}
-        type="button"
-        onClick={() => data.onToggleShortlist(flight.flightId)}
-        title={flight.isShortlisted ? "Remove from shortlist" : "Add to shortlist"}
-      >
-        {flight.isShortlisted ? "*" : "o"}
-      </button>
-
-      {COLUMNS.map((column) => {
+      {data.columns.map((column) => {
         const value = flight[column.key];
         const content = column.render ? column.render(value) : value;
 
@@ -73,7 +79,9 @@ function Row({ index, style, data }) {
           <button
             key={column.key}
             type="button"
-            className="table-cell"
+            className={`table-cell ${
+              RIGHT_ALIGNED_COLUMN_KEYS.has(column.key) ? "table-cell--right" : ""
+            }`}
             style={{ width: `${column.width}px` }}
             onClick={() => data.onSelectFlight(flight.flightId)}
             title={typeof content === "string" ? content : String(value ?? "")}
@@ -90,11 +98,12 @@ export default function FlightTable({
   flights,
   selectedFlightId,
   sort,
+  timeDisplayMode,
   onSort,
-  onSelectFlight,
-  onToggleShortlist
+  onSelectFlight
 }) {
-  const totalWidth = COLUMNS.reduce((sum, column) => sum + column.width, 64);
+  const columns = buildColumns(timeDisplayMode);
+  const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
   const headerScrollRef = useRef(null);
   const listOuterRef = useRef(null);
 
@@ -120,18 +129,17 @@ export default function FlightTable({
   }, [flights.length]);
 
   const itemData = {
+    columns,
     flights,
     selectedFlightId,
-    onSelectFlight,
-    onToggleShortlist
+    onSelectFlight
   };
 
   return (
     <section className="table-shell">
       <div className="table-header-scroll" ref={headerScrollRef}>
         <div className="table-header" style={{ minWidth: `${totalWidth}px` }}>
-          <div className="table-header__pin">Pin</div>
-          {COLUMNS.map((column) => (
+          {columns.map((column) => (
             <div key={column.key} style={{ width: `${column.width}px` }}>
               <SortButton
                 label={column.label}
