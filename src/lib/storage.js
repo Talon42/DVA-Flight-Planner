@@ -7,7 +7,7 @@ import {
 const PERSISTED_SCHEDULE_VERSION = 2;
 const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
 const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
-const LOG_CHAR_LIMIT = 200000;
+const LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -41,12 +41,25 @@ function toClockValue(isoValue) {
   return typeof isoValue === "string" && isoValue.length >= 16 ? isoValue.slice(11, 16) : "";
 }
 
-function trimLogText(text) {
-  if (!text || text.length <= LOG_CHAR_LIMIT) {
-    return text || "";
+function measureTextBytes(text) {
+  return textEncoder.encode(text || "").length;
+}
+
+function buildNextLogText(existingText, incomingText) {
+  const existing = existingText || "";
+  const incoming = incomingText || "";
+
+  if (!incoming) {
+    return existing;
   }
 
-  return text.slice(-LOG_CHAR_LIMIT);
+  const combined = existing ? `${existing.trimEnd()}\n\n${incoming}` : incoming;
+
+  if (measureTextBytes(combined) < LOG_SIZE_LIMIT_BYTES) {
+    return combined;
+  }
+
+  return incoming;
 }
 
 function uint8ArrayToBase64(bytes) {
@@ -345,9 +358,7 @@ async function appendLogFile(relativePath, storageKey, logText) {
             baseDir: BaseDirectory.AppData
           })
         : "";
-      const nextText = trimLogText(
-        existing ? `${existing.trimEnd()}\n\n${logText}` : logText
-      );
+      const nextText = buildNextLogText(existing, logText);
 
       await writeTextFile(relativePath, nextText, {
         baseDir: BaseDirectory.AppData
@@ -356,9 +367,7 @@ async function appendLogFile(relativePath, storageKey, logText) {
       return resolveAppDataPath(relativePath);
     } catch (error) {
       const existing = window.localStorage.getItem(storageKey) || "";
-      const nextText = trimLogText(
-        existing ? `${existing.trimEnd()}\n\n${logText}` : logText
-      );
+      const nextText = buildNextLogText(existing, logText);
       window.localStorage.setItem(storageKey, nextText);
       const reason = error instanceof Error ? error.message : String(error);
       return `browser-local-storage (fs write failed: ${reason})`;
@@ -366,7 +375,7 @@ async function appendLogFile(relativePath, storageKey, logText) {
   }
 
   const existing = window.localStorage.getItem(storageKey) || "";
-  const nextText = trimLogText(existing ? `${existing.trimEnd()}\n\n${logText}` : logText);
+  const nextText = buildNextLogText(existing, logText);
   window.localStorage.setItem(storageKey, nextText);
   return "browser-local-storage";
 }

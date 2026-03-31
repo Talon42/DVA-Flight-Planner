@@ -5,6 +5,23 @@ import {
   formatDuration,
   formatTimeOnly
 } from "../lib/formatters";
+import { getAirlineLogo } from "../lib/airlineBranding";
+
+function AddonAirportIndicator({ airportCode, addonAirports }) {
+  const normalizedAirportCode = String(airportCode || "").trim().toUpperCase();
+  if (!normalizedAirportCode || !addonAirports?.has(normalizedAirportCode)) {
+    return normalizedAirportCode;
+  }
+
+  return (
+      <span className="airport-code-with-addon">
+      <span>{normalizedAirportCode}</span>
+      <span className="addon-airport-badge" aria-label={`${normalizedAirportCode} addon airport`}>
+        ✓
+      </span>
+    </span>
+  );
+}
 
 function formatFlightNumber(value) {
   if (typeof value !== "string") {
@@ -40,16 +57,44 @@ function resolveAirlineColumnWidth(flights) {
   return Math.max(180, Math.min(360, longestLength * 9 + 24));
 }
 
-function buildColumns(timeDisplayMode, flights) {
+function AirlineCell({ flight }) {
+  const airlineName = flight?.airlineName || "";
+  const logoSrc = getAirlineLogo({
+    airlineName,
+    airlineIata: flight?.airline,
+    airlineIcao: flight?.airlineIcao
+  });
+
+  return (
+    <span className="airline-cell">
+      {logoSrc ? (
+        <img
+          className="airline-cell__logo"
+          src={logoSrc}
+          alt=""
+          aria-hidden="true"
+        />
+      ) : null}
+      <span className="airline-cell__name">{airlineName}</span>
+    </span>
+  );
+}
+
+function buildColumns(timeDisplayMode, flights, addonAirports) {
   const isLocalMode = timeDisplayMode === "local";
   const airlineColumnWidth = resolveAirlineColumnWidth(flights);
 
   return [
     { key: "flightIcao", label: "ICAO", width: 82, sortKey: "flightCode", render: (_, flight) => formatFlightIcao(flight?.flightCode) },
     { key: "flightCode", label: "Flight #", width: 118, render: formatFlightNumber },
-    { key: "airlineName", label: "Airline", width: airlineColumnWidth },
-    { key: "from", label: "Origin", width: 92 },
-    { key: "to", label: "Destination", width: 104 },
+    {
+      key: "airlineName",
+      label: "Airline",
+      width: airlineColumnWidth,
+      render: (_, flight) => <AirlineCell flight={flight} />
+    },
+    { key: "from", label: "Origin", width: 124, render: (value) => <AddonAirportIndicator airportCode={value} addonAirports={addonAirports} /> },
+    { key: "to", label: "Destination", width: 136, render: (value) => <AddonAirportIndicator airportCode={value} addonAirports={addonAirports} /> },
     {
       key: isLocalMode ? "stdLocal" : "stdUtc",
       label: isLocalMode ? "Departure (Local)" : "Departure (UTC)",
@@ -154,11 +199,12 @@ export default function FlightTable({
   selectedFlightId,
   sort,
   timeDisplayMode,
+  addonAirports,
   onSort,
   onSelectFlight,
   onAddToFlightBoard
 }) {
-  const columns = buildColumns(timeDisplayMode, flights);
+  const columns = buildColumns(timeDisplayMode, flights, addonAirports);
   const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
   const headerScrollRef = useRef(null);
   const listOuterRef = useRef(null);

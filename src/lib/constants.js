@@ -1,9 +1,12 @@
 export const STORAGE_DIR = "flight-planner";
 export const SAVED_SCHEDULE_FILE = `${STORAGE_DIR}/saved-schedule.json`;
 export const IMPORT_LOG_FILE = `${STORAGE_DIR}/log.txt`;
+export const ADDON_MATCH_MODES = ["either", "origin", "destination", "both"];
 
 export const DEFAULT_FILTERS = {
   airline: "ALL",
+  region: "ALL",
+  country: "ALL",
   originAirport: "",
   origin: "",
   destinationAirport: "",
@@ -18,7 +21,10 @@ export const DEFAULT_FILTERS = {
   flightLengthMax: null,
   distanceMin: null,
   distanceMax: null,
-  search: ""
+  search: "",
+  addonFilterEnabled: false,
+  addonPriorityEnabled: false,
+  addonMatchMode: "either"
 };
 
 export const DEFAULT_SORT = {

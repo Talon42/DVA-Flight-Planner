@@ -273,10 +273,125 @@ function EquipmentMultiSelect({
   );
 }
 
+export function AddonAirportMatchControls({
+  filters,
+  onFilterChange
+}) {
+  return (
+    <div className="filter-grid filter-grid--addon">
+      <label className="filter-block">
+        <span>Addon Match Rule</span>
+        <select
+          value={filters.addonMatchMode}
+          onChange={(event) => onFilterChange("addonMatchMode", event.target.value)}
+        >
+          <option value="either">Origin or destination</option>
+          <option value="origin">Origin only</option>
+          <option value="destination">Destination only</option>
+          <option value="both">Origin and destination</option>
+        </select>
+      </label>
+
+      <div className="filter-block">
+        <span>Addon Result Controls</span>
+        <div className="toggle-row">
+          <button
+            className={`ghost-button ${filters.addonFilterEnabled ? "ghost-button--active" : ""}`}
+            type="button"
+            onClick={() => onFilterChange("addonFilterEnabled", !filters.addonFilterEnabled)}
+          >
+            {filters.addonFilterEnabled ? "Addon Only On" : "Addon Only Off"}
+          </button>
+          <button
+            className={`ghost-button ${filters.addonPriorityEnabled ? "ghost-button--active" : ""}`}
+            type="button"
+            onClick={() => onFilterChange("addonPriorityEnabled", !filters.addonPriorityEnabled)}
+          >
+            {filters.addonPriorityEnabled ? "Priority On" : "Priority Off"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AddonAirportPanel({
+  filters,
+  addonScan,
+  addonScanSummary,
+  isAddonScanBusy,
+  isDesktopAddonScanAvailable,
+  onFilterChange,
+  onAddAddonRoot,
+  onRemoveAddonRoot,
+  onScanAddonAirports
+}) {
+  return (
+    <section className="addon-panel">
+      <div className="filter-heading filter-heading--addon">
+        <div>
+          <p className="eyebrow">Addon Airports</p>
+          <h2>Manage installed scenery coverage</h2>
+        </div>
+
+        <div className="addon-panel__actions">
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={onAddAddonRoot}
+            disabled={!isDesktopAddonScanAvailable || isAddonScanBusy}
+          >
+            Add Folder
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={onScanAddonAirports}
+            disabled={!isDesktopAddonScanAvailable || isAddonScanBusy || !addonScan.roots.length}
+          >
+            {isAddonScanBusy ? "Scanning..." : "Scan Now"}
+          </button>
+        </div>
+      </div>
+
+      <div className="addon-panel__summary">
+        <p>{addonScanSummary}</p>
+        {!isDesktopAddonScanAvailable ? (
+          <p>Addon airport scanning is available only in the desktop app.</p>
+        ) : null}
+      </div>
+
+      <div className="addon-root-list">
+        {addonScan.roots.length ? (
+          addonScan.roots.map((root) => (
+            <div key={root} className="addon-root-item">
+              <code>{root}</code>
+              <button
+                className="ghost-button addon-root-item__remove"
+                type="button"
+                onClick={() => onRemoveAddonRoot(root)}
+                disabled={isAddonScanBusy}
+              >
+                Remove
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="empty-note">
+            No addon folders saved yet. Add one or more Addon/Community roots, then scan them.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function FilterBar({
   filters,
   airlines,
   airportOptions,
+  regionOptions,
+  countryOptions,
   equipmentOptions,
   filterBounds,
   onFilterChange,
@@ -311,17 +426,56 @@ export default function FilterBar({
         </label>
 
         <label className="filter-block">
+          <span>Region</span>
+          <select
+            value={filters.region}
+            onChange={(event) => onFilterChange("region", event.target.value)}
+          >
+            <option value="ALL">All regions</option>
+            {regionOptions.map((region) => (
+              <option key={`region-${region.code}`} value={region.code}>
+                {region.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="filter-block">
+          <span>Country</span>
+          <select
+            value={filters.country}
+            onChange={(event) => onFilterChange("country", event.target.value)}
+          >
+            <option value="ALL">All countries</option>
+            {countryOptions.map((country) => (
+              <option key={`country-${country}`} value={country}>
+                {country}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="filter-grid filter-grid--route-fields">
+        <label className="filter-block filter-block--airport-select">
           <span>Origin Airport</span>
           <select
             value={filters.origin}
             onChange={(event) => onFilterChange("originAirport", event.target.value)}
           >
             <option value="">All origin airports</option>
-            {airportOptions.map((airport) => (
+            {airportOptions
+              .filter(
+                (airport) =>
+                  airport.usedAsOrigin &&
+                  (filters.region === "ALL" || airport.regionCode === filters.region) &&
+                  (filters.country === "ALL" || airport.country === filters.country)
+              )
+              .map((airport) => (
               <option key={`origin-${airport.icao}`} value={airport.icao}>
                 {airport.name} ({airport.icao})
               </option>
-            ))}
+              ))}
           </select>
         </label>
 
@@ -335,18 +489,25 @@ export default function FilterBar({
           />
         </label>
 
-        <label className="filter-block">
+        <label className="filter-block filter-block--airport-select">
           <span>Destination Airport</span>
           <select
             value={filters.destination}
             onChange={(event) => onFilterChange("destinationAirport", event.target.value)}
           >
             <option value="">All destination airports</option>
-            {airportOptions.map((airport) => (
+            {airportOptions
+              .filter(
+                (airport) =>
+                  airport.usedAsDestination &&
+                  (filters.region === "ALL" || airport.regionCode === filters.region) &&
+                  (filters.country === "ALL" || airport.country === filters.country)
+              )
+              .map((airport) => (
               <option key={`destination-${airport.icao}`} value={airport.icao}>
                 {airport.name} ({airport.icao})
               </option>
-            ))}
+              ))}
           </select>
         </label>
 
@@ -426,6 +587,8 @@ export default function FilterBar({
           }
         />
       </div>
+
+      <AddonAirportMatchControls filters={filters} onFilterChange={onFilterChange} />
     </section>
   );
 }

@@ -26,7 +26,25 @@ function formatData(data) {
     return "";
   }
 
-  return entries.map(([key, value]) => `${key}=${String(value)}`).join(" ");
+  return entries
+    .map(([key, value]) => `${key}=${formatValue(value)}`)
+    .join(" ");
+}
+
+function formatValue(value) {
+  if (value === null) {
+    return "null";
+  }
+
+  if (Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
 }
 
 export async function logAppEvent(event, data = null) {

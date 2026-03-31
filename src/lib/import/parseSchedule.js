@@ -32,7 +32,17 @@ const equipmentTypes = equipmentTypeCsv
   .filter(Boolean);
 
 const airlineMap = new Map(
-  airlineRows.map((row) => [String(row.ICAO || "").trim().toUpperCase(), row.Airline])
+  airlineRows.map((row) => [
+    String(row.IATA || row.ICAO || "").trim().toUpperCase(),
+    row.Airline
+  ])
+);
+
+const airlineIcaoMap = new Map(
+  airlineRows.map((row) => [
+    String(row.IATA || row.ICAO || "").trim().toUpperCase(),
+    String(row.ICAO || "").trim().toUpperCase()
+  ])
 );
 
 const airportMap = new Map(
@@ -148,6 +158,7 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         flightCode: `${rawFlight.airline}${rawFlight.flightNumber}`,
         airline: rawFlight.airline,
         airlineName,
+        airlineIcao: airlineIcaoMap.get(rawFlight.airline) || "",
         from: rawFlight.from,
         to: rawFlight.to,
         route: `${rawFlight.from}-${rawFlight.to}`,

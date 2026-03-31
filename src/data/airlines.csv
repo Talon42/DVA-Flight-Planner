@@ -1,60 +1,60 @@
-ICAO,Airline
-AM,AeroMexico
-AMH,AeroMexico Historical
-SUD,Aeroflot Historical
-SU,Aeroflot Russian Airlines
-AR,Aerolineas Argentina
-UX,Air Europa
-AF,Air France
-AFH,Air France Historic
-RW,Air West
-AS,Alaska Airlines
-AZD,Alitalia Historic
-CI,China Airlines
-CID,China Airlines Historic
-MU,China Eastern
-MUD,China Eastern Historical
-CZ,China Southern
-CZH,China Southern Historical
-OK,Czech Air Lines
-DL,Delta Air Lines
-DLC,Delta Connection
-DVH,Delta Historic
-GA,Garuda Indonesia
-GLO,Gol Transportes Aereos
-HA,Hawaiian Airlines
-AZ,ITA Airways
-JAD,Jet Airways Historical
-KLH,KLM Historic
-KL,KLM Royal Dutch Airlines
-KQ,Kenya Airways
-KQH,Kenya Airways Historic
-KE,Korean Air Lines
-KEH,Korean Air Lines Historic
-ME,Middle East Airlines
-NA,National Airlines
-NPA,National Parks Airways
-NCA,North Central Airlines
-NEH,Northeast Airlines
-NW,Northwest Airlines
-PAH,Pan American Airways
-SV,Saudi Arabian Airlines
-SVD,Saudia Historical
-SK,Scandinavian Airlines
-SBS,Seaborne Airlines
-FM,Shanghai Airlines
-SWR,Swissair
-ROH,Tarom Historical
-HV,Transavia
-HVD,Transavia Historical
-RO,Transporturile Aeriene Române
-VND,Vietnam Air Historical
-VN,Vietnam Airlines
-VS,Virgin Atlantic
-VSD,Virgin Atlantic Historic
-VA,Virgin Australia
-WS,WestJet Airlines
-WSH,WestJet Airlines Historical
-WR,WestJet Encore
-WAH,Western Airlines
-MF,Xiamen Airlines
+IATA,Airline,ICAO
+AM,AeroMexico,AMX
+AMH,AeroMexico Historical,AMX
+SUD,Aeroflot Historical,AFL
+SU,Aeroflot Russian Airlines,AFL
+AR,Aerolineas Argentina,ARG
+UX,Air Europa,AEA
+AF,Air France,AFR
+AFH,Air France Historic,AFR
+RW,Air West,AWT
+AS,Alaska Airlines,ASA
+AZD,Alitalia Historic,AZA
+CI,China Airlines,CAL
+CID,China Airlines Historic,CAL
+MU,China Eastern,CES
+MUD,China Eastern Historical,CES
+CZ,China Southern,CSN
+CZH,China Southern Historical,CSN
+OK,Czech Air Lines,CSA
+DL,Delta Air Lines,DAL
+DLC,Delta Connection,DAL
+DVH,Delta Historic,DAL
+GA,Garuda Indonesia,GIA
+GLO,Gol Transportes Aereos,GLO
+HA,Hawaiian Airlines,HAL
+AZ,ITA Airways,ITY
+JAD,Jet Airways Historical,JAI
+KLH,KLM Historic,KLM
+KL,KLM Royal Dutch Airlines,KLM
+KQ,Kenya Airways,KQA
+KQH,Kenya Airways Historic,KQA
+KE,Korean Air Lines,KAL
+KEH,Korean Air Lines Historic,KAL
+ME,Middle East Airlines,MEA
+NA,National Airlines,NAL
+NPA,National Parks Airways,
+NCA,North Central Airlines,NC
+NEH,Northeast Airlines,NEE
+NW,Northwest Airlines,NWA
+PAH,Pan American Airways,PAA
+SV,Saudi Arabian Airlines,SVA
+SVD,Saudia Historical,SVA
+SK,Scandinavian Airlines,SAS
+SBS,Seaborne Airlines,SBS
+FM,Shanghai Airlines,CSH
+SWR,Swissair,SWR
+ROH,Tarom Historical,ROT
+HV,Transavia,TRA
+HVD,Transavia Historical,TRA
+RO,Transporturile Aeriene Române,ROT
+VND,Vietnam Air Historical,HVN
+VN,Vietnam Airlines,HVN
+VS,Virgin Atlantic,VIR
+VSD,Virgin Atlantic Historic,VIR
+VA,Virgin Australia,VOZ
+WS,WestJet Airlines,WJA
+WSH,WestJet Airlines Historical,WJA
+WR,WestJet Encore,WEN
+WAH,Western Airlines,WAL
+MF,Xiamen Airlines,CXA

@@ -1,10 +1,18 @@
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import FilterBar from "./components/FilterBar";
+import { AddonAirportPanel } from "./components/FilterBar";
 import FlightTable from "./components/FlightTable";
 import DetailsPanel from "./components/DetailsPanel";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
 import { buildAirportOptions, getAirportByIcao } from "./lib/airportCatalog";
 import dalLogo from "./data/images/DAL.png";
+import {
+  createEmptyAddonAirportScan,
+  pickAddonAirportFolder,
+  readAddonAirportCache,
+  saveAddonAirportRoots,
+  scanAddonAirports
+} from "./lib/addonAirportScan";
 import {
   closeDeltaVirtualSyncWindow,
   pruneDeltaVirtualStorage,
@@ -22,6 +30,10 @@ import {
 } from "./lib/storage";
 
 const THEME_STORAGE_KEY = "flight-planner.theme";
+
+function isTauriRuntime() {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
 
 function readSavedTheme() {
   if (typeof window === "undefined") {
@@ -61,11 +73,27 @@ function ThemeToggleIcon({ theme }) {
   );
 }
 
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
+      <path
+        d="M6.8 1.9h2.4l.4 1.6c.4.1.8.3 1.1.5l1.5-.7 1.2 2.1-1.2 1.1c.1.4.2.8.2 1.2s-.1.8-.2 1.2l1.2 1.1-1.2 2.1-1.5-.7c-.3.2-.7.4-1.1.5l-.4 1.6H6.8l-.4-1.6c-.4-.1-.8-.3-1.1-.5l-1.5.7-1.2-2.1 1.2-1.1A4.8 4.8 0 0 1 3.6 8c0-.4.1-.8.2-1.2L2.6 5.7l1.2-2.1 1.5.7c.3-.2.7-.4 1.1-.5l.4-1.6Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.3"
+      />
+      <circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
 function sortFlights(flights, sort) {
   const direction = sort.direction === "asc" ? 1 : -1;
   return [...flights].sort((left, right) => {
-    const leftValue = normalizeSortValue(left[sort.key], sort.key);
-    const rightValue = normalizeSortValue(right[sort.key], sort.key);
+    const leftValue = normalizeSortValue(left[sort.key]);
+    const rightValue = normalizeSortValue(right[sort.key]);
 
     if (leftValue < rightValue) {
       return -1 * direction;
@@ -79,7 +107,26 @@ function sortFlights(flights, sort) {
   });
 }
 
-function normalizeSortValue(value, key) {
+function prioritizeAddonFlights(flights, addonAirports, matchMode) {
+  if (!flights.length || !addonAirports.size) {
+    return flights;
+  }
+
+  const matched = [];
+  const unmatched = [];
+
+  for (const flight of flights) {
+    if (matchesAddonAirport(flight, addonAirports, matchMode)) {
+      matched.push(flight);
+    } else {
+      unmatched.push(flight);
+    }
+  }
+
+  return [...matched, ...unmatched];
+}
+
+function normalizeSortValue(value) {
   if (value === null || value === undefined || value === "") {
     return "";
   }
@@ -119,6 +166,150 @@ function matchesSearch(flight, query) {
     .toUpperCase();
 
   return haystack.includes(query.toUpperCase());
+}
+
+function matchesAddonAirport(flight, addonAirports, matchMode) {
+  if (!addonAirports.size) {
+    return false;
+  }
+
+  const originMatch = addonAirports.has(String(flight.from || "").trim().toUpperCase());
+  const destinationMatch = addonAirports.has(String(flight.to || "").trim().toUpperCase());
+
+  switch (matchMode) {
+    case "origin":
+      return originMatch;
+    case "destination":
+      return destinationMatch;
+    case "both":
+      return originMatch && destinationMatch;
+    case "either":
+    default:
+      return originMatch || destinationMatch;
+  }
+}
+
+function formatScanTimestamp(value) {
+  if (!value) {
+    return "";
+  }
+
+  const normalized = String(value);
+  if (/^\d+\.\d+$/.test(normalized)) {
+    const millis = Number(normalized) * 1000;
+    if (Number.isFinite(millis)) {
+      return new Date(millis).toLocaleString();
+    }
+  }
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return normalized;
+  }
+
+  return parsed.toLocaleString();
+}
+
+function formatAddonScanSummary(addonScan) {
+  if (!addonScan.roots.length) {
+    return "No addon folders saved.";
+  }
+
+  const scanStamp = formatScanTimestamp(addonScan.lastScannedAt);
+  const baseSummary = `${formatNumber(addonScan.airports.length)} airports cached from ${formatNumber(
+    addonScan.contentHistoryFilesScanned
+  )} ContentHistory files${scanStamp ? `, last scanned ${scanStamp}` : ""}.`;
+
+  if (addonScan.lastError) {
+    return `${baseSummary} ${addonScan.lastError}`;
+  }
+
+  return baseSummary;
+}
+
+function buildAddonAirportPreview(airports, limit = 12) {
+  if (!Array.isArray(airports) || !airports.length) {
+    return [];
+  }
+
+  return airports.slice(0, limit);
+}
+
+function buildAddonScanLogData(addonScan) {
+  return {
+    rootCount: addonScan?.roots?.length || 0,
+    roots: addonScan?.roots || [],
+    airportsCached: addonScan?.airports?.length || 0,
+    airportPreview: buildAddonAirportPreview(addonScan?.airports || []),
+    contentHistoryFilesScanned: addonScan?.contentHistoryFilesScanned || 0,
+    airportEntriesFound: addonScan?.airportEntriesFound || 0,
+    lastScannedAt: addonScan?.lastScannedAt || null,
+    status: addonScan?.status || "idle",
+    lastError: addonScan?.lastError || null,
+    warnings: addonScan?.warnings || [],
+    scanDetails: addonScan?.scanDetails || []
+  };
+}
+
+function formatLogTimestamp() {
+  return new Date().toISOString();
+}
+
+function buildAddonNotCachedItems(addonScan) {
+  const items = [];
+
+  for (const detail of addonScan?.scanDetails || []) {
+    if (Array.isArray(detail?.duplicateAirports) && detail.duplicateAirports.length) {
+      for (const airport of detail.duplicateAirports) {
+        items.push({
+          name: airport,
+          reason: "duplicate",
+          path: detail.path
+        });
+      }
+    }
+
+    if (detail?.status === "malformed-json") {
+      items.push({
+        name: detail.path,
+        reason: "malformed-json",
+        path: detail.path
+      });
+    }
+
+    if (detail?.status === "unreadable-file") {
+      items.push({
+        name: detail.path,
+        reason: "unreadable-file",
+        path: detail.path
+      });
+    }
+
+    if (detail?.status === "no-airport-content") {
+      items.push({
+        name: detail.path,
+        reason: "no-airport-content",
+        path: detail.path
+      });
+    }
+  }
+
+  return items;
+}
+
+function buildAddonScanLogReport(addonScan) {
+  const notCachedItems = buildAddonNotCachedItems(addonScan);
+  const lines = [
+    `[${formatLogTimestamp()}] [App] addon-scan-summary scanned=${addonScan?.contentHistoryFilesScanned || 0} cached=${addonScan?.airports?.length || 0} notCached=${notCachedItems.length}`
+  ];
+
+  for (const item of notCachedItems) {
+    lines.push(
+      `[${formatLogTimestamp()}] [App] addon-scan-not-cached name="${item.name}" reason="${item.reason}" path="${item.path}"`
+    );
+  }
+
+  return lines.join("\n");
 }
 
 function buildSavedSchedule(schedule, uiState) {
@@ -190,6 +381,40 @@ function buildRangeDefaults(bounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }) {
   };
 }
 
+function buildGeoOptions(airportOptions) {
+  const regionMap = new Map();
+  const countrySet = new Set();
+
+  for (const airport of airportOptions || []) {
+    const icao = String(airport?.icao || "").trim().toUpperCase();
+    if (!icao) {
+      continue;
+    }
+
+    const regionCode = String(airport?.regionCode || "").trim().toUpperCase();
+    const regionName = String(airport?.regionName || "").trim();
+    const country = String(airport?.country || "").trim();
+
+    if (regionCode && regionName && !regionMap.has(regionCode)) {
+      regionMap.set(regionCode, {
+        code: regionCode,
+        name: regionName
+      });
+    }
+
+    if (country) {
+      countrySet.add(country);
+    }
+  }
+
+  return {
+    regions: [...regionMap.values()].toSorted((left, right) =>
+      left.name.localeCompare(right.name)
+    ),
+    countries: [...countrySet].toSorted((left, right) => left.localeCompare(right))
+  };
+}
+
 function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }) {
   const nextFilters = {
     ...DEFAULT_FILTERS,
@@ -198,8 +423,17 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
 
   nextFilters.origin = String(nextFilters.origin || "").trim().toUpperCase();
   nextFilters.destination = String(nextFilters.destination || "").trim().toUpperCase();
+  nextFilters.region = String(nextFilters.region || "ALL").trim().toUpperCase() || "ALL";
+  nextFilters.country = String(nextFilters.country || "ALL").trim() || "ALL";
   nextFilters.originAirport = String(nextFilters.originAirport || "").trim();
   nextFilters.destinationAirport = String(nextFilters.destinationAirport || "").trim();
+  nextFilters.addonFilterEnabled = Boolean(nextFilters.addonFilterEnabled);
+  nextFilters.addonPriorityEnabled = Boolean(nextFilters.addonPriorityEnabled);
+  nextFilters.addonMatchMode = ["either", "origin", "destination", "both"].includes(
+    nextFilters.addonMatchMode
+  )
+    ? nextFilters.addonMatchMode
+    : "either";
 
   if (nextFilters.origin && !nextFilters.originAirport) {
     nextFilters.originAirport = getAirportByIcao(nextFilters.origin)?.name || "";
@@ -213,8 +447,7 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
     nextFilters.equipment = nextFilters.equipment ? [nextFilters.equipment] : [];
   }
 
-  nextFilters.timeDisplayMode =
-    nextFilters.timeDisplayMode === "local" ? "local" : "utc";
+  nextFilters.timeDisplayMode = nextFilters.timeDisplayMode === "local" ? "local" : "utc";
 
   const defaultFlightLengthMax = bounds.maxBlockMinutes;
   const defaultDistanceMax = bounds.maxDistanceNm;
@@ -260,11 +493,32 @@ export default function App() {
   const [filterUiVersion, setFilterUiVersion] = useState(0);
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [theme, setTheme] = useState(readSavedTheme);
+  const [addonScan, setAddonScan] = useState(createEmptyAddonAirportScan);
   const [isImporting, setIsImporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
+  const [isAddonScanBusy, setIsAddonScanBusy] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready");
   const deferredFilters = useDeferredValue(filters);
+  const isDesktopAddonScanAvailable = isTauriRuntime();
+
+  useEffect(() => {
+    if (!isSettingsOpen) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsSettingsOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isSettingsOpen]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -277,16 +531,41 @@ export default function App() {
     logAppEvent("app-start").catch(() => {});
 
     async function hydrate() {
-      try {
-        const savedSchedule = await readSavedSchedule();
+      const [scheduleResult, addonCacheResult] = await Promise.allSettled([
+        readSavedSchedule(),
+        readAddonAirportCache()
+      ]);
 
-        if (cancelled || !savedSchedule?.flights?.length) {
-          if (!cancelled) {
+      try {
+        if (cancelled) {
+          return;
+        }
+
+        if (addonCacheResult.status === "fulfilled") {
+          setAddonScan(addonCacheResult.value);
+          await logAppEvent("addon-cache-loaded", buildAddonScanLogData(addonCacheResult.value));
+        } else {
+          setStatusMessage(
+            addonCacheResult.reason?.message || "Unable to load addon airport cache."
+          );
+          await logAppError("addon-cache-hydrate-failed", addonCacheResult.reason);
+        }
+
+        if (
+          scheduleResult.status !== "fulfilled" ||
+          cancelled ||
+          !scheduleResult.value?.flights?.length
+        ) {
+          if (scheduleResult.status === "rejected") {
+            setStatusMessage(scheduleResult.reason?.message || "Unable to load saved schedule.");
+            await logAppError("hydrate-failed", scheduleResult.reason);
+          } else {
             await logAppEvent("hydrate-empty");
           }
           return;
         }
 
+        const savedSchedule = scheduleResult.value;
         setSchedule({
           importedAt: savedSchedule.importedAt,
           flights: savedSchedule.flights,
@@ -308,14 +587,13 @@ export default function App() {
             savedSchedule.flights[0]?.flightId ||
             null
         );
-        setStatusMessage("");
+        if (addonCacheResult.status === "fulfilled") {
+          setStatusMessage("");
+        }
         await logAppEvent("hydrate-loaded", {
           flights: savedSchedule.flights.length,
           source: savedSchedule.importSummary?.sourceFileName || "unknown"
         });
-      } catch (error) {
-        setStatusMessage(error.message || "Unable to load saved schedule.");
-        await logAppError("hydrate-failed", error);
       } finally {
         if (!cancelled) {
           setIsHydrating(false);
@@ -323,7 +601,13 @@ export default function App() {
       }
     }
 
-    hydrate();
+    hydrate().catch(async (error) => {
+      if (!cancelled) {
+        setStatusMessage(error.message || "Unable to initialize the app.");
+        setIsHydrating(false);
+      }
+      await logAppError("hydrate-unhandled-failed", error);
+    });
 
     return () => {
       cancelled = true;
@@ -363,15 +647,36 @@ export default function App() {
         .sort()
     : [];
   const airportOptions = buildAirportOptions(schedule?.flights || []);
+  const geoOptions = buildGeoOptions(airportOptions);
 
   const filterBounds = buildFilterBounds(schedule?.flights || []);
   const normalizedDeferredFilters = normalizeFilters(deferredFilters, filterBounds);
+  const addonAirports = new Set(addonScan.airports);
 
   const filteredFlights = schedule
     ? schedule.flights.filter((flight) => {
+        const fromAirport = getAirportByIcao(flight.from);
+        const toAirport = getAirportByIcao(flight.to);
+
         if (
           normalizedDeferredFilters.airline !== "ALL" &&
           flight.airlineName !== normalizedDeferredFilters.airline
+        ) {
+          return false;
+        }
+
+        if (
+          normalizedDeferredFilters.region !== "ALL" &&
+          (fromAirport?.regionCode !== normalizedDeferredFilters.region ||
+            toAirport?.regionCode !== normalizedDeferredFilters.region)
+        ) {
+          return false;
+        }
+
+        if (
+          normalizedDeferredFilters.country !== "ALL" &&
+          (fromAirport?.country !== normalizedDeferredFilters.country ||
+            toAirport?.country !== normalizedDeferredFilters.country)
         ) {
           return false;
         }
@@ -442,11 +747,30 @@ export default function App() {
           return false;
         }
 
-        return matchesSearch(flight, normalizedDeferredFilters.search.trim());
+        if (!matchesSearch(flight, normalizedDeferredFilters.search.trim())) {
+          return false;
+        }
+
+        if (normalizedDeferredFilters.addonFilterEnabled) {
+          return matchesAddonAirport(
+            flight,
+            addonAirports,
+            normalizedDeferredFilters.addonMatchMode
+          );
+        }
+
+        return true;
       })
     : [];
 
-  const sortedFlights = sortFlights(filteredFlights, sort);
+  const sortedFlights = (() => {
+    const sorted = sortFlights(filteredFlights, sort);
+    if (!normalizedDeferredFilters.addonPriorityEnabled) {
+      return sorted;
+    }
+
+    return prioritizeAddonFlights(sorted, addonAirports, normalizedDeferredFilters.addonMatchMode);
+  })();
 
   const shortlist = schedule
     ? schedule.flights.filter((flight) => flight.isShortlisted)
@@ -603,6 +927,24 @@ export default function App() {
   }
 
   function handleFilterChange(key, value) {
+    if (
+      key === "addonMatchMode" ||
+      key === "addonFilterEnabled" ||
+      key === "addonPriorityEnabled"
+    ) {
+      logAppEvent("addon-filter-updated", {
+        key,
+        value,
+        addonMatchMode:
+          key === "addonMatchMode" ? value : filters.addonMatchMode,
+        addonFilterEnabled:
+          key === "addonFilterEnabled" ? value : filters.addonFilterEnabled,
+        addonPriorityEnabled:
+          key === "addonPriorityEnabled" ? value : filters.addonPriorityEnabled,
+        airportsCached: addonScan.airports.length
+      }).catch(() => {});
+    }
+
     startTransition(() => {
       setFilters((current) => {
         if (key === "origin") {
@@ -659,6 +1001,7 @@ export default function App() {
 
   function handleResetFilters() {
     setFilters(normalizeFilters(DEFAULT_FILTERS, filterBounds));
+    setFilterUiVersion((current) => current + 1);
   }
 
   function handleSort(sortKey) {
@@ -741,8 +1084,106 @@ export default function App() {
     }
   }
 
+  async function persistAddonRoots(nextRoots) {
+    const nextScan = await saveAddonAirportRoots(nextRoots);
+    setAddonScan(nextScan);
+    return nextScan;
+  }
+
+  async function handleAddAddonRoot() {
+    try {
+      const path = await pickAddonAirportFolder();
+      if (!path) {
+        await logAppEvent("addon-root-add-cancelled");
+        return;
+      }
+
+      const nextRoots = [...new Set([...addonScan.roots, path])];
+      await persistAddonRoots(nextRoots);
+      setStatusMessage(`Saved ${formatNumber(nextRoots.length)} addon folder roots.`);
+      await logAppEvent("addon-root-added", {
+        rootAdded: path,
+        rootCount: nextRoots.length,
+        roots: nextRoots
+      });
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to add addon folder.");
+      await logAppError("addon-root-add-failed", error);
+    }
+  }
+
+  async function handleRemoveAddonRoot(rootToRemove) {
+    try {
+      const nextRoots = addonScan.roots.filter((root) => root !== rootToRemove);
+      await persistAddonRoots(nextRoots);
+      setStatusMessage(
+        nextRoots.length
+          ? `Removed addon folder. ${formatNumber(nextRoots.length)} roots remain.`
+          : "Removed addon folder. No roots saved."
+      );
+      await logAppEvent("addon-root-removed", {
+        rootRemoved: rootToRemove,
+        rootCount: nextRoots.length,
+        roots: nextRoots
+      });
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to update addon folder list.");
+      await logAppError("addon-root-remove-failed", error);
+    }
+  }
+
+  async function handleScanAddonAirports() {
+    if (!addonScan.roots.length) {
+      await logAppEvent("addon-scan-skipped-no-roots");
+      return;
+    }
+
+    setIsAddonScanBusy(true);
+    setStatusMessage("Scanning addon folders for ContentHistory.json...");
+    await logAppEvent("addon-scan-start", {
+      roots: addonScan.roots,
+      rootCount: addonScan.roots.length,
+      previousAirportsCached: addonScan.airports.length,
+      previousContentHistoryFilesScanned: addonScan.contentHistoryFilesScanned
+    });
+
+    try {
+      const nextScan = await scanAddonAirports(addonScan.roots);
+      setAddonScan(nextScan);
+      setStatusMessage(
+        `Scanned ${formatNumber(nextScan.contentHistoryFilesScanned)} ContentHistory files and cached ${formatNumber(nextScan.airports.length)} addon airports.`
+      );
+      await appendImportLog(buildAddonScanLogReport(nextScan));
+    } catch (error) {
+      setStatusMessage(error.message || "Addon airport scan failed.");
+      await logAppError("addon-scan-failed", error, {
+        rootCount: addonScan.roots.length,
+        roots: addonScan.roots
+      });
+    } finally {
+      setIsAddonScanBusy(false);
+    }
+  }
+
   function handleToggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
+  }
+
+  function handleToggleSettings() {
+    setIsSettingsOpen((current) => {
+      const nextValue = !current;
+      logAppEvent(nextValue ? "settings-opened" : "settings-closed", {
+        section: "addon-airports"
+      }).catch(() => {});
+      return nextValue;
+    });
+  }
+
+  function handleCloseSettings() {
+    setIsSettingsOpen(false);
+    logAppEvent("settings-closed", {
+      section: "addon-airports"
+    }).catch(() => {});
   }
 
   return (
@@ -761,7 +1202,7 @@ export default function App() {
             className="primary-button"
             type="button"
             onClick={handleImport}
-            disabled={isImporting || isSyncing}
+            disabled={isImporting || isSyncing || isAddonScanBusy || isHydrating}
           >
             {isImporting ? "Importing..." : schedule ? "Replace Schedule" : "Import Schedule XML"}
           </button>
@@ -769,7 +1210,7 @@ export default function App() {
             className="ghost-button"
             type="button"
             onClick={handleDeltaVirtualSync}
-            disabled={isImporting || isSyncing}
+            disabled={isImporting || isSyncing || isAddonScanBusy || isHydrating}
           >
             {isSyncing ? "Syncing..." : "Sync from Delta Virtual"}
           </button>
@@ -782,27 +1223,18 @@ export default function App() {
           >
             <ThemeToggleIcon theme={theme} />
           </button>
+          <button
+            className="theme-toggle"
+            type="button"
+            onClick={handleToggleSettings}
+            title="Open settings"
+            aria-label="Open settings"
+            aria-expanded={isSettingsOpen}
+          >
+            <SettingsIcon />
+          </button>
         </div>
       </header>
-
-      <section className="summary-strip">
-        <div className="summary-card">
-          <span>Flights Loaded</span>
-          <strong>{formatNumber(schedule?.flights?.length || 0)}</strong>
-        </div>
-        <div className="summary-card">
-          <span>Filtered Result</span>
-          <strong>{formatNumber(sortedFlights.length)}</strong>
-        </div>
-        <div className="summary-card">
-          <span>Flight Board</span>
-          <strong>{formatNumber(shortlist.length)}</strong>
-        </div>
-        <div className="summary-card">
-          <span>Import Status</span>
-          <strong>{schedule?.importSummary?.omittedRows ? "Issues logged" : "Clean"}</strong>
-        </div>
-      </section>
 
       <main className="workspace">
         <div className="workspace__main">
@@ -811,6 +1243,8 @@ export default function App() {
             filters={normalizeFilters(filters, filterBounds)}
             airlines={airlines}
             airportOptions={airportOptions}
+            regionOptions={geoOptions.regions}
+            countryOptions={geoOptions.countries}
             equipmentOptions={equipmentOptions}
             filterBounds={filterBounds}
             onFilterChange={handleFilterChange}
@@ -824,6 +1258,7 @@ export default function App() {
                 selectedFlightId={selectedFlightId}
                 sort={sort}
                 timeDisplayMode={normalizedDeferredFilters.timeDisplayMode}
+                addonAirports={addonAirports}
                 onSort={handleSort}
                 onSelectFlight={handleSelectFlight}
                 onAddToFlightBoard={handleAddToFlightBoard}
@@ -860,6 +1295,48 @@ export default function App() {
           />
         </div>
       </main>
+
+      {isSettingsOpen ? (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onClick={handleCloseSettings}
+        >
+          <section
+            className="settings-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Settings"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="settings-modal__header">
+              <div>
+                <p className="eyebrow">Settings</p>
+                <h2>Addon Airport Settings</h2>
+              </div>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={handleCloseSettings}
+              >
+                Close
+              </button>
+            </div>
+
+            <AddonAirportPanel
+              filters={normalizeFilters(filters, filterBounds)}
+              addonScan={addonScan}
+              addonScanSummary={formatAddonScanSummary(addonScan)}
+              isAddonScanBusy={isAddonScanBusy}
+              isDesktopAddonScanAvailable={isDesktopAddonScanAvailable}
+              onFilterChange={handleFilterChange}
+              onAddAddonRoot={handleAddAddonRoot}
+              onRemoveAddonRoot={handleRemoveAddonRoot}
+              onScanAddonAirports={handleScanAddonAirports}
+            />
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

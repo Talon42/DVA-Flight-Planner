@@ -4,9 +4,9 @@
   --delta-blue-deep: #0b1f36;
   --delta-red: #c8102e;
   --app-bg:
-    radial-gradient(circle at top left, rgba(200, 16, 46, 0.24), transparent 30%),
-    radial-gradient(circle at top right, rgba(0, 58, 112, 0.12), transparent 32%),
-    linear-gradient(155deg, #f5f8fc 0%, #fdf8fa 52%, #eef3f9 100%);
+    radial-gradient(circle at top left, rgba(11, 31, 54, 0.34), transparent 22%),
+    radial-gradient(circle at top right, rgba(0, 58, 112, 0.24), transparent 24%),
+    linear-gradient(155deg, #e4ebf4 0%, #dbe4ef 48%, #d1dce9 100%);
   --text-primary: #102136;
   --text-heading: var(--delta-blue-deep);
   --text-muted: #64758a;
@@ -19,7 +19,7 @@
   --surface-panel: rgba(245, 248, 252, 0.88);
   --surface-table-row: rgba(255, 255, 255, 0.4);
   --surface-table-row-selected:
-    linear-gradient(90deg, rgba(200, 16, 46, 0.16), rgba(0, 58, 112, 0.06)),
+    linear-gradient(90deg, rgba(0, 58, 112, 0.18), rgba(11, 31, 54, 0.08)),
     rgba(255, 255, 255, 0.84);
   --surface-option: rgba(246, 249, 252, 0.9);
   --surface-option-selected: rgba(0, 58, 112, 0.08);
@@ -45,6 +45,9 @@
   --status-resolved-bg: rgba(18, 104, 53, 0.12);
   --status-resolved-text: #126835;
   --status-ambiguous-bg: rgba(200, 16, 46, 0.12);
+  --range-track-active: linear-gradient(90deg, var(--delta-blue) 0%, var(--delta-blue-deep) 100%);
+  --range-thumb-max: var(--delta-blue);
+  --button-active-bg: var(--delta-blue);
   --theme-toggle-bg: rgba(255, 255, 255, 0.76);
   --theme-toggle-border: rgba(16, 33, 54, 0.12);
   --theme-toggle-text: var(--delta-blue-deep);
@@ -97,6 +100,9 @@
   --status-resolved-bg: rgba(60, 173, 111, 0.18);
   --status-resolved-text: #9de4bc;
   --status-ambiguous-bg: rgba(200, 16, 46, 0.2);
+  --range-track-active: linear-gradient(90deg, var(--delta-blue) 0%, var(--delta-red) 100%);
+  --range-thumb-max: var(--delta-red);
+  --button-active-bg: linear-gradient(135deg, var(--delta-red) 0%, #7d0f24 100%);
   --theme-toggle-bg: rgba(10, 24, 43, 0.88);
   --theme-toggle-border: rgba(186, 209, 234, 0.18);
   --theme-toggle-text: #ffffff;
@@ -186,14 +192,6 @@ button {
   color: var(--delta-red);
 }
 
-.summary-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.summary-card,
 .filter-bar,
 .table-shell,
 .details-card,
@@ -202,34 +200,6 @@ button {
   background: var(--surface);
   backdrop-filter: blur(18px);
   box-shadow: var(--shadow);
-}
-
-.summary-card {
-  padding: 16px 18px;
-  border-radius: 20px;
-}
-
-.summary-card span {
-  display: block;
-  margin-bottom: 10px;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.summary-card strong {
-  font-size: 1.5rem;
-  letter-spacing: -0.04em;
-}
-
-.status-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 14px 4px 18px;
-  color: var(--text-muted);
-  font-size: 0.92rem;
 }
 
 .workspace {
@@ -277,6 +247,64 @@ button {
   z-index: 3;
 }
 
+.addon-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface-panel);
+}
+
+.filter-heading--addon {
+  margin-bottom: 0;
+}
+
+.addon-panel__actions,
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.addon-panel__summary {
+  display: grid;
+  gap: 6px;
+}
+
+.addon-panel__summary p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.addon-root-list {
+  display: grid;
+  gap: 10px;
+}
+
+.addon-root-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--input-bg);
+}
+
+.addon-root-item code {
+  overflow-wrap: anywhere;
+}
+
+.addon-root-item__remove,
+.ghost-button--active {
+  border-color: rgba(0, 58, 112, 0.25);
+  background: var(--chip-bg);
+  color: var(--text-heading);
+}
+
 .filter-heading,
 .details-card__header {
   display: flex;
@@ -300,18 +328,61 @@ button {
 }
 
 .filter-grid--routing {
-  grid-template-columns:
-    minmax(220px, 1.35fr)
-    minmax(220px, 1.35fr)
-    minmax(96px, 0.45fr)
-    minmax(220px, 1.35fr)
-    minmax(96px, 0.45fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: end;
+}
+
+.filter-grid--route-fields {
+  grid-template-columns: minmax(0, 2fr) minmax(120px, 0.7fr) minmax(0, 2fr) minmax(120px, 0.7fr);
+  align-items: end;
+  margin-top: 12px;
 }
 
 .filter-grid--advanced {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 12px;
+}
+
+.filter-grid--addon {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 20, 36, 0.42);
+  backdrop-filter: blur(8px);
+  z-index: 50;
+}
+
+.settings-modal {
+  width: min(860px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid var(--surface-border);
+  border-radius: 28px;
+  background: var(--surface-raised);
+  box-shadow: var(--menu-shadow);
+}
+
+.settings-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.settings-modal__header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.04em;
+  color: var(--text-heading);
 }
 
 .filter-block,
@@ -322,6 +393,10 @@ button {
 
 .filter-block--wide {
   grid-column: span 2;
+}
+
+.filter-block--airport-select {
+  min-width: 0;
 }
 
 .filter-block--icao {
@@ -352,6 +427,27 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.airline-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.airline-cell__logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.airline-cell__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .time-mode-toggle,
@@ -620,7 +716,7 @@ select:focus,
 
 .range-slider__track--active {
   right: auto;
-  background: linear-gradient(90deg, var(--delta-blue) 0%, var(--delta-red) 100%);
+  background: var(--range-track-active);
 }
 
 .range-slider__input {
@@ -653,7 +749,7 @@ select:focus,
 }
 
 .range-slider__input:last-child::-webkit-slider-thumb {
-  background: var(--delta-red);
+  background: var(--range-thumb-max);
 }
 
 .range-slider__input::-moz-range-track {
@@ -672,7 +768,7 @@ select:focus,
 }
 
 .range-slider__input:last-child::-moz-range-thumb {
-  background: var(--delta-red);
+  background: var(--range-thumb-max);
 }
 
 .primary-button,
@@ -693,7 +789,7 @@ select:focus,
 }
 
 .primary-button--active {
-  background: linear-gradient(135deg, var(--delta-red) 0%, #7d0f24 100%);
+  background: var(--button-active-bg);
 }
 
 .ghost-button {
@@ -845,6 +941,31 @@ select:focus,
   text-overflow: ellipsis;
 }
 
+.airport-code-with-addon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.addon-airport-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(18, 104, 53, 0.14);
+  color: #126835;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+:root[data-theme="dark"] .addon-airport-badge {
+  background: rgba(60, 173, 111, 0.2);
+  color: #9de4bc;
+}
+
 .table-cell--right {
   text-align: right;
 }
@@ -977,7 +1098,27 @@ select:focus,
   gap: 12px;
 }
 
-.route-banner__meta span {
+.route-banner__meta > span {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.flight-board-airline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.flight-board-airline__logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.flight-board-airline__code {
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -1012,11 +1153,12 @@ select:focus,
 }
 
 @media (max-width: 1180px) {
-  .summary-strip,
   .workspace,
   .table-board-layout,
   .filter-grid--routing,
-  .filter-grid--advanced {
+  .filter-grid--route-fields,
+  .filter-grid--advanced,
+  .filter-grid--addon {
     grid-template-columns: 1fr;
   }
 
@@ -1024,10 +1166,10 @@ select:focus,
     grid-column: span 1;
   }
 
-  .status-line,
   .topbar,
   .filter-heading,
-  .details-card__header {
+  .details-card__header,
+  .settings-modal__header {
     flex-direction: column;
     align-items: flex-start;
   }

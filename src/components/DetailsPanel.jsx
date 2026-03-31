@@ -2,6 +2,7 @@ import {
   formatNumber,
   formatUtc,
 } from "../lib/formatters";
+import { getAirlineLogo } from "../lib/airlineBranding";
 import planeLight from "../data/images/plane_light.png";
 
 function DetailRow({ label, value }) {
@@ -9,6 +10,28 @@ function DetailRow({ label, value }) {
     <div className="detail-row">
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function FlightBoardAirline({ flight }) {
+  const logoSrc = getAirlineLogo({
+    airlineName: flight?.airlineName,
+    airlineIata: flight?.airline,
+    airlineIcao: flight?.airlineIcao
+  });
+
+  return (
+    <div className="flight-board-airline">
+      {logoSrc ? (
+        <img
+          className="flight-board-airline__logo"
+          src={logoSrc}
+          alt=""
+          aria-hidden="true"
+        />
+      ) : null}
+      <span className="flight-board-airline__code">{flight.flightCode}</span>
     </div>
   );
 }
@@ -82,7 +105,7 @@ export default function DetailsPanel({
               >
                 <div className="route-banner route-banner--compact">
                   <div className="route-banner__meta">
-                    <span>{flight.flightCode}</span>
+                    <FlightBoardAirline flight={flight} />
                     <small>{formatUtc(flight.stdUtc)}</small>
                   </div>
                   <div>

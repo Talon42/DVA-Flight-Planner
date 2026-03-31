@@ -1,0 +1,196 @@
+﻿region_code,region_name,country
+APAC,Asia and Pacific,Afghanistan
+APAC,Asia and Pacific,Australia
+APAC,Asia and Pacific,Bangladesh
+APAC,Asia and Pacific,Bhutan
+APAC,Asia and Pacific,Brunei Darussalam
+APAC,Asia and Pacific,Cambodia
+APAC,Asia and Pacific,China
+APAC,Asia and Pacific,Cook Islands
+APAC,Asia and Pacific,Democratic People's Republic of Korea
+APAC,Asia and Pacific,Fiji
+APAC,Asia and Pacific,"Hong Kong, China"
+APAC,Asia and Pacific,India
+APAC,Asia and Pacific,Indonesia
+APAC,Asia and Pacific,Japan
+APAC,Asia and Pacific,Kiribati
+APAC,Asia and Pacific,Lao People's Democratic Republic
+APAC,Asia and Pacific,"Macao, China"
+APAC,Asia and Pacific,Malaysia
+APAC,Asia and Pacific,Maldives
+APAC,Asia and Pacific,Marshall Islands
+APAC,Asia and Pacific,Micronesia (Federated States of)
+APAC,Asia and Pacific,Mongolia
+APAC,Asia and Pacific,Myanmar
+APAC,Asia and Pacific,Nauru
+APAC,Asia and Pacific,Nepal
+APAC,Asia and Pacific,New Zealand
+APAC,Asia and Pacific,Pakistan
+APAC,Asia and Pacific,Palau
+APAC,Asia and Pacific,Papua New Guinea
+APAC,Asia and Pacific,Philippines
+APAC,Asia and Pacific,Republic of Korea
+APAC,Asia and Pacific,Samoa
+APAC,Asia and Pacific,Singapore
+APAC,Asia and Pacific,Solomon Islands
+APAC,Asia and Pacific,Sri Lanka
+APAC,Asia and Pacific,Thailand
+APAC,Asia and Pacific,Timor Leste
+APAC,Asia and Pacific,Tonga
+APAC,Asia and Pacific,Tuvalu
+APAC,Asia and Pacific,Vanuatu
+APAC,Asia and Pacific,Viet Nam
+ESAF,Eastern and Southern African,Angola
+ESAF,Eastern and Southern African,Botswana
+ESAF,Eastern and Southern African,Burundi
+ESAF,Eastern and Southern African,Comoros
+ESAF,Eastern and Southern African,Djibouti
+ESAF,Eastern and Southern African,Eritrea
+ESAF,Eastern and Southern African,Eswatini
+ESAF,Eastern and Southern African,Ethiopia
+ESAF,Eastern and Southern African,Kenya
+ESAF,Eastern and Southern African,Lesotho
+ESAF,Eastern and Southern African,Madagascar
+ESAF,Eastern and Southern African,Malawi
+ESAF,Eastern and Southern African,Mauritius
+ESAF,Eastern and Southern African,Mozambique
+ESAF,Eastern and Southern African,Namibia
+ESAF,Eastern and Southern African,Rwanda
+ESAF,Eastern and Southern African,Seychelles
+ESAF,Eastern and Southern African,Somalia
+ESAF,Eastern and Southern African,South Africa
+ESAF,Eastern and Southern African,South Sudan
+ESAF,Eastern and Southern African,Uganda
+ESAF,Eastern and Southern African,United Republic of Tanzania
+ESAF,Eastern and Southern African,Zambia
+ESAF,Eastern and Southern African,Zimbabwe
+EUR/NAT,European and North Atlantic,Albania
+EUR/NAT,European and North Atlantic,Algeria
+EUR/NAT,European and North Atlantic,Andorra
+EUR/NAT,European and North Atlantic,Armenia
+EUR/NAT,European and North Atlantic,Austria
+EUR/NAT,European and North Atlantic,Azerbaijan
+EUR/NAT,European and North Atlantic,Belarus
+EUR/NAT,European and North Atlantic,Belgium
+EUR/NAT,European and North Atlantic,Bosnia and Herzegovina
+EUR/NAT,European and North Atlantic,Bulgaria
+EUR/NAT,European and North Atlantic,Croatia
+EUR/NAT,European and North Atlantic,Cyprus
+EUR/NAT,European and North Atlantic,Czechia
+EUR/NAT,European and North Atlantic,Denmark
+EUR/NAT,European and North Atlantic,Estonia
+EUR/NAT,European and North Atlantic,Finland
+EUR/NAT,European and North Atlantic,France
+EUR/NAT,European and North Atlantic,Georgia
+EUR/NAT,European and North Atlantic,Germany
+EUR/NAT,European and North Atlantic,Greece
+EUR/NAT,European and North Atlantic,Hungary
+EUR/NAT,European and North Atlantic,Iceland
+EUR/NAT,European and North Atlantic,Ireland
+EUR/NAT,European and North Atlantic,Israel
+EUR/NAT,European and North Atlantic,Italy
+EUR/NAT,European and North Atlantic,Kazakhstan
+EUR/NAT,European and North Atlantic,Kyrgyzstan
+EUR/NAT,European and North Atlantic,Latvia
+EUR/NAT,European and North Atlantic,Lithuania
+EUR/NAT,European and North Atlantic,Luxembourg
+EUR/NAT,European and North Atlantic,Malta
+EUR/NAT,European and North Atlantic,Monaco
+EUR/NAT,European and North Atlantic,Montenegro
+EUR/NAT,European and North Atlantic,Morocco
+EUR/NAT,European and North Atlantic,Netherlands
+EUR/NAT,European and North Atlantic,North Macedonia
+EUR/NAT,European and North Atlantic,Norway
+EUR/NAT,European and North Atlantic,Poland
+EUR/NAT,European and North Atlantic,Portugal
+EUR/NAT,European and North Atlantic,Republic of Moldova
+EUR/NAT,European and North Atlantic,Romania
+EUR/NAT,European and North Atlantic,Russian Federation
+EUR/NAT,European and North Atlantic,San Marino
+EUR/NAT,European and North Atlantic,Serbia
+EUR/NAT,European and North Atlantic,Slovakia
+EUR/NAT,European and North Atlantic,Slovenia
+EUR/NAT,European and North Atlantic,Spain
+EUR/NAT,European and North Atlantic,Sweden
+EUR/NAT,European and North Atlantic,Switzerland
+EUR/NAT,European and North Atlantic,Tajikistan
+EUR/NAT,European and North Atlantic,Tunisia
+EUR/NAT,European and North Atlantic,Turkmenistan
+EUR/NAT,European and North Atlantic,Türkiye
+EUR/NAT,European and North Atlantic,Ukraine
+EUR/NAT,European and North Atlantic,United Kingdom
+EUR/NAT,European and North Atlantic,Uzbekistan
+MID,Middle East,Bahrain
+MID,Middle East,Egypt
+MID,Middle East,Iran
+MID,Middle East,Iraq
+MID,Middle East,Jordan
+MID,Middle East,Kuwait
+MID,Middle East,Lebanon
+MID,Middle East,Libya
+MID,Middle East,Oman
+MID,Middle East,Qatar
+MID,Middle East,Saudi Arabia
+MID,Middle East,Sudan
+MID,Middle East,Syrian Arab Republic
+MID,Middle East,United Arab Emirates
+MID,Middle East,Yemen
+NACC,"North American, Central American and Caribbean",Antigua and Barbuda
+NACC,"North American, Central American and Caribbean",Bahamas
+NACC,"North American, Central American and Caribbean",Barbados
+NACC,"North American, Central American and Caribbean",Belize
+NACC,"North American, Central American and Caribbean",Canada
+NACC,"North American, Central American and Caribbean",Costa Rica
+NACC,"North American, Central American and Caribbean",Cuba
+NACC,"North American, Central American and Caribbean",Dominica
+NACC,"North American, Central American and Caribbean",Dominican Republic
+NACC,"North American, Central American and Caribbean",El Salvador
+NACC,"North American, Central American and Caribbean",Grenada
+NACC,"North American, Central American and Caribbean",Guatemala
+NACC,"North American, Central American and Caribbean",Haiti
+NACC,"North American, Central American and Caribbean",Honduras
+NACC,"North American, Central American and Caribbean",Jamaica
+NACC,"North American, Central American and Caribbean",Mexico
+NACC,"North American, Central American and Caribbean",Nicaragua
+NACC,"North American, Central American and Caribbean",Saint Kitts and Nevis
+NACC,"North American, Central American and Caribbean",Saint Lucia
+NACC,"North American, Central American and Caribbean",Saint Vincent and the Grenadines
+NACC,"North American, Central American and Caribbean",Trinidad and Tobago
+NACC,"North American, Central American and Caribbean",United States
+SAM,South American,Argentina
+SAM,South American,Bolivia (Plurinational State of)
+SAM,South American,Brazil
+SAM,South American,Chile
+SAM,South American,Colombia
+SAM,South American,Ecuador
+SAM,South American,Guyana
+SAM,South American,Panama
+SAM,South American,Paraguay
+SAM,South American,Peru
+SAM,South American,Suriname
+SAM,South American,Uruguay
+SAM,South American,Venezuela (Bolivarian Republic of)
+WACAF,Western and Central African,Benin
+WACAF,Western and Central African,Burkina Faso
+WACAF,Western and Central African,Cabo Verde
+WACAF,Western and Central African,Cameroon
+WACAF,Western and Central African,Central African Republic
+WACAF,Western and Central African,Chad
+WACAF,Western and Central African,Congo
+WACAF,Western and Central African,Côte d’Ivoire
+WACAF,Western and Central African,Democratic Republic of the Congo
+WACAF,Western and Central African,Equatorial Guinea
+WACAF,Western and Central African,Gabon
+WACAF,Western and Central African,Gambia
+WACAF,Western and Central African,Ghana
+WACAF,Western and Central African,Guinea
+WACAF,Western and Central African,Guinea-Bissau
+WACAF,Western and Central African,Liberia
+WACAF,Western and Central African,Mali
+WACAF,Western and Central African,Mauritania
+WACAF,Western and Central African,Niger
+WACAF,Western and Central African,Nigeria
+WACAF,Western and Central African,Sao Tome and Principe
+WACAF,Western and Central African,Senegal
+WACAF,Western and Central African,Sierra Leone
+WACAF,Western and Central African,Togo
