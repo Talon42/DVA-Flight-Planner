@@ -37,6 +37,55 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
       window.chrome.webview.postMessage(debugPrefix + message);
     }
   };
+  const ensureSyncOverlay = () => {
+    let overlay = document.getElementById('flight-planner-sync-overlay');
+    if (overlay) {
+      return overlay;
+    }
+
+    overlay = document.createElement('div');
+    overlay.id = 'flight-planner-sync-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.inset = '0';
+    overlay.style.background = '#ffffff';
+    overlay.style.zIndex = '2147483647';
+    overlay.style.display = 'none';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.flexDirection = 'column';
+    overlay.style.gap = '12px';
+    overlay.style.color = '#0f172a';
+    overlay.style.fontFamily = 'Segoe UI, Tahoma, Arial, sans-serif';
+    overlay.style.fontSize = '14px';
+
+    const icon = document.createElement('div');
+    icon.textContent = '⌛';
+    icon.style.fontSize = '42px';
+    icon.style.lineHeight = '1';
+    icon.style.animation = 'flightPlannerHourglassPulse 1.1s ease-in-out infinite';
+
+    const text = document.createElement('div');
+    text.textContent = 'Downloading and processing schedule...';
+
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes flightPlannerHourglassPulse {
+        0% { opacity: 0.45; transform: scale(0.95); }
+        50% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0.45; transform: scale(0.95); }
+      }
+    `;
+
+    overlay.appendChild(icon);
+    overlay.appendChild(text);
+    overlay.appendChild(style);
+    document.documentElement.appendChild(overlay);
+    return overlay;
+  };
+  const showSyncOverlay = () => {
+    const overlay = ensureSyncOverlay();
+    overlay.style.display = 'flex';
+  };
   if (window.location.origin !== 'https://www.deltava.org') {
     return;
   }
@@ -75,6 +124,7 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
 
   if (window.location.href === targetUrl) {
     emitDebug('state:at-pfpx');
+    showSyncOverlay();
     if (window.__flightPlannerDeltaXmlPosted) {
       emitDebug('state:xml-already-posted');
       return;
@@ -135,6 +185,7 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
 
   window.__flightPlannerDeltaSyncPending = true;
   emitDebug(`state:fetching:${targetUrl}`);
+  showSyncOverlay();
   window.setTimeout(async () => {
     if (!window.chrome?.webview?.postMessage) {
       return;
@@ -319,6 +370,11 @@ fn close_sync_window(app: &AppHandle) {
     }
 }
 
+#[tauri::command]
+fn close_deltava_sync_window(app: AppHandle) {
+    close_sync_window(&app);
+}
+
 #[cfg(windows)]
 fn attach_windows_xml_message_handler(
     window: &tauri::WebviewWindow,
@@ -388,7 +444,6 @@ fn attach_windows_xml_message_handler(
                                     app_handle
                                         .state::<DeltaSyncManager>()
                                         .finish(DELTAVA_SYNC_LABEL, result);
-                                    close_sync_window(&app_handle);
                                 });
                             }
 
@@ -514,7 +569,6 @@ async fn start_deltava_sync(
                         app_handle
                             .state::<DeltaSyncManager>()
                             .finish(DELTAVA_SYNC_LABEL, result);
-                        close_sync_window(&app_handle);
                     });
 
                     true
@@ -555,7 +609,10 @@ async fn start_deltava_sync(
 fn main() {
     tauri::Builder::default()
         .manage(DeltaSyncManager::default())
-        .invoke_handler(tauri::generate_handler![start_deltava_sync])
+        .invoke_handler(tauri::generate_handler![
+            start_deltava_sync,
+            close_deltava_sync_window
+        ])
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())

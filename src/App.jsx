@@ -3,7 +3,10 @@ import FilterBar from "./components/FilterBar";
 import FlightTable from "./components/FlightTable";
 import DetailsPanel from "./components/DetailsPanel";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
-import { syncScheduleFromDeltaVirtual } from "./lib/deltaVirtualSync";
+import {
+  closeDeltaVirtualSyncWindow,
+  syncScheduleFromDeltaVirtual
+} from "./lib/deltaVirtualSync";
 import { formatNumber } from "./lib/formatters";
 import { runScheduleImport } from "./lib/importClient";
 import {
@@ -480,10 +483,12 @@ export default function App() {
 
     setIsSyncing(true);
     setStatusMessage("Opening Delta Virtual login...");
+    let shouldCloseSyncWindow = false;
 
     try {
       setStatusMessage("Waiting for Delta Virtual login and schedule download...");
       const syncedFile = await syncScheduleFromDeltaVirtual();
+      shouldCloseSyncWindow = true;
       setStatusMessage("Processing Delta Virtual schedule...");
       await processImportedSchedule(syncedFile, "deltava-sync");
     } catch (error) {
@@ -493,6 +498,9 @@ export default function App() {
         setStatusMessage(error.message || "Delta Virtual sync failed.");
       }
     } finally {
+      if (shouldCloseSyncWindow) {
+        await closeDeltaVirtualSyncWindow();
+      }
       setIsSyncing(false);
     }
   }

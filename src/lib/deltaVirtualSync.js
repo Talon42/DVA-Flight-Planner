@@ -38,3 +38,16 @@ export async function syncScheduleFromDeltaVirtual() {
     throw normalizeSyncError(String(error));
   }
 }
+
+export async function closeDeltaVirtualSyncWindow() {
+  if (!isTauriRuntime()) {
+    return;
+  }
+
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("close_deltava_sync_window");
+  } catch {
+    // Window may already be closed; ignore.
+  }
+}
