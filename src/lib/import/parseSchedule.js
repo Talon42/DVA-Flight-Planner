@@ -1,10 +1,10 @@
 import Papa from "papaparse";
 import { DateTime } from "luxon";
-import airlinesCsv from "../../../Data Info/airlines.csv?raw";
-import airportsCsv from "../../../Data Info/airports.csv?raw";
-import aircraftProfilesCsv from "../../../Data Info/aircraft_profiles.csv?raw";
-import aircraftFamilyCsv from "../../../Data Info/aircraft_family.csv?raw";
-import equipmentTypeCsv from "../../../Data Info/equipment_type.csv?raw";
+import airlinesCsv from "../../data/airlines.csv?raw";
+import airportsCsv from "../../data/airports.csv?raw";
+import aircraftProfilesCsv from "../../data/aircraft_profiles.csv?raw";
+import aircraftFamilyCsv from "../../data/aircraft_family.csv?raw";
+import equipmentTypeCsv from "../../data/equipment_type.csv?raw";
 
 const CSV_OPTIONS = {
   header: true,
