@@ -4,12 +4,269 @@ import {
   STORAGE_DIR
 } from "./constants";
 
+const PERSISTED_SCHEDULE_VERSION = 2;
+const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
+const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
+const LOG_CHAR_LIMIT = 200000;
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
 async function loadFsModule() {
   return import("@tauri-apps/plugin-fs");
+}
+
+function buildCompactLabel(values, visibleCount) {
+  if (!values.length) {
+    return "None";
+  }
+
+  if (values.length <= visibleCount) {
+    return values.join(", ");
+  }
+
+  return `${values.slice(0, visibleCount).join(", ")} +${values.length - visibleCount}`;
+}
+
+function buildCompatibilityReason(compatibleEquipment) {
+  return compatibleEquipment.length
+    ? `${compatibleEquipment.length} equipment profiles satisfy passenger, MTOW, MLW, and range limits.`
+    : "No aircraft profiles satisfy passenger, MTOW, MLW, and range limits.";
+}
+
+function toClockValue(isoValue) {
+  return typeof isoValue === "string" && isoValue.length >= 16 ? isoValue.slice(11, 16) : "";
+}
+
+function trimLogText(text) {
+  if (!text || text.length <= LOG_CHAR_LIMIT) {
+    return text || "";
+  }
+
+  return text.slice(-LOG_CHAR_LIMIT);
+}
+
+function uint8ArrayToBase64(bytes) {
+  let binary = "";
+
+  for (let index = 0; index < bytes.length; index += 32768) {
+    const chunk = bytes.subarray(index, index + 32768);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+}
+
+function base64ToUint8Array(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+}
+
+async function compressPersistedPayload(text) {
+  if (typeof CompressionStream === "undefined") {
+    return {
+      payloadEncoding: PERSISTED_SCHEDULE_ENCODING_PLAIN,
+      payload: text
+    };
+  }
+
+  const stream = new CompressionStream("gzip");
+  const writer = stream.writable.getWriter();
+  await writer.write(textEncoder.encode(text));
+  await writer.close();
+
+  const compressed = new Uint8Array(await new Response(stream.readable).arrayBuffer());
+  return {
+    payloadEncoding: PERSISTED_SCHEDULE_ENCODING_GZIP,
+    payload: uint8ArrayToBase64(compressed)
+  };
+}
+
+async function decompressPersistedPayload(payloadEncoding, payload) {
+  if (payloadEncoding === PERSISTED_SCHEDULE_ENCODING_PLAIN) {
+    return payload;
+  }
+
+  if (payloadEncoding !== PERSISTED_SCHEDULE_ENCODING_GZIP) {
+    throw new Error(`Unsupported saved schedule encoding: ${payloadEncoding}`);
+  }
+
+  if (typeof DecompressionStream === "undefined") {
+    throw new Error("This runtime cannot read compressed saved schedules.");
+  }
+
+  const compressedBytes = base64ToUint8Array(payload);
+  const stream = new DecompressionStream("gzip");
+  const writer = stream.writable.getWriter();
+  await writer.write(compressedBytes);
+  await writer.close();
+
+  const decompressed = await new Response(stream.readable).arrayBuffer();
+  return textDecoder.decode(decompressed);
+}
+
+function buildPersistedCompatibilityCatalog(flights = []) {
+  const compatibilityCatalog = [];
+  const compatibilityMap = new Map();
+
+  const persistedFlights = flights.map((flight) => {
+    const compatibleEquipment = Array.isArray(flight.compatibleEquipment)
+      ? [...flight.compatibleEquipment]
+      : [];
+    const compatibleFamilies = Array.isArray(flight.compatibleFamilies)
+      ? [...flight.compatibleFamilies]
+      : [];
+    const compatibilityKey = JSON.stringify([compatibleEquipment, compatibleFamilies]);
+    let compatibilityRef = compatibilityMap.get(compatibilityKey);
+
+    if (compatibilityRef === undefined) {
+      compatibilityRef = compatibilityCatalog.length;
+      compatibilityCatalog.push({
+        compatibleEquipment,
+        compatibleFamilies
+      });
+      compatibilityMap.set(compatibilityKey, compatibilityRef);
+    }
+
+    return {
+      flightId: flight.flightId,
+      flightCode: flight.flightCode,
+      airline: flight.airline,
+      airlineName: flight.airlineName,
+      from: flight.from,
+      to: flight.to,
+      fromAirport: flight.fromAirport,
+      toAirport: flight.toAirport,
+      fromTimezone: flight.fromTimezone,
+      toTimezone: flight.toTimezone,
+      stdLocal: flight.stdLocal,
+      staLocal: flight.staLocal,
+      stdUtc: flight.stdUtc,
+      staUtc: flight.staUtc,
+      stdUtcMillis: flight.stdUtcMillis,
+      staUtcMillis: flight.staUtcMillis,
+      mtow: flight.mtow,
+      mlw: flight.mlw,
+      maxPax: flight.maxPax,
+      blockMinutes: flight.blockMinutes,
+      distanceNm: flight.distanceNm,
+      compatibilityRef,
+      notes: flight.notes || ""
+    };
+  });
+
+  return { compatibilityCatalog, persistedFlights };
+}
+
+function createPersistedSchedule(savedSchedule) {
+  const { compatibilityCatalog, persistedFlights } = buildPersistedCompatibilityCatalog(
+    savedSchedule?.flights || []
+  );
+
+  return {
+    importedAt: savedSchedule.importedAt,
+    sourceFileName: savedSchedule.sourceFileName || null,
+    importSummary: savedSchedule.importSummary || null,
+    shortlist: Array.isArray(savedSchedule.shortlist) ? savedSchedule.shortlist : [],
+    uiState: savedSchedule.uiState || null,
+    compatibilityCatalog,
+    flights: persistedFlights
+  };
+}
+
+function hydratePersistedFlight(flight, compatibilityEntry, shortlistSet) {
+  const compatibleEquipment = Array.isArray(compatibilityEntry?.compatibleEquipment)
+    ? compatibilityEntry.compatibleEquipment
+    : [];
+  const compatibleFamilies = Array.isArray(compatibilityEntry?.compatibleFamilies)
+    ? compatibilityEntry.compatibleFamilies
+    : [];
+
+  return {
+    ...flight,
+    route: `${flight.from}-${flight.to}`,
+    localDepartureClock: toClockValue(flight.stdLocal),
+    utcDepartureClock: toClockValue(flight.stdUtc),
+    compatibleEquipment,
+    compatibleEquipmentLabel: buildCompactLabel(compatibleEquipment, 3),
+    compatibleFamilies,
+    compatibleFamiliesLabel: buildCompactLabel(compatibleFamilies, 3),
+    compatibilityCount: compatibleEquipment.length,
+    compatibilityStatus: compatibleEquipment.length ? "compatible" : "none",
+    compatibilityReason: buildCompatibilityReason(compatibleEquipment),
+    isShortlisted: shortlistSet.has(flight.flightId),
+    notes: flight.notes || ""
+  };
+}
+
+function hydratePersistedSchedule(savedSchedule) {
+  if (!savedSchedule?.flights?.length) {
+    return {
+      importedAt: savedSchedule?.importedAt || null,
+      sourceFileName: savedSchedule?.sourceFileName || null,
+      importSummary: savedSchedule?.importSummary || null,
+      shortlist: Array.isArray(savedSchedule?.shortlist) ? savedSchedule.shortlist : [],
+      uiState: savedSchedule?.uiState || null,
+      flights: []
+    };
+  }
+
+  const shortlist = Array.isArray(savedSchedule.shortlist) ? savedSchedule.shortlist : [];
+  const shortlistSet = new Set(shortlist);
+  const compatibilityCatalog = Array.isArray(savedSchedule.compatibilityCatalog)
+    ? savedSchedule.compatibilityCatalog
+    : [];
+
+  return {
+    importedAt: savedSchedule.importedAt,
+    sourceFileName: savedSchedule.sourceFileName || null,
+    importSummary: savedSchedule.importSummary || null,
+    shortlist,
+    uiState: savedSchedule.uiState || null,
+    flights: savedSchedule.flights.map((flight) =>
+      hydratePersistedFlight(flight, compatibilityCatalog[flight.compatibilityRef], shortlistSet)
+    )
+  };
+}
+
+async function parseSavedScheduleText(text) {
+  if (!text) {
+    return null;
+  }
+
+  const parsed = JSON.parse(text);
+
+  if (parsed?.version === PERSISTED_SCHEDULE_VERSION) {
+    const payloadText = await decompressPersistedPayload(
+      parsed.payloadEncoding,
+      parsed.payload
+    );
+    const payload = JSON.parse(payloadText);
+    return hydratePersistedSchedule(payload);
+  }
+
+  return parsed;
+}
+
+async function serializeSavedSchedule(savedSchedule) {
+  const persistedSchedule = createPersistedSchedule(savedSchedule);
+  const payloadText = JSON.stringify(persistedSchedule);
+  const { payloadEncoding, payload } = await compressPersistedPayload(payloadText);
+
+  return JSON.stringify({
+    version: PERSISTED_SCHEDULE_VERSION,
+    payloadEncoding,
+    payload
+  });
 }
 
 export async function readSavedSchedule() {
@@ -27,14 +284,16 @@ export async function readSavedSchedule() {
       baseDir: BaseDirectory.AppData
     });
 
-    return JSON.parse(text);
+    return parseSavedScheduleText(text);
   }
 
   const text = window.localStorage.getItem("flight-planner.saved-schedule");
-  return text ? JSON.parse(text) : null;
+  return text ? parseSavedScheduleText(text) : null;
 }
 
 export async function writeSavedSchedule(savedSchedule) {
+  const serializedSchedule = await serializeSavedSchedule(savedSchedule);
+
   if (isTauriRuntime()) {
     const { mkdir, writeTextFile, BaseDirectory } = await loadFsModule();
     await mkdir(STORAGE_DIR, {
@@ -44,16 +303,13 @@ export async function writeSavedSchedule(savedSchedule) {
 
     await writeTextFile(
       SAVED_SCHEDULE_FILE,
-      JSON.stringify(savedSchedule, null, 2),
+      serializedSchedule,
       { baseDir: BaseDirectory.AppData }
     );
     return;
   }
 
-  window.localStorage.setItem(
-    "flight-planner.saved-schedule",
-    JSON.stringify(savedSchedule)
-  );
+  window.localStorage.setItem("flight-planner.saved-schedule", serializedSchedule);
 }
 
 async function resolveAppDataPath(relativePath) {
@@ -89,7 +345,9 @@ async function appendLogFile(relativePath, storageKey, logText) {
             baseDir: BaseDirectory.AppData
           })
         : "";
-      const nextText = existing ? `${existing.trimEnd()}\n\n${logText}` : logText;
+      const nextText = trimLogText(
+        existing ? `${existing.trimEnd()}\n\n${logText}` : logText
+      );
 
       await writeTextFile(relativePath, nextText, {
         baseDir: BaseDirectory.AppData
@@ -98,7 +356,9 @@ async function appendLogFile(relativePath, storageKey, logText) {
       return resolveAppDataPath(relativePath);
     } catch (error) {
       const existing = window.localStorage.getItem(storageKey) || "";
-      const nextText = existing ? `${existing.trimEnd()}\n\n${logText}` : logText;
+      const nextText = trimLogText(
+        existing ? `${existing.trimEnd()}\n\n${logText}` : logText
+      );
       window.localStorage.setItem(storageKey, nextText);
       const reason = error instanceof Error ? error.message : String(error);
       return `browser-local-storage (fs write failed: ${reason})`;
@@ -106,7 +366,7 @@ async function appendLogFile(relativePath, storageKey, logText) {
   }
 
   const existing = window.localStorage.getItem(storageKey) || "";
-  const nextText = existing ? `${existing.trimEnd()}\n\n${logText}` : logText;
+  const nextText = trimLogText(existing ? `${existing.trimEnd()}\n\n${logText}` : logText);
   window.localStorage.setItem(storageKey, nextText);
   return "browser-local-storage";
 }

@@ -25,7 +25,80 @@ const DELTAVA_XML_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_PFPX_XML__";
 const DELTAVA_DEBUG_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_DEBUG__";
 const APP_STORAGE_DIR: &str = "flight-planner";
 const APP_LOG_FILE: &str = "log.txt";
+const APP_LOG_MAX_BYTES: u64 = 262_144;
+const DELTAVA_SYNC_DOWNLOAD_FILE: &str = "deltava-pfpxsched.xml";
 static DELTAVA_SYNC_LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
+const WEBVIEW_ROOT_PRUNE_DIRS: &[&str] = &[
+    "AutoLaunchProtocolsComponent",
+    "CertificateRevocation",
+    "component_crx_cache",
+    "Crashpad",
+    "Domain Actions",
+    "extensions_crx_cache",
+    "GraphiteDawnCache",
+    "GrShaderCache",
+    "hyphen-data",
+    "MEIPreload",
+    "OriginTrials",
+    "PKIMetadata",
+    "ShaderCache",
+    "Speech Recognition",
+    "Subresource Filter",
+    "Trust Protection Lists",
+    "TrustTokenKeyCommitments",
+    "WidevineCdm",
+];
+const WEBVIEW_ROOT_PRUNE_FILES: &[&str] = &["Last Version", "Variations"];
+const WEBVIEW_PROFILE_PRUNE_DIRS: &[&str] = &[
+    "AutofillAiModelCache",
+    "blob_storage",
+    "BudgetDatabase",
+    "Cache",
+    "Code Cache",
+    "commerce_subscription_db",
+    "DawnGraphiteCache",
+    "DawnWebGPUCache",
+    "discount_infos_db",
+    "discounts_db",
+    "EdgeJourneys",
+    "Extension Rules",
+    "Extension Scripts",
+    "Feature Engagement Tracker",
+    "GPUCache",
+    "Network",
+    "optimization_guide_hint_cache_store",
+    "parcel_tracking_db",
+    "Password_Diagnostics",
+    "PersistentOriginTrials",
+    "Safe Browsing Network",
+    "Session Storage",
+    "Sessions",
+    "Shared Dictionary",
+    "shared_proto_db",
+    "Site Characteristics Database",
+    "Sync Data",
+];
+const WEBVIEW_PROFILE_PRUNE_FILES: &[&str] = &[
+    "BrowsingTopicsSiteData",
+    "BrowsingTopicsSiteData-journal",
+    "BrowsingTopicsState",
+    "DIPS",
+    "Favicons",
+    "Favicons-journal",
+    "heavy_ad_intervention_opt_out.db",
+    "heavy_ad_intervention_opt_out.db-journal",
+    "History",
+    "History-journal",
+    "LOCK",
+    "LOG",
+    "LOG.old",
+    "Network Action Predictor",
+    "Network Action Predictor-journal",
+    "Top Sites",
+    "Top Sites-journal",
+    "Vpn Tokens",
+    "Vpn Tokens-journal",
+];
 
 const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
 (() => {
@@ -317,7 +390,7 @@ fn build_download_path(app: &AppHandle) -> Result<PathBuf, String> {
         prune_legacy_downloads(&current_dir);
     }
 
-    Ok(download_dir.join("deltava-pfpxsched.xml"))
+    Ok(download_dir.join(DELTAVA_SYNC_DOWNLOAD_FILE))
 }
 
 fn resolve_default_log_path() -> Option<PathBuf> {
@@ -361,6 +434,13 @@ fn append_sync_log(message: &str) {
         .or_else(resolve_default_log_path);
 
     if let Some(log_path) = log_path {
+        if fs::metadata(&log_path)
+            .map(|metadata| metadata.len() > APP_LOG_MAX_BYTES)
+            .unwrap_or(false)
+        {
+            let _ = fs::remove_file(&log_path);
+        }
+
         if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(log_path) {
             let _ = file.write_all(line.as_bytes());
         }
@@ -385,6 +465,80 @@ fn build_webview_data_directory(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(data_dir)
 }
 
+fn is_expected_cleanup_skip(error: &std::io::Error) -> bool {
+    match error.raw_os_error() {
+        // ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION.
+        Some(5 | 32 | 33) => true,
+        _ => false,
+    }
+}
+
+fn remove_path_if_exists(path: &Path) {
+    if !path.exists() {
+        return;
+    }
+
+    let result = if path.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    };
+
+    if let Err(error) = result {
+        if !is_expected_cleanup_skip(&error) {
+            append_sync_log(&format!("cleanup:skip {} ({error})", path.display()));
+        }
+    }
+}
+
+fn prune_webview_profile(root: &Path) {
+    if !root.exists() {
+        return;
+    }
+
+    for dir_name in WEBVIEW_ROOT_PRUNE_DIRS {
+        remove_path_if_exists(&root.join(dir_name));
+    }
+
+    for file_name in WEBVIEW_ROOT_PRUNE_FILES {
+        remove_path_if_exists(&root.join(file_name));
+    }
+
+    let default_profile = root.join("Default");
+    if !default_profile.exists() {
+        return;
+    }
+
+    for dir_name in WEBVIEW_PROFILE_PRUNE_DIRS {
+        remove_path_if_exists(&default_profile.join(dir_name));
+    }
+
+    for file_name in WEBVIEW_PROFILE_PRUNE_FILES {
+        remove_path_if_exists(&default_profile.join(file_name));
+    }
+}
+
+fn prune_deltava_storage_internal(
+    app: &AppHandle,
+    remove_downloaded_schedule: bool,
+    include_main_webview_profile: bool,
+) {
+    let Ok(local_data_dir) = app.path().app_local_data_dir() else {
+        return;
+    };
+
+    if include_main_webview_profile {
+        prune_webview_profile(&local_data_dir.join("EBWebView"));
+    }
+    prune_webview_profile(&local_data_dir.join("deltava-webview").join("EBWebView"));
+
+    if remove_downloaded_schedule {
+        let download_dir = local_data_dir.join("deltava-sync").join("downloads");
+        remove_path_if_exists(&download_dir.join(DELTAVA_SYNC_DOWNLOAD_FILE));
+        prune_legacy_downloads(&download_dir);
+    }
+}
+
 fn close_sync_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(DELTAVA_SYNC_LABEL) {
         let _ = window.close();
@@ -394,6 +548,11 @@ fn close_sync_window(app: &AppHandle) {
 #[tauri::command]
 fn close_deltava_sync_window(app: AppHandle) {
     close_sync_window(&app);
+}
+
+#[tauri::command]
+fn prune_deltava_storage(app: AppHandle, remove_downloaded_schedule: bool) {
+    prune_deltava_storage_internal(&app, remove_downloaded_schedule, false);
 }
 
 #[cfg(windows)]
@@ -640,9 +799,16 @@ async fn start_deltava_sync(
 fn main() {
     tauri::Builder::default()
         .manage(DeltaSyncManager::default())
+        .setup(|app| {
+            let app_handle = app.handle().clone();
+            let _ = initialize_sync_log_path(&app_handle);
+            prune_deltava_storage_internal(&app_handle, false, true);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             start_deltava_sync,
-            close_deltava_sync_window
+            close_deltava_sync_window,
+            prune_deltava_storage
         ])
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())

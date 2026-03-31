@@ -5,6 +5,7 @@ import DetailsPanel from "./components/DetailsPanel";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
 import {
   closeDeltaVirtualSyncWindow,
+  pruneDeltaVirtualStorage,
   syncScheduleFromDeltaVirtual
 } from "./lib/deltaVirtualSync";
 import { formatNumber } from "./lib/formatters";
@@ -520,6 +521,7 @@ export default function App() {
     setIsSyncing(true);
     setStatusMessage("Opening Delta Virtual login...");
     let shouldCloseSyncWindow = false;
+    let shouldRemoveDownloadedSchedule = false;
 
     try {
       setStatusMessage("Waiting for Delta Virtual login and schedule download...");
@@ -531,6 +533,7 @@ export default function App() {
       });
       setStatusMessage("Processing Delta Virtual schedule...");
       await processImportedSchedule(syncedFile, "deltava-sync");
+      shouldRemoveDownloadedSchedule = true;
     } catch (error) {
       if (error?.kind === "cancelled") {
         setStatusMessage("Delta Virtual sync canceled.");
@@ -544,6 +547,7 @@ export default function App() {
         await closeDeltaVirtualSyncWindow();
         await logAppEvent("deltava-sync-window-closed");
       }
+      await pruneDeltaVirtualStorage(shouldRemoveDownloadedSchedule);
       setIsSyncing(false);
     }
   }

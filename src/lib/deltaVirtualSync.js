@@ -51,3 +51,16 @@ export async function closeDeltaVirtualSyncWindow() {
     // Window may already be closed; ignore.
   }
 }
+
+export async function pruneDeltaVirtualStorage(removeDownloadedSchedule = false) {
+  if (!isTauriRuntime()) {
+    return;
+  }
+
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("prune_deltava_storage", { removeDownloadedSchedule });
+  } catch {
+    // Cleanup is best-effort; do not surface this to the user.
+  }
+}
