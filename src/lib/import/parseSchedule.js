@@ -152,13 +152,17 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         Math.round(staLocal.toUTC().diff(stdLocal.toUTC(), "minutes").minutes)
       );
       const compatibility = resolveRouteCompatibility(rawFlight, distanceNm);
+      const airlineIcao = airlineIcaoMap.get(rawFlight.airline) || "";
+      const flightNumber = String(rawFlight.flightNumber || "").trim();
 
       flights.push({
         flightId: buildFlightId(rawFlight, index),
-        flightCode: `${rawFlight.airline}${rawFlight.flightNumber}`,
+        flightCode: `${rawFlight.airline}${flightNumber}`,
+        flightNumber,
         airline: rawFlight.airline,
         airlineName,
-        airlineIcao: airlineIcaoMap.get(rawFlight.airline) || "",
+        airlineIcao,
+        callsign: `${airlineIcao || rawFlight.airline}${flightNumber}`,
         from: rawFlight.from,
         to: rawFlight.to,
         route: `${rawFlight.from}-${rawFlight.to}`,
@@ -186,7 +190,10 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         compatibilityCount: compatibility.compatibilityCount,
         compatibilityStatus: compatibility.compatibilityStatus,
         compatibilityReason: compatibility.compatibilityReason,
+        simbriefSelectedType: "",
+        simbriefPlan: null,
         isShortlisted: false,
+        boardSequence: null,
         notes: rawFlight.notes
       });
     } catch (error) {

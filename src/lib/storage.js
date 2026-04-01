@@ -1,10 +1,13 @@
 import {
   IMPORT_LOG_FILE,
   SAVED_SCHEDULE_FILE,
+  SIMBRIEF_SETTINGS_FILE,
+  UI_STATE_FILE,
   STORAGE_DIR
 } from "./constants";
 
-const PERSISTED_SCHEDULE_VERSION = 2;
+const LEGACY_PERSISTED_SCHEDULE_VERSION = 2;
+const PERSISTED_SCHEDULE_VERSION = 4;
 const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
 const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
 const LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
@@ -39,6 +42,57 @@ function buildCompatibilityReason(compatibleEquipment) {
 
 function toClockValue(isoValue) {
   return typeof isoValue === "string" && isoValue.length >= 16 ? isoValue.slice(11, 16) : "";
+}
+
+function deriveFlightNumber(flight) {
+  const explicitFlightNumber = String(flight?.flightNumber || "").trim();
+  if (explicitFlightNumber) {
+    return explicitFlightNumber;
+  }
+
+  const flightCode = String(flight?.flightCode || "").trim();
+  if (!flightCode) {
+    return "";
+  }
+
+  const stripped = flightCode.replace(/^[^\d]+/, "");
+  return stripped || flightCode;
+}
+
+function deriveCallsign(flight) {
+  const explicitCallsign = String(flight?.callsign || "").trim().toUpperCase();
+  if (explicitCallsign) {
+    return explicitCallsign;
+  }
+
+  const airlineCode = String(flight?.airlineIcao || flight?.airline || "")
+    .trim()
+    .toUpperCase();
+  const flightNumber = deriveFlightNumber(flight).toUpperCase();
+  return `${airlineCode}${flightNumber}`.trim();
+}
+
+function normalizeSimBriefPlan(plan) {
+  if (!plan || typeof plan !== "object") {
+    return null;
+  }
+
+  const normalized = {
+    status: String(plan.status || "").trim(),
+    generatedAtUtc: String(plan.generatedAtUtc || "").trim(),
+    staticId: String(plan.staticId || "").trim(),
+    aircraftType: String(plan.aircraftType || "").trim(),
+    callsign: String(plan.callsign || "").trim(),
+    route: String(plan.route || "").trim(),
+    cruiseAltitude: String(plan.cruiseAltitude || "").trim(),
+    alternate: String(plan.alternate || "").trim(),
+    ete: String(plan.ete || "").trim(),
+    blockFuel: String(plan.blockFuel || "").trim(),
+    ofpUrl: String(plan.ofpUrl || "").trim(),
+    pdfUrl: String(plan.pdfUrl || "").trim()
+  };
+
+  return Object.values(normalized).some(Boolean) ? normalized : null;
 }
 
 function measureTextBytes(text) {
@@ -153,8 +207,11 @@ function buildPersistedCompatibilityCatalog(flights = []) {
     return {
       flightId: flight.flightId,
       flightCode: flight.flightCode,
+      flightNumber: deriveFlightNumber(flight),
       airline: flight.airline,
       airlineName: flight.airlineName,
+      airlineIcao: String(flight.airlineIcao || "").trim().toUpperCase(),
+      callsign: deriveCallsign(flight),
       from: flight.from,
       to: flight.to,
       fromAirport: flight.fromAirport,
@@ -172,6 +229,9 @@ function buildPersistedCompatibilityCatalog(flights = []) {
       maxPax: flight.maxPax,
       blockMinutes: flight.blockMinutes,
       distanceNm: flight.distanceNm,
+      simbriefSelectedType: String(flight.simbriefSelectedType || "").trim(),
+      simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
+      boardSequence: Number.isInteger(flight.boardSequence) ? flight.boardSequence : null,
       compatibilityRef,
       notes: flight.notes || ""
     };
@@ -209,6 +269,9 @@ function hydratePersistedFlight(flight, compatibilityEntry, shortlistSet) {
     route: `${flight.from}-${flight.to}`,
     localDepartureClock: toClockValue(flight.stdLocal),
     utcDepartureClock: toClockValue(flight.stdUtc),
+    flightNumber: deriveFlightNumber(flight),
+    airlineIcao: String(flight.airlineIcao || "").trim().toUpperCase(),
+    callsign: deriveCallsign(flight),
     compatibleEquipment,
     compatibleEquipmentLabel: buildCompactLabel(compatibleEquipment, 3),
     compatibleFamilies,
@@ -216,7 +279,10 @@ function hydratePersistedFlight(flight, compatibilityEntry, shortlistSet) {
     compatibilityCount: compatibleEquipment.length,
     compatibilityStatus: compatibleEquipment.length ? "compatible" : "none",
     compatibilityReason: buildCompatibilityReason(compatibleEquipment),
+    simbriefSelectedType: String(flight.simbriefSelectedType || "").trim(),
+    simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
     isShortlisted: shortlistSet.has(flight.flightId),
+    boardSequence: Number.isInteger(flight.boardSequence) ? flight.boardSequence : null,
     notes: flight.notes || ""
   };
 }
@@ -258,7 +324,11 @@ async function parseSavedScheduleText(text) {
 
   const parsed = JSON.parse(text);
 
-  if (parsed?.version === PERSISTED_SCHEDULE_VERSION) {
+  if (
+    parsed?.version === LEGACY_PERSISTED_SCHEDULE_VERSION ||
+    parsed?.version === 3 ||
+    parsed?.version === PERSISTED_SCHEDULE_VERSION
+  ) {
     const payloadText = await decompressPersistedPayload(
       parsed.payloadEncoding,
       parsed.payload
@@ -267,19 +337,36 @@ async function parseSavedScheduleText(text) {
     return hydratePersistedSchedule(payload);
   }
 
+  if (Array.isArray(parsed?.flights)) {
+    return hydratePersistedSchedule({
+      importedAt: parsed.importedAt,
+      sourceFileName: parsed.sourceFileName || null,
+      importSummary: parsed.importSummary || null,
+      shortlist: Array.isArray(parsed.shortlist) ? parsed.shortlist : [],
+      uiState: parsed.uiState || null,
+      compatibilityCatalog: Array.isArray(parsed.compatibilityCatalog)
+        ? parsed.compatibilityCatalog
+        : parsed.flights.map((flight) => ({
+            compatibleEquipment: Array.isArray(flight?.compatibleEquipment)
+              ? flight.compatibleEquipment
+              : [],
+            compatibleFamilies: Array.isArray(flight?.compatibleFamilies)
+              ? flight.compatibleFamilies
+              : []
+          })),
+      flights: parsed.flights.map((flight, index) => ({
+        ...flight,
+        compatibilityRef: Number.isInteger(flight?.compatibilityRef) ? flight.compatibilityRef : index
+      }))
+    });
+  }
+
   return parsed;
 }
 
 async function serializeSavedSchedule(savedSchedule) {
   const persistedSchedule = createPersistedSchedule(savedSchedule);
-  const payloadText = JSON.stringify(persistedSchedule);
-  const { payloadEncoding, payload } = await compressPersistedPayload(payloadText);
-
-  return JSON.stringify({
-    version: PERSISTED_SCHEDULE_VERSION,
-    payloadEncoding,
-    payload
-  });
+  return JSON.stringify(persistedSchedule);
 }
 
 export async function readSavedSchedule() {
@@ -323,6 +410,102 @@ export async function writeSavedSchedule(savedSchedule) {
   }
 
   window.localStorage.setItem("flight-planner.saved-schedule", serializedSchedule);
+}
+
+export async function readSavedUiState() {
+  if (isTauriRuntime()) {
+    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
+    const hasFile = await exists(UI_STATE_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+
+    if (!hasFile) {
+      return null;
+    }
+
+    const text = await readTextFile(UI_STATE_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+
+    return text ? JSON.parse(text) : null;
+  }
+
+  const text = window.localStorage.getItem("flight-planner.ui-state");
+  return text ? JSON.parse(text) : null;
+}
+
+export async function writeSavedUiState(uiState) {
+  const serialized = JSON.stringify(uiState || {});
+
+  if (isTauriRuntime()) {
+    const { mkdir, writeTextFile, BaseDirectory } = await loadFsModule();
+    await mkdir(STORAGE_DIR, {
+      baseDir: BaseDirectory.AppData,
+      recursive: true
+    });
+
+    await writeTextFile(UI_STATE_FILE, serialized, {
+      baseDir: BaseDirectory.AppData
+    });
+    return;
+  }
+
+  window.localStorage.setItem("flight-planner.ui-state", serialized);
+}
+
+export async function readSimBriefSettings() {
+  if (isTauriRuntime()) {
+    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
+    const hasFile = await exists(SIMBRIEF_SETTINGS_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+
+    if (!hasFile) {
+      return { username: "", pilotId: "" };
+    }
+
+    const text = await readTextFile(SIMBRIEF_SETTINGS_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+    const parsed = JSON.parse(text);
+    return {
+      username: String(parsed?.username || "").trim(),
+      pilotId: String(parsed?.pilotId || "").trim()
+    };
+  }
+
+  const text = window.localStorage.getItem("flight-planner.simbrief-settings");
+  if (!text) {
+    return { username: "", pilotId: "" };
+  }
+
+  const parsed = JSON.parse(text);
+  return {
+    username: String(parsed?.username || "").trim(),
+    pilotId: String(parsed?.pilotId || "").trim()
+  };
+}
+
+export async function writeSimBriefSettings(settings) {
+  const serialized = JSON.stringify({
+    username: String(settings?.username || "").trim(),
+    pilotId: String(settings?.pilotId || "").trim()
+  });
+
+  if (isTauriRuntime()) {
+    const { mkdir, writeTextFile, BaseDirectory } = await loadFsModule();
+    await mkdir(STORAGE_DIR, {
+      baseDir: BaseDirectory.AppData,
+      recursive: true
+    });
+
+    await writeTextFile(SIMBRIEF_SETTINGS_FILE, serialized, {
+      baseDir: BaseDirectory.AppData
+    });
+    return;
+  }
+
+  window.localStorage.setItem("flight-planner.simbrief-settings", serialized);
 }
 
 async function resolveAppDataPath(relativePath) {

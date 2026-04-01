@@ -121,9 +121,9 @@ const RIGHT_ALIGNED_COLUMN_KEYS = new Set([
   "distanceNm"
 ]);
 
-const INITIAL_VISIBLE_FLIGHTS = 100;
-const VISIBLE_FLIGHT_PAGE = 100;
-const VISIBLE_FLIGHT_THRESHOLD = 20;
+const INITIAL_VISIBLE_FLIGHTS = 50;
+const VISIBLE_FLIGHT_PAGE = 50;
+const VISIBLE_FLIGHT_THRESHOLD = 10;
 
 function SortButton({ label, sortKey, sort, onSort }) {
   const isActive = sort.key === sortKey;
@@ -262,6 +262,9 @@ export default function FlightTable({
 
   return (
     <section className="table-shell">
+      <div className="table-shell__header">
+        <p className="eyebrow">Schedule</p>
+      </div>
       <div className="table-header-scroll" ref={headerScrollRef}>
         <div className="table-header" style={{ minWidth: `${totalWidth}px` }}>
           {columns.map((column) => (

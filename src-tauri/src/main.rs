@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod simbrief;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -19,6 +21,9 @@ use webview2_com::{
 };
 #[cfg(windows)]
 use windows::core::{Interface, PWSTR};
+use simbrief::{
+    close_simbrief_dispatch_window, start_simbrief_dispatch, SimBriefDispatchManager,
+};
 
 const DELTAVA_LOGIN_URL: &str = "https://www.deltava.org/login.do";
 const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
@@ -1284,6 +1289,7 @@ mod tests {
 fn main() {
     tauri::Builder::default()
         .manage(DeltaSyncManager::default())
+        .manage(SimBriefDispatchManager::default())
         .setup(|app| {
             let app_handle = app.handle().clone();
             let _ = initialize_sync_log_path(&app_handle);
@@ -1294,6 +1300,8 @@ fn main() {
             start_deltava_sync,
             close_deltava_sync_window,
             prune_deltava_storage,
+            start_simbrief_dispatch,
+            close_simbrief_dispatch_window,
             read_addon_airport_cache,
             save_addon_airport_roots,
             scan_addon_airports

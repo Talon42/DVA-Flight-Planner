@@ -122,11 +122,7 @@ function RangeSlider({
   );
 }
 
-function EquipmentMultiSelect({
-  options,
-  selectedValues,
-  onChange
-}) {
+function EquipmentMultiSelect({ options, selectedValues, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const rootRef = useRef(null);
@@ -139,26 +135,19 @@ function EquipmentMultiSelect({
     }
 
     window.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-    };
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toUpperCase();
-
     if (!normalizedQuery) {
       return options;
     }
 
-    return options.filter((option) =>
-      option.toUpperCase().includes(normalizedQuery)
-    );
+    return options.filter((option) => option.toUpperCase().includes(normalizedQuery));
   }, [options, query]);
 
-  const selectionLabel = selectedValues.length
-    ? `${selectedValues.length} selected`
-    : "All aircraft";
+  const selectionLabel = selectedValues.length ? `${selectedValues.length} selected` : "All aircraft";
 
   function toggleValue(value) {
     if (selectedValues.includes(value)) {
@@ -225,18 +214,10 @@ function EquipmentMultiSelect({
             />
 
             <div className="multi-select__actions">
-              <button
-                className="multi-select__action"
-                type="button"
-                onClick={() => onChange(options)}
-              >
+              <button className="multi-select__action" type="button" onClick={() => onChange(options)}>
                 Select all
               </button>
-              <button
-                className="multi-select__action"
-                type="button"
-                onClick={() => onChange([])}
-              >
+              <button className="multi-select__action" type="button" onClick={() => onChange([])}>
                 Clear
               </button>
             </div>
@@ -244,7 +225,6 @@ function EquipmentMultiSelect({
             <div className="multi-select__options">
               {filteredOptions.map((option) => {
                 const selected = selectedValues.includes(option);
-
                 return (
                   <button
                     key={option}
@@ -273,120 +253,7 @@ function EquipmentMultiSelect({
   );
 }
 
-export function AddonAirportMatchControls({
-  filters,
-  onFilterChange
-}) {
-  return (
-    <div className="filter-grid filter-grid--addon">
-      <label className="filter-block">
-        <span>Addon Match Rule</span>
-        <select
-          value={filters.addonMatchMode}
-          onChange={(event) => onFilterChange("addonMatchMode", event.target.value)}
-        >
-          <option value="either">Origin or destination</option>
-          <option value="origin">Origin only</option>
-          <option value="destination">Destination only</option>
-          <option value="both">Origin and destination</option>
-        </select>
-      </label>
-
-      <div className="filter-block">
-        <span>Addon Result Controls</span>
-        <div className="toggle-row">
-          <button
-            className={`ghost-button ${filters.addonFilterEnabled ? "ghost-button--active" : ""}`}
-            type="button"
-            onClick={() => onFilterChange("addonFilterEnabled", !filters.addonFilterEnabled)}
-          >
-            {filters.addonFilterEnabled ? "Addon Only On" : "Addon Only Off"}
-          </button>
-          <button
-            className={`ghost-button ${filters.addonPriorityEnabled ? "ghost-button--active" : ""}`}
-            type="button"
-            onClick={() => onFilterChange("addonPriorityEnabled", !filters.addonPriorityEnabled)}
-          >
-            {filters.addonPriorityEnabled ? "Priority On" : "Priority Off"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function AddonAirportPanel({
-  filters,
-  addonScan,
-  addonScanSummary,
-  isAddonScanBusy,
-  isDesktopAddonScanAvailable,
-  onFilterChange,
-  onAddAddonRoot,
-  onRemoveAddonRoot,
-  onScanAddonAirports
-}) {
-  return (
-    <section className="addon-panel">
-      <div className="filter-heading filter-heading--addon">
-        <div>
-          <p className="eyebrow">Addon Airports</p>
-          <h2>Manage installed scenery coverage</h2>
-        </div>
-
-        <div className="addon-panel__actions">
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={onAddAddonRoot}
-            disabled={!isDesktopAddonScanAvailable || isAddonScanBusy}
-          >
-            Add Folder
-          </button>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={onScanAddonAirports}
-            disabled={!isDesktopAddonScanAvailable || isAddonScanBusy || !addonScan.roots.length}
-          >
-            {isAddonScanBusy ? "Scanning..." : "Scan Now"}
-          </button>
-        </div>
-      </div>
-
-      <div className="addon-panel__summary">
-        <p>{addonScanSummary}</p>
-        {!isDesktopAddonScanAvailable ? (
-          <p>Addon airport scanning is available only in the desktop app.</p>
-        ) : null}
-      </div>
-
-      <div className="addon-root-list">
-        {addonScan.roots.length ? (
-          addonScan.roots.map((root) => (
-            <div key={root} className="addon-root-item">
-              <code>{root}</code>
-              <button
-                className="ghost-button addon-root-item__remove"
-                type="button"
-                onClick={() => onRemoveAddonRoot(root)}
-                disabled={isAddonScanBusy}
-              >
-                Remove
-              </button>
-            </div>
-          ))
-        ) : (
-          <p className="empty-note">
-            No addon folders saved yet. Add one or more Addon/Community roots, then scan them.
-          </p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-export default function FilterBar({
+function BasicFilters({
   filters,
   airlines,
   airportOptions,
@@ -394,21 +261,10 @@ export default function FilterBar({
   countryOptions,
   equipmentOptions,
   filterBounds,
-  onFilterChange,
-  onReset
+  onFilterChange
 }) {
   return (
-    <section className="filter-bar">
-      <div className="filter-heading">
-        <div>
-          <p className="eyebrow">Planner Controls</p>
-          <h2>Filter the active schedule</h2>
-        </div>
-        <button className="ghost-button" type="button" onClick={onReset}>
-          Reset Filters
-        </button>
-      </div>
-
+    <>
       <div className="filter-grid filter-grid--routing">
         <label className="filter-block">
           <span>Airline</span>
@@ -472,9 +328,9 @@ export default function FilterBar({
                   (filters.country === "ALL" || airport.country === filters.country)
               )
               .map((airport) => (
-              <option key={`origin-${airport.icao}`} value={airport.icao}>
-                {airport.name} ({airport.icao})
-              </option>
+                <option key={`origin-${airport.icao}`} value={airport.icao}>
+                  {airport.name} ({airport.icao})
+                </option>
               ))}
           </select>
         </label>
@@ -504,9 +360,9 @@ export default function FilterBar({
                   (filters.country === "ALL" || airport.country === filters.country)
               )
               .map((airport) => (
-              <option key={`destination-${airport.icao}`} value={airport.icao}>
-                {airport.name} ({airport.icao})
-              </option>
+                <option key={`destination-${airport.icao}`} value={airport.icao}>
+                  {airport.name} ({airport.icao})
+                </option>
               ))}
           </select>
         </label>
@@ -516,9 +372,7 @@ export default function FilterBar({
           <input
             type="text"
             value={filters.destination}
-            onChange={(event) =>
-              onFilterChange("destination", event.target.value)
-            }
+            onChange={(event) => onFilterChange("destination", event.target.value)}
             placeholder="KLAX"
           />
         </label>
@@ -588,7 +442,439 @@ export default function FilterBar({
         />
       </div>
 
-      <AddonAirportMatchControls filters={filters} onFilterChange={onFilterChange} />
+      <div className="filter-grid filter-grid--addon">
+        <label className="filter-block">
+          <span>Addon Match Rule</span>
+          <select
+            value={filters.addonMatchMode}
+            onChange={(event) => onFilterChange("addonMatchMode", event.target.value)}
+          >
+            <option value="either">Origin or destination</option>
+            <option value="origin">Origin only</option>
+            <option value="destination">Destination only</option>
+            <option value="both">Origin and destination</option>
+          </select>
+        </label>
+
+        <div className="filter-block">
+          <span>Addon Result Controls</span>
+          <div className="toggle-row">
+            <button
+              className={`ghost-button ${filters.addonFilterEnabled ? "ghost-button--active" : ""}`}
+              type="button"
+              onClick={() => onFilterChange("addonFilterEnabled", !filters.addonFilterEnabled)}
+            >
+              {filters.addonFilterEnabled ? "Addon Only On" : "Addon Only Off"}
+            </button>
+            <button
+              className={`ghost-button ${filters.addonPriorityEnabled ? "ghost-button--active" : ""}`}
+              type="button"
+              onClick={() => onFilterChange("addonPriorityEnabled", !filters.addonPriorityEnabled)}
+            >
+              {filters.addonPriorityEnabled ? "Priority On" : "Priority Off"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function DutyScheduleFilters({
+  dutyFilters,
+  airlines,
+  regionOptions,
+  countryOptions,
+  dutyEquipmentOptions,
+  qualifyingDutyAirlines,
+  filterBounds,
+  onDutyFilterChange,
+  onBuildDutySchedule
+}) {
+  const hasLocationSelection =
+    dutyFilters.locationKind === "region"
+      ? Boolean(dutyFilters.selectedRegion)
+      : Boolean(dutyFilters.selectedCountry);
+  const canBuildByAirline = Boolean(dutyFilters.selectedAirline && dutyFilters.selectedEquipment);
+  const canBuildByLocation = Boolean(hasLocationSelection && dutyFilters.selectedEquipment && dutyFilters.resolvedAirline);
+  const canBuild = dutyFilters.buildMode === "location" ? canBuildByLocation : canBuildByAirline;
+
+  return (
+    <>
+      <div className="filter-grid filter-grid--routing">
+        <label className="filter-block">
+          <span>Build Mode</span>
+          <select
+            value={dutyFilters.buildMode}
+            onChange={(event) => onDutyFilterChange("buildMode", event.target.value)}
+          >
+            <option value="airline">By Airline</option>
+            <option value="location">Location</option>
+          </select>
+        </label>
+
+        {dutyFilters.buildMode === "airline" ? (
+          <label className="filter-block filter-block--wide">
+            <span>Airline</span>
+            <select
+              value={dutyFilters.selectedAirline}
+              onChange={(event) => onDutyFilterChange("selectedAirline", event.target.value)}
+            >
+              <option value="">Select an airline</option>
+              {airlines.map((airline) => (
+                <option key={airline} value={airline}>
+                  {airline}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <>
+            <label className="filter-block">
+              <span>Location Type</span>
+              <select
+                value={dutyFilters.locationKind}
+                onChange={(event) => onDutyFilterChange("locationKind", event.target.value)}
+              >
+                <option value="country">Country</option>
+                <option value="region">Region</option>
+              </select>
+            </label>
+
+            <label className="filter-block">
+              <span>{dutyFilters.locationKind === "region" ? "Region" : "Country"}</span>
+              <select
+                value={
+                  dutyFilters.locationKind === "region"
+                    ? dutyFilters.selectedRegion
+                    : dutyFilters.selectedCountry
+                }
+                onChange={(event) =>
+                  onDutyFilterChange(
+                    dutyFilters.locationKind === "region" ? "selectedRegion" : "selectedCountry",
+                    event.target.value
+                  )
+                }
+              >
+                <option value="">
+                  {dutyFilters.locationKind === "region" ? "Select a region" : "Select a country"}
+                </option>
+                {(dutyFilters.locationKind === "region" ? regionOptions : countryOptions).map((value) => {
+                  const optionValue = dutyFilters.locationKind === "region" ? value.code : value;
+                  const optionLabel = dutyFilters.locationKind === "region" ? value.name : value;
+                  return (
+                    <option key={optionValue} value={optionValue}>
+                      {optionLabel}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+          </>
+        )}
+      </div>
+
+      {dutyFilters.buildMode === "location" ? (
+        <div className="duty-schedule__note">
+          {hasLocationSelection ? (
+            dutyFilters.resolvedAirline ? (
+              <p>
+                Random airline selected for this location: <strong>{dutyFilters.resolvedAirline}</strong>
+                {qualifyingDutyAirlines.length ? ` from ${qualifyingDutyAirlines.length} qualifying airlines.` : null}
+              </p>
+            ) : (
+              <p>No qualifying airline was found with at least 10 flights touching this location.</p>
+            )
+          ) : (
+            <p>Select a location to let the app choose a qualifying airline.</p>
+          )}
+        </div>
+      ) : null}
+
+      <div className="filter-grid filter-grid--advanced">
+        <RangeSlider
+          label="Flight Length"
+          min={0}
+          max={filterBounds.maxBlockMinutes}
+          step={5}
+          lowValue={dutyFilters.flightLengthMin}
+          highValue={dutyFilters.flightLengthMax}
+          onChange={([minValue, maxValue]) => {
+            onDutyFilterChange("flightLengthMin", minValue);
+            onDutyFilterChange("flightLengthMax", maxValue);
+          }}
+          formatValue={formatDuration}
+        />
+
+        <RangeSlider
+          label="Distance"
+          min={0}
+          max={filterBounds.maxDistanceNm}
+          step={25}
+          lowValue={dutyFilters.distanceMin}
+          highValue={dutyFilters.distanceMax}
+          onChange={([minValue, maxValue]) => {
+            onDutyFilterChange("distanceMin", minValue);
+            onDutyFilterChange("distanceMax", maxValue);
+          }}
+          formatValue={formatDistanceNm}
+        />
+
+        <label className="filter-block">
+          <span>Aircraft</span>
+          <select
+            value={dutyFilters.selectedEquipment}
+            onChange={(event) => onDutyFilterChange("selectedEquipment", event.target.value)}
+          >
+            <option value="">Select one aircraft</option>
+            {dutyEquipmentOptions.map((equipment) => (
+              <option key={equipment} value={equipment}>
+                {equipment}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="filter-block">
+          <span>Duty Length</span>
+          <select
+            value={dutyFilters.dutyLength}
+            onChange={(event) => onDutyFilterChange("dutyLength", Number(event.target.value))}
+          >
+            {Array.from({ length: 9 }, (_, index) => index + 2).map((length) => (
+              <option key={length} value={length}>
+                {length} flights
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="filter-grid filter-grid--addon">
+        <div className="filter-block">
+          <span>Addon Prioritization</span>
+          <div className="toggle-row">
+            <button
+              className={`ghost-button ${
+                dutyFilters.addonPriorityEnabled ? "ghost-button--active" : ""
+              }`}
+              type="button"
+              onClick={() =>
+                onDutyFilterChange("addonPriorityEnabled", !dutyFilters.addonPriorityEnabled)
+              }
+            >
+              {dutyFilters.addonPriorityEnabled ? "Addon Priority On" : "Addon Priority Off"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="duty-schedule__actions">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={onBuildDutySchedule}
+          disabled={!canBuild}
+        >
+          Build my Schedule
+        </button>
+      </div>
+    </>
+  );
+}
+
+export function AddonAirportPanel({
+  addonScan,
+  addonScanSummary,
+  isAddonScanBusy,
+  isDesktopAddonScanAvailable,
+  onAddAddonRoot,
+  onRemoveAddonRoot,
+  onScanAddonAirports
+}) {
+  return (
+    <section className="addon-panel">
+      <div className="filter-heading filter-heading--addon">
+        <div>
+          <p className="eyebrow">Addon Airports</p>
+          <h2>Manage installed scenery coverage</h2>
+        </div>
+
+        <div className="addon-panel__actions">
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={onAddAddonRoot}
+            disabled={!isDesktopAddonScanAvailable || isAddonScanBusy}
+          >
+            Add Folder
+          </button>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={onScanAddonAirports}
+            disabled={!isDesktopAddonScanAvailable || isAddonScanBusy || !addonScan.roots.length}
+          >
+            {isAddonScanBusy ? "Scanning..." : "Scan Now"}
+          </button>
+        </div>
+      </div>
+
+      <div className="addon-panel__summary">
+        <p>{addonScanSummary}</p>
+        {!isDesktopAddonScanAvailable ? (
+          <p>Addon airport scanning is available only in the desktop app.</p>
+        ) : null}
+      </div>
+
+      <div className="addon-root-list">
+        {addonScan.roots.length ? (
+          addonScan.roots.map((root) => (
+            <div key={root} className="addon-root-item">
+              <code>{root}</code>
+              <button
+                className="ghost-button addon-root-item__remove"
+                type="button"
+                onClick={() => onRemoveAddonRoot(root)}
+                disabled={isAddonScanBusy}
+              >
+                Remove
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="empty-note">
+            No addon folders saved yet. Add one or more Addon/Community roots, then scan them.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export function SimBriefSettingsPanel({
+  username,
+  pilotId,
+  isSaving,
+  onUsernameChange,
+  onPilotIdChange,
+  onSave
+}) {
+  return (
+    <section className="addon-panel">
+      <div className="filter-heading filter-heading--addon">
+        <div>
+          <p className="eyebrow">SimBrief</p>
+          <h2>Configure SimBrief integration</h2>
+        </div>
+      </div>
+
+      <div className="filter-grid">
+        <label className="filter-block">
+          <span>Navigraph Alias</span>
+          <input
+            type="text"
+            value={username}
+            onChange={(event) => onUsernameChange(event.target.value)}
+            placeholder="Preferred for OFP fetches"
+          />
+        </label>
+
+        <label className="filter-block">
+          <span>Pilot ID</span>
+          <input
+            type="text"
+            value={pilotId}
+            onChange={(event) => onPilotIdChange(event.target.value)}
+            placeholder="Fallback if alias is unavailable"
+          />
+        </label>
+      </div>
+
+      <div className="addon-panel__actions">
+        <button className="primary-button" type="button" onClick={onSave} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+export default function FilterBar({
+  plannerMode,
+  filters,
+  dutyFilters,
+  airlines,
+  airportOptions,
+  regionOptions,
+  countryOptions,
+  equipmentOptions,
+  dutyEquipmentOptions,
+  qualifyingDutyAirlines,
+  filterBounds,
+  onPlannerModeChange,
+  onFilterChange,
+  onDutyFilterChange,
+  onBuildDutySchedule,
+  onReset
+}) {
+  return (
+    <section className="filter-bar">
+      <div className="filter-heading">
+        <div>
+          <p className="eyebrow">Planner Controls</p>
+          <h2>{plannerMode === "duty" ? "Build a generated duty schedule" : "Filter the active schedule"}</h2>
+        </div>
+        <button className="ghost-button" type="button" onClick={onReset}>
+          Reset Active Tab
+        </button>
+      </div>
+
+      <div className="planner-tabs" role="tablist" aria-label="Planner control tabs">
+        <button
+          className={`planner-tab ${plannerMode === "basic" ? "planner-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={plannerMode === "basic"}
+          onClick={() => onPlannerModeChange("basic")}
+        >
+          Basic Filters
+        </button>
+        <button
+          className={`planner-tab ${plannerMode === "duty" ? "planner-tab--active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={plannerMode === "duty"}
+          onClick={() => onPlannerModeChange("duty")}
+        >
+          Duty Schedule
+        </button>
+      </div>
+
+      {plannerMode === "duty" ? (
+        <DutyScheduleFilters
+          dutyFilters={dutyFilters}
+          airlines={airlines}
+          regionOptions={regionOptions}
+          countryOptions={countryOptions}
+          dutyEquipmentOptions={dutyEquipmentOptions}
+          qualifyingDutyAirlines={qualifyingDutyAirlines}
+          filterBounds={filterBounds}
+          onDutyFilterChange={onDutyFilterChange}
+          onBuildDutySchedule={onBuildDutySchedule}
+        />
+      ) : (
+        <BasicFilters
+          filters={filters}
+          airlines={airlines}
+          airportOptions={airportOptions}
+          regionOptions={regionOptions}
+          countryOptions={countryOptions}
+          equipmentOptions={equipmentOptions}
+          filterBounds={filterBounds}
+          onFilterChange={onFilterChange}
+        />
+      )}
     </section>
   );
 }
