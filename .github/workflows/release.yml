@@ -28,8 +28,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Print Tauri environment info
+        run: npm run tauri -- info
+
       - name: Build and publish EXE release
-        uses: tauri-apps/tauri-action@v0.6.0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -39,6 +42,7 @@ jobs:
             Windows executable build for ${{ github.ref_name }}
           releaseDraft: true
           prerelease: false
+          projectPath: .
           tauriScript: npm run tauri --
-          args: --no-bundle
+          args: --no-bundle --verbose
           uploadPlainBinary: true
