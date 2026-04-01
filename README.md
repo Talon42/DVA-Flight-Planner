@@ -4,7 +4,7 @@ Desktop flight planning tool for Delta Virtual Airlines schedules.
 
 <img width="2558" height="1390" alt="image" src="https://github.com/user-attachments/assets/42473695-a378-4874-8eff-35096b7fb6db" />
 
-Hi! I'm Jacob (`DVA11384`). I have been with Delta Virtual Airlines since 2013, and I built this app to make schedule filtering, flight selection, and board management faster, more practical, and fun for day-to-day planning.
+Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, and I built this app to make schedule filtering, flight selection, and board management faster, more practical, and fun for day-to-day planning.
 
 ## What It Does
 
