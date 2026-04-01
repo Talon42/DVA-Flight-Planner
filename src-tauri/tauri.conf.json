@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Flight Planner",
+  "productName": "DVA Flight Planner",
   "version": "0.1.0",
-  "identifier": "org.deltava.flightplanner",
+  "identifier": "dvaflightplanner",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Flight Planner",
+        "title": "DVA Flight Planner",
         "width": 1680,
         "height": 1020,
         "minWidth": 1200,
