@@ -5,6 +5,10 @@ description = "Desktop flight planner for flight simulator schedule imports."
 authors = ["Jake"]
 edition = "2021"
 
+[[bin]]
+name = "DVAFlightPlanner"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

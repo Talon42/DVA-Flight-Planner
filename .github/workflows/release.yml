@@ -1,4 +1,5 @@
 name: Release Windows EXE
+run-name: Release
 
 on:
   push:

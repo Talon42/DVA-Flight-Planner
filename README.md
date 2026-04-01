@@ -25,6 +25,18 @@ Hi! I'm Jacob (`DVA11384`). I have been with Delta Virtual Airlines since 2013, 
 5. Double-click a flight to add it to the Flight Board.
 6. Expand a Flight Board entry to dispatch, repair, or remove it.
 
+## Windows SmartScreen Warning
+
+When you launch the `.exe`, Windows may show a `Microsoft Defender SmartScreen` warning such as `Windows protected your PC`.
+
+That warning is common for small or newly released Windows applications that are not code-signed or do not yet have enough download reputation with Microsoft. It does not automatically mean the app is malicious.
+
+This app is a niche desktop tool distributed directly through this repository, so SmartScreen may warn even when the executable is the expected release build.
+
+If you downloaded the release from this repository and want to continue anyway, click `More info`, then click `Run anyway`.
+
+As with any executable, only do this if you trust the source you downloaded it from and the release matches the official project files.
+
 ## Importing a PFPX XML Manually
 
 1. Download your PFPX schedule XML from the Delta Virtual Airlines website.
