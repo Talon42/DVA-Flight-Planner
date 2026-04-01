@@ -2415,6 +2415,39 @@ export default function App() {
               onPilotIdChange={setSimBriefPilotIdDraft}
               onSave={handleSaveSimBriefSettings}
             />
+
+            <section className="addon-panel about-panel">
+              <div className="filter-heading filter-heading--addon">
+                <div>
+                  <p className="eyebrow">About</p>
+                  <h2>Developer Information</h2>
+                </div>
+              </div>
+
+              <div className="addon-panel__summary about-panel__content">
+                <p>
+                  Created by <strong>Jacob</strong> on GitHub as <strong>Talon42</strong>.
+                </p>
+                <p>Copyright &copy; 2026 Jacob. All rights reserved.</p>
+                <p>
+                  Repository:{" "}
+                  <a
+                    className="about-panel__link"
+                    href="https://github.com/Talon42/DVA-Flight-Planner.git"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    github.com/Talon42/DVA-Flight-Planner
+                  </a>
+                </p>
+                <p>
+                  Email:{" "}
+                  <a className="about-panel__link" href="mailto:jaben428@gmail.com">
+                    jaben428@gmail.com
+                  </a>
+                </p>
+              </div>
+            </section>
           </section>
         </div>
       ) : null}

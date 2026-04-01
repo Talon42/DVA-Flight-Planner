@@ -282,6 +282,24 @@ button {
   line-height: 1.5;
 }
 
+.about-panel {
+  margin-top: 4px;
+}
+
+.about-panel__content strong {
+  color: var(--text-heading);
+}
+
+.about-panel__link {
+  color: var(--delta-blue);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.about-panel__link:hover {
+  text-decoration: underline;
+}
+
 .addon-root-list {
   display: grid;
   gap: 10px;
