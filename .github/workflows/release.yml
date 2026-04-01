@@ -11,38 +11,35 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-
+    
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Setup Rust
+      - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
 
-      - name: Install dependencies
+      - name: Install npm dependencies
         run: npm ci
 
-      - name: Print Tauri environment info
-        run: npm run tauri -- info
+      - name: Build Tauri application
+        run: npm run tauri build -- --no-bundle
 
-      - name: Build and publish EXE release
-        uses: tauri-apps/tauri-action@v0.6.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: DVA Flight Planner ${{ github.ref_name }}
-          releaseBody: |
-            Windows executable build for ${{ github.ref_name }}
-          releaseDraft: true
+          tag: ${{ github.ref_name }}
+          name: DVA Flight Planner ${{ github.ref_name }}
+          body: Windows executable build for ${{ github.ref_name }}
+          draft: true
           prerelease: false
-          projectPath: .
-          tauriScript: npm run tauri --
-          args: --no-bundle --verbose
-          uploadPlainBinary: true
+          artifacts: src-tauri/target/release/*.exe
+          token: ${{ secrets.GITHUB_TOKEN }}
