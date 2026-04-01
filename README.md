@@ -2,6 +2,8 @@
 
 Desktop flight planning tool for Delta Virtual Airlines schedules.
 
+<img width="2558" height="1390" alt="image" src="https://github.com/user-attachments/assets/42473695-a378-4874-8eff-35096b7fb6db" />
+
 Hi! I'm Jacob (`DVA11384`). I have been with Delta Virtual Airlines since 2013, and I built this app to make schedule filtering, flight selection, and board management faster, more practical, and fun for day-to-day planning.
 
 ## What It Does
@@ -14,6 +16,16 @@ Hi! I'm Jacob (`DVA11384`). I have been with Delta Virtual Airlines since 2013, 
 - Supports direct schedule sync from the Delta Virtual website
 - Supports SimBrief dispatch from Flight Board entries (TBD)**
 
+## Windows SmartScreen Warning
+
+When you launch the `.exe`, Windows may show a `Microsoft Defender SmartScreen` warning such as `Windows protected your PC`.
+
+That warning is common for small or newly released Windows applications that are not code-signed or do not yet have enough download reputation with Microsoft. It does not automatically mean the app is malicious.
+
+This app is a niche desktop tool distributed directly through this repository, so SmartScreen may warn even when the executable is the expected release build.
+
+If you downloaded the release from this repository, click `More info`, then click `Run anyway`.
+
 ## Quick Start
 
 1. Open the app.
@@ -24,18 +36,6 @@ Hi! I'm Jacob (`DVA11384`). I have been with Delta Virtual Airlines since 2013, 
 4. Use `Basic Filters` or `Duty Schedule`.
 5. Double-click a flight to add it to the Flight Board.
 6. Expand a Flight Board entry to dispatch, repair, or remove it.
-
-## Windows SmartScreen Warning
-
-When you launch the `.exe`, Windows may show a `Microsoft Defender SmartScreen` warning such as `Windows protected your PC`.
-
-That warning is common for small or newly released Windows applications that are not code-signed or do not yet have enough download reputation with Microsoft. It does not automatically mean the app is malicious.
-
-This app is a niche desktop tool distributed directly through this repository, so SmartScreen may warn even when the executable is the expected release build.
-
-If you downloaded the release from this repository and want to continue anyway, click `More info`, then click `Run anyway`.
-
-As with any executable, only do this if you trust the source you downloaded it from and the release matches the official project files.
 
 ## Importing a PFPX XML Manually
 
@@ -56,9 +56,18 @@ If you already have a schedule loaded, importing a new one replaces the current 
 ### How it works
 
 1. Click `Sync from Delta Virtual`.
-2. A Delta Virtual login window opens.
-3. Sign in with your own DVA credentials on the official DVA site.
-4. The app waits for the official schedule XML download and imports it automatically.
+   
+   <img width="205" height="72" alt="image" src="https://github.com/user-attachments/assets/a6b11711-8bdc-4054-a8e4-8d31097ae8c6" />
+   
+3. A Delta Virtual login window opens.
+   
+   <img width="652" height="422" alt="image" src="https://github.com/user-attachments/assets/7aea0dd6-34a1-46be-b341-b7e854b82846" />
+   
+5. Sign in with your own DVA credentials on the official DVA site.
+6. The app waits for the official schedule XML download and imports it automatically.
+   
+   <img width="346" height="323" alt="image" src="https://github.com/user-attachments/assets/23c64e09-5488-4d72-a481-31e51d70e40b" />
+
 
 ### Security and privacy
 
@@ -99,9 +108,15 @@ Addon folder support is for matching your installed scenery coverage against the
 ### How to add addon folders
 
 1. Open `Settings`.
-2. In `Addon Airports`, click `Add Folder`.
-3. Select one or more top-level addon roots such as your MSFS `Community` folder or another addon root.
-4. Click `Scan Now`.
+
+<img width="70" height="63" alt="image" src="https://github.com/user-attachments/assets/a4477c69-a309-401a-8282-591daa5aacb2" />
+
+3. In `Addon Airports`, click `Add Folder`.
+
+<img width="442" height="165" alt="image" src="https://github.com/user-attachments/assets/603a2617-05a4-4bf3-9f6f-b7953ae55da7" />
+
+4. Select one or more top-level addon roots such as your MSFS `Community` folder or another addon root.
+5. Click `Scan Now`.
 
 The app recursively scans for `ContentHistory.json` files and builds a cached airport list from airport entries it finds.
 
