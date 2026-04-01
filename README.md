@@ -6,6 +6,10 @@ Desktop flight planning tool for Delta Virtual Airlines schedules.
 
 Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, and I built this app to make schedule filtering, flight selection, and board management faster, more practical, and fun for day-to-day planning.
 
+## Disclaimer
+
+For flight simulation purposes only. Not a commercial application. In no way is this application affiliated with Delta Air Lines, its affiliates, or any other airline. All logos, images, and trademarks remain the property of their respective owners.
+
 ## What It Does
 
 - Imports a Delta Virtual PFPX schedule XML

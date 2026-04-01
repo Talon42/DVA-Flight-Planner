@@ -2429,6 +2429,12 @@ export default function App() {
                   Created by <strong>Jacob</strong> on GitHub as <strong>Talon42</strong>.
                 </p>
                 <p>Copyright &copy; 2026 Jacob. All rights reserved.</p>
+                <p className="about-panel__disclaimer">
+                  For flight simulation purposes only. Not a commercial application. In no
+                  way is this application affiliated with Delta Air Lines, its affiliates,
+                  or any other airline. All logos, images, and trademarks remain the
+                  property of their respective owners.
+                </p>
                 <p>
                   Repository:{" "}
                   <a

@@ -290,6 +290,11 @@ button {
   color: var(--text-heading);
 }
 
+.about-panel__disclaimer {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
 .about-panel__link {
   color: var(--delta-blue);
   text-decoration: none;
