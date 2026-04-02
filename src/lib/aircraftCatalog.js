@@ -20,26 +20,37 @@ function convertStatuteMilesToNm(value) {
   return Math.round(value * 0.868976);
 }
 
-const aircraftProfileRows = Papa.parse(aircraftProfilesCsv, CSV_OPTIONS).data;
+let aircraftCatalog = null;
+let aircraftProfileMap = null;
 
-const aircraftCatalog = aircraftProfileRows.map((row) => ({
-  equipmentType: String(row["Aircraft Profile"] || "").trim().toUpperCase(),
-  maximumTakeoffWeight: parseNumeric(row["Maximum Takeoff Weight"]),
-  maximumLandingWeight: parseNumeric(row["Maximum Landing Weight"]),
-  maximumRangeNm: convertStatuteMilesToNm(parseNumeric(row["Maximum Range"]))
-}));
+function ensureAircraftCatalogLoaded() {
+  if (aircraftCatalog && aircraftProfileMap) {
+    return;
+  }
 
-const aircraftProfileMap = new Map(
-  aircraftCatalog
-    .filter((profile) => profile.equipmentType)
-    .map((profile) => [profile.equipmentType, profile])
-);
+  const aircraftProfileRows = Papa.parse(aircraftProfilesCsv, CSV_OPTIONS).data;
+
+  aircraftCatalog = aircraftProfileRows.map((row) => ({
+    equipmentType: String(row["Aircraft Profile"] || "").trim().toUpperCase(),
+    maximumTakeoffWeight: parseNumeric(row["Maximum Takeoff Weight"]),
+    maximumLandingWeight: parseNumeric(row["Maximum Landing Weight"]),
+    maximumRangeNm: convertStatuteMilesToNm(parseNumeric(row["Maximum Range"]))
+  }));
+
+  aircraftProfileMap = new Map(
+    aircraftCatalog
+      .filter((profile) => profile.equipmentType)
+      .map((profile) => [profile.equipmentType, profile])
+  );
+}
 
 export function getAircraftProfileOptions() {
+  ensureAircraftCatalogLoaded();
   return [...new Set(aircraftCatalog.map((profile) => profile.equipmentType).filter(Boolean))].sort();
 }
 
 export function supportsFlightByOperationalLimits(flight, equipmentType) {
+  ensureAircraftCatalogLoaded();
   const normalizedType = String(equipmentType || "").trim().toUpperCase();
   if (!normalizedType) {
     return true;

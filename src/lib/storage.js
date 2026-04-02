@@ -454,6 +454,35 @@ export async function writeSavedUiState(uiState) {
 }
 
 export async function readSimBriefSettings() {
+  function normalizeCustomAirframe(entry) {
+    if (!entry || typeof entry !== "object") {
+      return null;
+    }
+
+    const internalId = String(entry.internalId || "").trim();
+    const matchType = String(entry.matchType || "").trim().toUpperCase();
+    if (!internalId || !matchType) {
+      return null;
+    }
+
+    return {
+      internalId,
+      matchType
+    };
+  }
+
+  function normalizeSettings(parsed) {
+    const dispatchUnits = String(parsed?.dispatchUnits || "").trim().toUpperCase();
+    return {
+      username: String(parsed?.username || "").trim(),
+      pilotId: String(parsed?.pilotId || "").trim(),
+      dispatchUnits: dispatchUnits === "KGS" ? "KGS" : "LBS",
+      customAirframes: Array.isArray(parsed?.customAirframes)
+        ? parsed.customAirframes.map(normalizeCustomAirframe).filter(Boolean)
+        : []
+    };
+  }
+
   if (isTauriRuntime()) {
     const { exists, readTextFile, BaseDirectory } = await loadFsModule();
     const hasFile = await exists(SIMBRIEF_SETTINGS_FILE, {
@@ -461,35 +490,38 @@ export async function readSimBriefSettings() {
     });
 
     if (!hasFile) {
-      return { username: "", pilotId: "" };
+      return { username: "", pilotId: "", dispatchUnits: "LBS", customAirframes: [] };
     }
 
     const text = await readTextFile(SIMBRIEF_SETTINGS_FILE, {
       baseDir: BaseDirectory.AppData
     });
-    const parsed = JSON.parse(text);
-    return {
-      username: String(parsed?.username || "").trim(),
-      pilotId: String(parsed?.pilotId || "").trim()
-    };
+    return normalizeSettings(JSON.parse(text));
   }
 
   const text = window.localStorage.getItem("flight-planner.simbrief-settings");
   if (!text) {
-    return { username: "", pilotId: "" };
+    return { username: "", pilotId: "", dispatchUnits: "LBS", customAirframes: [] };
   }
 
-  const parsed = JSON.parse(text);
-  return {
-    username: String(parsed?.username || "").trim(),
-    pilotId: String(parsed?.pilotId || "").trim()
-  };
+  return normalizeSettings(JSON.parse(text));
 }
 
 export async function writeSimBriefSettings(settings) {
   const serialized = JSON.stringify({
     username: String(settings?.username || "").trim(),
-    pilotId: String(settings?.pilotId || "").trim()
+    pilotId: String(settings?.pilotId || "").trim(),
+    dispatchUnits: String(settings?.dispatchUnits || "LBS").trim().toUpperCase() === "KGS"
+      ? "KGS"
+      : "LBS",
+    customAirframes: Array.isArray(settings?.customAirframes)
+      ? settings.customAirframes
+          .map((entry) => ({
+            internalId: String(entry?.internalId || "").trim(),
+            matchType: String(entry?.matchType || "").trim().toUpperCase()
+          }))
+          .filter((entry) => entry.internalId && entry.matchType)
+      : []
   });
 
   if (isTauriRuntime()) {
@@ -642,6 +674,39 @@ export async function confirmOverwriteSchedule() {
   return window.confirm(
     "Importing a new schedule will replace the current saved schedule and shortlist. Continue?"
   );
+}
+
+export async function confirmDeleteUserData() {
+  const message =
+    "Delete all saved user data for this app? This removes saved schedules, SimBrief settings, addon folder roots, logs, and stored Delta Virtual login data.";
+
+  if (isTauriRuntime()) {
+    const { confirm } = await import("@tauri-apps/plugin-dialog");
+    return confirm(message, {
+      title: "Delete User Info",
+      kind: "warning",
+      okLabel: "Delete"
+    });
+  }
+
+  return window.confirm(message);
+}
+
+export async function deleteStoredUserData() {
+  if (isTauriRuntime()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("clear_user_data");
+  }
+
+  for (const key of [
+    "flight-planner.saved-schedule",
+    "flight-planner.ui-state",
+    "flight-planner.simbrief-settings",
+    "flight-planner.import-log",
+    "flight-planner.theme"
+  ]) {
+    window.localStorage.removeItem(key);
+  }
 }
 
 export async function pickXmlScheduleFile() {

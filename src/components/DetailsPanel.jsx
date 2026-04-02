@@ -1,5 +1,6 @@
 import { formatDistanceNm, formatDuration, formatUtc } from "../lib/formatters";
 import { getAirlineLogo } from "../lib/airlineBranding";
+import { groupSimBriefAircraftTypesByManufacturer } from "../lib/simbrief";
 import planeLight from "../data/images/plane_light.png";
 
 function DetailRow({ label, value }) {
@@ -106,48 +107,52 @@ function SimBriefInlinePanel({
   simBriefDispatchState,
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
+  simBriefAircraftTypes,
+  isSimBriefAircraftTypesLoading,
+  simBriefAircraftTypesError,
   onRemoveFromFlightBoard,
   onSimBriefTypeChange,
   onSimBriefDispatch
 }) {
   const selectedType = String(flight.simbriefSelectedType || "").trim().toUpperCase();
-  const dispatchMessage =
-    simBriefDispatchState.flightId === flight.boardEntryId ? simBriefDispatchState.message : "";
+  const availableAircraftTypes = Array.isArray(simBriefAircraftTypes) ? simBriefAircraftTypes : [];
+  const aircraftTypeGroups = groupSimBriefAircraftTypesByManufacturer(availableAircraftTypes);
+  const selectedTypeSupported =
+    !selectedType || availableAircraftTypes.some((type) => type.code === selectedType);
   const isDispatching =
     simBriefDispatchState.flightId === flight.boardEntryId && simBriefDispatchState.isDispatching;
   const dispatchDisabled =
-    !isDesktopSimBriefAvailable || isDispatching || !selectedType || !simBriefCredentialsConfigured;
+    !isDesktopSimBriefAvailable ||
+    isDispatching ||
+    (!availableAircraftTypes.length && isSimBriefAircraftTypesLoading) ||
+    (!availableAircraftTypes.length && Boolean(simBriefAircraftTypesError)) ||
+    !selectedType ||
+    !selectedTypeSupported ||
+    !simBriefCredentialsConfigured;
 
   return (
     <div className="simbrief-inline-panel">
-      <div className="filter-grid simbrief-controls">
-        <label className="filter-block">
-          <span>Aircraft Type</span>
-          <select
-            value={selectedType}
-            onChange={(event) => onSimBriefTypeChange(flight.boardEntryId, event.target.value)}
-          >
-            <option value="">Select a SimBrief profile</option>
-            {(flight.compatibleEquipment || []).map((equipment) => (
-              <option key={equipment} value={equipment}>
-                {equipment}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {!isDesktopSimBriefAvailable ? (
-        <p className="simbrief-status">SimBrief dispatch is available only in the desktop Tauri app.</p>
-      ) : null}
-
-      {isDesktopSimBriefAvailable && !simBriefCredentialsConfigured ? (
-        <p className="simbrief-status">
-          Save a SimBrief Navigraph Alias or Pilot ID in Settings before dispatching.
-        </p>
-      ) : null}
-
-      {dispatchMessage ? <p className="simbrief-status">{dispatchMessage}</p> : null}
+      <label className="filter-block simbrief-aircraft-select">
+        <span>SimBrief Aircraft</span>
+        <select
+          value={selectedType}
+          onChange={(event) => onSimBriefTypeChange(flight.boardEntryId, event.target.value)}
+          disabled={!availableAircraftTypes.length}
+        >
+          <option value="">
+            {isSimBriefAircraftTypesLoading ? "Loading aircraft..." : "Select aircraft"}
+          </option>
+          {aircraftTypeGroups.map((group) => (
+            <optgroup key={group.manufacturer} label={group.manufacturer}>
+              {group.items.map((type) => (
+                <option key={type.code} value={type.code}>
+                  {type.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
 
       <div className="details-actions details-actions--board-item">
         <button
@@ -169,8 +174,6 @@ function SimBriefInlinePanel({
           Remove from Flight Board
         </button>
       </div>
-
-      <SimBriefSummary flight={flight} />
     </div>
   );
 }
@@ -207,6 +210,9 @@ export default function DetailsPanel({
   simBriefDispatchState,
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
+  simBriefAircraftTypes,
+  isSimBriefAircraftTypesLoading,
+  simBriefAircraftTypesError,
   onToggleBoardFlight,
   onRemoveFromFlightBoard,
   onRepairFlightBoardEntry,
@@ -285,6 +291,9 @@ export default function DetailsPanel({
                       simBriefDispatchState={simBriefDispatchState}
                       simBriefCredentialsConfigured={simBriefCredentialsConfigured}
                       isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
+                      simBriefAircraftTypes={simBriefAircraftTypes}
+                      isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
+                      simBriefAircraftTypesError={simBriefAircraftTypesError}
                       onRemoveFromFlightBoard={onRemoveFromFlightBoard}
                       onSimBriefTypeChange={onSimBriefTypeChange}
                       onSimBriefDispatch={onSimBriefDispatch}

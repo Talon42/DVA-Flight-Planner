@@ -10,6 +10,10 @@ Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, 
 
 For flight simulation purposes only. Not a commercial application. In no way is this application affiliated with Delta Air Lines, its affiliates, or any other airline. All logos, images, and trademarks remain the property of their respective owners.
 
+## Disclaimer
+
+For flight simulation purposes only. Not a commercial application. In no way is this application affiliated with Delta Air Lines, its affiliates, or any other airline. All logos, images, and trademarks remain the property of their respective owners.
+
 ## What It Does
 
 - Imports a Delta Virtual PFPX schedule XML
@@ -18,7 +22,7 @@ For flight simulation purposes only. Not a commercial application. In no way is 
 - Builds a connected duty schedule
 - Lets you maintain a persistent Flight Board between sessions
 - Supports direct schedule sync from the Delta Virtual website
-- Supports SimBrief dispatch from Flight Board entries (TBD)**
+- Supports SimBrief dispatch from Flight Board entries
 
 ## Windows SmartScreen Warning
 
@@ -251,6 +255,27 @@ Repair is used for stale entries that came from an older schedule.
 If a repair is found, the board entry is relinked to the current schedule.
 
 If no repair match is found, the entry stays stale until you remove it.
+
+## SimBrief Dispatch
+
+SimBrief dispatch is available from Flight Board entries in the desktop app.
+
+### How it works
+
+1. Open `Settings`.
+2. Save your SimBrief `Navigraph Alias` or `Pilot ID`.
+3. Add a flight to the Flight Board.
+4. Expand the entry and choose a SimBrief aircraft type.
+5. Click `SimBrief Dispatch`.
+6. Sign in to SimBrief/Navigraph in the popup window if prompted.
+7. When the OFP finishes generating, the app fetches the latest plan summary and stores the OFP/PDF links on that board entry.
+
+### Notes
+
+- The app ships with a bundled SimBrief API key for desktop dispatch requests.
+- Pilots still sign in with their own SimBrief/Navigraph account. The app does not bypass SimBrief authentication.
+- `Navigraph Alias` is preferred for OFP fetches. `Pilot ID` is supported as a fallback.
+- At least one of those identifiers must be saved in `Settings` before dispatching.
 
 ## Logs
 

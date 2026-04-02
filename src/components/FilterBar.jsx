@@ -1,54 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDistanceNm, formatDuration } from "../lib/formatters";
+import { groupSimBriefAircraftTypesByManufacturer } from "../lib/simbrief";
 
-function TimeFilter({
-  label,
-  filterKey,
-  filters,
-  onFilterChange,
-  timeDisplayMode,
-  onToggleTimeDisplayMode
-}) {
-  const isLocalMode = timeDisplayMode === "local";
+const TIME_WINDOW_OPTIONS = [
+  { value: "", label: "Any time" },
+  { value: "red-eye", label: "Red Eye" },
+  { value: "morning", label: "Morning" },
+  { value: "afternoon", label: "Afternoon" },
+  { value: "evening", label: "Evening" }
+];
 
+function TimeWindowFilter({ label, filterKey, filters, onFilterChange }) {
   return (
     <label className="filter-block">
-      <span className="filter-label">
-        <span>{label}</span>
-        <button
-          className={`time-mode-toggle ${
-            isLocalMode ? "time-mode-toggle--local" : "time-mode-toggle--utc"
-          }`}
-          type="button"
-          onClick={onToggleTimeDisplayMode}
-          title={isLocalMode ? "Switch to UTC time" : "Switch to local time"}
-          aria-label={isLocalMode ? "Switch to UTC time" : "Switch to local time"}
-        >
-          <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
-            <path
-              d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9M13.5 8a5.5 5.5 0 0 1-9.4 3.9"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M11.3 2.8v2.6H8.7M4.7 13.2V10.6h2.6"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.5"
-            />
-          </svg>
-        </button>
-      </span>
-      <input
-        type="time"
+      <span>{label}</span>
+      <select
         value={filters[filterKey]}
         onChange={(event) => onFilterChange(filterKey, event.target.value)}
-      />
+      >
+        {TIME_WINDOW_OPTIONS.map((option) => (
+          <option key={option.value || "any"} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
@@ -413,32 +388,18 @@ function BasicFilters({
           onChange={(value) => onFilterChange("equipment", value)}
         />
 
-        <TimeFilter
-          label={filters.timeDisplayMode === "local" ? "Local Departure" : "UTC Departure"}
-          filterKey="utcDeparture"
+        <TimeWindowFilter
+          label="Local Departure"
+          filterKey="localDepartureWindow"
           filters={filters}
           onFilterChange={onFilterChange}
-          timeDisplayMode={filters.timeDisplayMode}
-          onToggleTimeDisplayMode={() =>
-            onFilterChange(
-              "timeDisplayMode",
-              filters.timeDisplayMode === "local" ? "utc" : "local"
-            )
-          }
         />
 
-        <TimeFilter
-          label={filters.timeDisplayMode === "local" ? "Local Arrival" : "UTC Arrival"}
-          filterKey="utcArrival"
+        <TimeWindowFilter
+          label="Local Arrival"
+          filterKey="localArrivalWindow"
           filters={filters}
           onFilterChange={onFilterChange}
-          timeDisplayMode={filters.timeDisplayMode}
-          onToggleTimeDisplayMode={() =>
-            onFilterChange(
-              "timeDisplayMode",
-              filters.timeDisplayMode === "local" ? "utc" : "local"
-            )
-          }
         />
       </div>
 
@@ -755,11 +716,49 @@ export function AddonAirportPanel({
 export function SimBriefSettingsPanel({
   username,
   pilotId,
+  dispatchUnits,
+  customAirframes,
+  customAirframeDraftId,
+  customAirframeDraftMatchType,
+  simBriefAircraftTypes,
+  isSimBriefAircraftTypesLoading,
+  simBriefAircraftTypesError,
   isSaving,
   onUsernameChange,
   onPilotIdChange,
-  onSave
+  onDispatchUnitsChange,
+  onCustomAirframeDraftIdChange,
+  onCustomAirframeDraftMatchTypeChange,
+  onAddCustomAirframe,
+  onRemoveCustomAirframe,
+  onSaveCredentials
 }) {
+  const aircraftTypeGroups = groupSimBriefAircraftTypesByManufacturer(simBriefAircraftTypes);
+  const [usernameValue, setUsernameValue] = useState(username);
+  const [pilotIdValue, setPilotIdValue] = useState(pilotId);
+
+  useEffect(() => {
+    setUsernameValue(username);
+  }, [username]);
+
+  useEffect(() => {
+    setPilotIdValue(pilotId);
+  }, [pilotId]);
+
+  const commitCredentials = () => {
+    onSaveCredentials({
+      username: usernameValue,
+      pilotId: pilotIdValue
+    });
+  };
+
+  const handleCredentialKeyDown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitCredentials();
+    }
+  };
+
   return (
     <section className="addon-panel">
       <div className="filter-heading filter-heading--addon">
@@ -769,14 +768,16 @@ export function SimBriefSettingsPanel({
         </div>
       </div>
 
-      <div className="filter-grid">
+      <div className="filter-grid simbrief-credentials-row">
         <label className="filter-block">
           <span>Navigraph Alias</span>
           <input
             type="text"
-            value={username}
-            onChange={(event) => onUsernameChange(event.target.value)}
-            placeholder="Preferred for OFP fetches"
+            value={usernameValue}
+            onChange={(event) => setUsernameValue(event.target.value)}
+            onBlur={commitCredentials}
+            onKeyDown={handleCredentialKeyDown}
+            placeholder="Enter Alias"
           />
         </label>
 
@@ -784,17 +785,119 @@ export function SimBriefSettingsPanel({
           <span>Pilot ID</span>
           <input
             type="text"
-            value={pilotId}
-            onChange={(event) => onPilotIdChange(event.target.value)}
-            placeholder="Fallback if alias is unavailable"
+            value={pilotIdValue}
+            onChange={(event) => setPilotIdValue(event.target.value)}
+            onBlur={commitCredentials}
+            onKeyDown={handleCredentialKeyDown}
+            placeholder="Enter Pilot ID"
           />
         </label>
       </div>
 
-      <div className="addon-panel__actions">
-        <button className="primary-button" type="button" onClick={onSave} disabled={isSaving}>
-          {isSaving ? "Saving..." : "Save"}
-        </button>
+      <div className="filter-block simbrief-units-toggle">
+        <span>Dispatch Units</span>
+        <div className="toggle-row">
+          <button
+            className={`ghost-button ${dispatchUnits === "LBS" ? "ghost-button--active" : ""}`}
+            type="button"
+            onClick={() => onDispatchUnitsChange("LBS")}
+          >
+            LBS
+          </button>
+          <button
+            className={`ghost-button ${dispatchUnits === "KGS" ? "ghost-button--active" : ""}`}
+            type="button"
+            onClick={() => onDispatchUnitsChange("KGS")}
+          >
+            KGS
+          </button>
+        </div>
+      </div>
+
+      <div className="simbrief-custom-airframes">
+        <div className="filter-heading filter-heading--addon">
+          <div>
+            <h3>Saved custom airframes</h3>
+            <p className="simbrief-status">
+              Add a SimBrief internal ID and match it to the aircraft shown on the flight board.
+            </p>
+          </div>
+        </div>
+
+        <div className="filter-grid simbrief-custom-airframes__form">
+          <label className="filter-block">
+            <span>Custom Airframe Internal ID</span>
+            <input
+              type="text"
+              value={customAirframeDraftId}
+              onChange={(event) => onCustomAirframeDraftIdChange(event.target.value)}
+              placeholder="1234_1234567891234"
+            />
+          </label>
+
+          <label className="filter-block">
+            <span>Matching Aircraft</span>
+            <select
+              value={customAirframeDraftMatchType}
+              onChange={(event) => onCustomAirframeDraftMatchTypeChange(event.target.value)}
+              disabled={!simBriefAircraftTypes.length}
+            >
+              <option value="">
+                {isSimBriefAircraftTypesLoading ? "Loading aircraft..." : "Select aircraft"}
+              </option>
+              {aircraftTypeGroups.map((group) => (
+                <optgroup key={group.manufacturer} label={group.manufacturer}>
+                  {group.items.map((type) => (
+                    <option key={type.code} value={type.code}>
+                      {type.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {simBriefAircraftTypesError ? <p className="empty-note">{simBriefAircraftTypesError}</p> : null}
+
+        <div className="addon-panel__actions">
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={onAddCustomAirframe}
+            disabled={!customAirframeDraftId.trim() || !customAirframeDraftMatchType}
+          >
+            Add Custom Airframe ID
+          </button>
+        </div>
+
+        <div className="simbrief-custom-airframe-list">
+          {customAirframes.length ? (
+            customAirframes.map((entry) => {
+              const matchedType =
+                simBriefAircraftTypes.find((type) => type.code === entry.matchType)?.name ||
+                entry.matchType;
+
+              return (
+                <div key={entry.internalId} className="simbrief-custom-airframe-item">
+                  <div>
+                    <strong>{matchedType}</strong>
+                    <p>{entry.internalId}</p>
+                  </div>
+                  <button
+                    className="ghost-button addon-root-item__remove"
+                    type="button"
+                    onClick={() => onRemoveCustomAirframe(entry.internalId)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              );
+            })
+          ) : (
+            <p className="empty-note">No custom SimBrief airframes saved yet.</p>
+          )}
+        </div>
       </div>
     </section>
   );

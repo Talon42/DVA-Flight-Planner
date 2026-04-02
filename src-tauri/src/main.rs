@@ -10,9 +10,12 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     sync::{Mutex, OnceLock},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, State, WebviewUrl,
+    WebviewWindow, WebviewWindowBuilder, WindowEvent,
+};
 use tokio::sync::oneshot;
 #[cfg(windows)]
 use webview2_com::{
@@ -22,19 +25,24 @@ use webview2_com::{
 #[cfg(windows)]
 use windows::core::{Interface, PWSTR};
 use simbrief::{
-    close_simbrief_dispatch_window, start_simbrief_dispatch, SimBriefDispatchManager,
+    close_simbrief_dispatch_window, fetch_simbrief_aircraft_types, start_simbrief_dispatch,
+    SimBriefDispatchManager,
 };
 
 const DELTAVA_LOGIN_URL: &str = "https://www.deltava.org/login.do";
 const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
 const DELTAVA_SYNC_TIMEOUT_SECONDS: u64 = 300;
+const DELTAVA_CLOSE_AFTER_PROMPT_WAIT_SECONDS: u64 = 30;
+const DELTAVA_FOCUS_LOSS_RECENT_WINDOW_MILLIS: u64 = 3000;
 const DELTAVA_XML_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_PFPX_XML__";
 const DELTAVA_DEBUG_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_DEBUG__";
 const APP_STORAGE_DIR: &str = "flight-planner";
 const APP_LOG_FILE: &str = "log.txt";
 const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
+const MAIN_WINDOW_STATE_FILE: &str = "main-window-state.json";
 const APP_LOG_MAX_BYTES: u64 = 262_144;
 const DELTAVA_SYNC_DOWNLOAD_FILE: &str = "deltava-pfpxsched.xml";
+const SIMBRIEF_WEBVIEW_DIR: &str = "simbrief-webview";
 static DELTAVA_SYNC_LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 const WEBVIEW_ROOT_PRUNE_DIRS: &[&str] = &[
     "AutoLaunchProtocolsComponent",
@@ -345,6 +353,16 @@ struct AddonAirportScanSummary {
     scan_details: Vec<AddonAirportScanDetail>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedWindowState {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    maximized: bool,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DeltaSyncPayload {
@@ -405,6 +423,91 @@ fn addon_airport_cache_path(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|error| format!("Unable to create app storage directory: {error}"))?;
 
     Ok(storage_dir.join(ADDON_AIRPORT_CACHE_FILE))
+}
+
+fn app_storage_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Unable to resolve app storage path: {error}"))?;
+
+    fs::create_dir_all(&app_data_dir)
+        .map_err(|error| format!("Unable to create app data directory: {error}"))?;
+
+    let storage_dir = app_data_dir.join(APP_STORAGE_DIR);
+    fs::create_dir_all(&storage_dir)
+        .map_err(|error| format!("Unable to create app storage directory: {error}"))?;
+
+    Ok(storage_dir)
+}
+
+fn main_window_state_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app_storage_dir(app)?.join(MAIN_WINDOW_STATE_FILE))
+}
+
+fn read_saved_main_window_state(app: &AppHandle) -> Option<SavedWindowState> {
+    let path = main_window_state_path(app).ok()?;
+    let text = fs::read_to_string(path).ok()?;
+    serde_json::from_str::<SavedWindowState>(&text).ok()
+}
+
+fn write_saved_main_window_state(app: &AppHandle, state: &SavedWindowState) -> Result<(), String> {
+    let path = main_window_state_path(app)?;
+    let text = serde_json::to_string_pretty(state)
+        .map_err(|error| format!("Unable to serialize main window state: {error}"))?;
+    fs::write(path, text).map_err(|error| format!("Unable to write main window state: {error}"))
+}
+
+fn capture_main_window_state(
+    window: &WebviewWindow,
+    preserve_bounds_if_maximized: bool,
+) -> Option<SavedWindowState> {
+    let app = window.app_handle();
+    let maximized = window.is_maximized().ok().unwrap_or(false);
+
+    if maximized && preserve_bounds_if_maximized {
+        let mut state = read_saved_main_window_state(&app).unwrap_or_default();
+        state.maximized = true;
+        return Some(state);
+    }
+
+    let position = window.outer_position().ok()?;
+    let size = window.outer_size().ok()?;
+    if size.width == 0 || size.height == 0 {
+        return None;
+    }
+
+    Some(SavedWindowState {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+        maximized,
+    })
+}
+
+fn persist_main_window_state(window: &WebviewWindow, preserve_bounds_if_maximized: bool) {
+    let Some(state) = capture_main_window_state(window, preserve_bounds_if_maximized) else {
+        return;
+    };
+
+    let _ = write_saved_main_window_state(&window.app_handle(), &state);
+}
+
+fn restore_main_window_state(window: &WebviewWindow) {
+    let Some(state) = read_saved_main_window_state(&window.app_handle()) else {
+        return;
+    };
+
+    if state.width > 0 && state.height > 0 {
+        let _ = window.set_size(Size::Physical(PhysicalSize::new(state.width, state.height)));
+    }
+
+    let _ = window.set_position(Position::Physical(PhysicalPosition::new(state.x, state.y)));
+
+    if state.maximized {
+        let _ = window.maximize();
+    }
 }
 
 fn normalize_addon_roots(roots: Vec<String>) -> Vec<String> {
@@ -893,9 +996,75 @@ fn prune_deltava_storage_internal(
     }
 }
 
+fn clear_user_data_internal(app: &AppHandle) -> Result<(), String> {
+    close_sync_window(app);
+    close_simbrief_dispatch_window(app.clone());
+
+    if let Ok(app_data_dir) = app.path().app_data_dir() {
+        remove_path_if_exists(&app_data_dir.join(APP_STORAGE_DIR));
+    }
+
+    if let Ok(local_data_dir) = app.path().app_local_data_dir() {
+        remove_path_if_exists(&local_data_dir.join("deltava-sync"));
+        remove_path_if_exists(&local_data_dir.join("deltava-webview"));
+        remove_path_if_exists(&local_data_dir.join(SIMBRIEF_WEBVIEW_DIR));
+        remove_path_if_exists(&local_data_dir.join("EBWebView"));
+    }
+
+    remove_path_if_exists(&std::env::temp_dir().join(APP_STORAGE_DIR));
+    Ok(())
+}
+
 fn close_sync_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(DELTAVA_SYNC_LABEL) {
         let _ = window.close();
+    }
+}
+
+async fn wait_for_sync_window_focus_return(
+    app: &AppHandle,
+    focus_lost_at: &std::sync::Arc<Mutex<Option<Instant>>>,
+) {
+    let Some(window) = app.get_webview_window(DELTAVA_SYNC_LABEL) else {
+        return;
+    };
+
+    let recently_lost_focus = focus_lost_at
+        .lock()
+        .ok()
+        .and_then(|guard| *guard)
+        .map(|timestamp| {
+            timestamp.elapsed() <= Duration::from_millis(DELTAVA_FOCUS_LOSS_RECENT_WINDOW_MILLIS)
+        })
+        .unwrap_or(false);
+
+    if !recently_lost_focus {
+        return;
+    }
+
+    append_sync_log("sync:waiting-for-focus-return");
+    let deadline =
+        tokio::time::Instant::now() + Duration::from_secs(DELTAVA_CLOSE_AFTER_PROMPT_WAIT_SECONDS);
+
+    loop {
+        if tokio::time::Instant::now() >= deadline {
+            append_sync_log("sync:focus-return-timeout");
+            break;
+        }
+
+        match window.is_focused() {
+            Ok(true) => {
+                append_sync_log("sync:focus-returned");
+                break;
+            }
+            Ok(false) => {}
+            Err(error) => {
+                append_sync_log(&format!("sync:focus-check-failed {error}"));
+                break;
+            }
+        }
+
+        tokio::time::sleep(Duration::from_millis(250)).await;
     }
 }
 
@@ -907,6 +1076,11 @@ fn close_deltava_sync_window(app: AppHandle) {
 #[tauri::command]
 fn prune_deltava_storage(app: AppHandle, remove_downloaded_schedule: bool) {
     prune_deltava_storage_internal(&app, remove_downloaded_schedule, false);
+}
+
+#[tauri::command]
+fn clear_user_data(app: AppHandle) -> Result<(), String> {
+    clear_user_data_internal(&app)
 }
 
 #[tauri::command]
@@ -1080,6 +1254,8 @@ async fn start_deltava_sync(
     let app_for_download = app.clone();
     let app_for_page_load = app.clone();
     let app_for_close = app.clone();
+    let focus_lost_at = std::sync::Arc::new(Mutex::new(None::<Instant>));
+    let focus_lost_at_for_events = focus_lost_at.clone();
 
     let login_url = DELTAVA_LOGIN_URL
         .parse()
@@ -1170,16 +1346,35 @@ async fn start_deltava_sync(
     append_sync_log("sync:webview-ready");
 
     window.on_window_event(move |event| {
-        if matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed) {
-            app_for_close.state::<DeltaSyncManager>().finish(
-                DELTAVA_SYNC_LABEL,
-                Err("cancelled: Delta Virtual sync window was closed before the XML was downloaded.".into()),
-            );
+        match event {
+            WindowEvent::Focused(focused) => {
+                if *focused {
+                    if let Ok(mut guard) = focus_lost_at_for_events.lock() {
+                        *guard = None;
+                    }
+                    append_sync_log("sync-window:focused");
+                } else {
+                    if let Ok(mut guard) = focus_lost_at_for_events.lock() {
+                        *guard = Some(Instant::now());
+                    }
+                    append_sync_log("sync-window:blurred");
+                }
+            }
+            WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
+                app_for_close.state::<DeltaSyncManager>().finish(
+                    DELTAVA_SYNC_LABEL,
+                    Err("cancelled: Delta Virtual sync window was closed before the XML was downloaded.".into()),
+                );
+            }
+            _ => {}
         }
     });
 
     match tokio::time::timeout(Duration::from_secs(DELTAVA_SYNC_TIMEOUT_SECONDS), receiver).await {
-        Ok(Ok(result)) => result,
+        Ok(Ok(result)) => {
+            wait_for_sync_window_focus_return(&app_for_page_load, &focus_lost_at).await;
+            result
+        }
         Ok(Err(_)) => Err("download_failed: Delta Virtual sync stopped unexpectedly.".into()),
         Err(_) => {
             app_for_page_load.state::<DeltaSyncManager>().finish(
@@ -1293,14 +1488,33 @@ fn main() {
         .setup(|app| {
             let app_handle = app.handle().clone();
             let _ = initialize_sync_log_path(&app_handle);
-            prune_deltava_storage_internal(&app_handle, false, true);
+            tauri::async_runtime::spawn(async move {
+                prune_deltava_storage_internal(&app_handle, false, true);
+            });
+
+            if let Some(main_window) = app.get_webview_window("main") {
+                restore_main_window_state(&main_window);
+                let main_window_for_events = main_window.clone();
+
+                main_window.on_window_event(move |event| match event {
+                    WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+                        persist_main_window_state(&main_window_for_events, true);
+                    }
+                    WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
+                        persist_main_window_state(&main_window_for_events, true);
+                    }
+                    _ => {}
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             start_deltava_sync,
             close_deltava_sync_window,
             prune_deltava_storage,
+            clear_user_data,
             start_simbrief_dispatch,
+            fetch_simbrief_aircraft_types,
             close_simbrief_dispatch_window,
             read_addon_airport_cache,
             save_addon_airport_roots,

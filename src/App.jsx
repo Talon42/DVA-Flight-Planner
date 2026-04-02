@@ -1,4 +1,4 @@
-import { startTransition, useDeferredValue, useEffect, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
 import { DateTime } from "luxon";
 import FilterBar from "./components/FilterBar";
 import { AddonAirportPanel } from "./components/FilterBar";
@@ -28,12 +28,15 @@ import { formatNumber } from "./lib/formatters";
 import { runScheduleImport } from "./lib/importClient";
 import { logAppError, logAppEvent, openAppLogFile } from "./lib/appLog";
 import {
+  buildSimBriefDispatchOptions,
   closeSimBriefDispatchWindow,
+  fetchSimBriefAircraftTypes,
+  normalizeSimBriefCustomAirframe,
   startSimBriefDispatch
 } from "./lib/simbrief";
 import {
   appendImportLog,
-  confirmOverwriteSchedule,
+  deleteStoredUserData,
   pickXmlScheduleFile,
   readSimBriefSettings,
   readSavedSchedule,
@@ -214,16 +217,46 @@ function normalizeSortValue(value) {
   return typeof value === "string" ? value.toUpperCase() : value;
 }
 
-function matchesTime(clockValue, filterValue) {
+function parseClockMinutes(clockValue) {
+  const normalized = String(clockValue || "").trim();
+  if (!/^\d{2}:\d{2}$/.test(normalized)) {
+    return null;
+  }
+
+  const [hoursText, minutesText] = normalized.split(":");
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function matchesLocalTimeWindow(clockValue, filterValue, filterKind) {
   if (!filterValue) {
     return true;
   }
 
-  if (!clockValue) {
+  const totalMinutes = parseClockMinutes(clockValue);
+  if (totalMinutes === null) {
     return false;
   }
 
-  return clockValue === filterValue;
+  switch (filterValue) {
+    case "red-eye":
+      return filterKind === "departure"
+        ? totalMinutes >= 23 * 60 || totalMinutes < 2 * 60
+        : totalMinutes >= 2 * 60 && totalMinutes < 6 * 60;
+    case "morning":
+      return totalMinutes >= 6 * 60 && totalMinutes < 12 * 60;
+    case "afternoon":
+      return totalMinutes >= 12 * 60 && totalMinutes < 18 * 60;
+    case "evening":
+      return totalMinutes >= 18 * 60 && totalMinutes < 23 * 60;
+    default:
+      return true;
+  }
 }
 
 function matchesSearch(flight, query) {
@@ -407,6 +440,16 @@ function buildSavedSchedule(schedule, uiState) {
 
 function buildBoardEntryId(seed = "") {
   return `board:${seed || "flight"}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeSimBriefAircraftTypeOption(value) {
+  const code = String(value?.code || "").trim().toUpperCase();
+  if (!code) {
+    return null;
+  }
+
+  const name = String(value?.name || "").trim() || code;
+  return { code, name };
 }
 
 function buildBoardEntryFromFlight(flight, overrides = {}) {
@@ -841,7 +884,16 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
     nextFilters.equipment = nextFilters.equipment ? [nextFilters.equipment] : [];
   }
 
-  nextFilters.timeDisplayMode = nextFilters.timeDisplayMode === "local" ? "local" : "utc";
+  nextFilters.localDepartureWindow = ["", "red-eye", "morning", "afternoon", "evening"].includes(
+    nextFilters.localDepartureWindow
+  )
+    ? nextFilters.localDepartureWindow
+    : "";
+  nextFilters.localArrivalWindow = ["", "red-eye", "morning", "afternoon", "evening"].includes(
+    nextFilters.localArrivalWindow
+  )
+    ? nextFilters.localArrivalWindow
+    : "";
 
   const defaultFlightLengthMax = bounds.maxBlockMinutes;
   const defaultDistanceMax = bounds.maxDistanceNm;
@@ -885,6 +937,7 @@ export default function App() {
   const [flightBoard, setFlightBoard] = useState([]);
   const [selectedFlightId, setSelectedFlightId] = useState(null);
   const [expandedBoardFlightId, setExpandedBoardFlightId] = useState(null);
+  const [scheduleTableTimeDisplayMode, setScheduleTableTimeDisplayMode] = useState("local");
   const [plannerMode, setPlannerMode] = useState("basic");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [dutyFilters, setDutyFilters] = useState(DEFAULT_DUTY_FILTERS);
@@ -896,24 +949,38 @@ export default function App() {
   const [simBriefUsernameDraft, setSimBriefUsernameDraft] = useState("");
   const [simBriefPilotId, setSimBriefPilotId] = useState("");
   const [simBriefPilotIdDraft, setSimBriefPilotIdDraft] = useState("");
+  const [simBriefDispatchUnits, setSimBriefDispatchUnits] = useState("LBS");
+  const [savedSimBriefDispatchUnits, setSavedSimBriefDispatchUnits] = useState("LBS");
+  const [simBriefCustomAirframes, setSimBriefCustomAirframes] = useState([]);
+  const [simBriefCustomAirframesDraft, setSimBriefCustomAirframesDraft] = useState([]);
+  const [simBriefCustomAirframeIdDraft, setSimBriefCustomAirframeIdDraft] = useState("");
+  const [simBriefCustomAirframeMatchTypeDraft, setSimBriefCustomAirframeMatchTypeDraft] =
+    useState("");
   const [simBriefDispatchState, setSimBriefDispatchState] = useState({
     flightId: "",
     isDispatching: false,
     message: ""
   });
+  const [simBriefAircraftTypes, setSimBriefAircraftTypes] = useState([]);
+  const [isSimBriefAircraftTypesLoading, setIsSimBriefAircraftTypesLoading] = useState(false);
+  const [simBriefAircraftTypesError, setSimBriefAircraftTypesError] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
   const [isAddonScanBusy, setIsAddonScanBusy] = useState(false);
   const [isSimBriefSaving, setIsSimBriefSaving] = useState(false);
+  const [isDeletingUserData, setIsDeletingUserData] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isReplaceScheduleConfirmOpen, setIsReplaceScheduleConfirmOpen] = useState(false);
+  const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready");
+  const replaceScheduleConfirmResolverRef = useRef(null);
+  const deleteUserDataConfirmResolverRef = useRef(null);
   const deferredFilters = useDeferredValue(filters);
   const deferredDutyFilters = useDeferredValue(dutyFilters);
   const isDesktopAddonScanAvailable = isTauriRuntime();
   const isDesktopSimBriefAvailable = isDesktopAddonScanAvailable;
   const scheduleDateLabel = buildScheduleDateLabel(schedule?.flights || []);
-
   useEffect(() => {
     if (!isSettingsOpen) {
       return undefined;
@@ -932,10 +999,101 @@ export default function App() {
   }, [isSettingsOpen]);
 
   useEffect(() => {
+    if (!isReplaceScheduleConfirmOpen && !isDeleteUserDataConfirmOpen) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        if (isReplaceScheduleConfirmOpen) {
+          resolveReplaceScheduleConfirmation(false);
+        }
+        if (isDeleteUserDataConfirmOpen) {
+          resolveDeleteUserDataConfirmation(false);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isReplaceScheduleConfirmOpen, isDeleteUserDataConfirmOpen]);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!isDesktopSimBriefAvailable) {
+      setSimBriefAircraftTypes([]);
+      setSimBriefAircraftTypesError("");
+      setIsSimBriefAircraftTypesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    let idleHandle = null;
+    let timeoutHandle = null;
+
+    const loadAircraftTypes = () => {
+      setIsSimBriefAircraftTypesLoading(true);
+
+      fetchSimBriefAircraftTypes()
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
+
+          const normalizedTypes = Array.isArray(result?.types)
+            ? result.types
+                .map(normalizeSimBriefAircraftTypeOption)
+                .filter(Boolean)
+                .sort((left, right) => left.code.localeCompare(right.code))
+            : [];
+          setSimBriefAircraftTypes(normalizedTypes);
+          setSimBriefAircraftTypesError(String(result?.warning || "").trim());
+          logAppEvent("simbrief-aircraft-types-loaded", {
+            source: "live",
+            returnedTypes: normalizedTypes.length
+          }).catch(() => {});
+        })
+        .catch((error) => {
+          if (cancelled) {
+            return;
+          }
+
+          setSimBriefAircraftTypes([]);
+          setSimBriefAircraftTypesError(
+            error instanceof Error ? error.message : "Unable to load SimBrief aircraft types."
+          );
+          logAppError("simbrief-aircraft-types-load-failed", error).catch(() => {});
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsSimBriefAircraftTypesLoading(false);
+          }
+        });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleHandle = window.requestIdleCallback(loadAircraftTypes, { timeout: 1500 });
+    } else {
+      timeoutHandle = window.setTimeout(loadAircraftTypes, 250);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleHandle !== null && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleHandle);
+      }
+      if (timeoutHandle !== null) {
+        window.clearTimeout(timeoutHandle);
+      }
+    };
+  }, [isDesktopSimBriefAvailable]);
 
   useEffect(() => {
     let cancelled = false;
@@ -967,13 +1125,26 @@ export default function App() {
         if (simBriefResult.status === "fulfilled") {
           const username = String(simBriefResult.value?.username || "").trim();
           const pilotId = String(simBriefResult.value?.pilotId || "").trim();
+          const dispatchUnits =
+            String(simBriefResult.value?.dispatchUnits || "").trim().toUpperCase() === "KGS"
+              ? "KGS"
+              : "LBS";
+          const customAirframes = Array.isArray(simBriefResult.value?.customAirframes)
+            ? simBriefResult.value.customAirframes.map(normalizeSimBriefCustomAirframe).filter(Boolean)
+            : [];
           setSimBriefUsername(username);
           setSimBriefUsernameDraft(username);
           setSimBriefPilotId(pilotId);
           setSimBriefPilotIdDraft(pilotId);
+          setSimBriefDispatchUnits(dispatchUnits);
+          setSavedSimBriefDispatchUnits(dispatchUnits);
+          setSimBriefCustomAirframes(customAirframes);
+          setSimBriefCustomAirframesDraft(customAirframes);
           await logAppEvent("simbrief-settings-loaded", {
             hasUsername: Boolean(username),
-            hasPilotId: Boolean(pilotId)
+            hasPilotId: Boolean(pilotId),
+            dispatchUnits,
+            customAirframeCount: customAirframes.length
           });
         } else {
           await logAppError("simbrief-settings-hydrate-failed", simBriefResult.reason);
@@ -1028,6 +1199,9 @@ export default function App() {
           )
         );
         setPlannerMode(savedUiState.plannerMode === "duty" ? "duty" : "basic");
+        setScheduleTableTimeDisplayMode(
+          savedUiState.scheduleTableTimeDisplayMode === "utc" ? "utc" : "local"
+        );
         setSort(savedUiState.sort || DEFAULT_SORT);
         setSelectedFlightId(
           savedUiState.selectedFlightId ||
@@ -1071,13 +1245,24 @@ export default function App() {
       filters,
       dutyFilters,
       flightBoard,
+      scheduleTableTimeDisplayMode,
       sort,
       selectedFlightId
     }).catch((error) => {
       setStatusMessage(error.message || "Unable to persist the current planner state.");
       logAppError("persist-ui-state-failed", error).catch(() => {});
     });
-  }, [schedule, plannerMode, filters, dutyFilters, flightBoard, sort, selectedFlightId, isHydrating]);
+  }, [
+    schedule,
+    plannerMode,
+    filters,
+    dutyFilters,
+    flightBoard,
+    scheduleTableTimeDisplayMode,
+    sort,
+    selectedFlightId,
+    isHydrating
+  ]);
 
   const airlines = schedule
     ? [...new Set(schedule.flights.map((flight) => flight.airlineName))].sort()
@@ -1097,6 +1282,10 @@ export default function App() {
   const normalizedDutyFilters = normalizeDutyFilters(dutyFilters, filterBounds);
   const normalizedDeferredDutyFilters = normalizeDutyFilters(deferredDutyFilters, filterBounds);
   const addonAirports = new Set(addonScan.airports);
+  const simBriefDispatchOptions = buildSimBriefDispatchOptions(
+    simBriefAircraftTypes,
+    simBriefCustomAirframes
+  );
   const qualifyingDutyAirlines = getDutyQualifyingAirlines(
     schedule?.flights || [],
     normalizedDutyFilters
@@ -1175,22 +1364,20 @@ export default function App() {
         }
 
         if (
-          !matchesTime(
-            normalizedDeferredFilters.timeDisplayMode === "local"
-              ? flight.localDepartureClock
-              : flight.utcDepartureClock,
-            normalizedDeferredFilters.utcDeparture
+          !matchesLocalTimeWindow(
+            flight.localDepartureClock,
+            normalizedDeferredFilters.localDepartureWindow,
+            "departure"
           )
         ) {
           return false;
         }
 
         if (
-          !matchesTime(
-            normalizedDeferredFilters.timeDisplayMode === "local"
-              ? flight.staLocal?.slice(11, 16) || ""
-              : flight.staUtc?.slice(11, 16) || "",
-            normalizedDeferredFilters.utcArrival
+          !matchesLocalTimeWindow(
+            flight.staLocal?.slice(11, 16) || "",
+            normalizedDeferredFilters.localArrivalWindow,
+            "arrival"
           )
         ) {
           return false;
@@ -1302,6 +1489,8 @@ export default function App() {
         filters: overrides.filters ?? filters,
         dutyFilters: overrides.dutyFilters ?? dutyFilters,
         flightBoard: overrides.flightBoard ?? flightBoard,
+        scheduleTableTimeDisplayMode:
+          overrides.scheduleTableTimeDisplayMode ?? scheduleTableTimeDisplayMode,
         sort: overrides.sort ?? sort,
         selectedFlightId: overrides.selectedFlightId ?? selectedFlightId
       })
@@ -1443,12 +1632,38 @@ export default function App() {
     }
   }
 
+  function resolveReplaceScheduleConfirmation(confirmed) {
+    setIsReplaceScheduleConfirmOpen(false);
+    if (replaceScheduleConfirmResolverRef.current) {
+      replaceScheduleConfirmResolverRef.current(confirmed);
+      replaceScheduleConfirmResolverRef.current = null;
+    }
+  }
+
+  function resolveDeleteUserDataConfirmation(confirmed) {
+    setIsDeleteUserDataConfirmOpen(false);
+    if (deleteUserDataConfirmResolverRef.current) {
+      deleteUserDataConfirmResolverRef.current(confirmed);
+      deleteUserDataConfirmResolverRef.current = null;
+    }
+  }
+
   async function confirmScheduleReplacement() {
     if (!schedule?.flights?.length) {
       return true;
     }
 
-    return confirmOverwriteSchedule();
+    return new Promise((resolve) => {
+      replaceScheduleConfirmResolverRef.current = resolve;
+      setIsReplaceScheduleConfirmOpen(true);
+    });
+  }
+
+  async function confirmDeleteUserDataInApp() {
+    return new Promise((resolve) => {
+      deleteUserDataConfirmResolverRef.current = resolve;
+      setIsDeleteUserDataConfirmOpen(true);
+    });
   }
 
   async function handleImport() {
@@ -2020,28 +2235,55 @@ export default function App() {
     }
   }
 
-  async function handleSaveSimBriefSettings() {
+  async function handleSaveSimBriefCredentials(overrides = {}) {
+    if (isSimBriefSaving) {
+      return;
+    }
+
+    const nextUsername = String(
+      overrides.username !== undefined ? overrides.username : simBriefUsernameDraft || ""
+    ).trim();
+    const nextPilotId = String(
+      overrides.pilotId !== undefined ? overrides.pilotId : simBriefPilotIdDraft || ""
+    ).trim();
+    const nextCustomAirframes = simBriefCustomAirframesDraft
+      .map(normalizeSimBriefCustomAirframe)
+      .filter(Boolean);
+
+    if (
+      nextUsername === simBriefUsername &&
+      nextPilotId === simBriefPilotId &&
+      JSON.stringify(nextCustomAirframes) === JSON.stringify(simBriefCustomAirframes)
+    ) {
+      return;
+    }
+
     setIsSimBriefSaving(true);
 
     try {
-      const nextUsername = String(simBriefUsernameDraft || "").trim();
-      const nextPilotId = String(simBriefPilotIdDraft || "").trim();
       await writeSimBriefSettings({
         username: nextUsername,
-        pilotId: nextPilotId
+        pilotId: nextPilotId,
+        dispatchUnits: simBriefDispatchUnits,
+        customAirframes: nextCustomAirframes
       });
       setSimBriefUsername(nextUsername);
       setSimBriefUsernameDraft(nextUsername);
       setSimBriefPilotId(nextPilotId);
       setSimBriefPilotIdDraft(nextPilotId);
+      setSavedSimBriefDispatchUnits(simBriefDispatchUnits);
+      setSimBriefCustomAirframes(nextCustomAirframes);
+      setSimBriefCustomAirframesDraft(nextCustomAirframes);
       setStatusMessage(
-        nextUsername || nextPilotId
+        nextUsername || nextPilotId || nextCustomAirframes.length
           ? "SimBrief settings saved."
           : "SimBrief settings cleared."
       );
       await logAppEvent("simbrief-settings-saved", {
         hasUsername: Boolean(nextUsername),
-        hasPilotId: Boolean(nextPilotId)
+        hasPilotId: Boolean(nextPilotId),
+        dispatchUnits: simBriefDispatchUnits,
+        customAirframeCount: nextCustomAirframes.length
       });
     } catch (error) {
       setStatusMessage(error.message || "Unable to save SimBrief settings.");
@@ -2051,8 +2293,109 @@ export default function App() {
     }
   }
 
+  async function handleAddCustomAirframeDraft() {
+    const normalizedEntry = normalizeSimBriefCustomAirframe({
+      internalId: simBriefCustomAirframeIdDraft,
+      matchType: simBriefCustomAirframeMatchTypeDraft
+    });
+
+    if (!normalizedEntry) {
+      setStatusMessage("Enter a SimBrief internal ID and matching aircraft before adding it.");
+      return;
+    }
+
+    if (
+      simBriefCustomAirframesDraft.some(
+        (entry) => entry.internalId === normalizedEntry.internalId
+      )
+    ) {
+      setStatusMessage("That custom SimBrief airframe ID has already been added.");
+      return;
+    }
+
+    const nextCustomAirframes = [...simBriefCustomAirframesDraft, normalizedEntry].sort(
+        (left, right) =>
+          left.matchType.localeCompare(right.matchType) ||
+          left.internalId.localeCompare(right.internalId)
+      );
+
+    setIsSimBriefSaving(true);
+
+    try {
+      const nextUsername = String(simBriefUsernameDraft || "").trim();
+      const nextPilotId = String(simBriefPilotIdDraft || "").trim();
+      await writeSimBriefSettings({
+        username: nextUsername,
+        pilotId: nextPilotId,
+        dispatchUnits: simBriefDispatchUnits,
+        customAirframes: nextCustomAirframes
+      });
+      setSimBriefUsername(nextUsername);
+      setSimBriefUsernameDraft(nextUsername);
+      setSimBriefPilotId(nextPilotId);
+      setSimBriefPilotIdDraft(nextPilotId);
+      setSavedSimBriefDispatchUnits(simBriefDispatchUnits);
+      setSimBriefCustomAirframes(nextCustomAirframes);
+      setSimBriefCustomAirframesDraft(nextCustomAirframes);
+      setSimBriefCustomAirframeIdDraft("");
+      setSimBriefCustomAirframeMatchTypeDraft("");
+      setStatusMessage("Custom SimBrief airframe saved.");
+      await logAppEvent("simbrief-custom-airframe-added", {
+        internalId: normalizedEntry.internalId,
+        matchType: normalizedEntry.matchType,
+        customAirframeCount: nextCustomAirframes.length
+      });
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to save the custom SimBrief airframe.");
+      await logAppError("simbrief-custom-airframe-add-failed", error, {
+        internalId: normalizedEntry.internalId,
+        matchType: normalizedEntry.matchType
+      });
+    } finally {
+      setIsSimBriefSaving(false);
+    }
+  }
+
+  async function handleRemoveCustomAirframeDraft(internalId) {
+    const nextCustomAirframes = simBriefCustomAirframesDraft.filter(
+      (entry) => entry.internalId !== internalId
+    );
+
+    setIsSimBriefSaving(true);
+
+    try {
+      const nextUsername = String(simBriefUsernameDraft || "").trim();
+      const nextPilotId = String(simBriefPilotIdDraft || "").trim();
+      await writeSimBriefSettings({
+        username: nextUsername,
+        pilotId: nextPilotId,
+        dispatchUnits: simBriefDispatchUnits,
+        customAirframes: nextCustomAirframes
+      });
+      setSimBriefUsername(nextUsername);
+      setSimBriefUsernameDraft(nextUsername);
+      setSimBriefPilotId(nextPilotId);
+      setSimBriefPilotIdDraft(nextPilotId);
+      setSavedSimBriefDispatchUnits(simBriefDispatchUnits);
+      setSimBriefCustomAirframes(nextCustomAirframes);
+      setSimBriefCustomAirframesDraft(nextCustomAirframes);
+      setStatusMessage("Custom SimBrief airframe removed.");
+      await logAppEvent("simbrief-custom-airframe-removed", {
+        internalId,
+        customAirframeCount: nextCustomAirframes.length
+      });
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to remove the custom SimBrief airframe.");
+      await logAppError("simbrief-custom-airframe-remove-failed", error, {
+        internalId
+      });
+    } finally {
+      setIsSimBriefSaving(false);
+    }
+  }
+
   function handleSimBriefTypeChange(boardEntryId, nextType) {
-    const normalizedType = String(nextType || "").trim().toUpperCase();
+    const normalizedType = String(nextType || "").trim();
     const nextFlightBoard = flightBoard.map((entry) =>
       entry.boardEntryId === boardEntryId
         ? {
@@ -2091,11 +2434,46 @@ export default function App() {
       return;
     }
 
-    const selectedType = String(selectedShortlistFlight.simbriefSelectedType || "")
-      .trim()
-      .toUpperCase();
+    const selectedType = String(selectedShortlistFlight.simbriefSelectedType || "").trim();
+    const availableAircraftTypes = simBriefAircraftTypes;
+    const selectedDispatchOption = simBriefDispatchOptions.find(
+      (option) => option.code === selectedType
+    );
     if (!selectedType) {
       const message = "Choose a SimBrief aircraft type before dispatching.";
+      setSimBriefDispatchState({
+        flightId: selectedShortlistFlight.boardEntryId,
+        isDispatching: false,
+        message
+      });
+      setStatusMessage(message);
+      return;
+    }
+
+    if (!availableAircraftTypes.length && !simBriefCustomAirframes.length && isSimBriefAircraftTypesLoading) {
+      const message = "SimBrief aircraft types are still loading.";
+      setSimBriefDispatchState({
+        flightId: selectedShortlistFlight.boardEntryId,
+        isDispatching: false,
+        message
+      });
+      setStatusMessage(message);
+      return;
+    }
+
+    if (!availableAircraftTypes.length && !simBriefCustomAirframes.length && simBriefAircraftTypesError) {
+      const message = "Unable to load SimBrief aircraft types right now.";
+      setSimBriefDispatchState({
+        flightId: selectedShortlistFlight.boardEntryId,
+        isDispatching: false,
+        message
+      });
+      setStatusMessage(message);
+      return;
+    }
+
+    if (!selectedDispatchOption) {
+      const message = `The selected SimBrief aircraft type (${selectedType}) is not currently supported.`;
       setSimBriefDispatchState({
         flightId: selectedShortlistFlight.boardEntryId,
         isDispatching: false,
@@ -2143,7 +2521,7 @@ export default function App() {
       flightId,
       origin: selectedShortlistFlight.from,
       destination: selectedShortlistFlight.to,
-      type: selectedType,
+      type: selectedDispatchOption.dispatchType,
       hasUsername: Boolean(username),
       hasPilotId: Boolean(pilotId)
     });
@@ -2156,7 +2534,8 @@ export default function App() {
         callsign,
         origin: selectedShortlistFlight.from,
         destination: selectedShortlistFlight.to,
-        aircraftType: selectedType,
+        aircraftType: selectedDispatchOption.dispatchType,
+        units: simBriefDispatchUnits,
         departureTimeUtc: selectedShortlistFlight.stdUtc,
         username,
         pilotId
@@ -2197,10 +2576,101 @@ export default function App() {
         flightId,
         origin: selectedShortlistFlight.from,
         destination: selectedShortlistFlight.to,
-        type: selectedType
+        type: selectedDispatchOption.dispatchType
       });
     } finally {
       await closeSimBriefDispatchWindow();
+    }
+  }
+
+  async function handleSimBriefDispatchUnitsChange(nextUnits) {
+    const normalizedUnits = nextUnits === "KGS" ? "KGS" : "LBS";
+    setSimBriefDispatchUnits(normalizedUnits);
+
+    if (normalizedUnits === savedSimBriefDispatchUnits || isSimBriefSaving) {
+      return;
+    }
+
+    setIsSimBriefSaving(true);
+
+    try {
+      const nextUsername = String(simBriefUsernameDraft || "").trim();
+      const nextPilotId = String(simBriefPilotIdDraft || "").trim();
+      const nextCustomAirframes = simBriefCustomAirframesDraft
+        .map(normalizeSimBriefCustomAirframe)
+        .filter(Boolean);
+      await writeSimBriefSettings({
+        username: nextUsername,
+        pilotId: nextPilotId,
+        dispatchUnits: normalizedUnits,
+        customAirframes: nextCustomAirframes
+      });
+      setSimBriefUsername(nextUsername);
+      setSimBriefUsernameDraft(nextUsername);
+      setSimBriefPilotId(nextPilotId);
+      setSimBriefPilotIdDraft(nextPilotId);
+      setSavedSimBriefDispatchUnits(normalizedUnits);
+      setSimBriefCustomAirframes(nextCustomAirframes);
+      setSimBriefCustomAirframesDraft(nextCustomAirframes);
+      setStatusMessage(`SimBrief dispatch units set to ${normalizedUnits}.`);
+      await logAppEvent("simbrief-dispatch-units-saved", {
+        dispatchUnits: normalizedUnits
+      });
+    } catch (error) {
+      setSimBriefDispatchUnits(savedSimBriefDispatchUnits);
+      setStatusMessage(error.message || "Unable to save SimBrief dispatch units.");
+      await logAppError("simbrief-dispatch-units-save-failed", error, {
+        dispatchUnits: normalizedUnits
+      });
+    } finally {
+      setIsSimBriefSaving(false);
+    }
+  }
+
+  async function handleDeleteUserData() {
+    const confirmed = await confirmDeleteUserDataInApp();
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeletingUserData(true);
+
+    try {
+      await deleteStoredUserData();
+      setSchedule(null);
+      setFlightBoard([]);
+      setSelectedFlightId(null);
+      setExpandedBoardFlightId(null);
+      setScheduleTableTimeDisplayMode("local");
+      setPlannerMode("basic");
+      setFilters(DEFAULT_FILTERS);
+      setDutyFilters(DEFAULT_DUTY_FILTERS);
+      setFilterUiVersion((current) => current + 1);
+      setSort(DEFAULT_SORT);
+      setTheme("light");
+      setAddonScan(createEmptyAddonAirportScan());
+      setSimBriefUsername("");
+      setSimBriefUsernameDraft("");
+      setSimBriefPilotId("");
+      setSimBriefPilotIdDraft("");
+      setSimBriefDispatchUnits("LBS");
+      setSavedSimBriefDispatchUnits("LBS");
+      setSimBriefCustomAirframes([]);
+      setSimBriefCustomAirframesDraft([]);
+      setSimBriefCustomAirframeIdDraft("");
+      setSimBriefCustomAirframeMatchTypeDraft("");
+      setSimBriefDispatchState({
+        flightId: "",
+        isDispatching: false,
+        message: ""
+      });
+      setStatusMessage("Deleted saved user info from this device.");
+      setIsSettingsOpen(false);
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to delete saved user info.");
+      await logAppError("delete-user-data-failed", error);
+    } finally {
+      setIsDeletingUserData(false);
     }
   }
 
@@ -2303,11 +2773,14 @@ export default function App() {
                 flights={sortedFlights}
                 selectedFlightId={selectedFlightId}
                 sort={sort}
-                timeDisplayMode={
-                  plannerMode === "basic" ? normalizedDeferredFilters.timeDisplayMode : "utc"
-                }
+                timeDisplayMode={scheduleTableTimeDisplayMode}
                 addonAirports={addonAirports}
                 onSort={handleSort}
+                onToggleTimeDisplayMode={() =>
+                  setScheduleTableTimeDisplayMode((current) =>
+                    current === "local" ? "utc" : "local"
+                  )
+                }
                 onSelectFlight={handleSelectFlight}
                 onAddToFlightBoard={handleAddToFlightBoard}
               />
@@ -2329,6 +2802,9 @@ export default function App() {
               simBriefDispatchState={simBriefDispatchState}
               simBriefCredentialsConfigured={simBriefCredentialsConfigured}
               isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
+              simBriefAircraftTypes={simBriefDispatchOptions}
+              isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
+              simBriefAircraftTypesError={simBriefAircraftTypesError}
               onToggleBoardFlight={handleToggleBoardFlight}
               onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
               onRepairFlightBoardEntry={handleRepairFlightBoardEntry}
@@ -2410,11 +2886,50 @@ export default function App() {
             <SimBriefSettingsPanel
               username={simBriefUsernameDraft}
               pilotId={simBriefPilotIdDraft}
+              dispatchUnits={simBriefDispatchUnits}
+              customAirframes={simBriefCustomAirframesDraft}
+              customAirframeDraftId={simBriefCustomAirframeIdDraft}
+              customAirframeDraftMatchType={simBriefCustomAirframeMatchTypeDraft}
+              simBriefAircraftTypes={simBriefAircraftTypes}
+              isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
+              simBriefAircraftTypesError={simBriefAircraftTypesError}
               isSaving={isSimBriefSaving}
               onUsernameChange={setSimBriefUsernameDraft}
               onPilotIdChange={setSimBriefPilotIdDraft}
-              onSave={handleSaveSimBriefSettings}
+              onDispatchUnitsChange={handleSimBriefDispatchUnitsChange}
+              onCustomAirframeDraftIdChange={setSimBriefCustomAirframeIdDraft}
+              onCustomAirframeDraftMatchTypeChange={setSimBriefCustomAirframeMatchTypeDraft}
+              onAddCustomAirframe={handleAddCustomAirframeDraft}
+              onRemoveCustomAirframe={handleRemoveCustomAirframeDraft}
+              onSaveCredentials={handleSaveSimBriefCredentials}
             />
+
+            <section className="addon-panel">
+              <div className="filter-heading filter-heading--addon">
+                <div>
+                  <p className="eyebrow">Privacy</p>
+                  <h2>Delete stored user info</h2>
+                </div>
+              </div>
+
+              <div className="addon-panel__summary">
+                <p>
+                  Removes saved schedules, UI state, SimBrief settings, addon folder roots,
+                  logs, and stored Delta Virtual webview login data from this device.
+                </p>
+              </div>
+
+              <div className="addon-panel__actions">
+                <button
+                  className="primary-button primary-button--danger"
+                  type="button"
+                  onClick={handleDeleteUserData}
+                  disabled={isDeletingUserData || isImporting || isSyncing || isSimBriefSaving}
+                >
+                  {isDeletingUserData ? "Deleting..." : "Delete User Info"}
+                </button>
+              </div>
+            </section>
 
             <section className="addon-panel about-panel">
               <div className="filter-heading filter-heading--addon">
@@ -2426,7 +2941,7 @@ export default function App() {
 
               <div className="addon-panel__summary about-panel__content">
                 <p>
-                  Created by <strong>Jacob</strong> on GitHub as <strong>Talon42</strong>.
+                  Created by <strong>Jacob Benjamin (DVA11384)</strong> on GitHub as <strong>Talon42</strong>.
                 </p>
                 <p>Copyright &copy; 2026 Jacob. All rights reserved.</p>
                 <p className="about-panel__disclaimer">
@@ -2454,6 +2969,96 @@ export default function App() {
                 </p>
               </div>
             </section>
+          </section>
+        </div>
+      ) : null}
+
+      {isReplaceScheduleConfirmOpen ? (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onClick={() => resolveReplaceScheduleConfirmation(false)}
+        >
+          <section
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Replace Saved Schedule"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="confirm-modal__header">
+              <div>
+                <p className="eyebrow">Replace Saved Schedule</p>
+                <h2>Import a new schedule?</h2>
+              </div>
+            </div>
+
+            <p className="confirm-modal__copy">
+              Importing a new schedule will replace the current saved schedule and flight board.
+              Continue?
+            </p>
+
+            <div className="confirm-modal__actions">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => resolveReplaceScheduleConfirmation(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="primary-button primary-button--danger"
+                type="button"
+                onClick={() => resolveReplaceScheduleConfirmation(true)}
+              >
+                Replace
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {isDeleteUserDataConfirmOpen ? (
+        <div
+          className="modal-overlay"
+          role="presentation"
+          onClick={() => resolveDeleteUserDataConfirmation(false)}
+        >
+          <section
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Delete User Info"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="confirm-modal__header">
+              <div>
+                <p className="eyebrow">Delete User Info</p>
+                <h2>Delete all stored user data?</h2>
+              </div>
+            </div>
+
+            <p className="confirm-modal__copy">
+              This removes saved schedules, UI state, SimBrief settings, addon folder roots, logs,
+              and stored Delta Virtual webview login data from this device.
+            </p>
+
+            <div className="confirm-modal__actions">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => resolveDeleteUserDataConfirmation(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="primary-button primary-button--danger"
+                type="button"
+                onClick={() => resolveDeleteUserDataConfirmation(true)}
+              >
+                Delete
+              </button>
+            </div>
           </section>
         </div>
       ) : null}

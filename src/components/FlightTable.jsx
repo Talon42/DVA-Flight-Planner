@@ -97,17 +97,19 @@ function buildColumns(timeDisplayMode, flights, addonAirports) {
     { key: "to", label: "Destination", width: 136, render: (value) => <AddonAirportIndicator airportCode={value} addonAirports={addonAirports} /> },
     {
       key: isLocalMode ? "stdLocal" : "stdUtc",
-      label: isLocalMode ? "Departure (Local)" : "Departure (UTC)",
-      width: 140,
+      label: isLocalMode ? "DEP (Local)" : "DEP (UTC)",
+      width: 150,
+      isTimeColumn: true,
       render: formatTimeOnly
     },
     {
       key: isLocalMode ? "staLocal" : "staUtc",
-      label: isLocalMode ? "Arrival (Local)" : "Arrival (UTC)",
-      width: 140,
+      label: isLocalMode ? "ARR (Local)" : "ARR (UTC)",
+      width: 150,
+      isTimeColumn: true,
       render: formatTimeOnly
     },
-    { key: "blockMinutes", label: "Block Time", width: 100, render: formatDuration },
+    { key: "blockMinutes", label: "Block Time", width: 124, render: formatDuration },
     { key: "distanceNm", label: "Distance", width: 110, render: formatDistanceNm }
   ];
 }
@@ -125,21 +127,76 @@ const INITIAL_VISIBLE_FLIGHTS = 50;
 const VISIBLE_FLIGHT_PAGE = 50;
 const VISIBLE_FLIGHT_THRESHOLD = 10;
 
-function SortButton({ label, sortKey, sort, onSort }) {
+function SortButton({ label, sortKey, sort, onSort, isTimeColumn, timeDisplayMode, onToggleTimeDisplayMode }) {
   const isActive = sort.key === sortKey;
   const directionClass = isActive
     ? sort.direction === "asc"
       ? "table-sort__icon--asc"
       : "table-sort__icon--desc"
     : "table-sort__icon--none";
+  const timeColumnLabel = String(label || "");
+  const timeColumnTitle = isTimeColumn ? timeColumnLabel.split(" (")[0] : "";
+  const timeColumnModeLabel = timeDisplayMode === "local" ? "Local" : "UTC";
 
   return (
     <button
-      className={`table-sort ${isActive ? "table-sort--active" : ""}`}
+      className={`table-sort ${isActive ? "table-sort--active" : ""} ${
+        isTimeColumn ? "table-sort--time-column" : ""
+      }`}
       type="button"
       onClick={() => onSort(sortKey)}
     >
-      <span>{label}</span>
+      <span className="table-sort__label">
+        {isTimeColumn ? (
+          <span className="table-sort__time-label">
+            <span>{timeColumnTitle}</span>
+            <span className="table-sort__time-mode-row">
+              <span>{timeColumnModeLabel}</span>
+              <span
+                className={`time-mode-toggle ${
+                  timeDisplayMode === "local" ? "time-mode-toggle--local" : "time-mode-toggle--utc"
+                }`}
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleTimeDisplayMode();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onToggleTimeDisplayMode();
+                  }
+                }}
+                title={timeDisplayMode === "local" ? "Switch to UTC time" : "Switch to local time"}
+                aria-label={timeDisplayMode === "local" ? "Switch to UTC time" : "Switch to local time"}
+              >
+                <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
+                  <path
+                    d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9M13.5 8a5.5 5.5 0 0 1-9.4 3.9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M11.3 2.8v2.6H8.7M4.7 13.2V10.6h2.6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+              </span>
+            </span>
+          </span>
+        ) : (
+          <span>{label}</span>
+        )}
+      </span>
       <span className={`table-sort__icon ${directionClass}`} aria-hidden="true">
         <svg viewBox="0 0 16 16" focusable="false">
           <path
@@ -201,6 +258,7 @@ export default function FlightTable({
   timeDisplayMode,
   addonAirports,
   onSort,
+  onToggleTimeDisplayMode,
   onSelectFlight,
   onAddToFlightBoard
 }) {
@@ -274,6 +332,9 @@ export default function FlightTable({
                 sortKey={column.sortKey || column.key}
                 sort={sort}
                 onSort={onSort}
+                isTimeColumn={column.isTimeColumn}
+                timeDisplayMode={timeDisplayMode}
+                onToggleTimeDisplayMode={onToggleTimeDisplayMode}
               />
             </div>
           ))}

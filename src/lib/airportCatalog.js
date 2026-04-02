@@ -8,36 +8,44 @@ const CSV_OPTIONS = {
   transformHeader: (header) => header.trim()
 };
 
-const airportRows = Papa.parse(airportsCsv, CSV_OPTIONS).data;
-const regionCountryRows = Papa.parse(regionsCountriesCsv, CSV_OPTIONS).data;
+let airportCatalog = null;
+let airportByIcao = null;
 
-const regionByCountry = new Map(
-  regionCountryRows
-    .map((row) => [
-      String(row.country || "").trim(),
-      {
-        code: String(row.region_code || "").trim().toUpperCase(),
-        name: String(row.region_name || "").trim()
-      }
-    ])
-    .filter(([country, region]) => country && region.name)
-);
+function ensureAirportCatalogLoaded() {
+  if (airportCatalog && airportByIcao) {
+    return;
+  }
 
-const airportCatalog = airportRows
-  .map((row) => ({
-    icao: String(row.ICAO || "").trim().toUpperCase(),
-    name: String(row.Name || "").trim(),
-    country: String(row.Country || "").trim(),
-    regionCode: regionByCountry.get(String(row.Country || "").trim())?.code || "",
-    regionName: regionByCountry.get(String(row.Country || "").trim())?.name || ""
-  }))
-  .filter((airport) => airport.icao && airport.name);
+  const airportRows = Papa.parse(airportsCsv, CSV_OPTIONS).data;
+  const regionCountryRows = Papa.parse(regionsCountriesCsv, CSV_OPTIONS).data;
 
-const airportByIcao = new Map(
-  airportCatalog.map((airport) => [airport.icao, airport])
-);
+  const regionByCountry = new Map(
+    regionCountryRows
+      .map((row) => [
+        String(row.country || "").trim(),
+        {
+          code: String(row.region_code || "").trim().toUpperCase(),
+          name: String(row.region_name || "").trim()
+        }
+      ])
+      .filter(([country, region]) => country && region.name)
+  );
+
+  airportCatalog = airportRows
+    .map((row) => ({
+      icao: String(row.ICAO || "").trim().toUpperCase(),
+      name: String(row.Name || "").trim(),
+      country: String(row.Country || "").trim(),
+      regionCode: regionByCountry.get(String(row.Country || "").trim())?.code || "",
+      regionName: regionByCountry.get(String(row.Country || "").trim())?.name || ""
+    }))
+    .filter((airport) => airport.icao && airport.name);
+
+  airportByIcao = new Map(airportCatalog.map((airport) => [airport.icao, airport]));
+}
 
 export function getAirportByIcao(icao) {
+  ensureAirportCatalogLoaded();
   return airportByIcao.get(String(icao || "").trim().toUpperCase()) || null;
 }
 

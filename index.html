@@ -7,9 +7,227 @@
       content="width=device-width, initial-scale=1.0"
     />
     <link rel="icon" type="image/png" href="/src/data/images/DAL.png" />
+    <link rel="preload" as="image" href="/src/data/images/DAL.png" />
     <title>Flight Planner</title>
+    <script>
+      (function () {
+        try {
+          var savedTheme = window.localStorage.getItem("flight-planner.theme");
+          var resolvedTheme = savedTheme === "dark" ? "dark" : "light";
+          document.documentElement.dataset.theme = resolvedTheme;
+          document.documentElement.style.colorScheme = resolvedTheme;
+        } catch (_) {}
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI Variable Display", "Bahnschrift", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(11, 31, 54, 0.34), transparent 22%),
+          radial-gradient(circle at top right, rgba(0, 58, 112, 0.24), transparent 24%),
+          linear-gradient(155deg, #e4ebf4 0%, #dbe4ef 48%, #d1dce9 100%);
+        color: #102136;
+      }
+
+      html,
+      body,
+      #root {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        min-height: 100vh;
+      }
+
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top left, rgba(11, 31, 54, 0.34), transparent 22%),
+          radial-gradient(circle at top right, rgba(0, 58, 112, 0.24), transparent 24%),
+          linear-gradient(155deg, #e4ebf4 0%, #dbe4ef 48%, #d1dce9 100%);
+        z-index: 9999;
+        transition: opacity 180ms ease;
+      }
+
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        background:
+          radial-gradient(circle at top left, rgba(200, 16, 46, 0.3), transparent 28%),
+          radial-gradient(circle at top right, rgba(0, 58, 112, 0.16), transparent 30%),
+          linear-gradient(155deg, #070f1b 0%, #121528 48%, #0f2135 100%);
+        color: #ecf3fb;
+      }
+
+      :root[data-theme="dark"] #boot-splash {
+        background:
+          radial-gradient(circle at top left, rgba(200, 16, 46, 0.3), transparent 28%),
+          radial-gradient(circle at top right, rgba(0, 58, 112, 0.16), transparent 30%),
+          linear-gradient(155deg, #070f1b 0%, #121528 48%, #0f2135 100%);
+      }
+
+      :root[data-theme="dark"] .boot-brand__title,
+      :root[data-theme="dark"] .boot-title {
+        color: #ffffff;
+      }
+
+      :root[data-theme="dark"] .boot-copy,
+      :root[data-theme="dark"] .boot-status {
+        color: #99afc7;
+      }
+
+      :root[data-theme="dark"] .boot-card {
+        border-color: rgba(186, 209, 234, 0.14);
+        background: rgba(10, 24, 43, 0.78);
+        box-shadow: 0 26px 60px rgba(0, 0, 0, 0.34);
+      }
+
+      :root[data-theme="dark"] .boot-spinner {
+        border-color: rgba(186, 209, 234, 0.2);
+        border-top-color: #f4f8fc;
+      }
+
+      #boot-splash[hidden] {
+        display: none;
+      }
+
+      body[data-app-ready="true"] #boot-splash {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .boot-layout {
+        width: min(720px, 100%);
+        display: grid;
+        gap: 24px;
+        justify-items: center;
+      }
+
+      .boot-brand {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+      }
+
+      .boot-brand__logo {
+        width: 56px;
+        height: 56px;
+        object-fit: contain;
+        flex: 0 0 auto;
+      }
+
+      .boot-brand__title {
+        margin: 0;
+        font-size: clamp(2rem, 3vw, 3.6rem);
+        line-height: 0.96;
+        letter-spacing: -0.06em;
+        color: #0b1f36;
+        text-align: center;
+        white-space: nowrap;
+      }
+
+      .boot-card {
+        width: min(560px, 100%);
+        padding: 28px 30px;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: 0 24px 54px rgba(10, 24, 43, 0.12);
+        backdrop-filter: blur(18px);
+      }
+
+      .boot-eyebrow {
+        margin: 0 0 10px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #c8102e;
+      }
+
+      .boot-title {
+        margin: 0;
+        font-size: clamp(2rem, 3vw, 3.2rem);
+        line-height: 0.96;
+        letter-spacing: -0.06em;
+        color: #0b1f36;
+      }
+
+      .boot-copy {
+        margin: 14px 0 0;
+        color: #64758a;
+        line-height: 1.6;
+      }
+
+      .boot-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 20px;
+        font-weight: 600;
+        color: #102136;
+      }
+
+      .boot-spinner {
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(0, 58, 112, 0.16);
+        border-top-color: #003a70;
+        border-radius: 50%;
+        animation: boot-spin 0.9s linear infinite;
+      }
+
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 1180px) {
+        .boot-brand {
+          flex-wrap: nowrap;
+          gap: 10px;
+        }
+
+        .boot-brand__logo {
+          width: 44px;
+          height: 44px;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-splash" aria-live="polite">
+      <div class="boot-layout">
+        <div class="boot-brand" aria-label="Application title">
+          <img
+            class="boot-brand__logo"
+            src="data:image/png;base64,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"
+            alt="Delta Virtual Airlines logo"
+            decoding="sync"
+            fetchpriority="high"
+          />
+          <h1 class="boot-brand__title">Delta Virtual Airlines Flight Planner</h1>
+        </div>
+        <section class="boot-card" aria-label="Application loading">
+          <h2 class="boot-title">Now Boarding</h2>
+          <p class="boot-copy">
+            Loading the planner workspace and saved schedule data.
+          </p>
+          <div class="boot-status">
+            <span class="boot-spinner" aria-hidden="true"></span>
+            <span>Please wait...</span>
+          </div>
+        </section>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

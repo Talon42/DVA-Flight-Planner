@@ -8,3 +8,13 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <App />
   </React.StrictMode>
 );
+
+requestAnimationFrame(() => {
+  document.body.dataset.appReady = "true";
+  window.setTimeout(() => {
+    const splash = document.getElementById("boot-splash");
+    if (splash) {
+      splash.hidden = true;
+    }
+  }, 200);
+});

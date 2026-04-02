@@ -12,19 +12,19 @@
   --text-muted: #64758a;
   --line: rgba(10, 25, 46, 0.08);
   --line-strong: rgba(16, 33, 54, 0.14);
-  --surface: rgba(255, 255, 255, 0.8);
-  --surface-border: rgba(255, 255, 255, 0.6);
-  --surface-raised: rgba(255, 255, 255, 0.84);
-  --surface-soft: rgba(255, 255, 255, 0.72);
-  --surface-panel: rgba(245, 248, 252, 0.88);
+  --surface: rgba(241, 246, 252, 0.92);
+  --surface-border: rgba(196, 211, 228, 0.98);
+  --surface-raised: rgba(223, 233, 244, 0.98);
+  --surface-soft: rgba(232, 239, 248, 0.88);
+  --surface-panel: rgba(214, 225, 238, 0.97);
   --surface-table-row: rgba(255, 255, 255, 0.4);
   --surface-table-row-selected:
     linear-gradient(90deg, rgba(0, 58, 112, 0.18), rgba(11, 31, 54, 0.08)),
     rgba(255, 255, 255, 0.84);
-  --surface-option: rgba(246, 249, 252, 0.9);
-  --surface-option-selected: rgba(0, 58, 112, 0.08);
-  --input-bg: rgba(255, 255, 255, 0.84);
-  --button-ghost-bg: rgba(255, 255, 255, 0.7);
+  --surface-option: rgba(210, 222, 236, 0.98);
+  --surface-option-selected: rgba(0, 58, 112, 0.18);
+  --input-bg: rgba(234, 241, 248, 0.98);
+  --button-ghost-bg: rgba(223, 233, 244, 0.94);
   --button-ghost-border: rgba(16, 33, 54, 0.1);
   --button-ghost-text: var(--text-primary);
   --button-ghost-hover-border: rgba(0, 58, 112, 0.25);
@@ -448,6 +448,36 @@ button {
   border-radius: 28px;
   background: var(--surface-raised);
   box-shadow: var(--menu-shadow);
+}
+
+.confirm-modal {
+  display: grid;
+  gap: 18px;
+  width: min(520px, 100%);
+  padding: 24px;
+  border: 1px solid var(--surface-border);
+  border-radius: 28px;
+  background: var(--surface-raised);
+  box-shadow: var(--menu-shadow);
+}
+
+.confirm-modal__header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.04em;
+  color: var(--text-heading);
+}
+
+.confirm-modal__copy {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .settings-modal__header {
@@ -954,9 +984,11 @@ select:focus,
 
 .table-sort {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 10px;
   width: 100%;
+  min-width: 0;
   padding: 14px 12px;
   border: 0;
   background: transparent;
@@ -965,15 +997,62 @@ select:focus,
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .table-sort--active {
   color: var(--chip-text);
 }
 
+.table-sort__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.table-sort--time-column {
+  align-items: center;
+  gap: 4px;
+}
+
+.table-sort--time-column .table-sort__label {
+  flex: 0 1 auto;
+}
+
+.table-sort__time-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.table-sort__time-mode-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.table-sort--time-column .time-mode-toggle {
+  width: 18px;
+  height: 18px;
+}
+
+.table-sort--time-column .time-mode-toggle svg {
+  width: 10px;
+  height: 10px;
+}
+
 .table-sort__icon {
   width: 14px;
   height: 14px;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1372,6 +1451,93 @@ select:focus,
   padding: 14px 12px 12px;
   border-top: 1px solid rgba(148, 184, 224, 0.14);
   background: var(--board-expanded-panel-bg);
+}
+
+.simbrief-aircraft-select {
+  width: 100%;
+}
+
+.simbrief-custom-airframes {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--surface-panel);
+}
+
+.simbrief-custom-airframes .filter-heading {
+  margin-bottom: -2px;
+}
+
+.simbrief-credentials-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.simbrief-units-toggle .toggle-row {
+  gap: 10px;
+}
+
+.simbrief-units-toggle .ghost-button {
+  min-width: 88px;
+}
+
+.simbrief-units-toggle .ghost-button--active {
+  border-color: rgba(0, 58, 112, 0.56);
+  background: linear-gradient(135deg, rgba(0, 58, 112, 0.98), rgba(11, 31, 54, 0.96));
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(0, 58, 112, 0.22);
+}
+
+:root[data-theme="dark"] .simbrief-units-toggle .ghost-button--active {
+  border-color: rgba(214, 228, 244, 0.24);
+  background: linear-gradient(135deg, rgba(200, 16, 46, 0.94), rgba(0, 58, 112, 0.84));
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.3);
+}
+
+.simbrief-custom-airframes .simbrief-status {
+  margin-bottom: 6px;
+}
+
+.simbrief-custom-airframes__form {
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr);
+  align-items: end;
+  gap: 12px;
+}
+
+.simbrief-custom-airframes__form .filter-block {
+  gap: 6px;
+}
+
+.simbrief-custom-airframes__form input,
+.simbrief-custom-airframes__form select {
+  min-height: 42px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.simbrief-custom-airframe-list {
+  display: grid;
+  gap: 10px;
+}
+
+.simbrief-custom-airframe-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.simbrief-custom-airframe-item p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
 }
 
 .simbrief-inline-panel--repair {
