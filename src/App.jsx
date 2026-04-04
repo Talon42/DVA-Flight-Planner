@@ -56,6 +56,7 @@ import {
   writeSavedSchedule,
   writeSavedUiState
 } from "./lib/storage";
+import { checkForAppUpdate, GITHUB_RELEASES_PAGE_URL } from "./lib/updateCheck";
 
 const THEME_STORAGE_KEY = "flight-planner.theme";
 const DEV_TOOLS_STORAGE_KEY = "flight-planner.dev-tools-enabled";
@@ -264,6 +265,22 @@ function FooterStat({ label, value, className = "" }) {
       <span>{label}:</span>
       <strong className="font-semibold text-[var(--text-heading)]">{value}</strong>
     </p>
+  );
+}
+
+function FooterLinkStat({ label, value, onClick, className = "" }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-baseline gap-1.5 border-0 bg-transparent p-0 text-left text-[0.78rem] font-medium text-[var(--delta-red)] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--delta-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-panel)] bp-1024:text-[0.72rem]",
+        className
+      )}
+    >
+      <span>{label}</span>
+      {value ? <strong className="font-semibold text-current">{value}</strong> : null}
+    </button>
   );
 }
 
@@ -1118,9 +1135,13 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isReplaceScheduleConfirmOpen, setIsReplaceScheduleConfirmOpen] = useState(false);
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
+  const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
+  const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
+  const [availableUpdate, setAvailableUpdate] = useState(null);
   const [statusMessage, setStatusMessage] = useState("Ready");
   const replaceScheduleConfirmResolverRef = useRef(null);
   const deleteUserDataConfirmResolverRef = useRef(null);
+  const hasPerformedStartupUpdateCheckRef = useRef(false);
   const devWindowMenuRef = useRef(null);
   const deferredFilters = useDeferredValue(filters);
   const deferredDutyFilters = useDeferredValue(dutyFilters);
@@ -1168,6 +1189,23 @@ export default function App() {
   }, [isSettingsOpen]);
 
   useEffect(() => {
+    if (!isUpdatePromptOpen) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsUpdatePromptOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isUpdatePromptOpen]);
+
+  useEffect(() => {
     if (!isReplaceScheduleConfirmOpen && !isDeleteUserDataConfirmOpen) {
       return undefined;
     }
@@ -1188,6 +1226,16 @@ export default function App() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isReplaceScheduleConfirmOpen, isDeleteUserDataConfirmOpen]);
+
+  useEffect(() => {
+    if (!isDesktopAddonScanAvailable || hasPerformedStartupUpdateCheckRef.current) {
+      return;
+    }
+
+    hasPerformedStartupUpdateCheckRef.current = true;
+
+    handleCheckForUpdates({ manual: false });
+  }, [isDesktopAddonScanAvailable]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -3043,6 +3091,75 @@ export default function App() {
     }).catch(() => {});
   }
 
+  function handleCloseUpdatePrompt() {
+    setIsUpdatePromptOpen(false);
+  }
+
+  async function handleOpenReleasePage() {
+    const releaseUrl = availableUpdate?.releaseUrl || GITHUB_RELEASES_PAGE_URL;
+
+    try {
+      if (isDesktopAddonScanAvailable) {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(releaseUrl);
+      } else {
+        window.open(releaseUrl, "_blank", "noopener,noreferrer");
+      }
+
+      setIsUpdatePromptOpen(false);
+
+      await logAppEvent("update-release-page-opened", {
+        releaseUrl,
+        latestVersion: availableUpdate?.latestVersion || ""
+      });
+    } catch (error) {
+      await logAppError("update-release-page-open-failed", error, {
+        releaseUrl
+      });
+    }
+  }
+
+  async function handleCheckForUpdates({ manual = false } = {}) {
+    if (!isDesktopAddonScanAvailable || isCheckingForUpdates) {
+      return;
+    }
+
+    setIsCheckingForUpdates(true);
+
+    try {
+      const result = await checkForAppUpdate();
+      setAvailableUpdate(result);
+
+      if (result.updateAvailable) {
+        setIsUpdatePromptOpen(true);
+        if (manual) {
+          setStatusMessage(`Update available: ${result.latestVersion}`);
+        }
+        await logAppEvent("update-available", {
+          currentVersion: result.currentVersion,
+          latestVersion: result.latestVersion
+        });
+        return;
+      }
+
+      if (manual) {
+        setStatusMessage(`You're up to date (${result.currentVersion}).`);
+      }
+
+      await logAppEvent("update-check-complete", {
+        currentVersion: result.currentVersion,
+        latestVersion: result.latestVersion,
+        updateAvailable: false
+      });
+    } catch (error) {
+      await logAppError("update-check-failed", error, {
+        manual
+      });
+    } finally {
+      setIsCheckingForUpdates(false);
+    }
+  }
+
   return (
     <div className="flex h-screen min-h-screen flex-col gap-6 overflow-hidden p-6 bp-1024:gap-3 bp-1024:p-3.5">
       <header className="flex min-w-0 flex-wrap items-end justify-between gap-4 bp-1024:items-start bp-1024:gap-3">
@@ -3253,6 +3370,13 @@ export default function App() {
                 </a>
                 <span>Version:</span>
                 <strong className="text-[var(--text-heading)]">{APP_BUILD_GIT_TAG}</strong>
+                {isDesktopAddonScanAvailable && availableUpdate?.updateAvailable ? (
+                  <FooterLinkStat
+                    label="Update Available"
+                    value=""
+                    onClick={handleOpenReleasePage}
+                  />
+                ) : null}
               </div>
             </footer>
           ) : null}
@@ -3368,6 +3492,15 @@ export default function App() {
                   </a>
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
+                  {isDesktopAddonScanAvailable ? (
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleCheckForUpdates({ manual: true })}
+                      disabled={isCheckingForUpdates}
+                    >
+                      {isCheckingForUpdates ? "Checking..." : "Check for Updates"}
+                    </Button>
+                  ) : null}
                   <Button onClick={handleOpenLogFile}>
                     Open Log File
                   </Button>
@@ -3435,6 +3568,43 @@ export default function App() {
               </Button>
               <Button variant="danger" onClick={() => resolveDeleteUserDataConfirmation(true)}>
                 Delete
+              </Button>
+            </div>
+          </Panel>
+        </ModalBackdrop>
+      ) : null}
+
+      {isUpdatePromptOpen && availableUpdate?.updateAvailable ? (
+        <ModalBackdrop onClick={handleCloseUpdatePrompt}>
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(520px,100%)] gap-5 rounded-[28px] bg-[var(--surface-raised)] shadow-[var(--menu-shadow)] bp-1024:gap-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Update Available"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader eyebrow="Update Available" title="A newer version is ready." />
+
+            <div className={mutedTextStackClassName}>
+              <p className="m-0">
+                Current version: <strong className="text-[var(--text-heading)]">{availableUpdate.currentVersion}</strong>
+              </p>
+              <p className="m-0">
+                Latest release: <strong className="text-[var(--text-heading)]">{availableUpdate.latestVersion}</strong>
+              </p>
+              <p className="m-0">
+                Open the GitHub release page to download the newest installer.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={handleCloseUpdatePrompt}>
+                Later
+              </Button>
+              <Button onClick={handleOpenReleasePage}>
+                Open Release Page
               </Button>
             </div>
           </Panel>
