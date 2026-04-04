@@ -69,7 +69,7 @@ If you already have a schedule loaded, importing a new one replaces the current 
 1. Click `Sync from Delta Virtual`.
    
    <!-- docshot: sync-entry -->
-   <img width="250 alt="image" src="https://github.com/user-attachments/assets/a6b11711-8bdc-4054-a8e4-8d31097ae8c6" />
+   <img width="250" alt="image" src="https://github.com/user-attachments/assets/a6b11711-8bdc-4054-a8e4-8d31097ae8c6" />
    
 3. A Delta Virtual login window opens.
    
