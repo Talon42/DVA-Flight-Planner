@@ -59,6 +59,15 @@
     "updateReadme": true
   },
   {
+    "id": "flight-board-overview",
+    "scenarioId": "flight-board-overview",
+    "selector": "[data-docshot='flight-board']",
+    "outputFile": "flight-board-overview.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
     "id": "addon-airports-panel",
     "scenarioId": "addon-airports-panel",
     "selector": "[data-docshot='addon-airports-panel']",

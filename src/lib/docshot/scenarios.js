@@ -137,6 +137,14 @@ function deriveDocshotFlightState(flights) {
   };
 }
 
+function buildFlightBoardEntries(flights, count = 3) {
+  return flights.slice(0, count).map((flight, index) => ({
+    boardEntryId: `docshot-board-${index + 1}`,
+    linkedFlightId: flight.flightId,
+    simbriefSelectedType: index === 0 ? "A20N" : ""
+  }));
+}
+
 function deriveDutyScenarioState(schedule) {
   const selectedFlights = selectPreferredFlights(schedule.flights);
   const anchorFlight = selectedFlights[0] || schedule.flights[0] || null;
@@ -214,6 +222,23 @@ const SCENARIO_BUILDERS = {
       basicAdvancedFiltersOpen: true,
       statusMessage: "Schedule imported and ready for planning."
     }),
+  "flight-board-overview": async () => {
+    const schedule = await getParsedSchedule();
+    const selectedFlights = selectPreferredFlights(schedule.flights);
+    const boardEntries = buildFlightBoardEntries(selectedFlights, 4);
+    const selectedFlightId =
+      selectedFlights[0]?.flightId || schedule.flights[0]?.flightId || null;
+
+    return {
+      ...(await buildBaseSnapshot({
+        schedule,
+        selectedFlightId,
+        flightBoard: boardEntries,
+        statusMessage: "Flight Board ready."
+      })),
+      expandedBoardFlightId: null
+    };
+  },
   "sync-import-status": async () => {
     const snapshot = await buildBaseSnapshot();
 

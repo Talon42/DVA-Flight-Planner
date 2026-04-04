@@ -223,6 +223,9 @@ The table shows airline, route, departure, arrival, block time, and distance. Ai
 
 The Flight Board is your working shortlist.
 
+<!-- docshot: flight-board-overview -->
+<img width="1000" alt="image" src="./readme-images/flight-board-overview.png" />
+
 ### Adding flights
 
 1. Find a flight in the schedule table.
