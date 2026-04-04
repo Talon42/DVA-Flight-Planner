@@ -218,6 +218,8 @@ function buildPersistedCompatibilityCatalog(flights = []) {
       toAirport: flight.toAirport,
       fromTimezone: flight.fromTimezone,
       toTimezone: flight.toTimezone,
+      missingAirportIcaos: Array.isArray(flight.missingAirportIcaos) ? flight.missingAirportIcaos : [],
+      hasMissingAirportData: Boolean(flight.hasMissingAirportData),
       stdLocal: flight.stdLocal,
       staLocal: flight.staLocal,
       stdUtc: flight.stdUtc,
@@ -279,6 +281,8 @@ function hydratePersistedFlight(flight, compatibilityEntry, shortlistSet) {
     compatibilityCount: compatibleEquipment.length,
     compatibilityStatus: compatibleEquipment.length ? "compatible" : "none",
     compatibilityReason: buildCompatibilityReason(compatibleEquipment),
+    missingAirportIcaos: Array.isArray(flight.missingAirportIcaos) ? flight.missingAirportIcaos : [],
+    hasMissingAirportData: Boolean(flight.hasMissingAirportData),
     simbriefSelectedType: String(flight.simbriefSelectedType || "").trim(),
     simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
     isShortlisted: shortlistSet.has(flight.flightId),
@@ -461,13 +465,15 @@ export async function readSimBriefSettings() {
 
     const internalId = String(entry.internalId || "").trim();
     const matchType = String(entry.matchType || "").trim().toUpperCase();
+    const name = String(entry.name || "").trim();
     if (!internalId || !matchType) {
       return null;
     }
 
     return {
       internalId,
-      matchType
+      matchType,
+      name
     };
   }
 
@@ -518,7 +524,8 @@ export async function writeSimBriefSettings(settings) {
       ? settings.customAirframes
           .map((entry) => ({
             internalId: String(entry?.internalId || "").trim(),
-            matchType: String(entry?.matchType || "").trim().toUpperCase()
+            matchType: String(entry?.matchType || "").trim().toUpperCase(),
+            name: String(entry?.name || "").trim()
           }))
           .filter((entry) => entry.internalId && entry.matchType)
       : []
@@ -703,7 +710,9 @@ export async function deleteStoredUserData() {
     "flight-planner.ui-state",
     "flight-planner.simbrief-settings",
     "flight-planner.import-log",
-    "flight-planner.theme"
+    "flight-planner.theme",
+    "flight-planner.dev-tools-enabled",
+    "flight-planner.dev-window-width"
   ]) {
     window.localStorage.removeItem(key);
   }

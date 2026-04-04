@@ -494,10 +494,98 @@ fn persist_main_window_state(window: &WebviewWindow, preserve_bounds_if_maximize
     let _ = write_saved_main_window_state(&window.app_handle(), &state);
 }
 
+fn window_state_intersects_monitor(
+    state: &SavedWindowState,
+    monitor_x: i32,
+    monitor_y: i32,
+    monitor_width: u32,
+    monitor_height: u32,
+) -> bool {
+    let window_left = i64::from(state.x);
+    let window_top = i64::from(state.y);
+    let window_right = window_left + i64::from(state.width);
+    let window_bottom = window_top + i64::from(state.height);
+    let monitor_left = i64::from(monitor_x);
+    let monitor_top = i64::from(monitor_y);
+    let monitor_right = monitor_left + i64::from(monitor_width);
+    let monitor_bottom = monitor_top + i64::from(monitor_height);
+
+    window_left < monitor_right
+        && window_right > monitor_left
+        && window_top < monitor_bottom
+        && window_bottom > monitor_top
+}
+
+fn center_window_state_on_monitor(
+    state: &SavedWindowState,
+    monitor_x: i32,
+    monitor_y: i32,
+    monitor_width: u32,
+    monitor_height: u32,
+) -> SavedWindowState {
+    let width = state.width.min(monitor_width).max(1);
+    let height = state.height.min(monitor_height).max(1);
+    let centered_x = i64::from(monitor_x) + ((i64::from(monitor_width) - i64::from(width)) / 2);
+    let centered_y = i64::from(monitor_y) + ((i64::from(monitor_height) - i64::from(height)) / 2);
+
+    SavedWindowState {
+        x: centered_x
+            .clamp(i64::from(i32::MIN), i64::from(i32::MAX))
+            as i32,
+        y: centered_y
+            .clamp(i64::from(i32::MIN), i64::from(i32::MAX))
+            as i32,
+        width,
+        height,
+        maximized: state.maximized,
+    }
+}
+
+fn sanitize_saved_main_window_state(window: &WebviewWindow, state: SavedWindowState) -> SavedWindowState {
+    let monitors = window.available_monitors().ok().unwrap_or_default();
+
+    if monitors.iter().any(|monitor| {
+        let position = monitor.position();
+        let size = monitor.size();
+        window_state_intersects_monitor(
+            &state,
+            position.x,
+            position.y,
+            size.width,
+            size.height,
+        )
+    }) {
+        return state;
+    }
+
+    let fallback_monitor = window
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.current_monitor().ok().flatten())
+        .or_else(|| monitors.into_iter().next());
+
+    let Some(monitor) = fallback_monitor else {
+        return state;
+    };
+    let position = monitor.position();
+    let size = monitor.size();
+
+    center_window_state_on_monitor(
+        &state,
+        position.x,
+        position.y,
+        size.width,
+        size.height,
+    )
+}
+
 fn restore_main_window_state(window: &WebviewWindow) {
-    let Some(state) = read_saved_main_window_state(&window.app_handle()) else {
+    let Some(saved_state) = read_saved_main_window_state(&window.app_handle()) else {
         return;
     };
+    let state = sanitize_saved_main_window_state(window, saved_state);
+    let _ = write_saved_main_window_state(&window.app_handle(), &state);
 
     if state.width > 0 && state.height > 0 {
         let _ = window.set_size(Size::Physical(PhysicalSize::new(state.width, state.height)));

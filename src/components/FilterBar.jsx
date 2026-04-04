@@ -1,6 +1,25 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { formatDistanceNm, formatDuration } from "../lib/formatters";
 import { groupSimBriefAircraftTypesByManufacturer } from "../lib/simbrief";
+import { getAircraftProfileOptionMetadata } from "../lib/aircraftCatalog";
+import Button from "./ui/Button";
+import Panel from "./ui/Panel";
+import {
+  insetPanelClassName,
+  mutedTextClassName,
+  mutedTextStackClassName
+} from "./ui/patterns";
+import SectionHeader, { Eyebrow } from "./ui/SectionHeader";
+import { cn } from "./ui/cn";
+import {
+  fieldBodyClassName,
+  fieldInputClassName,
+  fieldLabelClassName,
+  fieldSelectClassName,
+  fieldTitleClassName,
+  gridClassNames,
+  toggleButtonClassName
+} from "./ui/forms";
 
 const TIME_WINDOW_OPTIONS = [
   { value: "", label: "Any time" },
@@ -10,21 +29,58 @@ const TIME_WINDOW_OPTIONS = [
   { value: "evening", label: "Evening" }
 ];
 
+function SelectChevron() {
+  return (
+    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[var(--text-muted)]">
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false" aria-hidden="true">
+        <path
+          d="M4.5 6.5 8 10 11.5 6.5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.8"
+        />
+      </svg>
+    </span>
+  );
+}
+
+function Field({ label, className = "", titleClassName = "", children }) {
+  return (
+    <label className={cn(fieldLabelClassName, className)}>
+      <span className={titleClassName || fieldTitleClassName}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function SelectField({ label, className = "", selectClassName = "", children, ...props }) {
+  return (
+    <Field label={label} className={className}>
+      <div className="relative">
+        <select className={cn(fieldSelectClassName, "w-full", selectClassName)} {...props}>
+          {children}
+        </select>
+        <SelectChevron />
+      </div>
+    </Field>
+  );
+}
+
 function TimeWindowFilter({ label, filterKey, filters, onFilterChange }) {
   return (
-    <label className="filter-block">
-      <span>{label}</span>
-      <select
-        value={filters[filterKey]}
-        onChange={(event) => onFilterChange(filterKey, event.target.value)}
-      >
-        {TIME_WINDOW_OPTIONS.map((option) => (
-          <option key={option.value || "any"} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <SelectField
+      label={label}
+      value={filters[filterKey]}
+      onChange={(event) => onFilterChange(filterKey, event.target.value)}
+    >
+      {TIME_WINDOW_OPTIONS.map((option) => (
+        <option key={option.value || "any"} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </SelectField>
   );
 }
 
@@ -54,25 +110,24 @@ function RangeSlider({
   }
 
   return (
-    <div className="filter-block filter-block--wide">
-      <span>{label}</span>
-      <div className="range-slider">
-        <div className="range-slider__values">
+    <Field label={label} className="filter-block min-w-0">
+      <div className={cn(fieldBodyClassName, "grid gap-3 px-4 py-3")}>
+        <div className="flex items-center justify-between gap-3 text-[0.82rem] text-[var(--text-heading)]">
           <strong>{formatValue(lowValue)}</strong>
           <strong>{formatValue(safeHighValue)}</strong>
         </div>
 
-        <div className="range-slider__track-shell">
-          <div className="range-slider__track" />
+        <div className="relative h-6">
+          <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[var(--slider-track)]" />
           <div
-            className="range-slider__track range-slider__track--active"
+            className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[var(--range-track-active)]"
             style={{
               left: `${lowPercent}%`,
               width: `${Math.max(highPercent - lowPercent, 0)}%`
             }}
           />
           <input
-            className="range-slider__input"
+            className="range-input"
             type="range"
             min={min}
             max={max}
@@ -82,7 +137,7 @@ function RangeSlider({
             aria-label={`${label} minimum`}
           />
           <input
-            className="range-slider__input"
+            className="range-input"
             type="range"
             min={min}
             max={max}
@@ -93,14 +148,38 @@ function RangeSlider({
           />
         </div>
       </div>
-    </div>
+    </Field>
   );
 }
 
-function EquipmentMultiSelect({ options, selectedValues, onChange }) {
+export function SearchableMultiSelect({
+  label,
+  labelPlacement = "stacked",
+  placeholder,
+  emptyLabel,
+  allLabel = "All",
+  allowMultiple = true,
+  allowSingleDeselect = true,
+  fullWidth = false,
+  hideChips = false,
+  searchable = true,
+  showClearAction = true,
+  showOptionMark = true,
+  showSingleSelectedLabel = false,
+  prioritizeSelectedOptions = true,
+  filterQuery = "",
+  options,
+  selectedValues,
+  onChange
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [menuHorizontalAlign, setMenuHorizontalAlign] = useState("left");
+  const [menuVerticalAlign, setMenuVerticalAlign] = useState("bottom");
+  const [menuMaxWidth, setMenuMaxWidth] = useState(null);
+  const [menuOptionsMaxHeight, setMenuOptionsMaxHeight] = useState(null);
   const rootRef = useRef(null);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     function handlePointerDown(event) {
@@ -115,16 +194,151 @@ function EquipmentMultiSelect({ options, selectedValues, onChange }) {
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toUpperCase();
-    if (!normalizedQuery) {
+    const normalizedFilterQuery = String(filterQuery || "")
+      .trim()
+      .toUpperCase();
+
+    if (!normalizedQuery && !normalizedFilterQuery) {
       return options;
     }
 
-    return options.filter((option) => option.toUpperCase().includes(normalizedQuery));
-  }, [options, query]);
+    return options.filter((option) => {
+      const labelText = String(option?.label || "").toUpperCase();
+      const valueText = String(option?.value || "").toUpperCase();
+      const keywordsText = String(option?.keywords || "").toUpperCase();
+      const matchesSearch =
+        !normalizedQuery ||
+        labelText.includes(normalizedQuery) ||
+        valueText.includes(normalizedQuery) ||
+        keywordsText.includes(normalizedQuery);
+      const matchesFilter =
+        !normalizedFilterQuery ||
+        labelText.includes(normalizedFilterQuery) ||
+        valueText.includes(normalizedFilterQuery) ||
+        keywordsText.includes(normalizedFilterQuery);
 
-  const selectionLabel = selectedValues.length ? `${selectedValues.length} selected` : "All aircraft";
+      return (
+        matchesSearch &&
+        matchesFilter
+      );
+    });
+  }, [filterQuery, options, query]);
+
+  const orderedOptions = useMemo(() => {
+    const optionIndexByValue = new Map(options.map((option, index) => [option.value, index]));
+
+    return [...filteredOptions].sort((left, right) => {
+      const leftIsDefault = left.value === "";
+      const rightIsDefault = right.value === "";
+      if (leftIsDefault !== rightIsDefault) {
+        return leftIsDefault ? -1 : 1;
+      }
+
+      if (prioritizeSelectedOptions) {
+        const leftSelected = selectedValues.includes(left.value);
+        const rightSelected = selectedValues.includes(right.value);
+
+        if (leftSelected !== rightSelected) {
+          return leftSelected ? -1 : 1;
+        }
+      }
+
+      return (optionIndexByValue.get(left.value) ?? 0) - (optionIndexByValue.get(right.value) ?? 0);
+    });
+  }, [filteredOptions, options, prioritizeSelectedOptions, selectedValues]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setMenuHorizontalAlign("left");
+      setMenuVerticalAlign("bottom");
+      setMenuMaxWidth(null);
+      setMenuOptionsMaxHeight(null);
+      return undefined;
+    }
+
+    function updateMenuAlignment() {
+      if (!rootRef.current || !menuRef.current) {
+        return;
+      }
+
+      const menuBoundsHost =
+        rootRef.current.closest(".filter-bar") ||
+        rootRef.current.closest(".shortlist") ||
+        rootRef.current.closest(".details-card");
+      const filterBarRect = menuBoundsHost?.getBoundingClientRect() || {
+        left: 0,
+        right: window.innerWidth,
+        top: 0,
+        bottom: window.innerHeight
+      };
+      const rootRect = rootRef.current.getBoundingClientRect();
+      const menuRect = menuRef.current.getBoundingClientRect();
+      const optionsRect =
+        menuRef.current.querySelector(".multi-select__options")?.getBoundingClientRect() || null;
+      const cardLeftEdge = filterBarRect.left + 16;
+      const cardRightEdge = filterBarRect.right - 16;
+      const cardTopEdge = filterBarRect.top + 16;
+      const cardBottomEdge = filterBarRect.bottom - 16;
+      const availableWidthFromLeft = Math.max(cardRightEdge - rootRect.left, 220);
+      const availableWidthFromRight = Math.max(rootRect.right - cardLeftEdge, 220);
+      const availableHeightBelow = Math.max(cardBottomEdge - rootRect.bottom - 10, 120);
+      const availableHeightAbove = Math.max(rootRect.top - cardTopEdge - 10, 120);
+      const wouldOverflowLeft = menuRect.left < cardLeftEdge;
+      const wouldOverflowRight = menuRect.right > cardRightEdge;
+      const preferRightAlignment = availableWidthFromRight > availableWidthFromLeft;
+      const shouldOpenUpward = availableHeightBelow < menuRect.height && availableHeightAbove > availableHeightBelow;
+      const availableMenuHeight = shouldOpenUpward ? availableHeightAbove : availableHeightBelow;
+      const menuChromeHeight = optionsRect ? Math.max(menuRect.height - optionsRect.height, 0) : 88;
+      const nextOptionsMaxHeight = Math.max(
+        Math.min(availableMenuHeight - menuChromeHeight, 260),
+        88
+      );
+
+      if (preferRightAlignment || (wouldOverflowRight && availableWidthFromRight > availableWidthFromLeft)) {
+        setMenuHorizontalAlign("right");
+        setMenuMaxWidth(availableWidthFromRight);
+      } else if (wouldOverflowLeft && availableWidthFromLeft >= availableWidthFromRight) {
+        setMenuHorizontalAlign("left");
+        setMenuMaxWidth(availableWidthFromLeft);
+      } else {
+        setMenuHorizontalAlign("left");
+        setMenuMaxWidth(availableWidthFromLeft);
+      }
+
+      setMenuVerticalAlign(shouldOpenUpward ? "top" : "bottom");
+      setMenuOptionsMaxHeight(nextOptionsMaxHeight);
+    }
+
+    updateMenuAlignment();
+    window.addEventListener("resize", updateMenuAlignment);
+
+    return () => {
+      window.removeEventListener("resize", updateMenuAlignment);
+    };
+  }, [isOpen, orderedOptions.length, query]);
+
+  const selectedOptionByValue = useMemo(
+    () => new Map(options.map((option) => [option.value, option])),
+    [options]
+  );
+
+  let selectionLabel = allLabel;
+  if (selectedValues.length === 1 && showSingleSelectedLabel) {
+    const selectedOption = selectedOptionByValue.get(selectedValues[0]);
+    selectionLabel =
+      selectedOption?.selectedLabel || selectedOption?.label || selectedValues[0];
+  } else if (selectedValues.length) {
+    selectionLabel = `${selectedValues.length} selected`;
+  }
 
   function toggleValue(value) {
+    if (!allowMultiple) {
+      const isAlreadySelected = selectedValues.includes(value);
+      onChange(isAlreadySelected && allowSingleDeselect ? [] : [value]);
+      setIsOpen(false);
+      return;
+    }
+
     if (selectedValues.includes(value)) {
       onChange(selectedValues.filter((entry) => entry !== value));
       return;
@@ -138,17 +352,36 @@ function EquipmentMultiSelect({ options, selectedValues, onChange }) {
   }
 
   return (
-    <div className="filter-block filter-block--wide" ref={rootRef}>
-      <span>Aircraft</span>
-      <div className={`multi-select ${isOpen ? "multi-select--open" : ""}`}>
+    <div
+      className={cn(
+        "filter-block min-w-0",
+        labelPlacement === "inline"
+          ? "grid grid-cols-[minmax(110px,max-content)_minmax(0,1fr)] items-center gap-3"
+          : fieldLabelClassName,
+        fullWidth && "col-span-full",
+        isOpen && "relative z-20"
+      )}
+      ref={rootRef}
+    >
+      <span className={fieldTitleClassName}>{label}</span>
+      <div className={cn("multi-select relative min-w-0", isOpen && "z-20")}>
         <button
-          className="multi-select__trigger"
+          className={cn(
+            fieldBodyClassName,
+            "multi-select__trigger flex w-full items-center justify-between gap-3 px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-left"
+          )}
           type="button"
           onClick={() => setIsOpen((current) => !current)}
         >
-          <span className="multi-select__value">{selectionLabel}</span>
-          <span className="multi-select__chevron" aria-hidden="true">
-            <svg viewBox="0 0 16 16" focusable="false">
+          <span className="multi-select__value block min-w-0 truncate">{selectionLabel}</span>
+          <span
+            className={cn(
+              "multi-select__chevron shrink-0 text-[var(--text-muted)] transition-transform duration-150",
+              isOpen && "rotate-180"
+            )}
+            aria-hidden="true"
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
               <path
                 d="M4 6.5 8 10.5 12 6.5"
                 fill="none"
@@ -161,12 +394,12 @@ function EquipmentMultiSelect({ options, selectedValues, onChange }) {
           </span>
         </button>
 
-        {selectedValues.length ? (
-          <div className="multi-select__chips">
+        {!hideChips && selectedValues.length ? (
+          <div className="multi-select__chips mt-2 flex flex-wrap gap-2">
             {selectedValues.map((value) => (
               <button
                 key={value}
-                className="multi-select__chip"
+                className="multi-select__chip inline-flex items-center gap-1 rounded-full border border-[color:var(--chip-border)] bg-[var(--chip-bg)] px-2.5 py-1 text-[0.72rem] font-semibold text-[var(--chip-text)]"
                 type="button"
                 onClick={() => removeValue(value)}
                 title={`Remove ${value}`}
@@ -179,46 +412,83 @@ function EquipmentMultiSelect({ options, selectedValues, onChange }) {
         ) : null}
 
         {isOpen ? (
-          <div className="multi-select__menu">
-            <input
-              className="multi-select__search"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search aircraft"
-            />
+          <div
+            className={cn(
+              "multi-select__menu absolute left-0 top-[calc(100%+0.55rem)] grid min-w-[220px] gap-2 rounded-[22px] border border-[color:var(--surface-border)] bg-[var(--surface-raised)] p-3 shadow-[var(--menu-shadow)]",
+              menuHorizontalAlign === "right" && "left-auto right-0",
+              menuVerticalAlign === "top" && "top-auto bottom-[calc(100%+0.55rem)]"
+            )}
+            ref={menuRef}
+            style={menuMaxWidth ? { maxWidth: `${menuMaxWidth}px` } : undefined}
+          >
+            {searchable ? (
+              <input
+                className={cn(fieldInputClassName, "multi-select__search")}
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={placeholder}
+              />
+            ) : null}
 
-            <div className="multi-select__actions">
-              <button className="multi-select__action" type="button" onClick={() => onChange(options)}>
-                Select all
-              </button>
-              <button className="multi-select__action" type="button" onClick={() => onChange([])}>
-                Clear
-              </button>
-            </div>
+            {showClearAction ? (
+              <div className="multi-select__actions flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="multi-select__action rounded-xl"
+                  onClick={() => onChange([])}
+                  disabled={!selectedValues.length}
+                >
+                  Clear
+                </Button>
+              </div>
+            ) : null}
 
-            <div className="multi-select__options">
-              {filteredOptions.map((option) => {
-                const selected = selectedValues.includes(option);
+            <div
+              className="multi-select__options app-scrollbar grid gap-1 overflow-y-auto pr-1"
+              style={menuOptionsMaxHeight ? { maxHeight: `${menuOptionsMaxHeight}px` } : undefined}
+            >
+              {orderedOptions.map((option, index) => {
+                const optionValue = option.value;
+                const selected = selectedValues.includes(optionValue);
+                const previousOption = index > 0 ? orderedOptions[index - 1] : null;
+                const showGroupLabel =
+                  optionValue !== "" &&
+                  option.groupLabel &&
+                  option.groupLabel !== previousOption?.groupLabel;
+
                 return (
-                  <button
-                    key={option}
-                    className={`multi-select__option ${
-                      selected ? "multi-select__option--selected" : ""
-                    }`}
-                    type="button"
-                    onClick={() => toggleValue(option)}
-                  >
-                    <span>{option}</span>
-                    <span className="multi-select__option-mark">
-                      {selected ? "Selected" : "Add"}
-                    </span>
-                  </button>
+                  <Fragment key={optionValue}>
+                    {showGroupLabel ? (
+                      <div className="multi-select__group-label px-2 pb-1 pt-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                        {option.groupLabel}
+                      </div>
+                    ) : null}
+                    <button
+                      className={cn(
+                        "multi-select__option flex items-center justify-between gap-3 rounded-2xl border border-transparent px-3 py-2 text-left text-[0.82rem] font-semibold text-[var(--text-primary)] transition-colors duration-150 hover:border-[color:var(--button-ghost-hover-border)] hover:bg-[var(--surface-option)]",
+                        selected &&
+                          "border-[color:rgba(62,129,191,0.36)] bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
+                      )}
+                      type="button"
+                      onClick={() => toggleValue(optionValue)}
+                    >
+                      <span>{option.label}</span>
+                      {showOptionMark ? (
+                        <span className="multi-select__option-mark text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                          {selected ? "Selected" : "Add"}
+                        </span>
+                      ) : null}
+                    </button>
+                  </Fragment>
                 );
               })}
 
               {!filteredOptions.length ? (
-                <div className="multi-select__empty">No matching aircraft</div>
+                <div className="multi-select__empty rounded-2xl bg-[var(--surface-option)] px-3 py-4 text-center text-[0.78rem] font-semibold text-[var(--text-muted)]">
+                  {emptyLabel}
+                </div>
               ) : null}
             </div>
           </div>
@@ -238,122 +508,254 @@ function BasicFilters({
   filterBounds,
   onFilterChange
 }) {
+  const airlineOptions = useMemo(
+    () =>
+      airlines.map((airline) => ({
+        value: airline,
+        label: airline,
+        keywords: airline
+      })),
+    [airlines]
+  );
+  const regionFilterOptions = useMemo(
+    () =>
+      regionOptions.map((region) => ({
+        value: region.code,
+        label: region.name,
+        keywords: `${region.code} ${region.name}`
+      })),
+    [regionOptions]
+  );
+  const countryFilterOptions = useMemo(
+    () =>
+      countryOptions.map((country) => ({
+        value: country,
+        label: country,
+        keywords: country
+      })),
+    [countryOptions]
+  );
+  const originAirportOptions = useMemo(
+    () =>
+      airportOptions
+        .filter((airport) => airport.usedAsOrigin)
+        .map((airport) => ({
+          value: airport.icao,
+          label: airport.name,
+          selectedLabel: airport.name,
+          keywords: `${airport.icao} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
+        })),
+    [airportOptions]
+  );
+  const destinationAirportOptions = useMemo(
+    () =>
+      airportOptions
+        .filter((airport) => airport.usedAsDestination)
+        .map((airport) => ({
+          value: airport.icao,
+          label: airport.name,
+          selectedLabel: airport.name,
+          keywords: `${airport.icao} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
+        })),
+    [airportOptions]
+  );
+  const equipmentFilterOptions = useMemo(
+    () =>
+      [...equipmentOptions]
+        .map((equipment) => {
+          const metadata = getAircraftProfileOptionMetadata(equipment);
+          return {
+            value: equipment,
+            label: equipment,
+            groupLabel: metadata?.manufacturer || "Other",
+            sortLabel: metadata?.fullAircraftName || equipment,
+            keywords: [equipment, metadata?.fullAircraftName, metadata?.manufacturer]
+              .filter(Boolean)
+              .join(" ")
+          };
+        })
+        .sort(
+          (left, right) =>
+            left.groupLabel.localeCompare(right.groupLabel) ||
+            left.sortLabel.localeCompare(right.sortLabel) ||
+            left.label.localeCompare(right.label)
+        ),
+    [equipmentOptions]
+  );
+  const [originIcaoInput, setOriginIcaoInput] = useState(filters.origin[0] || "");
+  const [destinationIcaoInput, setDestinationIcaoInput] = useState(filters.destination[0] || "");
+
+  useEffect(() => {
+    setOriginIcaoInput(filters.origin.length === 1 ? filters.origin[0] : "");
+  }, [filters.origin]);
+
+  useEffect(() => {
+    setDestinationIcaoInput(filters.destination.length === 1 ? filters.destination[0] : "");
+  }, [filters.destination]);
+
+  function handleIcaoFieldChange(value, setInputValue) {
+    const icao = String(value || "")
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "")
+      .slice(0, 4);
+
+    setInputValue(icao);
+  }
+
+  function commitIcaoFieldValue(key, value, options, setInputValue) {
+    const icao = String(value || "")
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "")
+      .slice(0, 4);
+    const exactMatch = options.find((option) => option.value === icao);
+
+    if (exactMatch) {
+      setInputValue(exactMatch.value);
+      onFilterChange(key, [exactMatch.value]);
+      return;
+    }
+
+    setInputValue("");
+    onFilterChange(key, []);
+  }
+
+  function handleIcaoFieldKeyDown(event, key, value, options, setInputValue) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    commitIcaoFieldValue(key, value, options, setInputValue);
+    event.currentTarget.blur();
+  }
+
   return (
     <>
-      <div className="filter-grid filter-grid--routing">
-        <label className="filter-block">
-          <span>Airline</span>
-          <select
-            value={filters.airline}
-            onChange={(event) => onFilterChange("airline", event.target.value)}
-          >
-            <option value="ALL">All airlines</option>
-            {airlines.map((airline) => (
-              <option key={airline} value={airline}>
-                {airline}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className={gridClassNames.routing}>
+        <SearchableMultiSelect
+          label="Airline"
+          placeholder="Search airlines"
+          emptyLabel="No matching airlines"
+          allLabel="All"
+          hideChips
+          options={airlineOptions}
+          selectedValues={filters.airline}
+          onChange={(value) => onFilterChange("airline", value)}
+        />
 
-        <label className="filter-block">
-          <span>Region</span>
-          <select
-            value={filters.region}
-            onChange={(event) => onFilterChange("region", event.target.value)}
-          >
-            <option value="ALL">All regions</option>
-            {regionOptions.map((region) => (
-              <option key={`region-${region.code}`} value={region.code}>
-                {region.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SearchableMultiSelect
+          label="Region"
+          placeholder="Search regions"
+          emptyLabel="No matching regions"
+          allLabel="All"
+          hideChips
+          options={regionFilterOptions}
+          selectedValues={filters.region}
+          onChange={(value) => onFilterChange("region", value)}
+        />
 
-        <label className="filter-block">
-          <span>Country</span>
-          <select
-            value={filters.country}
-            onChange={(event) => onFilterChange("country", event.target.value)}
-          >
-            <option value="ALL">All countries</option>
-            {countryOptions.map((country) => (
-              <option key={`country-${country}`} value={country}>
-                {country}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SearchableMultiSelect
+          label="Country"
+          placeholder="Search countries"
+          emptyLabel="No matching countries"
+          allLabel="All"
+          hideChips
+          options={countryFilterOptions}
+          selectedValues={filters.country}
+          onChange={(value) => onFilterChange("country", value)}
+        />
       </div>
 
-      <div className="filter-grid filter-grid--route-fields">
-        <label className="filter-block filter-block--airport-select">
-          <span>Origin Airport</span>
-          <select
-            value={filters.origin}
-            onChange={(event) => onFilterChange("originAirport", event.target.value)}
-          >
-            <option value="">All origin airports</option>
-            {airportOptions
-              .filter(
-                (airport) =>
-                  airport.usedAsOrigin &&
-                  (filters.region === "ALL" || airport.regionCode === filters.region) &&
-                  (filters.country === "ALL" || airport.country === filters.country)
-              )
-              .map((airport) => (
-                <option key={`origin-${airport.icao}`} value={airport.icao}>
-                  {airport.name} ({airport.icao})
-                </option>
-              ))}
-          </select>
-        </label>
-
-        <label className="filter-block filter-block--icao">
-          <span>Origin ICAO</span>
+      <div className={gridClassNames.routeFields}>
+        <SearchableMultiSelect
+          label="Origin"
+          placeholder="Search origin airports"
+          emptyLabel="No matching origin airports"
+          allLabel="All"
+          allowMultiple={false}
+          hideChips
+          showClearAction={false}
+          showSingleSelectedLabel
+          filterQuery={originIcaoInput}
+          options={originAirportOptions}
+          selectedValues={filters.origin}
+          onChange={(value) => {
+            setOriginIcaoInput(value.length === 1 ? value[0] : "");
+            onFilterChange("origin", value);
+          }}
+        />
+        <Field label="ICAO" className="filter-block filter-block--icao min-w-0">
           <input
+            className={fieldInputClassName}
             type="text"
-            value={filters.origin}
-            onChange={(event) => onFilterChange("origin", event.target.value)}
+            value={originIcaoInput}
+            onChange={(event) => handleIcaoFieldChange(event.target.value, setOriginIcaoInput)}
+            onBlur={() =>
+              commitIcaoFieldValue("origin", originIcaoInput, originAirportOptions, setOriginIcaoInput)
+            }
+            onKeyDown={(event) =>
+              handleIcaoFieldKeyDown(
+                event,
+                "origin",
+                originIcaoInput,
+                originAirportOptions,
+                setOriginIcaoInput
+              )
+            }
             placeholder="KATL"
+            maxLength={4}
           />
-        </label>
+        </Field>
 
-        <label className="filter-block filter-block--airport-select">
-          <span>Destination Airport</span>
-          <select
-            value={filters.destination}
-            onChange={(event) => onFilterChange("destinationAirport", event.target.value)}
-          >
-            <option value="">All destination airports</option>
-            {airportOptions
-              .filter(
-                (airport) =>
-                  airport.usedAsDestination &&
-                  (filters.region === "ALL" || airport.regionCode === filters.region) &&
-                  (filters.country === "ALL" || airport.country === filters.country)
-              )
-              .map((airport) => (
-                <option key={`destination-${airport.icao}`} value={airport.icao}>
-                  {airport.name} ({airport.icao})
-                </option>
-              ))}
-          </select>
-        </label>
-
-        <label className="filter-block filter-block--icao">
-          <span>Destination ICAO</span>
+        <SearchableMultiSelect
+          label="Destination"
+          placeholder="Search destination airports"
+          emptyLabel="No matching destination airports"
+          allLabel="All"
+          allowMultiple={false}
+          hideChips
+          showClearAction={false}
+          showSingleSelectedLabel
+          filterQuery={destinationIcaoInput}
+          options={destinationAirportOptions}
+          selectedValues={filters.destination}
+          onChange={(value) => {
+            setDestinationIcaoInput(value.length === 1 ? value[0] : "");
+            onFilterChange("destination", value);
+          }}
+        />
+        <Field label="ICAO" className="filter-block filter-block--icao min-w-0">
           <input
+            className={fieldInputClassName}
             type="text"
-            value={filters.destination}
-            onChange={(event) => onFilterChange("destination", event.target.value)}
+            value={destinationIcaoInput}
+            onChange={(event) =>
+              handleIcaoFieldChange(event.target.value, setDestinationIcaoInput)
+            }
+            onBlur={() =>
+              commitIcaoFieldValue(
+                "destination",
+                destinationIcaoInput,
+                destinationAirportOptions,
+                setDestinationIcaoInput
+              )
+            }
+            onKeyDown={(event) =>
+              handleIcaoFieldKeyDown(
+                event,
+                "destination",
+                destinationIcaoInput,
+                destinationAirportOptions,
+                setDestinationIcaoInput
+              )
+            }
             placeholder="KLAX"
+            maxLength={4}
           />
-        </label>
+        </Field>
       </div>
 
-      <div className="filter-grid filter-grid--advanced">
+      <div className={gridClassNames.advanced}>
         <RangeSlider
           label="Flight Length"
           min={0}
@@ -382,60 +784,64 @@ function BasicFilters({
           formatValue={formatDistanceNm}
         />
 
-        <EquipmentMultiSelect
-          options={equipmentOptions}
+        <SearchableMultiSelect
+          label="Aircraft"
+          placeholder="Search aircraft"
+          emptyLabel="No matching aircraft"
+          allLabel="All"
+          fullWidth
+          hideChips
+          showClearAction={false}
+          options={equipmentFilterOptions}
           selectedValues={filters.equipment}
           onChange={(value) => onFilterChange("equipment", value)}
         />
 
         <TimeWindowFilter
-          label="Local Departure"
+          label="Departure"
           filterKey="localDepartureWindow"
           filters={filters}
           onFilterChange={onFilterChange}
         />
 
         <TimeWindowFilter
-          label="Local Arrival"
+          label="Arrival"
           filterKey="localArrivalWindow"
           filters={filters}
           onFilterChange={onFilterChange}
         />
       </div>
 
-      <div className="filter-grid filter-grid--addon">
-        <label className="filter-block">
-          <span>Addon Match Rule</span>
-          <select
-            value={filters.addonMatchMode}
-            onChange={(event) => onFilterChange("addonMatchMode", event.target.value)}
-          >
-            <option value="either">Origin or destination</option>
-            <option value="origin">Origin only</option>
-            <option value="destination">Destination only</option>
-            <option value="both">Origin and destination</option>
-          </select>
-        </label>
+      <div className={gridClassNames.addon}>
+        <SelectField
+          label="Addon Match"
+          value={filters.addonMatchMode}
+          onChange={(event) => onFilterChange("addonMatchMode", event.target.value)}
+        >
+          <option value="either">Origin or destination</option>
+          <option value="origin">Origin only</option>
+          <option value="destination">Destination only</option>
+          <option value="both">Origin and destination</option>
+        </SelectField>
 
-        <div className="filter-block">
-          <span>Addon Result Controls</span>
-          <div className="toggle-row">
+        <Field label="Addon Results" className="filter-block min-w-0">
+          <div className="toggle-row toggle-row--single-line flex flex-nowrap gap-2">
             <button
-              className={`ghost-button ${filters.addonFilterEnabled ? "ghost-button--active" : ""}`}
+              className={toggleButtonClassName(filters.addonFilterEnabled)}
               type="button"
               onClick={() => onFilterChange("addonFilterEnabled", !filters.addonFilterEnabled)}
             >
-              {filters.addonFilterEnabled ? "Addon Only On" : "Addon Only Off"}
+              Addon Only
             </button>
             <button
-              className={`ghost-button ${filters.addonPriorityEnabled ? "ghost-button--active" : ""}`}
+              className={toggleButtonClassName(filters.addonPriorityEnabled)}
               type="button"
               onClick={() => onFilterChange("addonPriorityEnabled", !filters.addonPriorityEnabled)}
             >
-              {filters.addonPriorityEnabled ? "Priority On" : "Priority Off"}
+              Priority
             </button>
           </div>
-        </div>
+        </Field>
       </div>
     </>
   );
@@ -459,100 +865,200 @@ function DutyScheduleFilters({
   const canBuildByAirline = Boolean(dutyFilters.selectedAirline && dutyFilters.selectedEquipment);
   const canBuildByLocation = Boolean(hasLocationSelection && dutyFilters.selectedEquipment && dutyFilters.resolvedAirline);
   const canBuild = dutyFilters.buildMode === "location" ? canBuildByLocation : canBuildByAirline;
+  const dutyBuildModeOptions = useMemo(
+    () => [
+      { value: "airline", label: "By Airline", keywords: "airline" },
+      { value: "location", label: "Location", keywords: "location" }
+    ],
+    []
+  );
+  const dutyAirlineOptions = useMemo(
+    () =>
+      [{ value: "", label: "Select an airline", keywords: "select airline none" }].concat(
+        airlines.map((airline) => ({
+          value: airline,
+          label: airline,
+          keywords: airline
+        }))
+      ),
+    [airlines]
+  );
+  const dutyLocationKindOptions = useMemo(
+    () => [
+      { value: "country", label: "Country", keywords: "country" },
+      { value: "region", label: "Region", keywords: "region" }
+    ],
+    []
+  );
+  const dutyLocationOptions = useMemo(
+    () =>
+      [
+        {
+          value: "",
+          label: dutyFilters.locationKind === "region" ? "Select a region" : "Select a country",
+          keywords: dutyFilters.locationKind === "region" ? "select region none" : "select country none"
+        }
+      ].concat(
+        (dutyFilters.locationKind === "region" ? regionOptions : countryOptions).map((value) => ({
+          value: dutyFilters.locationKind === "region" ? value.code : value,
+          label: dutyFilters.locationKind === "region" ? value.name : value,
+          keywords:
+            dutyFilters.locationKind === "region" ? `${value.code} ${value.name}` : String(value)
+        }))
+      ),
+    [countryOptions, dutyFilters.locationKind, regionOptions]
+  );
+  const dutyEquipmentSelectOptions = useMemo(
+    () =>
+      [{ value: "", label: "Select one aircraft", keywords: "select aircraft none" }].concat(
+        [...dutyEquipmentOptions]
+          .map((equipment) => {
+            const metadata = getAircraftProfileOptionMetadata(equipment);
+            return {
+              value: equipment,
+              label: equipment,
+              groupLabel: metadata?.manufacturer || "Other",
+              sortLabel: metadata?.fullAircraftName || equipment,
+              keywords: [equipment, metadata?.fullAircraftName, metadata?.manufacturer]
+                .filter(Boolean)
+                .join(" ")
+            };
+          })
+          .sort(
+            (left, right) =>
+              left.groupLabel.localeCompare(right.groupLabel) ||
+              left.sortLabel.localeCompare(right.sortLabel) ||
+              left.label.localeCompare(right.label)
+          )
+      ),
+    [dutyEquipmentOptions]
+  );
+  const dutyLengthOptions = useMemo(
+    () =>
+      Array.from({ length: 9 }, (_, index) => {
+        const length = index + 2;
+        return {
+          value: String(length),
+          label: `${length} flights`,
+          keywords: `${length} flights`
+        };
+      }),
+    []
+  );
+  const dutyAddonMatchOptions = useMemo(
+    () => [
+      { value: "either", label: "Origin or destination", keywords: "either origin destination" },
+      { value: "origin", label: "Origin only", keywords: "origin only" },
+      { value: "destination", label: "Destination only", keywords: "destination only" },
+      { value: "both", label: "Origin and destination", keywords: "both origin destination" }
+    ],
+    []
+  );
 
   return (
-    <>
-      <div className="filter-grid filter-grid--routing">
-        <label className="filter-block">
-          <span>Build Mode</span>
-          <select
-            value={dutyFilters.buildMode}
-            onChange={(event) => onDutyFilterChange("buildMode", event.target.value)}
-          >
-            <option value="airline">By Airline</option>
-            <option value="location">Location</option>
-          </select>
-        </label>
+    <div className="duty-schedule-filters grid gap-3">
+      <div className={gridClassNames.routing}>
+        <SearchableMultiSelect
+          label="Build Mode"
+          placeholder="Search build modes"
+          emptyLabel="No matching build modes"
+          allLabel="Build mode"
+          allowMultiple={false}
+          hideChips
+          searchable={false}
+          showClearAction={false}
+          showOptionMark={false}
+          showSingleSelectedLabel
+          options={dutyBuildModeOptions}
+          selectedValues={[dutyFilters.buildMode]}
+          onChange={(value) => onDutyFilterChange("buildMode", value[0] || "airline")}
+        />
 
         {dutyFilters.buildMode === "airline" ? (
-          <label className="filter-block filter-block--wide">
-            <span>Airline</span>
-            <select
-              value={dutyFilters.selectedAirline}
-              onChange={(event) => onDutyFilterChange("selectedAirline", event.target.value)}
-            >
-              <option value="">Select an airline</option>
-              {airlines.map((airline) => (
-                <option key={airline} value={airline}>
-                  {airline}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SearchableMultiSelect
+            label="Airline"
+            placeholder="Search airlines"
+            emptyLabel="No matching airlines"
+          allLabel="Select an airline"
+          allowMultiple={false}
+          fullWidth
+          hideChips
+          showClearAction={false}
+          showOptionMark={false}
+            showSingleSelectedLabel
+            options={dutyAirlineOptions}
+            selectedValues={dutyFilters.selectedAirline ? [dutyFilters.selectedAirline] : [""]}
+            onChange={(value) => onDutyFilterChange("selectedAirline", value[0] || "")}
+          />
         ) : (
           <>
-            <label className="filter-block">
-              <span>Location Type</span>
-              <select
-                value={dutyFilters.locationKind}
-                onChange={(event) => onDutyFilterChange("locationKind", event.target.value)}
-              >
-                <option value="country">Country</option>
-                <option value="region">Region</option>
-              </select>
-            </label>
+            <SearchableMultiSelect
+              label="Location Type"
+              placeholder="Search location types"
+              emptyLabel="No matching location types"
+              allLabel="Location type"
+              allowMultiple={false}
+              hideChips
+              searchable={false}
+              showClearAction={false}
+              showOptionMark={false}
+              showSingleSelectedLabel
+              options={dutyLocationKindOptions}
+              selectedValues={[dutyFilters.locationKind]}
+              onChange={(value) => onDutyFilterChange("locationKind", value[0] || "country")}
+            />
 
-            <label className="filter-block">
-              <span>{dutyFilters.locationKind === "region" ? "Region" : "Country"}</span>
-              <select
-                value={
-                  dutyFilters.locationKind === "region"
-                    ? dutyFilters.selectedRegion
-                    : dutyFilters.selectedCountry
-                }
-                onChange={(event) =>
-                  onDutyFilterChange(
-                    dutyFilters.locationKind === "region" ? "selectedRegion" : "selectedCountry",
-                    event.target.value
-                  )
-                }
-              >
-                <option value="">
-                  {dutyFilters.locationKind === "region" ? "Select a region" : "Select a country"}
-                </option>
-                {(dutyFilters.locationKind === "region" ? regionOptions : countryOptions).map((value) => {
-                  const optionValue = dutyFilters.locationKind === "region" ? value.code : value;
-                  const optionLabel = dutyFilters.locationKind === "region" ? value.name : value;
-                  return (
-                    <option key={optionValue} value={optionValue}>
-                      {optionLabel}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
+            <SearchableMultiSelect
+              label={dutyFilters.locationKind === "region" ? "Region" : "Country"}
+              placeholder={
+                dutyFilters.locationKind === "region" ? "Search regions" : "Search countries"
+              }
+              emptyLabel={
+                dutyFilters.locationKind === "region"
+                  ? "No matching regions"
+                  : "No matching countries"
+              }
+              allLabel={
+                dutyFilters.locationKind === "region" ? "Select a region" : "Select a country"
+              }
+              allowMultiple={false}
+              hideChips
+              showClearAction={false}
+              showOptionMark={false}
+              showSingleSelectedLabel
+              options={dutyLocationOptions}
+              selectedValues={[
+                dutyFilters.locationKind === "region"
+                  ? dutyFilters.selectedRegion || ""
+                  : dutyFilters.selectedCountry || ""
+              ]}
+              onChange={(value) =>
+                onDutyFilterChange(
+                  dutyFilters.locationKind === "region" ? "selectedRegion" : "selectedCountry",
+                  value[0] || ""
+                )
+              }
+            />
           </>
         )}
       </div>
 
-      {dutyFilters.buildMode === "location" ? (
-        <div className="duty-schedule__note">
-          {hasLocationSelection ? (
-            dutyFilters.resolvedAirline ? (
-              <p>
-                Random airline selected for this location: <strong>{dutyFilters.resolvedAirline}</strong>
-                {qualifyingDutyAirlines.length ? ` from ${qualifyingDutyAirlines.length} qualifying airlines.` : null}
-              </p>
-            ) : (
-              <p>No qualifying airline was found with at least 10 flights touching this location.</p>
-            )
-          ) : (
-            <p>Select a location to let the app choose a qualifying airline.</p>
-          )}
+      {dutyFilters.buildMode === "location" && hasLocationSelection ? (
+        <div className="rounded-2xl border border-[color:var(--line)] bg-[var(--surface-panel)] px-4 py-3 text-sm leading-6 text-[var(--text-muted)]">
+          {dutyFilters.resolvedAirline ? (
+            <p className="m-0">
+              Random airline selected for this location: <strong>{dutyFilters.resolvedAirline}</strong>
+              {qualifyingDutyAirlines.length ? ` from ${qualifyingDutyAirlines.length} qualifying airlines.` : null}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
-      <div className="filter-grid filter-grid--advanced">
+      <div
+        className={
+          dutyFilters.buildMode === "location" ? gridClassNames.advancedDuty : gridClassNames.advanced
+        }
+      >
         <RangeSlider
           label="Flight Length"
           min={0}
@@ -581,66 +1087,85 @@ function DutyScheduleFilters({
           formatValue={formatDistanceNm}
         />
 
-        <label className="filter-block">
-          <span>Aircraft</span>
-          <select
-            value={dutyFilters.selectedEquipment}
-            onChange={(event) => onDutyFilterChange("selectedEquipment", event.target.value)}
-          >
-            <option value="">Select one aircraft</option>
-            {dutyEquipmentOptions.map((equipment) => (
-              <option key={equipment} value={equipment}>
-                {equipment}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SearchableMultiSelect
+          label="Aircraft"
+          placeholder="Search aircraft"
+          emptyLabel="No matching aircraft"
+          allLabel="Select one aircraft"
+          allowMultiple={false}
+          hideChips
+          showClearAction={false}
+          showOptionMark={false}
+          showSingleSelectedLabel
+          options={dutyEquipmentSelectOptions}
+          selectedValues={dutyFilters.selectedEquipment ? [dutyFilters.selectedEquipment] : [""]}
+          onChange={(value) => onDutyFilterChange("selectedEquipment", value[0] || "")}
+        />
 
-        <label className="filter-block">
-          <span>Duty Length</span>
-          <select
-            value={dutyFilters.dutyLength}
-            onChange={(event) => onDutyFilterChange("dutyLength", Number(event.target.value))}
-          >
-            {Array.from({ length: 9 }, (_, index) => index + 2).map((length) => (
-              <option key={length} value={length}>
-                {length} flights
-              </option>
-            ))}
-          </select>
-        </label>
+        <SearchableMultiSelect
+          label="Duty Length"
+          placeholder="Search duty length"
+          emptyLabel="No matching duty lengths"
+          allLabel="Duty length"
+          allowMultiple={false}
+          hideChips
+          searchable={false}
+          showClearAction={false}
+          showOptionMark={false}
+          showSingleSelectedLabel
+          options={dutyLengthOptions}
+          selectedValues={[String(dutyFilters.dutyLength)]}
+          onChange={(value) => onDutyFilterChange("dutyLength", Number(value[0] || 2))}
+        />
       </div>
 
-      <div className="filter-grid filter-grid--addon">
-        <div className="filter-block">
-          <span>Addon Prioritization</span>
-          <div className="toggle-row">
+      <div className={gridClassNames.addon}>
+        <SearchableMultiSelect
+          label="Addon Match"
+          placeholder="Search addon match"
+          emptyLabel="No matching addon match modes"
+          allLabel="Origin or destination"
+          allowMultiple={false}
+          hideChips
+          searchable={false}
+          showClearAction={false}
+          showOptionMark={false}
+          showSingleSelectedLabel
+          options={dutyAddonMatchOptions}
+          selectedValues={[dutyFilters.addonMatchMode]}
+          onChange={(value) => onDutyFilterChange("addonMatchMode", value[0] || "either")}
+        />
+
+        <Field label="Addon Results" className="filter-block min-w-0">
+          <div className="toggle-row toggle-row--single-line flex flex-nowrap gap-2">
             <button
-              className={`ghost-button ${
-                dutyFilters.addonPriorityEnabled ? "ghost-button--active" : ""
-              }`}
+              className={toggleButtonClassName(dutyFilters.addonFilterEnabled)}
+              type="button"
+              onClick={() =>
+                onDutyFilterChange("addonFilterEnabled", !dutyFilters.addonFilterEnabled)
+              }
+            >
+              Addon Only
+            </button>
+            <button
+              className={toggleButtonClassName(dutyFilters.addonPriorityEnabled)}
               type="button"
               onClick={() =>
                 onDutyFilterChange("addonPriorityEnabled", !dutyFilters.addonPriorityEnabled)
               }
             >
-              {dutyFilters.addonPriorityEnabled ? "Addon Priority On" : "Addon Priority Off"}
+              Priority
             </button>
           </div>
-        </div>
+        </Field>
       </div>
 
-      <div className="duty-schedule__actions">
-        <button
-          className="primary-button"
-          type="button"
-          onClick={onBuildDutySchedule}
-          disabled={!canBuild}
-        >
+      <div className="flex justify-center">
+        <Button onClick={onBuildDutySchedule} disabled={!canBuild}>
           Build my Schedule
-        </button>
+        </Button>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -654,62 +1179,64 @@ export function AddonAirportPanel({
   onScanAddonAirports
 }) {
   return (
-    <section className="addon-panel">
-      <div className="filter-heading filter-heading--addon">
-        <div>
-          <p className="eyebrow">Addon Airports</p>
-          <h2>Manage installed scenery coverage</h2>
-        </div>
-
-        <div className="addon-panel__actions">
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={onAddAddonRoot}
-            disabled={!isDesktopAddonScanAvailable || isAddonScanBusy}
-          >
+    <Panel className={insetPanelClassName}>
+      <SectionHeader
+        eyebrow="Addon Airports"
+        title="Manage installed scenery coverage"
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              onClick={onAddAddonRoot}
+              disabled={!isDesktopAddonScanAvailable || isAddonScanBusy}
+            >
             Add Folder
-          </button>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={onScanAddonAirports}
-            disabled={!isDesktopAddonScanAvailable || isAddonScanBusy || !addonScan.roots.length}
-          >
-            {isAddonScanBusy ? "Scanning..." : "Scan Now"}
-          </button>
-        </div>
-      </div>
+            </Button>
+            <Button
+              onClick={onScanAddonAirports}
+              disabled={!isDesktopAddonScanAvailable || isAddonScanBusy || !addonScan.roots.length}
+            >
+              {isAddonScanBusy ? "Scanning..." : "Scan Now"}
+            </Button>
+          </>
+        }
+      />
 
-      <div className="addon-panel__summary">
-        <p>{addonScanSummary}</p>
+      <div className={mutedTextStackClassName}>
+        <p className="m-0">{addonScanSummary}</p>
         {!isDesktopAddonScanAvailable ? (
-          <p>Addon airport scanning is available only in the desktop app.</p>
+          <p className="m-0">Addon airport scanning is available only in the desktop app.</p>
         ) : null}
       </div>
 
-      <div className="addon-root-list">
+      <div className="grid gap-2">
         {addonScan.roots.length ? (
           addonScan.roots.map((root) => (
-            <div key={root} className="addon-root-item">
-              <code>{root}</code>
-              <button
-                className="ghost-button addon-root-item__remove"
-                type="button"
+            <div
+              key={root}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] bg-[var(--input-bg)] px-4 py-3"
+            >
+              <code className="[overflow-wrap:anywhere] text-[0.78rem] font-medium text-[var(--text-primary)]">
+                {root}
+              </code>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-xl"
                 onClick={() => onRemoveAddonRoot(root)}
                 disabled={isAddonScanBusy}
               >
                 Remove
-              </button>
+              </Button>
             </div>
           ))
         ) : (
-          <p className="empty-note">
+          <p className={mutedTextClassName}>
             No addon folders saved yet. Add one or more Addon/Community roots, then scan them.
           </p>
         )}
       </div>
-    </section>
+    </Panel>
   );
 }
 
@@ -719,6 +1246,7 @@ export function SimBriefSettingsPanel({
   dispatchUnits,
   customAirframes,
   customAirframeDraftId,
+  customAirframeDraftName,
   customAirframeDraftMatchType,
   simBriefAircraftTypes,
   isSimBriefAircraftTypesLoading,
@@ -728,6 +1256,7 @@ export function SimBriefSettingsPanel({
   onPilotIdChange,
   onDispatchUnitsChange,
   onCustomAirframeDraftIdChange,
+  onCustomAirframeDraftNameChange,
   onCustomAirframeDraftMatchTypeChange,
   onAddCustomAirframe,
   onRemoveCustomAirframe,
@@ -760,84 +1289,78 @@ export function SimBriefSettingsPanel({
   };
 
   return (
-    <section className="addon-panel">
-      <div className="filter-heading filter-heading--addon">
-        <div>
-          <p className="eyebrow">SimBrief</p>
-          <h2>Configure SimBrief integration</h2>
-        </div>
-      </div>
+    <Panel className={insetPanelClassName}>
+      <SectionHeader eyebrow="SimBrief" title="Configure SimBrief integration" />
 
-      <div className="filter-grid simbrief-credentials-row">
-        <label className="filter-block">
-          <span>Navigraph Alias</span>
+      <div className={gridClassNames.twoColumn}>
+        <Field label="Navigraph Alias">
           <input
             type="text"
+            className={fieldInputClassName}
             value={usernameValue}
             onChange={(event) => setUsernameValue(event.target.value)}
             onBlur={commitCredentials}
             onKeyDown={handleCredentialKeyDown}
             placeholder="Enter Alias"
           />
-        </label>
+        </Field>
 
-        <label className="filter-block">
-          <span>Pilot ID</span>
+        <Field label="Pilot ID">
           <input
             type="text"
+            className={fieldInputClassName}
             value={pilotIdValue}
             onChange={(event) => setPilotIdValue(event.target.value)}
             onBlur={commitCredentials}
             onKeyDown={handleCredentialKeyDown}
             placeholder="Enter Pilot ID"
           />
-        </label>
+        </Field>
       </div>
 
-      <div className="filter-block simbrief-units-toggle">
-        <span>Dispatch Units</span>
-        <div className="toggle-row">
-          <button
-            className={`ghost-button ${dispatchUnits === "LBS" ? "ghost-button--active" : ""}`}
-            type="button"
-            onClick={() => onDispatchUnitsChange("LBS")}
-          >
+      <Field label="Dispatch Units" className="simbrief-units-toggle">
+        <div className="toggle-row flex flex-wrap gap-2">
+          <button className={toggleButtonClassName(dispatchUnits === "LBS")} type="button" onClick={() => onDispatchUnitsChange("LBS")}>
             LBS
           </button>
-          <button
-            className={`ghost-button ${dispatchUnits === "KGS" ? "ghost-button--active" : ""}`}
-            type="button"
-            onClick={() => onDispatchUnitsChange("KGS")}
-          >
+          <button className={toggleButtonClassName(dispatchUnits === "KGS")} type="button" onClick={() => onDispatchUnitsChange("KGS")}>
             KGS
           </button>
         </div>
-      </div>
+      </Field>
 
-      <div className="simbrief-custom-airframes">
-        <div className="filter-heading filter-heading--addon">
-          <div>
-            <h3>Saved custom airframes</h3>
-            <p className="simbrief-status">
-              Add a SimBrief internal ID and match it to the aircraft shown on the flight board.
-            </p>
-          </div>
-        </div>
+      <div className="grid gap-4 rounded-[18px] border border-[color:var(--line)] bg-[var(--surface)] p-4">
+        <SectionHeader
+          title="Saved custom airframes"
+          titleClassName="text-[1rem]"
+          description="Add a SimBrief internal ID and match it to the aircraft shown on the flight board."
+        />
 
-        <div className="filter-grid simbrief-custom-airframes__form">
-          <label className="filter-block">
-            <span>Custom Airframe Internal ID</span>
+        <div className="grid gap-3 bp-1024:grid-cols-3">
+          <Field label="Custom Airframe Internal ID">
             <input
               type="text"
+              className={fieldInputClassName}
               value={customAirframeDraftId}
               onChange={(event) => onCustomAirframeDraftIdChange(event.target.value)}
               placeholder="1234_1234567891234"
             />
-          </label>
+          </Field>
 
-          <label className="filter-block">
-            <span>Matching Aircraft</span>
-            <select
+          <Field label="Airframe Name">
+            <input
+              type="text"
+              className={fieldInputClassName}
+              value={customAirframeDraftName}
+              onChange={(event) => onCustomAirframeDraftNameChange(event.target.value)}
+              placeholder="A320 Neo Charter"
+            />
+          </Field>
+
+          <Field label="Matching Aircraft">
+            <div className="relative">
+              <select
+              className={cn(fieldSelectClassName, "w-full")}
               value={customAirframeDraftMatchType}
               onChange={(event) => onCustomAirframeDraftMatchTypeChange(event.target.value)}
               disabled={!simBriefAircraftTypes.length}
@@ -854,24 +1377,25 @@ export function SimBriefSettingsPanel({
                   ))}
                 </optgroup>
               ))}
-            </select>
-          </label>
+              </select>
+              <SelectChevron />
+            </div>
+          </Field>
         </div>
 
-        {simBriefAircraftTypesError ? <p className="empty-note">{simBriefAircraftTypesError}</p> : null}
+        {simBriefAircraftTypesError ? <p className={mutedTextClassName}>{simBriefAircraftTypesError}</p> : null}
 
-        <div className="addon-panel__actions">
-          <button
-            className="ghost-button"
-            type="button"
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
             onClick={onAddCustomAirframe}
-            disabled={!customAirframeDraftId.trim() || !customAirframeDraftMatchType}
+            disabled={!customAirframeDraftId.trim() || !customAirframeDraftName.trim() || !customAirframeDraftMatchType}
           >
             Add Custom Airframe ID
-          </button>
+          </Button>
         </div>
 
-        <div className="simbrief-custom-airframe-list">
+        <div className="grid gap-2">
           {customAirframes.length ? (
             customAirframes.map((entry) => {
               const matchedType =
@@ -879,32 +1403,38 @@ export function SimBriefSettingsPanel({
                 entry.matchType;
 
               return (
-                <div key={entry.internalId} className="simbrief-custom-airframe-item">
-                  <div>
-                    <strong>{matchedType}</strong>
-                    <p>{entry.internalId}</p>
+                <div
+                  key={entry.internalId}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] bg-[var(--input-bg)] px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <strong>{entry.name || matchedType}</strong>
+                    <p className="m-0 [overflow-wrap:anywhere] text-[0.78rem] text-[var(--text-muted)]">{entry.internalId}</p>
                   </div>
-                  <button
-                    className="ghost-button addon-root-item__remove"
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-xl"
                     onClick={() => onRemoveCustomAirframe(entry.internalId)}
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               );
             })
           ) : (
-            <p className="empty-note">No custom SimBrief airframes saved yet.</p>
+            <p className={mutedTextClassName}>No custom SimBrief airframes saved yet.</p>
           )}
         </div>
       </div>
-    </section>
+    </Panel>
   );
 }
 
 export default function FilterBar({
   plannerMode,
+  popupMode = false,
+  plannerControlsCollapsed,
   filters,
   dutyFilters,
   airlines,
@@ -918,66 +1448,149 @@ export default function FilterBar({
   onPlannerModeChange,
   onFilterChange,
   onDutyFilterChange,
+  onTogglePlannerControls,
   onBuildDutySchedule,
   onReset
 }) {
+  function handlePlannerHeaderClick(event) {
+    if (event.target.closest("button, a, input, select, textarea")) {
+      return;
+    }
+
+    onTogglePlannerControls();
+  }
+
+  function handlePlannerHeaderKeyDown(event) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    onTogglePlannerControls();
+  }
+
   return (
-    <section className="filter-bar">
-      <div className="filter-heading">
-        <div>
-          <p className="eyebrow">Planner Controls</p>
-          <h2>{plannerMode === "duty" ? "Build a generated duty schedule" : "Filter the active schedule"}</h2>
-        </div>
-        <button className="ghost-button" type="button" onClick={onReset}>
-          Reset Active Tab
-        </button>
-      </div>
-
-      <div className="planner-tabs" role="tablist" aria-label="Planner control tabs">
-        <button
-          className={`planner-tab ${plannerMode === "basic" ? "planner-tab--active" : ""}`}
-          type="button"
-          role="tab"
-          aria-selected={plannerMode === "basic"}
-          onClick={() => onPlannerModeChange("basic")}
-        >
-          Basic Filters
-        </button>
-        <button
-          className={`planner-tab ${plannerMode === "duty" ? "planner-tab--active" : ""}`}
-          type="button"
-          role="tab"
-          aria-selected={plannerMode === "duty"}
-          onClick={() => onPlannerModeChange("duty")}
-        >
-          Duty Schedule
-        </button>
-      </div>
-
-      {plannerMode === "duty" ? (
-        <DutyScheduleFilters
-          dutyFilters={dutyFilters}
-          airlines={airlines}
-          regionOptions={regionOptions}
-          countryOptions={countryOptions}
-          dutyEquipmentOptions={dutyEquipmentOptions}
-          qualifyingDutyAirlines={qualifyingDutyAirlines}
-          filterBounds={filterBounds}
-          onDutyFilterChange={onDutyFilterChange}
-          onBuildDutySchedule={onBuildDutySchedule}
-        />
-      ) : (
-        <BasicFilters
-          filters={filters}
-          airlines={airlines}
-          airportOptions={airportOptions}
-          regionOptions={regionOptions}
-          countryOptions={countryOptions}
-          equipmentOptions={equipmentOptions}
-          filterBounds={filterBounds}
-          onFilterChange={onFilterChange}
-        />
+    <Panel
+      className={cn(
+        "filter-bar app-scrollbar grid content-start gap-3 overflow-x-hidden rounded-[26px] p-5 bp-1024:rounded-[20px] bp-1024:p-4",
+        popupMode
+          ? "max-h-none overflow-visible"
+          : plannerControlsCollapsed
+            ? "max-h-[min(44vh,420px)] overflow-y-hidden"
+            : "h-full min-h-0 max-h-none overflow-y-auto"
       )}
-    </section>
+    >
+      <div
+        className="filter-heading filter-heading--planner-toggle flex items-start justify-between gap-3 rounded-2xl"
+        onClick={handlePlannerHeaderClick}
+        onKeyDown={handlePlannerHeaderKeyDown}
+        role="button"
+        tabIndex={0}
+        aria-label={plannerControlsCollapsed ? "Open planner controls" : "Toggle planner controls"}
+      >
+        <div>
+          <Eyebrow>Planner Controls</Eyebrow>
+          <h2 className="m-0 text-[1.2rem] font-semibold tracking-[-0.04em] bp-1024:text-[1rem]">
+            {plannerMode === "duty" ? "Build a generated duty schedule" : "Filter the active schedule"}
+          </h2>
+        </div>
+        <div
+          className="filter-heading__actions flex flex-wrap items-center gap-2"
+        >
+          {!plannerControlsCollapsed ? (
+            <Button variant="ghost" size="sm" className="rounded-full" onClick={onReset}>
+              Reset
+            </Button>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-[34px] w-[34px] rounded-[10px] border-[color:var(--line)] bg-[var(--input-bg)] p-0 text-[var(--text-muted)] shadow-none bp-1024:h-8 bp-1024:w-8"
+            onClick={onTogglePlannerControls}
+            aria-label={plannerControlsCollapsed ? "Show planner controls" : "Hide planner controls"}
+            title={plannerControlsCollapsed ? "Show planner controls" : "Hide planner controls"}
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" focusable="false" aria-hidden="true">
+              <path
+                d={plannerControlsCollapsed ? "M4.5 6.5 8 10 11.5 6.5" : "M4.5 9.5 8 6 11.5 9.5"}
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+            </svg>
+          </Button>
+        </div>
+      </div>
+
+      {plannerControlsCollapsed ? (
+        null
+      ) : (
+        <>
+          <div
+            className="planner-tabs inline-flex w-fit max-w-full flex-nowrap gap-1 rounded-full border border-[color:var(--line)] bg-[var(--surface-panel)] p-1"
+            role="tablist"
+            aria-label="Planner control tabs"
+          >
+            <Button
+              variant="ghost"
+              active={plannerMode === "basic"}
+              className={cn(
+                "planner-tab min-h-9 min-w-[160px] rounded-full border px-3 py-2 text-[0.9rem]",
+                plannerMode === "basic"
+                  ? "border-[color:rgba(62,129,191,0.5)] bg-[rgba(9,62,109,0.62)] text-white"
+                  : "border-transparent bg-transparent text-[var(--text-muted)]"
+              )}
+              role="tab"
+              aria-selected={plannerMode === "basic"}
+              onClick={() => onPlannerModeChange("basic")}
+            >
+              Basic Filters
+            </Button>
+            <Button
+              variant="ghost"
+              active={plannerMode === "duty"}
+              className={cn(
+                "planner-tab min-h-9 min-w-[160px] rounded-full border px-3 py-2 text-[0.9rem]",
+                plannerMode === "duty"
+                  ? "border-[color:rgba(62,129,191,0.5)] bg-[rgba(9,62,109,0.62)] text-white"
+                  : "border-transparent bg-transparent text-[var(--text-muted)]"
+              )}
+              role="tab"
+              aria-selected={plannerMode === "duty"}
+              onClick={() => onPlannerModeChange("duty")}
+            >
+              Duty Schedule
+            </Button>
+          </div>
+
+          {plannerMode === "duty" ? (
+            <DutyScheduleFilters
+              dutyFilters={dutyFilters}
+              airlines={airlines}
+              regionOptions={regionOptions}
+              countryOptions={countryOptions}
+              dutyEquipmentOptions={dutyEquipmentOptions}
+              qualifyingDutyAirlines={qualifyingDutyAirlines}
+              filterBounds={filterBounds}
+              onDutyFilterChange={onDutyFilterChange}
+              onBuildDutySchedule={onBuildDutySchedule}
+            />
+          ) : (
+            <BasicFilters
+              filters={filters}
+              airlines={airlines}
+              airportOptions={airportOptions}
+              regionOptions={regionOptions}
+              countryOptions={countryOptions}
+              equipmentOptions={equipmentOptions}
+              filterBounds={filterBounds}
+              onFilterChange={onFilterChange}
+            />
+          )}
+        </>
+      )}
+    </Panel>
   );
 }

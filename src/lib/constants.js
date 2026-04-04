@@ -6,13 +6,13 @@ export const SIMBRIEF_SETTINGS_FILE = `${STORAGE_DIR}/simbrief-settings.json`;
 export const ADDON_MATCH_MODES = ["either", "origin", "destination", "both"];
 
 export const DEFAULT_FILTERS = {
-  airline: "ALL",
-  region: "ALL",
-  country: "ALL",
+  airline: [],
+  region: [],
+  country: [],
   originAirport: "",
-  origin: "",
+  origin: [],
   destinationAirport: "",
-  destination: "",
+  destination: [],
   route: "",
   aircraftFamily: "ALL",
   equipment: [],
@@ -39,6 +39,8 @@ export const DEFAULT_DUTY_FILTERS = {
   distanceMin: null,
   distanceMax: null,
   selectedEquipment: "",
+  addonMatchMode: "either",
+  addonFilterEnabled: false,
   addonPriorityEnabled: false,
   dutyLength: 2,
   resolvedAirline: ""

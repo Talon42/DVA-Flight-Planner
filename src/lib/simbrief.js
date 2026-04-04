@@ -130,13 +130,15 @@ export function normalizeSimBriefCustomAirframe(entry) {
 
   const internalId = String(entry.internalId || "").trim();
   const matchType = String(entry.matchType || "").trim().toUpperCase();
+  const name = String(entry.name || "").trim();
   if (!internalId || !matchType) {
     return null;
   }
 
   return {
     internalId,
-    matchType
+    matchType,
+    name
   };
 }
 
@@ -252,10 +254,11 @@ export function buildSimBriefDispatchOptions(aircraftTypes = [], customAirframes
     const totalForType = customCountsByMatchType.get(entry.matchType) || 0;
     const suffix =
       totalForType > 1 ? ` (Custom #${nextIndex})` : " (Custom Airframe)";
+    const displayName = String(entry.name || "").trim();
 
     return {
       code: entry.internalId,
-      name: `${baseName}${suffix}`,
+      name: displayName || `${baseName}${suffix}`,
       dispatchType: entry.internalId,
       matchType: entry.matchType,
       kind: "custom"

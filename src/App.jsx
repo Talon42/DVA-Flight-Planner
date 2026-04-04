@@ -5,6 +5,17 @@ import { AddonAirportPanel } from "./components/FilterBar";
 import { SimBriefSettingsPanel } from "./components/FilterBar";
 import FlightTable from "./components/FlightTable";
 import DetailsPanel from "./components/DetailsPanel";
+import Button from "./components/ui/Button";
+import IconButton from "./components/ui/IconButton";
+import Panel from "./components/ui/Panel";
+import {
+  insetPanelClassName,
+  modalPanelClassName,
+  mutedTextClassName,
+  mutedTextStackClassName
+} from "./components/ui/patterns";
+import SectionHeader, { Eyebrow } from "./components/ui/SectionHeader";
+import { cn } from "./components/ui/cn";
 import { DEFAULT_DUTY_FILTERS, DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
 import {
   getAircraftProfileOptions,
@@ -47,6 +58,14 @@ import {
 } from "./lib/storage";
 
 const THEME_STORAGE_KEY = "flight-planner.theme";
+const DEV_TOOLS_STORAGE_KEY = "flight-planner.dev-tools-enabled";
+const DEV_WINDOW_WIDTH_STORAGE_KEY = "flight-planner.dev-window-width";
+const APP_BUILD_GIT_TAG = String(import.meta.env.VITE_BUILD_GIT_TAG || "").trim() || "local-dev";
+const DEV_WINDOW_WIDTH_PRESETS = [
+  { width: 1920, height: 900, label: "1920x900" },
+  { width: 1400, height: 900, label: "1400x900" },
+  { width: 1024, height: 768, label: "1024x768" }
+];
 
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -58,6 +77,64 @@ function readSavedTheme() {
   }
 
   return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+}
+
+function readSavedDevToolsEnabled() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(DEV_TOOLS_STORAGE_KEY) === "true";
+}
+
+function readSavedDevWindowWidth() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const savedWidth = Number(window.localStorage.getItem(DEV_WINDOW_WIDTH_STORAGE_KEY));
+  return DEV_WINDOW_WIDTH_PRESETS.some((option) => option.width === savedWidth) ? savedWidth : null;
+}
+
+function readViewportSize() {
+  if (typeof window === "undefined") {
+    return {
+      width: 1400,
+      height: 900
+    };
+  }
+
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight
+  };
+}
+
+function getLayoutBucket(viewportSize) {
+  if (viewportSize.width <= 1024) {
+    return "compact";
+  }
+
+  if (viewportSize.width <= 1400) {
+    return "standard";
+  }
+
+  return "expanded";
+}
+
+function shouldUsePlannerControlsModal(viewportSize) {
+  return viewportSize.width <= 1400;
+}
+
+function getDefaultBasicFilterSectionState(viewportSize = readViewportSize()) {
+  return {
+    basicAdvancedFiltersOpen: false,
+    basicAddonFiltersOpen: false
+  };
+}
+
+function getDefaultPlannerControlsCollapsed() {
+  return true;
 }
 
 function deriveFlightNumber(flight) {
@@ -111,19 +188,23 @@ function buildScheduleDateLabel(flights = []) {
     }
   }
 
-  if (earliest.hasSame(latest, "day")) {
-    return earliest.toFormat("MMMM d");
-  }
+  const midpointOffsetDays = Math.floor(latest.diff(earliest, "days").days / 2);
+  const effectiveScheduleDate = earliest.plus({ days: midpointOffsetDays });
 
-  if (earliest.year === latest.year && earliest.month === latest.month) {
-    return `${earliest.toFormat("MMMM d")}-${latest.toFormat("d")}`;
-  }
+  return earliest.year !== latest.year
+    ? effectiveScheduleDate.toFormat("MMMM d, yyyy")
+    : effectiveScheduleDate.toFormat("MMMM d");
+}
 
-  if (earliest.year === latest.year) {
-    return `${earliest.toFormat("MMMM d")}-${latest.toFormat("MMMM d")}`;
+function getScheduleSourceLabel(importSummary) {
+  const source = String(importSummary?.source || "").trim().toLowerCase();
+  if (source === "deltava-sync") {
+    return "Sync";
   }
-
-  return `${earliest.toFormat("MMMM d, yyyy")}-${latest.toFormat("MMMM d, yyyy")}`;
+  if (source === "manual") {
+    return "Manual";
+  }
+  return "Manual";
 }
 
 function ThemeToggleIcon({ theme }) {
@@ -169,6 +250,32 @@ function SettingsIcon() {
       />
       <circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.3" />
     </svg>
+  );
+}
+
+function FooterStat({ label, value, className = "" }) {
+  return (
+    <p
+      className={cn(
+        "m-0 inline-flex items-baseline gap-1.5 text-[0.78rem] font-medium text-[var(--text-muted)] bp-1024:text-[0.72rem]",
+        className
+      )}
+    >
+      <span>{label}:</span>
+      <strong className="font-semibold text-[var(--text-heading)]">{value}</strong>
+    </p>
+  );
+}
+
+function ModalBackdrop({ children, onClick }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center overflow-auto bg-[rgba(8,20,36,0.42)] p-4 backdrop-blur-md bp-1024:p-3"
+      role="presentation"
+      onClick={onClick}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -469,6 +576,8 @@ function buildBoardEntryFromFlight(flight, overrides = {}) {
     route: String(flight?.route || `${flight?.from || ""}-${flight?.to || ""}`).trim(),
     fromAirport: String(flight?.fromAirport || "").trim(),
     toAirport: String(flight?.toAirport || "").trim(),
+    missingAirportIcaos: Array.isArray(flight?.missingAirportIcaos) ? [...flight.missingAirportIcaos] : [],
+    hasMissingAirportData: Boolean(flight?.hasMissingAirportData),
     fromTimezone: String(flight?.fromTimezone || "").trim(),
     toTimezone: String(flight?.toTimezone || "").trim(),
     stdLocal: String(flight?.stdLocal || "").trim(),
@@ -520,6 +629,8 @@ function normalizeBoardEntry(entry) {
     route: String(entry.route || `${entry.from || ""}-${entry.to || ""}`).trim(),
     fromAirport: String(entry.fromAirport || "").trim(),
     toAirport: String(entry.toAirport || "").trim(),
+    missingAirportIcaos: Array.isArray(entry.missingAirportIcaos) ? [...entry.missingAirportIcaos] : [],
+    hasMissingAirportData: Boolean(entry.hasMissingAirportData),
     fromTimezone: String(entry.fromTimezone || "").trim(),
     toTimezone: String(entry.toTimezone || "").trim(),
     stdLocal: String(entry.stdLocal || "").trim(),
@@ -684,6 +795,12 @@ function normalizeDutyFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDi
   nextFilters.selectedCountry = String(nextFilters.selectedCountry || "").trim();
   nextFilters.selectedRegion = String(nextFilters.selectedRegion || "").trim().toUpperCase();
   nextFilters.selectedEquipment = String(nextFilters.selectedEquipment || "").trim().toUpperCase();
+  nextFilters.addonMatchMode = ["either", "origin", "destination", "both"].includes(
+    nextFilters.addonMatchMode
+  )
+    ? nextFilters.addonMatchMode
+    : "either";
+  nextFilters.addonFilterEnabled = Boolean(nextFilters.addonFilterEnabled);
   nextFilters.addonPriorityEnabled = Boolean(nextFilters.addonPriorityEnabled);
   nextFilters.resolvedAirline = String(nextFilters.resolvedAirline || "").trim();
 
@@ -858,10 +975,20 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
     ...(savedFilters || {})
   };
 
-  nextFilters.origin = String(nextFilters.origin || "").trim().toUpperCase();
-  nextFilters.destination = String(nextFilters.destination || "").trim().toUpperCase();
-  nextFilters.region = String(nextFilters.region || "ALL").trim().toUpperCase() || "ALL";
-  nextFilters.country = String(nextFilters.country || "ALL").trim() || "ALL";
+  const toSelectionArray = (value, { uppercase = false } = {}) => {
+    const rawValues = Array.isArray(value) ? value : value ? [value] : [];
+    return rawValues
+      .map((entry) => String(entry || "").trim())
+      .filter(Boolean)
+      .filter((entry) => entry.toUpperCase() !== "ALL")
+      .map((entry) => (uppercase ? entry.toUpperCase() : entry));
+  };
+
+  nextFilters.airline = toSelectionArray(nextFilters.airline);
+  nextFilters.region = toSelectionArray(nextFilters.region, { uppercase: true });
+  nextFilters.country = toSelectionArray(nextFilters.country);
+  nextFilters.origin = toSelectionArray(nextFilters.origin, { uppercase: true });
+  nextFilters.destination = toSelectionArray(nextFilters.destination, { uppercase: true });
   nextFilters.originAirport = String(nextFilters.originAirport || "").trim();
   nextFilters.destinationAirport = String(nextFilters.destinationAirport || "").trim();
   nextFilters.addonFilterEnabled = Boolean(nextFilters.addonFilterEnabled);
@@ -872,12 +999,14 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
     ? nextFilters.addonMatchMode
     : "either";
 
-  if (nextFilters.origin && !nextFilters.originAirport) {
-    nextFilters.originAirport = getAirportByIcao(nextFilters.origin)?.name || "";
+  if (!nextFilters.origin.length && nextFilters.originAirport) {
+    nextFilters.origin = [String(nextFilters.originAirport).trim().toUpperCase()].filter(Boolean);
   }
 
-  if (nextFilters.destination && !nextFilters.destinationAirport) {
-    nextFilters.destinationAirport = getAirportByIcao(nextFilters.destination)?.name || "";
+  if (!nextFilters.destination.length && nextFilters.destinationAirport) {
+    nextFilters.destination = [String(nextFilters.destinationAirport).trim().toUpperCase()].filter(
+      Boolean
+    );
   }
 
   if (!Array.isArray(nextFilters.equipment)) {
@@ -933,6 +1062,8 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
 }
 
 export default function App() {
+  const initialViewportSize = readViewportSize();
+  const initialBasicFilterSections = getDefaultBasicFilterSectionState(initialViewportSize);
   const [schedule, setSchedule] = useState(null);
   const [flightBoard, setFlightBoard] = useState([]);
   const [selectedFlightId, setSelectedFlightId] = useState(null);
@@ -944,6 +1075,19 @@ export default function App() {
   const [filterUiVersion, setFilterUiVersion] = useState(0);
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [theme, setTheme] = useState(readSavedTheme);
+  const [isDevToolsEnabled, setIsDevToolsEnabled] = useState(readSavedDevToolsEnabled);
+  const [devWindowWidth, setDevWindowWidth] = useState(readSavedDevWindowWidth);
+  const [isDevWindowMenuOpen, setIsDevWindowMenuOpen] = useState(false);
+  const [viewportSize, setViewportSize] = useState(initialViewportSize);
+  const [plannerControlsCollapsed, setPlannerControlsCollapsed] = useState(
+    getDefaultPlannerControlsCollapsed()
+  );
+  const [basicAdvancedFiltersOpen, setBasicAdvancedFiltersOpen] = useState(
+    initialBasicFilterSections.basicAdvancedFiltersOpen
+  );
+  const [basicAddonFiltersOpen, setBasicAddonFiltersOpen] = useState(
+    initialBasicFilterSections.basicAddonFiltersOpen
+  );
   const [addonScan, setAddonScan] = useState(createEmptyAddonAirportScan);
   const [simBriefUsername, setSimBriefUsername] = useState("");
   const [simBriefUsernameDraft, setSimBriefUsernameDraft] = useState("");
@@ -954,6 +1098,7 @@ export default function App() {
   const [simBriefCustomAirframes, setSimBriefCustomAirframes] = useState([]);
   const [simBriefCustomAirframesDraft, setSimBriefCustomAirframesDraft] = useState([]);
   const [simBriefCustomAirframeIdDraft, setSimBriefCustomAirframeIdDraft] = useState("");
+  const [simBriefCustomAirframeNameDraft, setSimBriefCustomAirframeNameDraft] = useState("");
   const [simBriefCustomAirframeMatchTypeDraft, setSimBriefCustomAirframeMatchTypeDraft] =
     useState("");
   const [simBriefDispatchState, setSimBriefDispatchState] = useState({
@@ -976,11 +1121,35 @@ export default function App() {
   const [statusMessage, setStatusMessage] = useState("Ready");
   const replaceScheduleConfirmResolverRef = useRef(null);
   const deleteUserDataConfirmResolverRef = useRef(null);
+  const devWindowMenuRef = useRef(null);
   const deferredFilters = useDeferredValue(filters);
   const deferredDutyFilters = useDeferredValue(dutyFilters);
   const isDesktopAddonScanAvailable = isTauriRuntime();
   const isDesktopSimBriefAvailable = isDesktopAddonScanAvailable;
   const scheduleDateLabel = buildScheduleDateLabel(schedule?.flights || []);
+  const layoutBucket = getLayoutBucket(viewportSize);
+  const usesPlannerControlsModal = shouldUsePlannerControlsModal(viewportSize);
+  const isPlannerControlsInlineCollapsed = plannerControlsCollapsed;
+  const selectedDevWindowPreset =
+    DEV_WINDOW_WIDTH_PRESETS.find((option) => option.width === devWindowWidth) || null;
+  const topbarTitle =
+    layoutBucket === "compact"
+      ? "DVA Flight Planner"
+      : "Delta Virtual Airlines Flight Planner";
+  const importButtonLabel =
+    layoutBucket === "compact"
+      ? schedule
+        ? "Replace Schedule"
+        : "Import Schedule"
+      : schedule
+        ? "Replace Schedule"
+        : "Import Schedule XML";
+  const syncButtonLabel =
+    layoutBucket === "compact"
+      ? "Sync DVA"
+      : "Sync from Delta Virtual";
+  const devWindowButtonLabel = "Window Size";
+  const currentWindowSizeLabel = `Current ${viewportSize.width} x ${viewportSize.height}`;
   useEffect(() => {
     if (!isSettingsOpen) {
       return undefined;
@@ -1025,6 +1194,76 @@ export default function App() {
     document.documentElement.style.colorScheme = theme;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    window.localStorage.setItem(DEV_TOOLS_STORAGE_KEY, isDevToolsEnabled ? "true" : "false");
+  }, [isDevToolsEnabled]);
+
+  useEffect(() => {
+    if (devWindowWidth === null) {
+      window.localStorage.removeItem(DEV_WINDOW_WIDTH_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(DEV_WINDOW_WIDTH_STORAGE_KEY, String(devWindowWidth));
+  }, [devWindowWidth]);
+
+  useEffect(() => {
+    if (!isDevWindowMenuOpen) {
+      return undefined;
+    }
+
+    function handlePointerDown(event) {
+      if (!devWindowMenuRef.current?.contains(event.target)) {
+        setIsDevWindowMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsDevWindowMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isDevWindowMenuOpen]);
+
+  useEffect(() => {
+    function handleContextMenu(event) {
+      if (isDevToolsEnabled) {
+        return;
+      }
+
+      event.preventDefault();
+    }
+
+    window.addEventListener("contextmenu", handleContextMenu);
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu);
+    };
+  }, [isDevToolsEnabled]);
+
+  useEffect(() => {
+    if (!isDevToolsEnabled) {
+      setIsDevWindowMenuOpen(false);
+    }
+  }, [isDevToolsEnabled]);
+
+  useEffect(() => {
+    function handleResize() {
+      setViewportSize(readViewportSize());
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isDesktopSimBriefAvailable) {
@@ -1170,6 +1409,7 @@ export default function App() {
           uiStateResult.status === "fulfilled" && uiStateResult.value
             ? uiStateResult.value
             : savedSchedule.uiState || {};
+        const defaultBasicFilterSections = getDefaultBasicFilterSectionState(readViewportSize());
         setSchedule({
           importedAt: savedSchedule.importedAt,
           flights: savedSchedule.flights,
@@ -1203,6 +1443,13 @@ export default function App() {
           savedUiState.scheduleTableTimeDisplayMode === "utc" ? "utc" : "local"
         );
         setSort(savedUiState.sort || DEFAULT_SORT);
+        setPlannerControlsCollapsed(
+          typeof savedUiState.plannerControlsCollapsed === "boolean"
+            ? savedUiState.plannerControlsCollapsed
+            : getDefaultPlannerControlsCollapsed()
+        );
+        setBasicAdvancedFiltersOpen(defaultBasicFilterSections.basicAdvancedFiltersOpen);
+        setBasicAddonFiltersOpen(defaultBasicFilterSections.basicAddonFiltersOpen);
         setSelectedFlightId(
           savedUiState.selectedFlightId ||
             savedSchedule.flights[0]?.flightId ||
@@ -1245,6 +1492,9 @@ export default function App() {
       filters,
       dutyFilters,
       flightBoard,
+      plannerControlsCollapsed,
+      basicAdvancedFiltersOpen,
+      basicAddonFiltersOpen,
       scheduleTableTimeDisplayMode,
       sort,
       selectedFlightId
@@ -1258,6 +1508,9 @@ export default function App() {
     filters,
     dutyFilters,
     flightBoard,
+    plannerControlsCollapsed,
+    basicAdvancedFiltersOpen,
+    basicAddonFiltersOpen,
     scheduleTableTimeDisplayMode,
     sort,
     selectedFlightId,
@@ -1297,38 +1550,38 @@ export default function App() {
         const toAirport = getAirportByIcao(flight.to);
 
         if (
-          normalizedDeferredFilters.airline !== "ALL" &&
-          flight.airlineName !== normalizedDeferredFilters.airline
+          normalizedDeferredFilters.airline.length &&
+          !normalizedDeferredFilters.airline.includes(flight.airlineName)
         ) {
           return false;
         }
 
         if (
-          normalizedDeferredFilters.region !== "ALL" &&
-          (fromAirport?.regionCode !== normalizedDeferredFilters.region ||
-            toAirport?.regionCode !== normalizedDeferredFilters.region)
+          normalizedDeferredFilters.region.length &&
+          (!normalizedDeferredFilters.region.includes(String(fromAirport?.regionCode || "").trim().toUpperCase()) ||
+            !normalizedDeferredFilters.region.includes(String(toAirport?.regionCode || "").trim().toUpperCase()))
         ) {
           return false;
         }
 
         if (
-          normalizedDeferredFilters.country !== "ALL" &&
-          (fromAirport?.country !== normalizedDeferredFilters.country ||
-            toAirport?.country !== normalizedDeferredFilters.country)
+          normalizedDeferredFilters.country.length &&
+          (!normalizedDeferredFilters.country.includes(String(fromAirport?.country || "").trim()) ||
+            !normalizedDeferredFilters.country.includes(String(toAirport?.country || "").trim()))
         ) {
           return false;
         }
 
         if (
-          normalizedDeferredFilters.origin &&
-          !flight.from.includes(normalizedDeferredFilters.origin.trim().toUpperCase())
+          normalizedDeferredFilters.origin.length &&
+          !normalizedDeferredFilters.origin.includes(String(flight.from || "").trim().toUpperCase())
         ) {
           return false;
         }
 
         if (
-          normalizedDeferredFilters.destination &&
-          !flight.to.includes(normalizedDeferredFilters.destination.trim().toUpperCase())
+          normalizedDeferredFilters.destination.length &&
+          !normalizedDeferredFilters.destination.includes(String(flight.to || "").trim().toUpperCase())
         ) {
           return false;
         }
@@ -1450,6 +1703,14 @@ export default function App() {
           return false;
         }
 
+        if (normalizedDeferredDutyFilters.addonFilterEnabled) {
+          return matchesAddonAirport(
+            flight,
+            addonAirports,
+            normalizedDeferredDutyFilters.addonMatchMode
+          );
+        }
+
         return true;
       })
     : [];
@@ -1489,6 +1750,11 @@ export default function App() {
         filters: overrides.filters ?? filters,
         dutyFilters: overrides.dutyFilters ?? dutyFilters,
         flightBoard: overrides.flightBoard ?? flightBoard,
+        plannerControlsCollapsed:
+          overrides.plannerControlsCollapsed ?? plannerControlsCollapsed,
+        basicAdvancedFiltersOpen:
+          overrides.basicAdvancedFiltersOpen ?? basicAdvancedFiltersOpen,
+        basicAddonFiltersOpen: overrides.basicAddonFiltersOpen ?? basicAddonFiltersOpen,
         scheduleTableTimeDisplayMode:
           overrides.scheduleTableTimeDisplayMode ?? scheduleTableTimeDisplayMode,
         sort: overrides.sort ?? sort,
@@ -1566,7 +1832,10 @@ export default function App() {
       const nextSchedule = {
         importedAt: imported.importedAt,
         flights: imported.flights,
-        importSummary: imported.importSummary
+        importSummary: {
+          ...imported.importSummary,
+          source: sourceLabel
+        }
       };
 
       startTransition(() => {
@@ -1761,47 +2030,25 @@ export default function App() {
     startTransition(() => {
       setPlannerMode("basic");
       setFilters((current) => {
-        if (key === "origin") {
-          const icao = String(value || "").trim().toUpperCase();
-          const airport = getAirportByIcao(icao);
-
+        if (key === "originIcao") {
+          const icao = String(value || "")
+            .toUpperCase()
+            .replace(/[^A-Z]/g, "")
+            .slice(0, 4);
           return {
             ...current,
-            origin: icao,
-            originAirport: airport?.name || ""
+            origin: icao ? [icao] : []
           };
         }
 
-        if (key === "destination") {
-          const icao = String(value || "").trim().toUpperCase();
-          const airport = getAirportByIcao(icao);
-
+        if (key === "destinationIcao") {
+          const icao = String(value || "")
+            .toUpperCase()
+            .replace(/[^A-Z]/g, "")
+            .slice(0, 4);
           return {
             ...current,
-            destination: icao,
-            destinationAirport: airport?.name || ""
-          };
-        }
-
-        if (key === "originAirport") {
-          const selectedIcao = String(value || "").trim().toUpperCase();
-          const airport = getAirportByIcao(selectedIcao);
-
-          return {
-            ...current,
-            originAirport: airport?.name || "",
-            origin: airport?.icao || ""
-          };
-        }
-
-        if (key === "destinationAirport") {
-          const selectedIcao = String(value || "").trim().toUpperCase();
-          const airport = getAirportByIcao(selectedIcao);
-
-          return {
-            ...current,
-            destinationAirport: airport?.name || "",
-            destination: airport?.icao || ""
+            destination: icao ? [icao] : []
           };
         }
 
@@ -1937,10 +2184,11 @@ export default function App() {
         return current;
       }
 
-      nextFlightBoard = [...current, buildBoardEntryFromFlight(matchedFlight)];
+      nextFlightBoard = [buildBoardEntryFromFlight(matchedFlight), ...current];
       return nextFlightBoard;
     });
     setExpandedBoardFlightId(null);
+    setPlannerControlsCollapsed(true);
   }
 
   function handleRemoveFromFlightBoard(flightId) {
@@ -1959,6 +2207,34 @@ export default function App() {
           }
         : current
     );
+  }
+
+  function handleReorderFlightBoard(sourceBoardEntryId, targetBoardEntryId, position = "before") {
+    if (!sourceBoardEntryId || !targetBoardEntryId || sourceBoardEntryId === targetBoardEntryId) {
+      return;
+    }
+
+    setFlightBoard((current) => {
+      const sourceIndex = current.findIndex((entry) => entry.boardEntryId === sourceBoardEntryId);
+      const targetIndex = current.findIndex((entry) => entry.boardEntryId === targetBoardEntryId);
+
+      if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+        return current;
+      }
+
+      const nextFlightBoard = [...current];
+      const [movedEntry] = nextFlightBoard.splice(sourceIndex, 1);
+      const adjustedTargetIndex =
+        position === "after"
+          ? targetIndex > sourceIndex
+            ? targetIndex
+            : targetIndex + 1
+          : targetIndex > sourceIndex
+            ? targetIndex - 1
+            : targetIndex;
+      nextFlightBoard.splice(adjustedTargetIndex, 0, movedEntry);
+      return nextFlightBoard;
+    });
   }
 
   async function handleRepairFlightBoardEntry(boardEntryId) {
@@ -2056,6 +2332,14 @@ export default function App() {
         return false;
       }
 
+      if (effectiveDutyFilters.addonFilterEnabled) {
+        return matchesAddonAirport(
+          flight,
+          addonAirports,
+          effectiveDutyFilters.addonMatchMode
+        );
+      }
+
       return true;
     });
 
@@ -2092,7 +2376,7 @@ export default function App() {
       if (effectiveDutyFilters.addonPriorityEnabled) {
         const prioritizedFlights = prioritizeDutyCandidates(eligibleFlights, addonAirports);
         const addonFirstFlights = prioritizedFlights.filter((flight) =>
-          matchesAddonAirport(flight, addonAirports, "either")
+          matchesAddonAirport(flight, addonAirports, effectiveDutyFilters.addonMatchMode)
         );
         if (addonFirstFlights.length) {
           eligibleFlights = addonFirstFlights;
@@ -2116,6 +2400,7 @@ export default function App() {
 
     replaceFlightBoard(selectedFlights.map((flight) => flight.flightId));
     setSelectedFlightId(selectedFlights[0]?.flightId || null);
+    setPlannerControlsCollapsed(true);
 
     const resolvedAirlineLabel =
       effectiveDutyFilters.buildMode === "location"
@@ -2296,11 +2581,12 @@ export default function App() {
   async function handleAddCustomAirframeDraft() {
     const normalizedEntry = normalizeSimBriefCustomAirframe({
       internalId: simBriefCustomAirframeIdDraft,
+      name: simBriefCustomAirframeNameDraft,
       matchType: simBriefCustomAirframeMatchTypeDraft
     });
 
     if (!normalizedEntry) {
-      setStatusMessage("Enter a SimBrief internal ID and matching aircraft before adding it.");
+      setStatusMessage("Enter an airframe name, SimBrief internal ID, and matching aircraft before adding it.");
       return;
     }
 
@@ -2338,6 +2624,7 @@ export default function App() {
       setSimBriefCustomAirframes(nextCustomAirframes);
       setSimBriefCustomAirframesDraft(nextCustomAirframes);
       setSimBriefCustomAirframeIdDraft("");
+      setSimBriefCustomAirframeNameDraft("");
       setSimBriefCustomAirframeMatchTypeDraft("");
       setStatusMessage("Custom SimBrief airframe saved.");
       await logAppEvent("simbrief-custom-airframe-added", {
@@ -2648,6 +2935,16 @@ export default function App() {
       setFilterUiVersion((current) => current + 1);
       setSort(DEFAULT_SORT);
       setTheme("light");
+      setIsDevToolsEnabled(false);
+      setDevWindowWidth(null);
+      setIsDevWindowMenuOpen(false);
+      setPlannerControlsCollapsed(getDefaultPlannerControlsCollapsed());
+      setBasicAdvancedFiltersOpen(
+        getDefaultBasicFilterSectionState(viewportSize).basicAdvancedFiltersOpen
+      );
+      setBasicAddonFiltersOpen(
+        getDefaultBasicFilterSectionState(viewportSize).basicAddonFiltersOpen
+      );
       setAddonScan(createEmptyAddonAirportScan());
       setSimBriefUsername("");
       setSimBriefUsernameDraft("");
@@ -2678,7 +2975,57 @@ export default function App() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
+  function handleToggleDevTools() {
+    const nextValue = !isDevToolsEnabled;
+    setIsDevToolsEnabled(nextValue);
+    if (!nextValue) {
+      setIsDevWindowMenuOpen(false);
+    }
+    logAppEvent(nextValue ? "dev-tools-enabled" : "dev-tools-disabled", {
+      selectedWidth: devWindowWidth
+    }).catch(() => {});
+  }
+
+  async function handleSelectDevWindowWidth(width) {
+    if (!isDesktopAddonScanAvailable) {
+      setStatusMessage("Window size presets are only available in the desktop app.");
+      setIsDevWindowMenuOpen(false);
+      return;
+    }
+
+    const selectedPreset = DEV_WINDOW_WIDTH_PRESETS.find((option) => option.width === width);
+    if (!selectedPreset) {
+      return;
+    }
+
+    try {
+      const [{ getCurrentWindow }, { LogicalSize }] = await Promise.all([
+        import("@tauri-apps/api/window"),
+        import("@tauri-apps/api/dpi")
+      ]);
+      const currentWindow = getCurrentWindow();
+
+      if (await currentWindow.isMaximized()) {
+        await currentWindow.unmaximize();
+      }
+
+      await currentWindow.setSize(new LogicalSize(selectedPreset.width, selectedPreset.height));
+
+      setDevWindowWidth(width);
+      setIsDevWindowMenuOpen(false);
+      setStatusMessage(`Responsive window size set to ${selectedPreset.label}.`);
+      await logAppEvent("dev-window-width-selected", {
+        width: selectedPreset.width,
+        height: selectedPreset.height
+      });
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to change the window width.");
+      await logAppError("dev-window-width-select-failed", error);
+    }
+  }
+
   function handleToggleSettings() {
+    setIsDevWindowMenuOpen(false);
     setIsSettingsOpen((current) => {
       const nextValue = !current;
       logAppEvent(nextValue ? "settings-opened" : "settings-closed", {
@@ -2689,6 +3036,7 @@ export default function App() {
   }
 
   function handleCloseSettings() {
+    setIsDevWindowMenuOpen(false);
     setIsSettingsOpen(false);
     logAppEvent("settings-closed", {
       section: "addon-airports"
@@ -2696,83 +3044,114 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="brand-lockup">
-          <p className="eyebrow">Flight Planner</p>
-          <div className="brand-lockup__title">
-            <img src={dalLogo} alt="Delta Virtual Airlines logo" className="brand-lockup__logo" />
-            <h1>Delta Virtual Airlines Flight Planner</h1>
+    <div className="flex h-screen min-h-screen flex-col gap-6 overflow-hidden p-6 bp-1024:gap-3 bp-1024:p-3.5">
+      <header className="flex min-w-0 flex-wrap items-end justify-between gap-4 bp-1024:items-start bp-1024:gap-3">
+        <div className="max-w-[720px] min-w-0">
+          <Eyebrow>Flight Planner</Eyebrow>
+          <div className="flex items-center gap-3 bp-1024:gap-2.5">
+            <img
+              src={dalLogo}
+              alt="Delta Virtual Airlines logo"
+              className="h-14 w-14 shrink-0 object-contain bp-1024:h-11 bp-1024:w-11"
+            />
+            <h1 className="m-0 whitespace-nowrap text-[clamp(1.22rem,3vw,3.6rem)] leading-[0.96] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
+              {topbarTitle}
+            </h1>
           </div>
         </div>
 
-        <div className="topbar__actions">
-          <button
-            className="primary-button"
-            type="button"
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-3 self-end bp-1024:gap-2">
+          <Button
             onClick={handleImport}
             disabled={isImporting || isSyncing || isAddonScanBusy || isHydrating}
+            className="bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
           >
-            {isImporting ? "Importing..." : schedule ? "Replace Schedule" : "Import Schedule XML"}
-          </button>
-          <button
-            className="ghost-button"
-            type="button"
+            {isImporting ? "Importing..." : importButtonLabel}
+          </Button>
+          <Button
             onClick={handleDeltaVirtualSync}
             disabled={isImporting || isSyncing || isAddonScanBusy || isHydrating}
+            className="bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
           >
-            {isSyncing ? "Syncing..." : "Sync from Delta Virtual"}
-          </button>
-          <button
-            className="theme-toggle"
-            type="button"
+            {isSyncing ? "Syncing..." : syncButtonLabel}
+          </Button>
+          {isDevToolsEnabled ? (
+            <div className="relative" ref={devWindowMenuRef}>
+              <Button
+                variant="ghost"
+                active={isDevWindowMenuOpen}
+                onClick={() => setIsDevWindowMenuOpen((current) => !current)}
+                aria-expanded={isDevWindowMenuOpen}
+                aria-haspopup="menu"
+                disabled={!isDesktopAddonScanAvailable}
+                className="min-h-11 flex-col items-start gap-0.5 px-4 py-2 text-left bp-1024:min-h-9 bp-1024:px-3 bp-1024:text-[0.74rem]"
+                title={
+                  isDesktopAddonScanAvailable
+                    ? "Choose a responsive test window width"
+                    : "Window size presets are only available in the desktop app"
+                }
+              >
+                <span>{devWindowButtonLabel}</span>
+                <strong className="font-semibold text-[var(--text-heading)]">
+                  {selectedDevWindowPreset?.label || "Choose"}
+                </strong>
+                <span className="text-[0.62rem] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  {currentWindowSizeLabel}
+                </span>
+              </Button>
+              {isDevWindowMenuOpen ? (
+                <div
+                  className="absolute right-0 top-[calc(100%+0.5rem)] z-30 flex min-w-[180px] flex-col gap-1 rounded-3xl border border-[color:var(--surface-border)] bg-[var(--surface-raised)] p-2 shadow-[var(--menu-shadow)]"
+                  role="menu"
+                  aria-label="Window size presets"
+                >
+                  {DEV_WINDOW_WIDTH_PRESETS.map((option) => (
+                    <Button
+                      key={option.width}
+                      variant="ghost"
+                      active={devWindowWidth === option.width}
+                      className="justify-start rounded-2xl px-3 py-2 text-[0.8rem]"
+                      role="menuitemradio"
+                      aria-checked={devWindowWidth === option.width}
+                      onClick={() => handleSelectDevWindowWidth(option.width)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <IconButton
             onClick={handleToggleTheme}
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            className="size-9 bp-1024:size-8"
           >
             <ThemeToggleIcon theme={theme} />
-          </button>
-          <button
-            className="theme-toggle"
-            type="button"
+          </IconButton>
+          <IconButton
             onClick={handleToggleSettings}
             title="Open settings"
             aria-label="Open settings"
             aria-expanded={isSettingsOpen}
+            className="size-9 bp-1024:size-8"
           >
             <SettingsIcon />
-          </button>
+          </IconButton>
         </div>
       </header>
 
-      <main className="workspace">
-        <div className="workspace__main">
-          <FilterBar
-            key={`filters-${filterUiVersion}`}
-            plannerMode={plannerMode}
-            filters={normalizeFilters(filters, filterBounds)}
-            dutyFilters={normalizeDutyFilters(dutyFilters, filterBounds)}
-            airlines={airlines}
-            airportOptions={airportOptions}
-            regionOptions={geoOptions.regions}
-            countryOptions={geoOptions.countries}
-            equipmentOptions={equipmentOptions}
-            dutyEquipmentOptions={dutyEquipmentOptions}
-            qualifyingDutyAirlines={qualifyingDutyAirlines}
-            filterBounds={filterBounds}
-            onPlannerModeChange={handlePlannerModeChange}
-            onFilterChange={handleFilterChange}
-            onDutyFilterChange={handleDutyFilterChange}
-            onBuildDutySchedule={handleBuildDutySchedule}
-            onReset={handleResetFilters}
-          />
-
-          <div className="table-board-layout">
+      <main className="min-h-0 flex-1 overflow-hidden">
+        <div className="grid h-full min-h-0 gap-4 [grid-template-rows:minmax(0,1fr)_auto] bp-1024:gap-3">
+          <div className="grid min-h-0 gap-4 [grid-template-columns:minmax(0,1.42fr)_minmax(224px,0.9fr)] bp-1024:gap-3 bp-1024:[grid-template-columns:minmax(0,1.48fr)_minmax(248px,0.9fr)] bp-1400:[grid-template-columns:minmax(0,1.55fr)_minmax(260px,0.92fr)]">
             {schedule ? (
               <FlightTable
                 flights={sortedFlights}
                 selectedFlightId={selectedFlightId}
                 sort={sort}
+                layoutBucket={layoutBucket}
+                useNarrowDesktopColumns={usesPlannerControlsModal}
                 timeDisplayMode={scheduleTableTimeDisplayMode}
                 addonAirports={addonAirports}
                 onSort={handleSort}
@@ -2785,52 +3164,95 @@ export default function App() {
                 onAddToFlightBoard={handleAddToFlightBoard}
               />
             ) : (
-              <section className="empty-state">
-                <p className="eyebrow">No Active Schedule</p>
-                <h2>Import a PFPX XML file to start planning.</h2>
-                <p>
+              <Panel className="grid content-start gap-3 rounded-[26px] bp-1024:rounded-[20px] bp-1024:p-4">
+                <Eyebrow>No Active Schedule</Eyebrow>
+                <h2 className="m-0 text-[1.14rem] font-semibold tracking-[-0.04em] bp-1024:text-[1.04rem]">
+                  Import a PFPX XML file to start planning.
+                </h2>
+                <p className="m-0 max-w-[56ch] text-[0.94rem] leading-6 text-[var(--text-muted)] bp-1024:text-[0.88rem]">
                   The app validates airport coverage, converts local schedule times to
                   UTC, calculates route distance, and filters routes by compatible
                   aircraft families and equipment based on weight, capacity, and range.
                 </p>
-              </section>
+              </Panel>
             )}
 
-            <DetailsPanel
-              shortlist={shortlist}
-              expandedBoardFlightId={expandedBoardFlightId}
-              simBriefDispatchState={simBriefDispatchState}
-              simBriefCredentialsConfigured={simBriefCredentialsConfigured}
-              isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
-              simBriefAircraftTypes={simBriefDispatchOptions}
-              isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
-              simBriefAircraftTypesError={simBriefAircraftTypesError}
-              onToggleBoardFlight={handleToggleBoardFlight}
-              onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
-              onRepairFlightBoardEntry={handleRepairFlightBoardEntry}
-              onSimBriefTypeChange={handleSimBriefTypeChange}
-              onSimBriefDispatch={handleSimBriefDispatch}
-              showFlightBoard
-            />
+            <div
+              className={cn(
+                "grid min-h-0 gap-3 bp-1024:gap-2.5",
+                isPlannerControlsInlineCollapsed
+                  ? "[grid-template-rows:auto_minmax(0,1fr)]"
+                  : "grid-rows-[minmax(0,1fr)]"
+              )}
+            >
+              <FilterBar
+                key={`filters-${filterUiVersion}`}
+                plannerMode={plannerMode}
+                popupMode={false}
+                filters={normalizeFilters(filters, filterBounds)}
+                dutyFilters={normalizeDutyFilters(dutyFilters, filterBounds)}
+                airlines={airlines}
+                airportOptions={airportOptions}
+                regionOptions={geoOptions.regions}
+                countryOptions={geoOptions.countries}
+                equipmentOptions={equipmentOptions}
+                dutyEquipmentOptions={dutyEquipmentOptions}
+                qualifyingDutyAirlines={qualifyingDutyAirlines}
+                filterBounds={filterBounds}
+                onPlannerModeChange={handlePlannerModeChange}
+                onFilterChange={handleFilterChange}
+                onDutyFilterChange={handleDutyFilterChange}
+                plannerControlsCollapsed={isPlannerControlsInlineCollapsed}
+                onTogglePlannerControls={() => setPlannerControlsCollapsed((current) => !current)}
+                onBuildDutySchedule={handleBuildDutySchedule}
+                onReset={handleResetFilters}
+              />
+
+              {isPlannerControlsInlineCollapsed ? (
+                <DetailsPanel
+                  shortlist={shortlist}
+                  expandedBoardFlightId={expandedBoardFlightId}
+                  simBriefDispatchState={simBriefDispatchState}
+                  simBriefCredentialsConfigured={simBriefCredentialsConfigured}
+                  isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
+                  simBriefAircraftTypes={simBriefDispatchOptions}
+                  isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
+                  simBriefAircraftTypesError={simBriefAircraftTypesError}
+                  onToggleBoardFlight={handleToggleBoardFlight}
+                  onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
+                  onRepairFlightBoardEntry={handleRepairFlightBoardEntry}
+                  onReorderFlightBoard={handleReorderFlightBoard}
+                  onSimBriefTypeChange={handleSimBriefTypeChange}
+                  onSimBriefDispatch={handleSimBriefDispatch}
+                  showFlightBoard
+                />
+              ) : null}
+            </div>
           </div>
 
           {schedule?.importSummary ? (
-            <footer className="import-health-footer">
-              <div className="import-health-footer__item">
-                <span>Source File</span>
-                <strong>{schedule.importSummary.sourceFileName || "None"}</strong>
-              </div>
-              <div className="import-health-footer__item">
-                <span>Schedule Date</span>
-                <strong>{scheduleDateLabel}</strong>
-              </div>
-              <div className="import-health-footer__item">
-                <span>Imported Rows</span>
-                <strong>{formatNumber(schedule.importSummary.importedRows ?? 0)}</strong>
-              </div>
-              <div className="import-health-footer__item">
-                <span>Omitted Rows</span>
-                <strong>{formatNumber(schedule.importSummary.omittedRows ?? 0)}</strong>
+            <footer className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[color:var(--line)] pt-1.5 bp-1024:gap-x-3">
+              <FooterStat label="Source" value={getScheduleSourceLabel(schedule.importSummary)} />
+              <FooterStat label="Schedule Date" value={scheduleDateLabel} />
+              <FooterStat
+                label="Imported Flights"
+                value={formatNumber(schedule.importSummary.importedRows ?? 0)}
+              />
+              <div
+                className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] font-medium text-[var(--text-muted)] bp-1024:text-[0.72rem]"
+                aria-label="Copyright © 2026 Talon42"
+              >
+                <span>Copyright &copy; 2026</span>
+                <a
+                  className="text-[var(--delta-blue)] no-underline hover:underline"
+                  href="https://github.com/Talon42/DVA-Flight-Planner"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Talon42
+                </a>
+                <span>Version:</span>
+                <strong className="text-[var(--text-heading)]">{APP_BUILD_GIT_TAG}</strong>
               </div>
             </footer>
           ) : null}
@@ -2838,40 +3260,24 @@ export default function App() {
       </main>
 
       {isSettingsOpen ? (
-        <div
-          className="modal-overlay"
-          role="presentation"
-          onClick={handleCloseSettings}
-        >
-          <section
-            className="settings-modal"
+        <ModalBackdrop onClick={handleCloseSettings}>
+          <Panel
+            as="section"
+            padding="lg"
+            className={cn(
+              "app-scrollbar max-h-[calc(100vh-24px)] overflow-x-hidden overflow-y-auto overscroll-contain",
+              modalPanelClassName
+            )}
             role="dialog"
             aria-modal="true"
             aria-label="Settings"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="settings-modal__header">
-              <div>
-                <p className="eyebrow">Settings</p>
-                <h2>Application Settings</h2>
-              </div>
-              <div className="settings-modal__actions">
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={handleOpenLogFile}
-                >
-                  Open Log File
-                </button>
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={handleCloseSettings}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+            <SectionHeader
+              eyebrow="Settings"
+              title="Application Settings"
+              actions={<Button variant="ghost" onClick={handleCloseSettings}>Close</Button>}
+            />
 
             <AddonAirportPanel
               addonScan={addonScan}
@@ -2889,6 +3295,7 @@ export default function App() {
               dispatchUnits={simBriefDispatchUnits}
               customAirframes={simBriefCustomAirframesDraft}
               customAirframeDraftId={simBriefCustomAirframeIdDraft}
+              customAirframeDraftName={simBriefCustomAirframeNameDraft}
               customAirframeDraftMatchType={simBriefCustomAirframeMatchTypeDraft}
               simBriefAircraftTypes={simBriefAircraftTypes}
               isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
@@ -2898,62 +3305,55 @@ export default function App() {
               onPilotIdChange={setSimBriefPilotIdDraft}
               onDispatchUnitsChange={handleSimBriefDispatchUnitsChange}
               onCustomAirframeDraftIdChange={setSimBriefCustomAirframeIdDraft}
+              onCustomAirframeDraftNameChange={setSimBriefCustomAirframeNameDraft}
               onCustomAirframeDraftMatchTypeChange={setSimBriefCustomAirframeMatchTypeDraft}
               onAddCustomAirframe={handleAddCustomAirframeDraft}
               onRemoveCustomAirframe={handleRemoveCustomAirframeDraft}
               onSaveCredentials={handleSaveSimBriefCredentials}
             />
 
-            <section className="addon-panel">
-              <div className="filter-heading filter-heading--addon">
-                <div>
-                  <p className="eyebrow">Privacy</p>
-                  <h2>Delete stored user info</h2>
-                </div>
-              </div>
+            <Panel className={insetPanelClassName}>
+              <SectionHeader eyebrow="Privacy" title="Delete User Data" />
 
-              <div className="addon-panel__summary">
-                <p>
+              <div className={mutedTextStackClassName}>
+                <p className="m-0">
                   Removes saved schedules, UI state, SimBrief settings, addon folder roots,
                   logs, and stored Delta Virtual webview login data from this device.
                 </p>
               </div>
 
-              <div className="addon-panel__actions">
-                <button
-                  className="primary-button primary-button--danger"
-                  type="button"
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="danger"
                   onClick={handleDeleteUserData}
                   disabled={isDeletingUserData || isImporting || isSyncing || isSimBriefSaving}
                 >
-                  {isDeletingUserData ? "Deleting..." : "Delete User Info"}
-                </button>
+                  {isDeletingUserData ? "Deleting..." : "Delete"}
+                </Button>
               </div>
-            </section>
+            </Panel>
 
-            <section className="addon-panel about-panel">
-              <div className="filter-heading filter-heading--addon">
-                <div>
-                  <p className="eyebrow">About</p>
-                  <h2>Developer Information</h2>
-                </div>
-              </div>
+            <Panel className={insetPanelClassName}>
+              <SectionHeader eyebrow="About" title="Developer Information" />
 
-              <div className="addon-panel__summary about-panel__content">
-                <p>
+              <div className="grid gap-3 text-sm leading-6 text-[var(--text-muted)]">
+                <p className="m-0">
                   Created by <strong>Jacob Benjamin (DVA11384)</strong> on GitHub as <strong>Talon42</strong>.
                 </p>
-                <p>Copyright &copy; 2026 Jacob. All rights reserved.</p>
-                <p className="about-panel__disclaimer">
+                <p className="m-0">
+                  App Version: <strong>{APP_BUILD_GIT_TAG}</strong>
+                </p>
+                <p className="m-0">Copyright &copy; 2026 Talon42</p>
+                <p className="m-0">
                   For flight simulation purposes only. Not a commercial application. In no
                   way is this application affiliated with Delta Air Lines, its affiliates,
                   or any other airline. All logos, images, and trademarks remain the
                   property of their respective owners.
                 </p>
-                <p>
+                <p className="m-0">
                   Repository:{" "}
                   <a
-                    className="about-panel__link"
+                    className="text-[var(--delta-blue)] no-underline hover:underline"
                     href="https://github.com/Talon42/DVA-Flight-Planner.git"
                     target="_blank"
                     rel="noreferrer"
@@ -2961,106 +3361,84 @@ export default function App() {
                     github.com/Talon42/DVA-Flight-Planner
                   </a>
                 </p>
-                <p>
+                <p className="m-0">
                   Email:{" "}
-                  <a className="about-panel__link" href="mailto:jaben428@gmail.com">
+                  <a className="text-[var(--delta-blue)] no-underline hover:underline" href="mailto:jaben428@gmail.com">
                     jaben428@gmail.com
                   </a>
                 </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={handleOpenLogFile}>
+                    Open Log File
+                  </Button>
+                  <Button onClick={handleToggleDevTools}>
+                    {isDevToolsEnabled ? "Dev Tools On" : "Dev Tools Off"}
+                  </Button>
+                </div>
               </div>
-            </section>
-          </section>
-        </div>
+            </Panel>
+          </Panel>
+        </ModalBackdrop>
       ) : null}
 
       {isReplaceScheduleConfirmOpen ? (
-        <div
-          className="modal-overlay"
-          role="presentation"
-          onClick={() => resolveReplaceScheduleConfirmation(false)}
-        >
-          <section
-            className="confirm-modal"
+        <ModalBackdrop onClick={() => resolveReplaceScheduleConfirmation(false)}>
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(520px,100%)] gap-5 rounded-[28px] bg-[var(--surface-raised)] shadow-[var(--menu-shadow)] bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
             aria-label="Replace Saved Schedule"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="confirm-modal__header">
-              <div>
-                <p className="eyebrow">Replace Saved Schedule</p>
-                <h2>Import a new schedule?</h2>
-              </div>
-            </div>
+            <SectionHeader eyebrow="Replace Saved Schedule" title="Import a new schedule?" />
 
-            <p className="confirm-modal__copy">
+            <p className={mutedTextClassName}>
               Importing a new schedule will replace the current saved schedule and flight board.
               Continue?
             </p>
 
-            <div className="confirm-modal__actions">
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => resolveReplaceScheduleConfirmation(false)}
-              >
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => resolveReplaceScheduleConfirmation(false)}>
                 Cancel
-              </button>
-              <button
-                className="primary-button primary-button--danger"
-                type="button"
-                onClick={() => resolveReplaceScheduleConfirmation(true)}
-              >
+              </Button>
+              <Button variant="danger" onClick={() => resolveReplaceScheduleConfirmation(true)}>
                 Replace
-              </button>
+              </Button>
             </div>
-          </section>
-        </div>
+          </Panel>
+        </ModalBackdrop>
       ) : null}
 
       {isDeleteUserDataConfirmOpen ? (
-        <div
-          className="modal-overlay"
-          role="presentation"
-          onClick={() => resolveDeleteUserDataConfirmation(false)}
-        >
-          <section
-            className="confirm-modal"
+        <ModalBackdrop onClick={() => resolveDeleteUserDataConfirmation(false)}>
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(520px,100%)] gap-5 rounded-[28px] bg-[var(--surface-raised)] shadow-[var(--menu-shadow)] bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
             aria-label="Delete User Info"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="confirm-modal__header">
-              <div>
-                <p className="eyebrow">Delete User Info</p>
-                <h2>Delete all stored user data?</h2>
-              </div>
-            </div>
+            <SectionHeader eyebrow="Delete User Info" title="Delete all stored user data?" />
 
-            <p className="confirm-modal__copy">
+            <p className={mutedTextClassName}>
               This removes saved schedules, UI state, SimBrief settings, addon folder roots, logs,
               and stored Delta Virtual webview login data from this device.
             </p>
 
-            <div className="confirm-modal__actions">
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => resolveDeleteUserDataConfirmation(false)}
-              >
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => resolveDeleteUserDataConfirmation(false)}>
                 Cancel
-              </button>
-              <button
-                className="primary-button primary-button--danger"
-                type="button"
-                onClick={() => resolveDeleteUserDataConfirmation(true)}
-              >
+              </Button>
+              <Button variant="danger" onClick={() => resolveDeleteUserDataConfirmation(true)}>
                 Delete
-              </button>
+              </Button>
             </div>
-          </section>
-        </div>
+          </Panel>
+        </ModalBackdrop>
       ) : null}
     </div>
   );

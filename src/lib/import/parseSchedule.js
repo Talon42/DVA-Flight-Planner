@@ -100,36 +100,36 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
 
       const fromAirport = airportMap.get(rawFlight.from);
       const toAirport = airportMap.get(rawFlight.to);
+      const missingIcaos = [rawFlight.from, rawFlight.to].filter((icao) => !airportMap.has(icao));
 
-      if (!fromAirport || !toAirport) {
-        const missingIcaos = [rawFlight.from, rawFlight.to].filter(
-          (icao) => !airportMap.has(icao)
-        );
+      const stdLocal = DateTime.fromFormat(rawFlight.std, DATE_FORMAT, {
+        zone: fromAirport?.timezone || "UTC"
+      });
+      const rawStaLocal = DateTime.fromFormat(rawFlight.sta, DATE_FORMAT, {
+        zone: toAirport?.timezone || "UTC"
+      });
+      const distanceNm =
+        fromAirport && toAirport
+          ? calculateGreatCircleNm(
+              fromAirport.latitude,
+              fromAirport.longitude,
+              toAirport.latitude,
+              toAirport.longitude
+            )
+          : 0;
+
+      if (missingIcaos.length) {
         importIssues.push({
-          severity: "error",
+          severity: "warning",
           kind: "missing-airport",
           flightId: buildFlightId(rawFlight, index),
           sourceFileName: fileName,
-          details: `${issuePrefix} omitted because airport data was missing for ${missingIcaos.join(
+          details: `${issuePrefix} imported with missing airport data for ${missingIcaos.join(
             ", "
-          )}.`,
+          )}. Airport does not exist in database.`,
           loggedAt: importedAt
         });
-        continue;
       }
-
-      const stdLocal = DateTime.fromFormat(rawFlight.std, DATE_FORMAT, {
-        zone: fromAirport.timezone
-      });
-      const rawStaLocal = DateTime.fromFormat(rawFlight.sta, DATE_FORMAT, {
-        zone: toAirport.timezone
-      });
-      const distanceNm = calculateGreatCircleNm(
-        fromAirport.latitude,
-        fromAirport.longitude,
-        toAirport.latitude,
-        toAirport.longitude
-      );
 
       if (!stdLocal.isValid || !rawStaLocal.isValid) {
         importIssues.push({
@@ -166,10 +166,12 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         from: rawFlight.from,
         to: rawFlight.to,
         route: `${rawFlight.from}-${rawFlight.to}`,
-        fromAirport: fromAirport.name,
-        toAirport: toAirport.name,
-        fromTimezone: fromAirport.timezone,
-        toTimezone: toAirport.timezone,
+        fromAirport: fromAirport?.name || `${rawFlight.from} (not in database)`,
+        toAirport: toAirport?.name || `${rawFlight.to} (not in database)`,
+        fromTimezone: fromAirport?.timezone || "UTC",
+        toTimezone: toAirport?.timezone || "UTC",
+        missingAirportIcaos: missingIcaos,
+        hasMissingAirportData: missingIcaos.length > 0,
         stdLocal: stdLocal.toISO(),
         staLocal: staLocal.toISO(),
         stdUtc: stdLocal.toUTC().toISO(),
@@ -219,7 +221,7 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
       sourceFileName: fileName,
       totalRows: flightBlocks.length,
       importedRows: flights.length,
-      omittedRows: importIssues.length,
+      omittedRows: 0,
       incompatibleRoutes,
       errorLogPath: importIssues.length ? "pending-write" : null
     }
