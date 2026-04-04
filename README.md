@@ -323,6 +323,10 @@ To add one:
    - the matching aircraft type
 3. Save the custom airframe.
 
+The custom airframe internal ID is the SimBrief airframe's internal identifier. You can find it in SimBrief when you edit an airframe, where it appears as the `Internal ID` value.
+
+<img width="1000" alt="SimBrief airframe internal ID shown in the SimBrief edit airframe screen" src="./readme-images/simbrief-airframe-internal-id.png" />
+
 Saved custom airframes are then available as dispatch choices on Flight Board entries.
 
 <!-- docshot: simbrief-custom-airframes -->
