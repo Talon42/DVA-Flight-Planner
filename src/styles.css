@@ -238,3 +238,22 @@ body.flight-board-reordering,
 body.flight-board-reordering * {
   cursor: grabbing !important;
 }
+
+:root[data-docshot-capture="true"],
+:root[data-docshot-capture="true"] * {
+  animation: none !important;
+  transition: none !important;
+  caret-color: transparent !important;
+  scroll-behavior: auto !important;
+  user-select: none !important;
+  cursor: default !important;
+}
+
+:root[data-docshot-capture="true"] body,
+:root[data-docshot-capture="true"] button,
+:root[data-docshot-capture="true"] a,
+:root[data-docshot-capture="true"] input,
+:root[data-docshot-capture="true"] select,
+:root[data-docshot-capture="true"] textarea {
+  pointer-events: none !important;
+}

@@ -1179,7 +1179,7 @@ export function AddonAirportPanel({
   onScanAddonAirports
 }) {
   return (
-    <Panel className={insetPanelClassName}>
+    <Panel className={insetPanelClassName} data-docshot="addon-airports-panel">
       <SectionHeader
         eyebrow="Addon Airports"
         title="Manage installed scenery coverage"
@@ -1471,6 +1471,7 @@ export default function FilterBar({
 
   return (
     <Panel
+      data-docshot="planner-controls"
       className={cn(
         "filter-bar app-scrollbar grid content-start gap-3 overflow-x-hidden rounded-[26px] p-5 bp-1024:rounded-[20px] bp-1024:p-4",
         popupMode

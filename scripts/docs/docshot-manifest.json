@@ -1,0 +1,70 @@
+[
+  {
+    "id": "hero-overview",
+    "scenarioId": "hero-overview",
+    "selector": "[data-docshot='app-shell']",
+    "outputFile": "hero-overview.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "quick-start-overview",
+    "scenarioId": "quick-start-overview",
+    "selector": "[data-docshot='planner-workspace']",
+    "outputFile": "quick-start-overview.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "sync-entry",
+    "scenarioId": "hero-overview",
+    "selector": "[data-docshot='app-header']",
+    "outputFile": "sync-entry.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "sync-login-window",
+    "manual": true,
+    "notes": "External Delta Virtual content is intentionally left out of automated capture."
+  },
+  {
+    "id": "sync-import-status",
+    "scenarioId": "sync-import-status",
+    "selector": "[data-docshot='app-shell']",
+    "outputFile": "sync-import-status.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "settings-trigger",
+    "scenarioId": "hero-overview",
+    "selector": "[data-docshot='app-header']",
+    "outputFile": "settings-trigger.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "duty-schedule-builder",
+    "scenarioId": "duty-schedule-builder",
+    "selector": "[data-docshot='planner-controls']",
+    "outputFile": "duty-schedule-builder.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "addon-airports-panel",
+    "scenarioId": "addon-airports-panel",
+    "selector": "[data-docshot='addon-airports-panel']",
+    "outputFile": "addon-airports-panel.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  }
+]

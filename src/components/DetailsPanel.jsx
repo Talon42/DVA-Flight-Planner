@@ -498,7 +498,10 @@ export default function DetailsPanel({
 
   return (
     <aside className="details-panel min-h-0">
-      <Panel className="details-card flex h-full min-h-0 flex-col rounded-[26px] p-4 bp-1024:rounded-[20px] bp-1024:p-4">
+      <Panel
+        className="details-card flex h-full min-h-0 flex-col rounded-[26px] p-4 bp-1024:rounded-[20px] bp-1024:p-4"
+        data-docshot="flight-board"
+      >
         <div className="details-card__header mb-3">
           <Eyebrow>Flight Board</Eyebrow>
         </div>

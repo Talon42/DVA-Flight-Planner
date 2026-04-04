@@ -2,13 +2,10 @@
 
 Desktop flight planning tool for Delta Virtual Airlines schedules.
 
-<img width="2558" height="1390" alt="image" src="https://github.com/user-attachments/assets/42473695-a378-4874-8eff-35096b7fb6db" />
+<!-- docshot: hero-overview -->
+<img width="1000" alt="image" src="https://github.com/user-attachments/assets/42473695-a378-4874-8eff-35096b7fb6db" />
 
 Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, and I built this app to make schedule filtering, flight selection, and board management faster, more practical, and fun for day-to-day planning.
-
-## Disclaimer
-
-For flight simulation purposes only. Not a commercial application. In no way is this application affiliated with Delta Air Lines, its affiliates, or any other airline. All logos, images, and trademarks remain the property of their respective owners.
 
 ## Disclaimer
 
@@ -21,8 +18,10 @@ For flight simulation purposes only. Not a commercial application. In no way is 
 - Scans your MSFS addon folders and uses that airport coverage in filtering
 - Builds a connected duty schedule
 - Lets you maintain a persistent Flight Board between sessions
+- Lets you drag Flight Board cards to reorder your working sequence
 - Supports direct schedule sync from the Delta Virtual website
 - Supports SimBrief dispatch from Flight Board entries
+- Supports saved custom SimBrief airframes mapped to specific aircraft types
 
 ## Windows SmartScreen Warning
 
@@ -43,7 +42,11 @@ If you downloaded the release from this repository, click `More info`, then clic
 3. Review the schedule table.
 4. Use `Basic Filters` or `Duty Schedule`.
 5. Double-click a flight to add it to the Flight Board.
-6. Expand a Flight Board entry to dispatch, repair, or remove it.
+6. Drag Flight Board cards to reorder them if needed.
+7. Expand a Flight Board entry to dispatch, repair, or remove it.
+
+<!-- docshot: quick-start-overview -->
+<img width="1000" alt="image" src="./readme-images/quick-start-overview.png" />
 
 ## Importing a PFPX XML Manually
 
@@ -65,16 +68,19 @@ If you already have a schedule loaded, importing a new one replaces the current 
 
 1. Click `Sync from Delta Virtual`.
    
-   <img width="205" height="72" alt="image" src="https://github.com/user-attachments/assets/a6b11711-8bdc-4054-a8e4-8d31097ae8c6" />
+   <!-- docshot: sync-entry -->
+   <img width="1000" alt="image" src="https://github.com/user-attachments/assets/a6b11711-8bdc-4054-a8e4-8d31097ae8c6" />
    
 3. A Delta Virtual login window opens.
    
-   <img width="652" height="422" alt="image" src="https://github.com/user-attachments/assets/7aea0dd6-34a1-46be-b341-b7e854b82846" />
+   <!-- docshot: sync-login-window -->
+   <img width="1000" alt="image" src="https://github.com/user-attachments/assets/7aea0dd6-34a1-46be-b341-b7e854b82846" />
    
 5. Sign in with your own DVA credentials on the official DVA site.
 6. The app waits for the official schedule XML download and imports it automatically.
    
-   <img width="346" height="323" alt="image" src="https://github.com/user-attachments/assets/23c64e09-5488-4d72-a481-31e51d70e40b" />
+   <!-- docshot: sync-import-status -->
+   <img width="1000" alt="image" src="https://github.com/user-attachments/assets/23c64e09-5488-4d72-a481-31e51d70e40b" />
 
 
 ### Security and privacy
@@ -117,11 +123,13 @@ Addon folder support is for matching your installed scenery coverage against the
 
 1. Open `Settings`.
 
-<img width="70" height="63" alt="image" src="https://github.com/user-attachments/assets/a4477c69-a309-401a-8282-591daa5aacb2" />
+<!-- docshot: settings-trigger -->
+<img width="1000" alt="image" src="https://github.com/user-attachments/assets/a4477c69-a309-401a-8282-591daa5aacb2" />
 
 3. In `Addon Airports`, click `Add Folder`.
 
-<img width="442" height="165" alt="image" src="https://github.com/user-attachments/assets/603a2617-05a4-4bf3-9f6f-b7953ae55da7" />
+<!-- docshot: addon-airports-panel -->
+<img width="1000" alt="image" src="https://github.com/user-attachments/assets/603a2617-05a4-4bf3-9f6f-b7953ae55da7" />
 
 4. Select one or more top-level addon roots such as your MSFS `Community` folder or another addon root.
 5. Click `Scan Now`.
@@ -177,6 +185,9 @@ Use the `Basic Filters` tab for normal schedule filtering.
 
 Use the `Duty Schedule` tab when you want the app to build a connected sequence of flights for you.
 
+<!-- docshot: duty-schedule-builder -->
+<img width="1000" alt="image" src="./readme-images/duty-schedule-builder.png" />
+
 ### Airline mode
 
 1. Choose `By Airline`.
@@ -219,6 +230,12 @@ The Flight Board is your working shortlist.
 3. It is added to the Flight Board.
 
 The app prevents duplicate board entries for the same linked schedule flight.
+
+### Reordering flights
+
+Use the drag handle at the top of a Flight Board card to move it up or down.
+
+This lets you manually arrange your planned sequence after adding flights from the schedule table or after building a duty schedule automatically.
 
 ### Removing flights
 
@@ -264,11 +281,40 @@ SimBrief dispatch is available from Flight Board entries in the desktop app.
 
 1. Open `Settings`.
 2. Save your SimBrief `Navigraph Alias` or `Pilot ID`.
-3. Add a flight to the Flight Board.
-4. Expand the entry and choose a SimBrief aircraft type.
-5. Click `SimBrief Dispatch`.
-6. Sign in to SimBrief/Navigraph in the popup window if prompted.
-7. When the OFP finishes generating, the app fetches the latest plan summary and stores the OFP/PDF links on that board entry.
+3. Optional: save one or more custom airframes.
+4. Add a flight to the Flight Board.
+5. Expand the entry and choose a SimBrief aircraft type.
+6. Click `SimBrief Dispatch`.
+7. Sign in to SimBrief/Navigraph in the popup window if prompted.
+8. The app sends the dispatch request for that board entry using the selected aircraft type, route, and planned departure time.
+
+### SimBrief settings
+
+The `Settings` screen supports:
+
+- `Navigraph Alias`
+- `Pilot ID`
+- dispatch units (`LBS` or `KGS`)
+- saved custom airframes
+
+The app can load available SimBrief aircraft types and present them in the Flight Board aircraft selector.
+
+### Custom airframes
+
+Custom airframes let you save a SimBrief internal airframe ID and map it to a matching aircraft type in the app.
+
+This is useful when you want a Flight Board entry to dispatch against a specific saved SimBrief airframe instead of the standard aircraft type code.
+
+To add one:
+
+1. Open `Settings`.
+2. In the SimBrief section, enter:
+   - the SimBrief internal airframe ID
+   - a display name
+   - the matching aircraft type
+3. Save the custom airframe.
+
+Saved custom airframes are then available as dispatch choices on Flight Board entries.
 
 ### Notes
 
@@ -276,6 +322,13 @@ SimBrief dispatch is available from Flight Board entries in the desktop app.
 - Pilots still sign in with their own SimBrief/Navigraph account. The app does not bypass SimBrief authentication.
 - `Navigraph Alias` is preferred for OFP fetches. `Pilot ID` is supported as a fallback.
 - At least one of those identifiers must be saved in `Settings` before dispatching.
+- `Push to ACARS` is present in the UI but currently disabled.
+
+### Current limitation
+
+The app sends the SimBrief dispatch request correctly, but returned dispatch details may not always be surfaced back into the Flight Board the way you expect.
+
+The code is set up to store returned SimBrief plan data and OFP/PDF links on the board entry when that data is available, but if no plan details come back from the dispatch flow then the dispatch is still sent without a populated plan summary in the app.
 
 ## Logs
 

@@ -812,6 +812,7 @@ export default function FlightTable({
       as="section"
       ref={tableShellRef}
       padding="none"
+      data-docshot="schedule-table"
       className={cn(
         "table-shell flex min-h-0 flex-col overflow-hidden rounded-[26px] bp-1024:rounded-[20px]",
         useNarrowDesktopColumns && "table-shell--narrow-columns"
