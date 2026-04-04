@@ -1289,7 +1289,7 @@ export function SimBriefSettingsPanel({
   };
 
   return (
-    <Panel className={insetPanelClassName}>
+    <Panel className={insetPanelClassName} data-docshot="simbrief-settings-panel">
       <SectionHeader eyebrow="SimBrief" title="Configure SimBrief integration" />
 
       <div className={gridClassNames.twoColumn}>
@@ -1329,7 +1329,10 @@ export function SimBriefSettingsPanel({
         </div>
       </Field>
 
-      <div className="grid gap-4 rounded-[18px] border border-[color:var(--line)] bg-[var(--surface)] p-4">
+      <div
+        className="grid gap-4 rounded-[18px] border border-[color:var(--line)] bg-[var(--surface)] p-4"
+        data-docshot="simbrief-custom-airframes"
+      >
         <SectionHeader
           title="Saved custom airframes"
           titleClassName="text-[1rem]"

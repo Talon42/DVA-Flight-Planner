@@ -153,7 +153,10 @@ function SimBriefInlinePanel({
     !simBriefCredentialsConfigured;
 
   return (
-    <div className="grid gap-3 rounded-[18px] border border-[color:var(--line)] bg-[var(--surface-panel)] p-3">
+    <div
+      className="grid gap-3 rounded-[18px] border border-[color:var(--line)] bg-[var(--surface-panel)] p-3"
+      data-docshot="simbrief-dispatch-panel"
+    >
       <SearchableMultiSelect
         label="SIMBRIEF AIRCRAFT"
         labelPlacement="inline"

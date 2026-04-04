@@ -291,6 +291,9 @@ SimBrief dispatch is available from Flight Board entries in the desktop app.
 7. Sign in to SimBrief/Navigraph in the popup window if prompted.
 8. The app sends the dispatch request for that board entry using the selected aircraft type, route, and planned departure time.
 
+<!-- docshot: simbrief-how-it-works -->
+<img width="1000" alt="image" src="./readme-images/simbrief-how-it-works.png" />
+
 ### SimBrief settings
 
 The `Settings` screen supports:
@@ -301,6 +304,9 @@ The `Settings` screen supports:
 - saved custom airframes
 
 The app can load available SimBrief aircraft types and present them in the Flight Board aircraft selector.
+
+<!-- docshot: simbrief-settings-overview -->
+<img width="1000" alt="image" src="./readme-images/simbrief-settings-overview.png" />
 
 ### Custom airframes
 
@@ -318,6 +324,9 @@ To add one:
 3. Save the custom airframe.
 
 Saved custom airframes are then available as dispatch choices on Flight Board entries.
+
+<!-- docshot: simbrief-custom-airframes -->
+<img width="1000" alt="image" src="./readme-images/simbrief-custom-airframes.png" />
 
 ### Notes
 

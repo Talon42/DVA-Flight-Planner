@@ -23,6 +23,19 @@ const BASE_SIMBRIEF_TYPES = [
   { code: "CRJ9", name: "Bombardier CRJ-900" }
 ];
 
+const BASE_SIMBRIEF_CUSTOM_AIRFRAMES = [
+  {
+    internalId: "a20n_1708123456789",
+    name: "A320 Neo Charter",
+    matchType: "A20N"
+  },
+  {
+    internalId: "b38m_1708123456790",
+    name: "737 MAX Fleet",
+    matchType: "B38M"
+  }
+];
+
 const DOCSHOT_FLIGHT_PREFERENCES = [
   { route: "KATL-KJFK", equipmentIncludes: "A20N" },
   { route: "KSEA-KSLC" },
@@ -239,6 +252,44 @@ const SCENARIO_BUILDERS = {
       expandedBoardFlightId: null
     };
   },
+  "simbrief-how-it-works": async () => {
+    const snapshot = await buildBaseSnapshot({
+      statusMessage: "SimBrief dispatch ready.",
+      simBriefSettings: {
+        username: "Talon42",
+        pilotId: "11384",
+        dispatchUnits: "LBS",
+        customAirframes: BASE_SIMBRIEF_CUSTOM_AIRFRAMES
+      }
+    });
+
+    return {
+      ...snapshot,
+      expandedBoardFlightId: snapshot.flightBoard[0]?.boardEntryId || null
+    };
+  },
+  "simbrief-settings-overview": async () =>
+    buildBaseSnapshot({
+      isSettingsOpen: true,
+      statusMessage: "SimBrief settings ready.",
+      simBriefSettings: {
+        username: "Talon42",
+        pilotId: "11384",
+        dispatchUnits: "LBS",
+        customAirframes: BASE_SIMBRIEF_CUSTOM_AIRFRAMES
+      }
+    }),
+  "simbrief-custom-airframes": async () =>
+    buildBaseSnapshot({
+      isSettingsOpen: true,
+      statusMessage: "Custom SimBrief airframes ready.",
+      simBriefSettings: {
+        username: "Talon42",
+        pilotId: "11384",
+        dispatchUnits: "LBS",
+        customAirframes: BASE_SIMBRIEF_CUSTOM_AIRFRAMES
+      }
+    }),
   "sync-import-status": async () => {
     const snapshot = await buildBaseSnapshot();
 

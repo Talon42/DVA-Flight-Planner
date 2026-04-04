@@ -68,6 +68,33 @@
     "updateReadme": true
   },
   {
+    "id": "simbrief-how-it-works",
+    "scenarioId": "simbrief-how-it-works",
+    "selector": "[data-docshot='simbrief-dispatch-panel']",
+    "outputFile": "simbrief-how-it-works.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "simbrief-settings-overview",
+    "scenarioId": "simbrief-settings-overview",
+    "selector": "[data-docshot='simbrief-settings-panel']",
+    "outputFile": "simbrief-settings-overview.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "simbrief-custom-airframes",
+    "scenarioId": "simbrief-custom-airframes",
+    "selector": "[data-docshot='simbrief-custom-airframes']",
+    "outputFile": "simbrief-custom-airframes.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
     "id": "addon-airports-panel",
     "scenarioId": "addon-airports-panel",
     "selector": "[data-docshot='addon-airports-panel']",
