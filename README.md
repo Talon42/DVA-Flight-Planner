@@ -3,7 +3,7 @@
 Desktop flight planning tool for Delta Virtual Airlines schedules.
 
 <!-- docshot: hero-overview -->
-<img width="1000" alt="image" src="https://github.com/user-attachments/assets/42473695-a378-4874-8eff-35096b7fb6db" />
+<img width="1000" alt="image" src="./readme-images/hero-overview.png" />
 
 Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, and I built this app to make schedule filtering, flight selection, and board management faster, more practical, and fun for day-to-day planning.
 
@@ -69,7 +69,7 @@ If you already have a schedule loaded, importing a new one replaces the current 
 1. Click `Sync from Delta Virtual`.
    
    <!-- docshot: sync-entry -->
-   <img width="250" alt="image" src="https://github.com/user-attachments/assets/a6b11711-8bdc-4054-a8e4-8d31097ae8c6" />
+   <img width="1000" alt="image" src="./readme-images/sync-entry.png" />
    
 3. A Delta Virtual login window opens.
    
@@ -80,7 +80,7 @@ If you already have a schedule loaded, importing a new one replaces the current 
 6. The app waits for the official schedule XML download and imports it automatically.
    
    <!-- docshot: sync-import-status -->
-   <img width="1000" alt="image" src="https://github.com/user-attachments/assets/23c64e09-5488-4d72-a481-31e51d70e40b" />
+   <img width="1000" alt="image" src="./readme-images/sync-import-status.png" />
 
 
 ### Security and privacy
@@ -124,12 +124,12 @@ Addon folder support is for matching your installed scenery coverage against the
 1. Open `Settings`.
 
 <!-- docshot: settings-trigger -->
-<img width="250" alt="image" src="https://github.com/user-attachments/assets/a4477c69-a309-401a-8282-591daa5aacb2" />
+<img width="1000" alt="image" src="./readme-images/settings-trigger.png" />
 
 3. In `Addon Airports`, click `Add Folder`.
 
 <!-- docshot: addon-airports-panel -->
-<img width="1000" alt="image" src="https://github.com/user-attachments/assets/603a2617-05a4-4bf3-9f6f-b7953ae55da7" />
+<img width="1000" alt="image" src="./readme-images/addon-airports-panel.png" />
 
 4. Select one or more top-level addon roots such as your MSFS `Community` folder or another addon root.
 5. Click `Scan Now`.
