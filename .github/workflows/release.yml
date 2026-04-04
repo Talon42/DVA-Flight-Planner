@@ -58,14 +58,14 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          VERSION="${RELEASE_TAG#v}"
           python - <<'PY'
           import json
           import os
           import pathlib
           import re
 
-          version = os.environ["VERSION"]
+          release_tag = os.environ["RELEASE_TAG"]
+          version = release_tag[1:] if release_tag.startswith("v") else release_tag
 
           package_json_path = pathlib.Path("package.json")
           package_lock_path = pathlib.Path("package-lock.json")

@@ -1,6 +1,10 @@
-import scheduleXml from "../../../test-data/pfpxsched.xml?raw";
 import { DEFAULT_DUTY_FILTERS, DEFAULT_FILTERS, DEFAULT_SORT } from "../constants";
 import { parseScheduleImport } from "../import/parseSchedule";
+
+const scheduleXmlLoaders = import.meta.glob("../../../test-data/pfpxsched.xml", {
+  query: "?raw",
+  import: "default"
+});
 
 const BASE_ADDON_SCAN = {
   roots: [
@@ -47,16 +51,23 @@ let parsedSchedulePromise = null;
 
 function getParsedSchedule() {
   if (!parsedSchedulePromise) {
-    parsedSchedulePromise = Promise.resolve(
-      parseScheduleImport("pfpxsched.xml", scheduleXml)
-    ).then((imported) => ({
-      importedAt: imported.importedAt,
-      flights: imported.flights,
-      importSummary: {
-        ...imported.importSummary,
-        source: "manual"
-      }
-    }));
+    const scheduleXmlLoader = scheduleXmlLoaders["../../../test-data/pfpxsched.xml"];
+    if (!scheduleXmlLoader) {
+      throw new Error(
+        "Docshot schedule source was not found. Expected test-data/pfpxsched.xml to be available for docshot builds."
+      );
+    }
+
+    parsedSchedulePromise = Promise.resolve(scheduleXmlLoader())
+      .then((scheduleXml) => parseScheduleImport("pfpxsched.xml", scheduleXml))
+      .then((imported) => ({
+        importedAt: imported.importedAt,
+        flights: imported.flights,
+        importSummary: {
+          ...imported.importSummary,
+          source: "manual"
+        }
+      }));
   }
 
   return parsedSchedulePromise;
