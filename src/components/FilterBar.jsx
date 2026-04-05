@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { formatDistanceNm, formatDuration } from "../lib/formatters";
+import { formatDistanceNm } from "../lib/formatters";
 import { groupSimBriefAircraftTypesByManufacturer } from "../lib/simbrief";
 import { getAircraftProfileOptionMetadata } from "../lib/aircraftCatalog";
 import Button from "./ui/Button";
@@ -29,6 +29,10 @@ const TIME_WINDOW_OPTIONS = [
   { value: "afternoon", label: "Afternoon" },
   { value: "evening", label: "Evening" }
 ];
+
+function formatHoursOnly(minutes) {
+  return `${Math.round(Number(minutes || 0) / 60)}h`;
+}
 
 function SelectChevron() {
   return (
@@ -866,7 +870,7 @@ function BasicFilters({
             onFilterChange("flightLengthMin", minValue);
             onFilterChange("flightLengthMax", maxValue);
           }}
-          formatValue={formatDuration}
+          formatValue={formatHoursOnly}
         />
 
         <RangeSlider
@@ -1169,7 +1173,7 @@ function DutyScheduleFilters({
             onDutyFilterChange("flightLengthMin", minValue);
             onDutyFilterChange("flightLengthMax", maxValue);
           }}
-          formatValue={formatDuration}
+          formatValue={formatHoursOnly}
         />
 
         <RangeSlider
