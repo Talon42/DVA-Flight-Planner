@@ -126,8 +126,7 @@ LIME,Il Caravaggio International Airport,,Italy,Europe/Rome,45.673901,9.70417
 ENBR,"Bergen Airport, Flesland",,Norway,Europe/Oslo,60.29339981,5.218140125
 EDDB,Berlin Brandenburg Airport,,Germany,Europe/Berlin,52.38000107,13.52250004
 KBML,Berlin Regional Airport,New Hampshire,United States,America/New_York,44.575401,-71.175903
-EDDX,Berlin,,Germany,Europe/Berlin,,
-EDDT,Berlin,,Germany,Europe/Berlin,52.55970001,13.2876997
+EDDT,Berlin Tegel "Otto Lilienthal",Germany,Europe/Berlin,52.56047859485743,13.287863830688257
 LSZB,Bern Airport,,Switzerland,Europe/Zurich,46.91410065,7.497149944309999
 PABE,Bethel Airport,Alaska,United States,America/Anchorage,60.77980042,-161.8379974
 LFMU,Beziers Vias airport,,France,Europe/Paris,43.32350158691406,3.353899955749512
@@ -1399,3 +1398,43 @@ ZGSD,Zhuhai Jinwan Airport,,China,Asia/Shanghai,22.006399,113.375999
 ZUZY,Zunyi Xinzhou Airport,,China,Asia/Shanghai,27.5895,107.0007
 ZUMT,Zunyi Maotai Airport,,China,Asia/Shanghai,27.96806,106.43889
 LSZH,Zurich Airport,,Switzerland,Europe/Zurich,47.46469879,8.54916954
+ESSV,Visby Airport,,Sweden,Europe/Stockholm,57.66279983520508,18.34670066833496
+ZLDL,Haixi Delingha Airport,,China,Asia/Shanghai,37.1250,97.2686
+ZWKC,Kuqa Qiuci Airport,,China,Asia/Shanghai,41.67762295929437,82.87232360388975
+RJFR,Kitakyushu Airport,,Japan,Asia/Tokyo,33.83921383589565,131.03356964188748
+RJNT,Toyama Airport,,Japan,Asia/Tokyo,36.64842392233156,137.18778326893514
+RJOT,Takamatsu Airport,,Japan,Asia/Tokyo,34.2150814858111,134.01476121305967
+RJSI,Iwate Hanamaki Airport,,Japan,Asia/Tokyo,39.42157937920644,141.13848452482335
+RJSN,Niigata Airport,,Japan,Asia/Tokyo,37.95512172395241,139.11115994013042
+GMAD,Agadir Al-Massira International Airport,,Morocco,Africa/Casablanca,30.330113982617675,-9.410307360036494
+CYMX,Montréal-Mirabel International Airport,Quebec,Canada,America/Toronto,45.67016311209406,-74.0323266173329
+FEFF,Bangui-M'Poko International Airport,,Central African Republic,Africa/Bangui,4.398946848520539,18.52411732437494
+HCMH,Egal International Airport,,Somalia,Africa/Mogadishu,9.518189769888496,44.08370005506988
+LDSP,Split Airport,,Croatia,Europe/Zagreb,43.53889846801758,16.29800033569336
+LIEO,Olbia Costa Smeralda Airport,,Italy,Europe/Rome,40.89830017,9.517960548400879
+LGSR,Santorini Airport,,Greece,Europe/Athens,36.402599778249616,25.473045428453663
+UGTB,Tbilisi International Airport,,Georgia,Asia/Tbilisi,41.6697073724361,44.96465442673446
+LGMK,Mykonos Airport,,Greece,Europe/Athens,37.43460241796088,25.345883453609858
+LDDU,Dubrovnik Airport,,Croatia,Europe/Zagreb,42.56190109,18.26819992
+LFKF,Figari-South Corsica Airport,,France,Europe/Paris,41.49886855392466,9.09825144022168
+LFKJ,Ajaccio Napoleon Bonaparte Airport,,France,Europe/Paris,41.92300034,8.802500724
+FCPP,Agostinho-Neto International Airport,,Republic of the Congo,Africa/Luanda,-4.816130921798328,11.882870268595536
+EDLW,Dortmund Airport,,Germany,Europe/Berlin,51.5174872794824,7.6121093577176975
+KGJT,Grand Junction Regional Airport,Colorado,United States,America/Denver,39.12220001,-108.5260009765625
+KPAE,Snohomish County Airport / Paine Field,Washington,United States,America/Los_Angeles,47.90629959,-122.2819977
+WATO,Komodo International Airport,,Indonesia,Asia/Jakarta,-8.58382988,119.52300262451172
+RKPS,Sacheon Airport,,South Korea,Asia/Seoul,35.00870132446289,128.07199096679688
+RJSA,Aomori Airport,,Japan,Asia/Tokyo,40.73469924926758,140.69000244140625
+ORER,Erbil International Airport,,Iraq,Asia/Baghdad,36.234901428222656,43.963600158691406
+UWKD,Kazan Airport,,Russia,Europe/Moscow,55.606201171875,49.27859878540039
+ZBLL,Lüliang Dawu Airport,,China,Asia/Shanghai,37.51972222,111.1461111
+ZURK,Xigaze Peace Airport,,China,Asia/Shanghai,29.34972222,88.8808333
+ESKS,Scandinavian Mountains Airport,,Sweden,Europe/Stockholm,61.83169937,12.09250069
+OEAH,Al-Ahsa Airport,,Saudi Arabia,Asia/Riyadh,24.28529930114746,49.64059829711914
+OEWJ,Al Wajh Domestic Airport,,Saudi Arabia,Asia/Riyadh,27.227699279785156,36.463600158691406
+LEGR,Federico García Lorca Granada Airport,,Spain,Europe/Madrid,37.18870163,-3.777960062
+GCRR,César Manrique-Lanzarote Airport,,Spain,Atlantic/Canary,28.94540024,-13.6050005
+YGLA,Gladstone Airport,Queensland,Australia,Australia/Brisbane,-23.84250069,151.2180023
+YPCC,Cocos Islands Airport,,Cocos (Keeling) Islands,Indian/Cocos,12.18890095,96.83309937
+VVCM,Ca Mau Airport,,Vietnam,Asia/Saigon,9.17667,105.15028
+SAVV,Gobernador Edgardo Castello Airport,,Argentina,America/Catamarca,-28.4844,-65.7792
