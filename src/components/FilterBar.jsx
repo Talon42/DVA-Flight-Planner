@@ -316,10 +316,11 @@ export function SearchableMultiSelect({
       const wouldOverflowLeft = menuRect.left < cardLeftEdge;
       const wouldOverflowRight = menuRect.right > cardRightEdge;
       const preferRightAlignment = availableWidthFromRight > availableWidthFromLeft;
-      const shouldPreferUpward = Boolean(isBoundsMenu && menuBoundsHost);
-      const shouldOpenUpward =
-        (shouldPreferUpward && availableHeightAbove >= 180) ||
-        (availableHeightBelow < menuRect.height && availableHeightAbove > availableHeightBelow);
+      const triggerMidpoint = rootRect.top + rootRect.height / 2;
+      const boundsMidpoint = filterBarRect.top + filterBarRect.height / 2;
+      const shouldOpenUpward = isBoundsMenu
+        ? triggerMidpoint > boundsMidpoint && availableHeightAbove > availableHeightBelow + 24
+        : availableHeightBelow < 220 && availableHeightAbove > availableHeightBelow;
       const availableMenuHeight = shouldOpenUpward ? availableHeightAbove : availableHeightBelow;
       const menuChromeHeight = optionsRect ? Math.max(menuRect.height - optionsRect.height, 0) : 88;
       const nextOptionsMaxHeight = Math.max(
@@ -339,7 +340,7 @@ export function SearchableMultiSelect({
 
       if (isBoundsMenu && menuBoundsHost) {
         const menuWidth = Math.min(
-          Math.max(rootRect.width, Math.min(menuRect.width || rootRect.width, 380)),
+          Math.max(240, Math.min(rootRect.width, 320)),
           Math.max(filterBarRect.width - 32, 220)
         );
         const desiredLeft =

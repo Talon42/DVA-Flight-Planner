@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { SearchableMultiSelect } from "./FilterBar";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatDistanceNm, formatDuration, formatUtc } from "../lib/formatters";
 import { getAirlineLogo } from "../lib/airlineBranding";
 import { groupSimBriefAircraftTypesByManufacturer } from "../lib/simbrief";
 import planeLight from "../data/images/plane_light.png";
 import Button from "./ui/Button";
 import Panel from "./ui/Panel";
-import { gridClassNames } from "./ui/forms";
-import { mutedTextClassName } from "./ui/patterns";
+import {
+  fieldBodyClassName,
+  fieldInputClassName,
+  fieldTitleClassName,
+  gridClassNames
+} from "./ui/forms";
+import { modalPanelClassName, mutedTextClassName } from "./ui/patterns";
 import { Eyebrow } from "./ui/SectionHeader";
 import { cn } from "./ui/cn";
 
@@ -108,6 +113,188 @@ function SimBriefSummary({ flight }) {
   );
 }
 
+function ModalBackdrop({ children, onClick }) {
+  return (
+    <div
+      className="absolute inset-0 z-[60] grid place-items-center overflow-hidden bg-[rgba(8,20,36,0.42)] p-4 backdrop-blur-md bp-1024:p-3"
+      role="presentation"
+      onClick={onClick}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FlightCardAircraftSelector({
+  options,
+  selectedValue,
+  isLoading,
+  onChange
+}) {
+  const rootRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === "Escape" && isOpen) {
+        setIsOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const selectedOption = useMemo(
+    () => options.find((option) => option.value === selectedValue) || null,
+    [options, selectedValue]
+  );
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toUpperCase();
+    if (!normalizedQuery) {
+      return options;
+    }
+
+    return options.filter((option) => {
+      const haystack = `${option.label || ""} ${option.value || ""} ${option.keywords || ""}`.toUpperCase();
+      return haystack.includes(normalizedQuery);
+    });
+  }, [options, query]);
+
+  const selectionLabel = selectedOption?.selectedLabel || selectedOption?.label || "Select aircraft";
+  const overlayHost =
+    typeof document !== "undefined"
+      ? rootRef.current?.closest('[data-docshot="flight-board"]') || null
+      : null;
+
+  return (
+    <div className="grid gap-3" ref={rootRef}>
+      <div className="grid grid-cols-[minmax(110px,max-content)_minmax(0,1fr)] items-center gap-3">
+        <span className={fieldTitleClassName}>SIMBRIEF AIRCRAFT</span>
+        <button
+          className={cn(
+            fieldBodyClassName,
+            "flex w-full items-center justify-between gap-3 px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-left"
+          )}
+          type="button"
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <span className="block min-w-0 truncate">{selectionLabel}</span>
+          <span
+            className={cn(
+              "shrink-0 text-[var(--text-muted)] transition-transform duration-150",
+              isOpen && "rotate-180"
+            )}
+            aria-hidden="true"
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
+              <path
+                d="M4 6.5 8 10.5 12 6.5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.75"
+              />
+            </svg>
+          </span>
+        </button>
+      </div>
+
+      {isOpen && overlayHost
+        ? createPortal(
+            <ModalBackdrop onClick={() => setIsOpen(false)}>
+              <Panel
+                className={cn(
+                  modalPanelClassName,
+                  "relative z-[61] w-[min(640px,calc(100%-2rem))] p-5 bp-1024:w-[min(560px,calc(100%-1.5rem))] bp-1024:p-4"
+                )}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Select SimBrief aircraft"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className={fieldTitleClassName}>SimBrief aircraft</div>
+                    <p className="m-0 text-[0.88rem] text-[var(--text-muted)]">
+                      Search and apply one aircraft type to this flight card.
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+
+                <input
+                  className={fieldInputClassName}
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={isLoading ? "Loading aircraft..." : "Search aircraft"}
+                  autoFocus
+                />
+
+                <div className="app-scrollbar grid max-h-[min(58vh,460px)] gap-1 overflow-y-auto pr-1">
+                  {filteredOptions.map((option, index) => {
+                    const previousOption = index > 0 ? filteredOptions[index - 1] : null;
+                    const showGroupLabel =
+                      option.groupLabel && option.groupLabel !== previousOption?.groupLabel;
+                    const isSelected = option.value === selectedValue;
+
+                    return (
+                      <Fragment key={option.value}>
+                        {showGroupLabel ? (
+                          <div className="px-2 pb-1 pt-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                            {option.groupLabel}
+                          </div>
+                        ) : null}
+                        <button
+                          className={cn(
+                            "flex items-center justify-between gap-3 rounded-2xl border border-transparent px-3 py-2 text-left text-[0.82rem] font-semibold text-[var(--text-primary)] transition-colors duration-150 hover:border-[color:var(--button-ghost-hover-border)] hover:bg-[var(--surface-option)]",
+                            isSelected &&
+                              "border-[color:rgba(62,129,191,0.36)] bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
+                          )}
+                          type="button"
+                          onClick={() => {
+                            onChange(option.value);
+                            setIsOpen(false);
+                            setQuery("");
+                          }}
+                        >
+                          <span className="min-w-0 truncate">{option.label}</span>
+                          <span className="shrink-0 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                            {isSelected ? "Selected" : "Add"}
+                          </span>
+                        </button>
+                      </Fragment>
+                    );
+                  })}
+
+                  {!filteredOptions.length ? (
+                    <div className="rounded-2xl bg-[var(--surface-option)] px-3 py-4 text-center text-[0.78rem] font-semibold text-[var(--text-muted)]">
+                      No matching aircraft
+                    </div>
+                  ) : null}
+                </div>
+              </Panel>
+            </ModalBackdrop>,
+            overlayHost
+          )
+        : null}
+    </div>
+  );
+}
+
 function SimBriefInlinePanel({
   flight,
   simBriefDispatchState,
@@ -157,23 +344,14 @@ function SimBriefInlinePanel({
       className="grid gap-3 rounded-[18px] border border-[color:var(--line)] bg-[var(--surface-panel)] p-3"
       data-docshot="simbrief-dispatch-panel"
     >
-      <SearchableMultiSelect
-        label="SIMBRIEF AIRCRAFT"
-        labelPlacement="inline"
-        placeholder={isSimBriefAircraftTypesLoading ? "Loading aircraft..." : "Search aircraft"}
-        emptyLabel="No matching aircraft"
-        allLabel={isSimBriefAircraftTypesLoading ? "Loading aircraft..." : "Select aircraft"}
-        allowMultiple={false}
-        hideChips
-        showClearAction={false}
-        showSingleSelectedLabel
-        menuLayer="bounds"
+      <FlightCardAircraftSelector
         options={aircraftTypeOptions}
-        selectedValues={selectedType ? [selectedType] : []}
-        onChange={(value) => onSimBriefTypeChange(flight.boardEntryId, value[0] || "")}
+        selectedValue={selectedType}
+        isLoading={isSimBriefAircraftTypesLoading}
+        onChange={(value) => onSimBriefTypeChange(flight.boardEntryId, value || "")}
       />
 
-      <div className={gridClassNames.boardActions}>
+      <div className="grid gap-2 min-[1401px]:grid-cols-3">
         <Button variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
           {isDispatching ? "Dispatching..." : "SimBrief Dispatch"}
         </Button>
