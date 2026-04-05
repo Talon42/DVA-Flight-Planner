@@ -42,7 +42,7 @@ jobs:
           body: Windows executable build for ${{ github.ref_name }}
           draft: true
           prerelease: false
-          artifacts: src-tauri/target/release/*.exe
+          artifacts: src-tauri/target/release/DVAFlightPlanner.exe
           token: ${{ secrets.GITHUB_TOKEN }}
 
   sync-repo-version:
