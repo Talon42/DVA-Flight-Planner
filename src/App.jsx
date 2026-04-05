@@ -3587,12 +3587,16 @@ export default function App() {
           {schedule?.importSummary || isDevToolsEnabled ? (
             <footer className="grid gap-x-4 gap-y-1.5 border-t border-[color:var(--line)] pt-1.5 bp-1024:grid-cols-[1fr_auto_1fr] bp-1024:items-center bp-1024:gap-x-3">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 bp-1024:justify-self-start bp-1024:gap-x-3">
-                <FooterStat label="Source" value={getScheduleSourceLabel(schedule.importSummary)} />
-                <FooterStat label="Schedule Date" value={scheduleDateLabel} />
-                <FooterStat
-                  label="Imported Flights"
-                  value={formatNumber(schedule.importSummary.importedRows ?? 0)}
-                />
+                {schedule?.importSummary ? (
+                  <>
+                    <FooterStat label="Source" value={getScheduleSourceLabel(schedule.importSummary)} />
+                    <FooterStat label="Schedule Date" value={scheduleDateLabel} />
+                    <FooterStat
+                      label="Imported Flights"
+                      value={formatNumber(schedule.importSummary.importedRows ?? 0)}
+                    />
+                  </>
+                ) : null}
               </div>
               {isDevToolsEnabled ? (
                 <div className="relative justify-self-center" ref={devWindowMenuRef}>
