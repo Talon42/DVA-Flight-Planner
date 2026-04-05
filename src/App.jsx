@@ -1183,8 +1183,7 @@ export default function App() {
     layoutBucket === "compact"
       ? "Sync DVA"
       : "Sync from Delta Virtual";
-  const devWindowButtonLabel = "Window Size";
-  const currentWindowSizeLabel = `Current ${viewportSize.width} x ${viewportSize.height}`;
+  const currentWindowSizeLabel = `${viewportSize.width}x${viewportSize.height}`;
   useEffect(() => {
     if (!isSettingsOpen) {
       return undefined;
@@ -3472,53 +3471,6 @@ export default function App() {
           >
             {isSyncing ? "Syncing..." : syncButtonLabel}
           </Button>
-          {isDevToolsEnabled ? (
-            <div className="relative" ref={devWindowMenuRef}>
-              <Button
-                variant="ghost"
-                active={isDevWindowMenuOpen}
-                onClick={() => setIsDevWindowMenuOpen((current) => !current)}
-                aria-expanded={isDevWindowMenuOpen}
-                aria-haspopup="menu"
-                disabled={!isDesktopAddonScanAvailable}
-                className="min-h-11 flex-col items-start gap-0.5 px-4 py-2 text-left bp-1024:min-h-9 bp-1024:px-3 bp-1024:text-[0.74rem]"
-                title={
-                  isDesktopAddonScanAvailable
-                    ? "Choose a responsive test window width"
-                    : "Window size presets are only available in the desktop app"
-                }
-              >
-                <span>{devWindowButtonLabel}</span>
-                <strong className="font-semibold text-[var(--text-heading)]">
-                  {selectedDevWindowPreset?.label || "Choose"}
-                </strong>
-                <span className="text-[0.62rem] uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                  {currentWindowSizeLabel}
-                </span>
-              </Button>
-              {isDevWindowMenuOpen ? (
-                <div
-                  className="absolute right-0 top-[calc(100%+0.5rem)] z-30 flex min-w-[180px] flex-col gap-1 rounded-3xl border border-[color:var(--surface-border)] bg-[var(--surface-raised)] p-2 shadow-[var(--menu-shadow)]"
-                  role="menu"
-                  aria-label="Window size presets"
-                >
-                  {DEV_WINDOW_WIDTH_PRESETS.map((option) => (
-                    <Button
-                      key={option.width}
-                      variant="ghost"
-                      active={devWindowWidth === option.width}
-                      className="justify-start rounded-2xl px-3 py-2 text-[0.8rem]"
-                      role="menuitemradio"
-                      aria-checked={devWindowWidth === option.width}
-                      onClick={() => handleSelectDevWindowWidth(option.width)}
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
           <IconButton
             onClick={handleToggleTheme}
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
@@ -3632,16 +3584,65 @@ export default function App() {
             </div>
           </div>
 
-          {schedule?.importSummary ? (
-            <footer className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[color:var(--line)] pt-1.5 bp-1024:gap-x-3">
-              <FooterStat label="Source" value={getScheduleSourceLabel(schedule.importSummary)} />
-              <FooterStat label="Schedule Date" value={scheduleDateLabel} />
-              <FooterStat
-                label="Imported Flights"
-                value={formatNumber(schedule.importSummary.importedRows ?? 0)}
-              />
+          {schedule?.importSummary || isDevToolsEnabled ? (
+            <footer className="grid gap-x-4 gap-y-1.5 border-t border-[color:var(--line)] pt-1.5 bp-1024:grid-cols-[1fr_auto_1fr] bp-1024:items-center bp-1024:gap-x-3">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 bp-1024:justify-self-start bp-1024:gap-x-3">
+                <FooterStat label="Source" value={getScheduleSourceLabel(schedule.importSummary)} />
+                <FooterStat label="Schedule Date" value={scheduleDateLabel} />
+                <FooterStat
+                  label="Imported Flights"
+                  value={formatNumber(schedule.importSummary.importedRows ?? 0)}
+                />
+              </div>
+              {isDevToolsEnabled ? (
+                <div className="relative justify-self-center" ref={devWindowMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsDevWindowMenuOpen((current) => !current)}
+                    aria-expanded={isDevWindowMenuOpen}
+                    aria-haspopup="menu"
+                    disabled={!isDesktopAddonScanAvailable}
+                    className="inline-flex items-center gap-1 rounded-none border-0 bg-transparent p-0 text-[0.78rem] font-medium text-[var(--text-muted)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] bp-1024:text-[0.74rem]"
+                    title={
+                      isDesktopAddonScanAvailable
+                        ? "Choose a responsive test window width"
+                        : "Window size presets are only available in the desktop app"
+                    }
+                  >
+                    <span>Window Size:</span>
+                    <strong className="font-semibold text-[var(--text-heading)]">
+                      {selectedDevWindowPreset?.label || "Choose"}
+                    </strong>
+                    <span>| Current Size:</span>
+                    <strong className="font-semibold text-[var(--text-heading)]">
+                      {currentWindowSizeLabel}
+                    </strong>
+                  </button>
+                  {isDevWindowMenuOpen ? (
+                    <div
+                      className="absolute left-1/2 bottom-[calc(100%+0.5rem)] z-30 flex min-w-[180px] -translate-x-1/2 flex-col gap-1 rounded-3xl border border-[color:var(--surface-border)] bg-[var(--surface-raised)] p-2 shadow-[var(--menu-shadow)]"
+                      role="menu"
+                      aria-label="Window size presets"
+                    >
+                      {DEV_WINDOW_WIDTH_PRESETS.map((option) => (
+                        <Button
+                          key={option.width}
+                          variant="ghost"
+                          active={devWindowWidth === option.width}
+                          className="justify-start rounded-2xl px-3 py-2 text-[0.8rem]"
+                          role="menuitemradio"
+                          aria-checked={devWindowWidth === option.width}
+                          onClick={() => handleSelectDevWindowWidth(option.width)}
+                        >
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <div
-                className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] font-medium text-[var(--text-muted)] bp-1024:text-[0.72rem]"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] font-medium text-[var(--text-muted)] bp-1024:col-start-3 bp-1024:justify-self-end bp-1024:text-[0.72rem]"
                 aria-label="Copyright © 2026 Talon42"
               >
                 <span>Copyright &copy; 2026</span>
