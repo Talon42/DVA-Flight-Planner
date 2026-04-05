@@ -167,6 +167,7 @@ function SimBriefInlinePanel({
         hideChips
         showClearAction={false}
         showSingleSelectedLabel
+        menuLayer="bounds"
         options={aircraftTypeOptions}
         selectedValues={selectedType ? [selectedType] : []}
         onChange={(value) => onSimBriefTypeChange(flight.boardEntryId, value[0] || "")}
@@ -502,15 +503,19 @@ export default function DetailsPanel({
   return (
     <aside className="details-panel min-h-0">
       <Panel
-        className="details-card flex h-full min-h-0 flex-col rounded-[26px] p-4 bp-1024:rounded-[20px] bp-1024:p-4"
+        className="details-card relative flex h-full min-h-0 flex-col rounded-[26px] p-4 bp-1024:rounded-[20px] bp-1024:p-4"
         data-docshot="flight-board"
+        data-menu-bounds
       >
         <div className="details-card__header mb-3">
           <Eyebrow>Flight Board</Eyebrow>
         </div>
 
         {shortlist.length ? (
-          <div className="shortlist app-scrollbar grid min-h-0 gap-3 overflow-y-auto pr-1" ref={shortlistRef}>
+          <div
+            className="shortlist app-scrollbar grid min-h-0 gap-3 overflow-y-auto pr-1"
+            ref={shortlistRef}
+          >
             {visibleShortlist.map((flight, index) => (
               <div key={`slot-${flight.boardEntryId}`} className="grid gap-3">
                 {placeholderIndex === index ? (
@@ -526,7 +531,7 @@ export default function DetailsPanel({
                   className={cn(
                     "shortlist-item relative grid gap-1.5 rounded-[22px] border border-[color:var(--text-muted)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-raised)_78%,white_22%),color-mix(in_srgb,var(--surface)_82%,var(--delta-blue)_8%))] px-2 py-1.5 text-[var(--text-primary)] transition-[transform,opacity,filter,border-color,background] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1.12)] bp-1024:gap-1 bp-1024:px-1.5 bp-1024:py-1.25 dark:border-[color:var(--line)] dark:bg-[var(--surface)]",
                     expandedBoardFlightId === flight.boardEntryId &&
-                      "border-[color:rgba(62,129,191,0.4)] shadow-[0_14px_30px_rgba(0,58,112,0.14)]",
+                      "z-20 border-[color:rgba(62,129,191,0.4)] shadow-[0_14px_30px_rgba(0,58,112,0.14)]",
                     flight.isStale && "border-[color:rgba(200,16,46,0.26)]",
                     draggedBoardEntryId && "opacity-70 saturate-[0.82]"
                   )}

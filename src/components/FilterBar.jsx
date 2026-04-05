@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatDistanceNm, formatDuration } from "../lib/formatters";
 import { groupSimBriefAircraftTypesByManufacturer } from "../lib/simbrief";
 import { getAircraftProfileOptionMetadata } from "../lib/aircraftCatalog";
@@ -167,6 +168,7 @@ export function SearchableMultiSelect({
   showOptionMark = true,
   showSingleSelectedLabel = false,
   prioritizeSelectedOptions = true,
+  menuLayer = "inline",
   filterQuery = "",
   options,
   selectedValues,
@@ -178,11 +180,19 @@ export function SearchableMultiSelect({
   const [menuVerticalAlign, setMenuVerticalAlign] = useState("bottom");
   const [menuMaxWidth, setMenuMaxWidth] = useState(null);
   const [menuOptionsMaxHeight, setMenuOptionsMaxHeight] = useState(null);
+  const [menuBoundsPosition, setMenuBoundsPosition] = useState(null);
   const rootRef = useRef(null);
   const menuRef = useRef(null);
+  const isBoundsMenu = menuLayer === "bounds";
+  const boundsPortalHost = isBoundsMenu
+    ? rootRef.current?.closest("[data-menu-bounds]") || null
+    : null;
 
   useEffect(() => {
     function handlePointerDown(event) {
+      if (rootRef.current?.contains(event.target) || menuRef.current?.contains(event.target)) {
+        return;
+      }
       if (!rootRef.current?.contains(event.target)) {
         setIsOpen(false);
       }
@@ -253,18 +263,31 @@ export function SearchableMultiSelect({
       setMenuVerticalAlign("bottom");
       setMenuMaxWidth(null);
       setMenuOptionsMaxHeight(null);
+      setMenuBoundsPosition(null);
+      return undefined;
+    }
+
+    const boundsHost =
+      rootRef.current?.closest("[data-menu-bounds]") ||
+      rootRef.current?.closest(".filter-bar") ||
+      rootRef.current?.closest(".shortlist") ||
+      rootRef.current?.closest(".details-card") ||
+      null;
+
+    if (isBoundsMenu) {
+      if (!boundsHost || !rootRef.current) {
+        return undefined;
+      }
+    } else if (!rootRef.current || !menuRef.current) {
       return undefined;
     }
 
     function updateMenuAlignment() {
-      if (!rootRef.current || !menuRef.current) {
+      if (!rootRef.current) {
         return;
       }
 
-      const menuBoundsHost =
-        rootRef.current.closest(".filter-bar") ||
-        rootRef.current.closest(".shortlist") ||
-        rootRef.current.closest(".details-card");
+      const menuBoundsHost = boundsHost;
       const filterBarRect = menuBoundsHost?.getBoundingClientRect() || {
         left: 0,
         right: window.innerWidth,
@@ -272,9 +295,16 @@ export function SearchableMultiSelect({
         bottom: window.innerHeight
       };
       const rootRect = rootRef.current.getBoundingClientRect();
-      const menuRect = menuRef.current.getBoundingClientRect();
+      const menuRect = menuRef.current?.getBoundingClientRect() || {
+        width: Math.max(rootRect.width, 320),
+        height: 320,
+        left: rootRect.left,
+        right: rootRect.left + Math.max(rootRect.width, 320),
+        top: rootRect.bottom + 8,
+        bottom: rootRect.bottom + 328
+      };
       const optionsRect =
-        menuRef.current.querySelector(".multi-select__options")?.getBoundingClientRect() || null;
+        menuRef.current?.querySelector(".multi-select__options")?.getBoundingClientRect() || null;
       const cardLeftEdge = filterBarRect.left + 16;
       const cardRightEdge = filterBarRect.right - 16;
       const cardTopEdge = filterBarRect.top + 16;
@@ -286,15 +316,53 @@ export function SearchableMultiSelect({
       const wouldOverflowLeft = menuRect.left < cardLeftEdge;
       const wouldOverflowRight = menuRect.right > cardRightEdge;
       const preferRightAlignment = availableWidthFromRight > availableWidthFromLeft;
-      const shouldOpenUpward = availableHeightBelow < menuRect.height && availableHeightAbove > availableHeightBelow;
+      const shouldPreferUpward = Boolean(isBoundsMenu && menuBoundsHost);
+      const shouldOpenUpward =
+        (shouldPreferUpward && availableHeightAbove >= 180) ||
+        (availableHeightBelow < menuRect.height && availableHeightAbove > availableHeightBelow);
       const availableMenuHeight = shouldOpenUpward ? availableHeightAbove : availableHeightBelow;
       const menuChromeHeight = optionsRect ? Math.max(menuRect.height - optionsRect.height, 0) : 88;
       const nextOptionsMaxHeight = Math.max(
-        Math.min(availableMenuHeight - menuChromeHeight, 260),
-        88
+        Math.min(availableMenuHeight - menuChromeHeight, 420),
+        140
       );
 
+      let nextHorizontalAlign = "left";
+      let nextMaxWidth = availableWidthFromLeft;
       if (preferRightAlignment || (wouldOverflowRight && availableWidthFromRight > availableWidthFromLeft)) {
+        nextHorizontalAlign = "right";
+        nextMaxWidth = availableWidthFromRight;
+      } else if (wouldOverflowLeft && availableWidthFromLeft >= availableWidthFromRight) {
+        nextHorizontalAlign = "left";
+        nextMaxWidth = availableWidthFromLeft;
+      }
+
+      if (isBoundsMenu && menuBoundsHost) {
+        const menuWidth = Math.min(
+          Math.max(rootRect.width, Math.min(menuRect.width || rootRect.width, 380)),
+          Math.max(filterBarRect.width - 32, 220)
+        );
+        const desiredLeft =
+          nextHorizontalAlign === "right"
+            ? rootRect.right - filterBarRect.left - menuWidth
+            : rootRect.left - filterBarRect.left;
+        const clampedLeft = Math.min(
+          Math.max(desiredLeft, 16),
+          Math.max(filterBarRect.width - menuWidth - 16, 16)
+        );
+        const top = shouldOpenUpward
+          ? Math.max(rootRect.top - filterBarRect.top - menuRect.height - 8, 16)
+          : Math.min(
+              rootRect.bottom - filterBarRect.top + 8,
+              Math.max(filterBarRect.height - menuRect.height - 16, 16)
+            );
+
+        setMenuBoundsPosition({
+          left: clampedLeft,
+          top,
+          width: menuWidth
+        });
+      } else if (preferRightAlignment || (wouldOverflowRight && availableWidthFromRight > availableWidthFromLeft)) {
         setMenuHorizontalAlign("right");
         setMenuMaxWidth(availableWidthFromRight);
       } else if (wouldOverflowLeft && availableWidthFromLeft >= availableWidthFromRight) {
@@ -305,17 +373,23 @@ export function SearchableMultiSelect({
         setMenuMaxWidth(availableWidthFromLeft);
       }
 
+      if (!isBoundsMenu) {
+        setMenuMaxWidth(nextMaxWidth);
+        setMenuHorizontalAlign(nextHorizontalAlign);
+      }
       setMenuVerticalAlign(shouldOpenUpward ? "top" : "bottom");
       setMenuOptionsMaxHeight(nextOptionsMaxHeight);
     }
 
     updateMenuAlignment();
     window.addEventListener("resize", updateMenuAlignment);
+    boundsHost?.addEventListener?.("scroll", updateMenuAlignment, { passive: true });
 
     return () => {
       window.removeEventListener("resize", updateMenuAlignment);
+      boundsHost?.removeEventListener?.("scroll", updateMenuAlignment);
     };
-  }, [isOpen, orderedOptions.length, query]);
+  }, [isBoundsMenu, isOpen, orderedOptions.length, query]);
 
   const selectedOptionByValue = useMemo(
     () => new Map(options.map((option) => [option.value, option])),
@@ -350,6 +424,81 @@ export function SearchableMultiSelect({
   function removeValue(value) {
     onChange(selectedValues.filter((entry) => entry !== value));
   }
+
+  const menuContent = (
+    <>
+      {searchable ? (
+        <input
+          className={cn(fieldInputClassName, "multi-select__search")}
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={placeholder}
+        />
+      ) : null}
+
+      {showClearAction ? (
+        <div className="multi-select__actions flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="multi-select__action rounded-xl"
+            onClick={() => onChange([])}
+            disabled={!selectedValues.length}
+          >
+            Clear
+          </Button>
+        </div>
+      ) : null}
+
+      <div
+        className="multi-select__options app-scrollbar grid gap-1 overflow-y-auto pr-1"
+        style={menuOptionsMaxHeight ? { maxHeight: `${menuOptionsMaxHeight}px` } : undefined}
+      >
+        {orderedOptions.map((option, index) => {
+          const optionValue = option.value;
+          const selected = selectedValues.includes(optionValue);
+          const previousOption = index > 0 ? orderedOptions[index - 1] : null;
+          const showGroupLabel =
+            optionValue !== "" &&
+            option.groupLabel &&
+            option.groupLabel !== previousOption?.groupLabel;
+
+          return (
+            <Fragment key={optionValue}>
+              {showGroupLabel ? (
+                <div className="multi-select__group-label px-2 pb-1 pt-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                  {option.groupLabel}
+                </div>
+              ) : null}
+              <button
+                className={cn(
+                  "multi-select__option flex items-center justify-between gap-3 rounded-2xl border border-transparent px-3 py-2 text-left text-[0.82rem] font-semibold text-[var(--text-primary)] transition-colors duration-150 hover:border-[color:var(--button-ghost-hover-border)] hover:bg-[var(--surface-option)]",
+                  selected &&
+                    "border-[color:rgba(62,129,191,0.36)] bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
+                )}
+                type="button"
+                onClick={() => toggleValue(optionValue)}
+              >
+                <span>{option.label}</span>
+                {showOptionMark ? (
+                  <span className="multi-select__option-mark text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    {selected ? "Selected" : "Add"}
+                  </span>
+                ) : null}
+              </button>
+            </Fragment>
+          );
+        })}
+
+        {!filteredOptions.length ? (
+          <div className="multi-select__empty rounded-2xl bg-[var(--surface-option)] px-3 py-4 text-center text-[0.78rem] font-semibold text-[var(--text-muted)]">
+            {emptyLabel}
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
 
   return (
     <div
@@ -411,7 +560,7 @@ export function SearchableMultiSelect({
           </div>
         ) : null}
 
-        {isOpen ? (
+        {isOpen && !isBoundsMenu ? (
           <div
             className={cn(
               "multi-select__menu absolute left-0 top-[calc(100%+0.55rem)] grid min-w-[220px] gap-2 rounded-[22px] border border-[color:var(--surface-border)] bg-[var(--surface-raised)] p-3 shadow-[var(--menu-shadow)]",
@@ -421,79 +570,28 @@ export function SearchableMultiSelect({
             ref={menuRef}
             style={menuMaxWidth ? { maxWidth: `${menuMaxWidth}px` } : undefined}
           >
-            {searchable ? (
-              <input
-                className={cn(fieldInputClassName, "multi-select__search")}
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={placeholder}
-              />
-            ) : null}
-
-            {showClearAction ? (
-              <div className="multi-select__actions flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="multi-select__action rounded-xl"
-                  onClick={() => onChange([])}
-                  disabled={!selectedValues.length}
-                >
-                  Clear
-                </Button>
-              </div>
-            ) : null}
-
-            <div
-              className="multi-select__options app-scrollbar grid gap-1 overflow-y-auto pr-1"
-              style={menuOptionsMaxHeight ? { maxHeight: `${menuOptionsMaxHeight}px` } : undefined}
-            >
-              {orderedOptions.map((option, index) => {
-                const optionValue = option.value;
-                const selected = selectedValues.includes(optionValue);
-                const previousOption = index > 0 ? orderedOptions[index - 1] : null;
-                const showGroupLabel =
-                  optionValue !== "" &&
-                  option.groupLabel &&
-                  option.groupLabel !== previousOption?.groupLabel;
-
-                return (
-                  <Fragment key={optionValue}>
-                    {showGroupLabel ? (
-                      <div className="multi-select__group-label px-2 pb-1 pt-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                        {option.groupLabel}
-                      </div>
-                    ) : null}
-                    <button
-                      className={cn(
-                        "multi-select__option flex items-center justify-between gap-3 rounded-2xl border border-transparent px-3 py-2 text-left text-[0.82rem] font-semibold text-[var(--text-primary)] transition-colors duration-150 hover:border-[color:var(--button-ghost-hover-border)] hover:bg-[var(--surface-option)]",
-                        selected &&
-                          "border-[color:rgba(62,129,191,0.36)] bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
-                      )}
-                      type="button"
-                      onClick={() => toggleValue(optionValue)}
-                    >
-                      <span>{option.label}</span>
-                      {showOptionMark ? (
-                        <span className="multi-select__option-mark text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                          {selected ? "Selected" : "Add"}
-                        </span>
-                      ) : null}
-                    </button>
-                  </Fragment>
-                );
-              })}
-
-              {!filteredOptions.length ? (
-                <div className="multi-select__empty rounded-2xl bg-[var(--surface-option)] px-3 py-4 text-center text-[0.78rem] font-semibold text-[var(--text-muted)]">
-                  {emptyLabel}
-                </div>
-              ) : null}
-            </div>
+            {menuContent}
           </div>
         ) : null}
       </div>
+      {isOpen && isBoundsMenu && boundsPortalHost
+        ? createPortal(
+            <div
+              className="multi-select__menu absolute z-30 grid min-w-[220px] gap-2 rounded-[22px] border border-[color:var(--surface-border)] bg-[var(--surface-raised)] p-3 shadow-[var(--menu-shadow)]"
+              ref={menuRef}
+              style={{
+                left: `${menuBoundsPosition?.left ?? 16}px`,
+                top: `${menuBoundsPosition?.top ?? Math.max((rootRef.current?.getBoundingClientRect().bottom || 0) - (boundsPortalHost.getBoundingClientRect().top || 0) + 8, 16)}px`,
+                width: `${menuBoundsPosition?.width ?? Math.max(rootRef.current?.getBoundingClientRect().width ?? 220, 220)}px`,
+                maxWidth: `${menuBoundsPosition?.width ?? Math.max(rootRef.current?.getBoundingClientRect().width ?? 220, 220)}px`,
+                visibility: "visible"
+              }}
+            >
+              {menuContent}
+            </div>,
+            boundsPortalHost
+          )
+        : null}
     </div>
   );
 }
