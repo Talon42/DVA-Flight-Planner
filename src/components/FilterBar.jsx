@@ -859,7 +859,7 @@ function BasicFilters({
           label="Flight Length"
           min={0}
           max={filterBounds.maxBlockMinutes}
-          step={5}
+          step={60}
           lowValue={filters.flightLengthMin}
           highValue={filters.flightLengthMax}
           onChange={([minValue, maxValue]) => {
@@ -873,7 +873,7 @@ function BasicFilters({
           label="Distance"
           min={0}
           max={filterBounds.maxDistanceNm}
-          step={25}
+          step={100}
           lowValue={filters.distanceMin}
           highValue={filters.distanceMax}
           onChange={([minValue, maxValue]) => {
@@ -1162,7 +1162,7 @@ function DutyScheduleFilters({
           label="Flight Length"
           min={0}
           max={filterBounds.maxBlockMinutes}
-          step={5}
+          step={60}
           lowValue={dutyFilters.flightLengthMin}
           highValue={dutyFilters.flightLengthMax}
           onChange={([minValue, maxValue]) => {
@@ -1176,7 +1176,7 @@ function DutyScheduleFilters({
           label="Distance"
           min={0}
           max={filterBounds.maxDistanceNm}
-          step={25}
+          step={100}
           lowValue={dutyFilters.distanceMin}
           highValue={dutyFilters.distanceMax}
           onChange={([minValue, maxValue]) => {
