@@ -12,7 +12,7 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,61 +44,3 @@ jobs:
           prerelease: false
           artifacts: src-tauri/target/release/DVAFlightPlanner.exe
           token: ${{ secrets.GITHUB_TOKEN }}
-
-  sync-repo-version:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout default branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-
-      - name: Sync repo version files to release tag
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          import pathlib
-          import re
-
-          release_tag = os.environ["RELEASE_TAG"]
-          version = release_tag[1:] if release_tag.startswith("v") else release_tag
-
-          package_json_path = pathlib.Path("package.json")
-          package_lock_path = pathlib.Path("package-lock.json")
-          tauri_conf_path = pathlib.Path("src-tauri/tauri.conf.json")
-          cargo_toml_path = pathlib.Path("src-tauri/Cargo.toml")
-
-          package_json = json.loads(package_json_path.read_text())
-          package_json["version"] = version
-          package_json_path.write_text(json.dumps(package_json, indent=2) + "\n")
-
-          package_lock = json.loads(package_lock_path.read_text())
-          package_lock["version"] = version
-          package_lock["packages"][""]["version"] = version
-          package_lock_path.write_text(json.dumps(package_lock, indent=2) + "\n")
-
-          tauri_conf = json.loads(tauri_conf_path.read_text())
-          tauri_conf["version"] = version
-          tauri_conf_path.write_text(json.dumps(tauri_conf, indent=2) + "\n")
-
-          cargo_toml = cargo_toml_path.read_text()
-          cargo_toml = re.sub(r'(?m)^version = ".*"$', f'version = "{version}"', cargo_toml, count=1)
-          cargo_toml_path.write_text(cargo_toml)
-          PY
-
-      - name: Commit synced version files
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          if git diff --quiet; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
-          git commit -m "Sync app version to ${RELEASE_TAG#v}"
-          git push
