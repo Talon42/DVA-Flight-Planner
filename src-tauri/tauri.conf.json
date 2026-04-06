@@ -1,36 +1,36 @@
 {
-    "$schema":  "https://schema.tauri.app/config/2",
-    "productName":  "DVA Flight Planner",
-    "version":  "0.1.6-alpha",
-    "identifier":  "dvaflightplanner",
-    "build":  {
-                  "beforeDevCommand":  "npm run dev",
-                  "devUrl":  "http://localhost:1420",
-                  "beforeBuildCommand":  "npm run build",
-                  "frontendDist":  "../dist"
-              },
-    "app":  {
-                "windows":  [
-                                {
-                                    "label":  "main",
-                                    "title":  "DVA Flight Planner",
-                                    "width":  1680,
-                                    "height":  1020,
-                                    "minWidth":  1024,
-                                    "minHeight":  768,
-                                    "resizable":  true,
-                                    "fullscreen":  false
-                                }
-                            ],
-                "security":  {
-                                 "csp":  null
-                             }
-            },
-    "bundle":  {
-                   "active":  true,
-                   "targets":  [
-                                   "nsis",
-                                   "msi"
-                               ]
-               }
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DVA Flight Planner",
+  "version": "0.1.6-alpha",
+  "identifier": "dvaflightplanner",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DVA Flight Planner",
+        "width": 1680,
+        "height": 1020,
+        "minWidth": 1024,
+        "minHeight": 768,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi"
+    ]
+  }
 }
