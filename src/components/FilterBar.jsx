@@ -7,6 +7,7 @@ import Button from "./ui/Button";
 import Panel from "./ui/Panel";
 import {
   insetPanelClassName,
+  modalPanelClassName,
   mutedTextClassName,
   mutedTextStackClassName
 } from "./ui/patterns";
@@ -75,17 +76,41 @@ function SelectField({ label, className = "", selectClassName = "", children, ..
 
 function TimeWindowFilter({ label, filterKey, filters, onFilterChange }) {
   return (
-    <SelectField
+    <SearchableMultiSelect
       label={label}
-      value={filters[filterKey]}
-      onChange={(event) => onFilterChange(filterKey, event.target.value)}
+      placeholder={`Search ${label.toLowerCase()} windows`}
+      emptyLabel="No matching time windows"
+      allLabel="Any time"
+      allowMultiple={false}
+      allowSingleDeselect={false}
+      hideChips
+      searchable={false}
+      showClearAction={false}
+      showOptionMark={false}
+      showSingleSelectedLabel
+      options={TIME_WINDOW_OPTIONS.map((option) => ({
+        value: option.value,
+        label: option.label,
+        keywords: option.label
+      }))}
+      selectedValues={[filters[filterKey] || ""]}
+      onChange={(value) => onFilterChange(filterKey, value[0] || "")}
+    />
+  );
+}
+
+function CenteredFilterOverlay({ children, onClick, compact = false }) {
+  return (
+    <div
+      className={cn(
+        "absolute inset-0 z-[60] flex min-h-full w-full justify-center bg-[rgba(8,20,36,0.42)] p-4 backdrop-blur-md bp-1024:p-3",
+        compact ? "items-start overflow-y-auto" : "items-center overflow-hidden"
+      )}
+      role="presentation"
+      onClick={onClick}
     >
-      {TIME_WINDOW_OPTIONS.map((option) => (
-        <option key={option.value || "any"} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </SelectField>
+      {children}
+    </div>
   );
 }
 
@@ -172,7 +197,6 @@ export function SearchableMultiSelect({
   showOptionMark = true,
   showSingleSelectedLabel = false,
   prioritizeSelectedOptions = true,
-  menuLayer = "inline",
   filterQuery = "",
   options,
   selectedValues,
@@ -180,31 +204,34 @@ export function SearchableMultiSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [menuHorizontalAlign, setMenuHorizontalAlign] = useState("left");
-  const [menuVerticalAlign, setMenuVerticalAlign] = useState("bottom");
-  const [menuMaxWidth, setMenuMaxWidth] = useState(null);
-  const [menuOptionsMaxHeight, setMenuOptionsMaxHeight] = useState(null);
-  const [menuBoundsPosition, setMenuBoundsPosition] = useState(null);
   const rootRef = useRef(null);
-  const menuRef = useRef(null);
-  const isBoundsMenu = menuLayer === "bounds";
-  const boundsPortalHost = isBoundsMenu
-    ? rootRef.current?.closest("[data-menu-bounds]") || null
-    : null;
+  const panelRef = useRef(null);
+  const optionsRef = useRef(null);
+  const [overlayLayout, setOverlayLayout] = useState({
+    compact: false,
+    panelMaxHeight: null,
+    optionsMaxHeight: null
+  });
+  const overlayHost =
+    typeof document !== "undefined"
+      ? rootRef.current?.closest('[data-docshot="planner-controls"]') || rootRef.current?.closest(".filter-bar") || null
+      : null;
 
   useEffect(() => {
-    function handlePointerDown(event) {
-      if (rootRef.current?.contains(event.target) || menuRef.current?.contains(event.target)) {
-        return;
-      }
-      if (!rootRef.current?.contains(event.target)) {
+    if (!isOpen) {
+      setQuery("");
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
         setIsOpen(false);
       }
     }
 
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, []);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toUpperCase();
@@ -262,139 +289,46 @@ export function SearchableMultiSelect({
   }, [filteredOptions, options, prioritizeSelectedOptions, selectedValues]);
 
   useLayoutEffect(() => {
-    if (!isOpen) {
-      setMenuHorizontalAlign("left");
-      setMenuVerticalAlign("bottom");
-      setMenuMaxWidth(null);
-      setMenuOptionsMaxHeight(null);
-      setMenuBoundsPosition(null);
+    if (!isOpen || !overlayHost || !panelRef.current || !optionsRef.current) {
+      setOverlayLayout({
+        compact: false,
+        panelMaxHeight: null,
+        optionsMaxHeight: null
+      });
       return undefined;
     }
 
-    const boundsHost =
-      rootRef.current?.closest("[data-menu-bounds]") ||
-      rootRef.current?.closest(".filter-bar") ||
-      rootRef.current?.closest(".shortlist") ||
-      rootRef.current?.closest(".details-card") ||
-      null;
-
-    if (isBoundsMenu) {
-      if (!boundsHost || !rootRef.current) {
-        return undefined;
-      }
-    } else if (!rootRef.current || !menuRef.current) {
-      return undefined;
-    }
-
-    function updateMenuAlignment() {
-      if (!rootRef.current) {
+    function updateOverlayLayout() {
+      if (!overlayHost || !panelRef.current || !optionsRef.current) {
         return;
       }
 
-      const menuBoundsHost = boundsHost;
-      const filterBarRect = menuBoundsHost?.getBoundingClientRect() || {
-        left: 0,
-        right: window.innerWidth,
-        top: 0,
-        bottom: window.innerHeight
-      };
-      const rootRect = rootRef.current.getBoundingClientRect();
-      const menuRect = menuRef.current?.getBoundingClientRect() || {
-        width: Math.max(rootRect.width, 320),
-        height: 320,
-        left: rootRect.left,
-        right: rootRect.left + Math.max(rootRect.width, 320),
-        top: rootRect.bottom + 8,
-        bottom: rootRect.bottom + 328
-      };
-      const optionsRect =
-        menuRef.current?.querySelector(".multi-select__options")?.getBoundingClientRect() || null;
-      const cardLeftEdge = filterBarRect.left + 16;
-      const cardRightEdge = filterBarRect.right - 16;
-      const cardTopEdge = filterBarRect.top + 16;
-      const cardBottomEdge = filterBarRect.bottom - 16;
-      const availableWidthFromLeft = Math.max(cardRightEdge - rootRect.left, 220);
-      const availableWidthFromRight = Math.max(rootRect.right - cardLeftEdge, 220);
-      const availableHeightBelow = Math.max(cardBottomEdge - rootRect.bottom - 10, 120);
-      const availableHeightAbove = Math.max(rootRect.top - cardTopEdge - 10, 120);
-      const wouldOverflowLeft = menuRect.left < cardLeftEdge;
-      const wouldOverflowRight = menuRect.right > cardRightEdge;
-      const preferRightAlignment = availableWidthFromRight > availableWidthFromLeft;
-      const triggerMidpoint = rootRect.top + rootRect.height / 2;
-      const boundsMidpoint = filterBarRect.top + filterBarRect.height / 2;
-      const shouldOpenUpward = isBoundsMenu
-        ? triggerMidpoint > boundsMidpoint && availableHeightAbove > availableHeightBelow + 24
-        : availableHeightBelow < 220 && availableHeightAbove > availableHeightBelow;
-      const availableMenuHeight = shouldOpenUpward ? availableHeightAbove : availableHeightBelow;
-      const menuChromeHeight = optionsRect ? Math.max(menuRect.height - optionsRect.height, 0) : 88;
+      const isSmallViewport = window.innerWidth <= 1024;
+      const hostRect = overlayHost.getBoundingClientRect();
+      const verticalPadding = isSmallViewport ? 32 : 24;
+      const availableHeight = Math.max(hostRect.height - verticalPadding, 220);
+      const panelRect = panelRef.current.getBoundingClientRect();
+      const optionsRect = optionsRef.current.getBoundingClientRect();
+      const panelChromeHeight = Math.max(panelRect.height - optionsRect.height, 0);
       const nextOptionsMaxHeight = Math.max(
-        Math.min(availableMenuHeight - menuChromeHeight, 420),
+        Math.min(availableHeight - panelChromeHeight, optionsRect.height),
         140
       );
 
-      let nextHorizontalAlign = "left";
-      let nextMaxWidth = availableWidthFromLeft;
-      if (preferRightAlignment || (wouldOverflowRight && availableWidthFromRight > availableWidthFromLeft)) {
-        nextHorizontalAlign = "right";
-        nextMaxWidth = availableWidthFromRight;
-      } else if (wouldOverflowLeft && availableWidthFromLeft >= availableWidthFromRight) {
-        nextHorizontalAlign = "left";
-        nextMaxWidth = availableWidthFromLeft;
-      }
-
-      if (isBoundsMenu && menuBoundsHost) {
-        const menuWidth = Math.min(
-          Math.max(240, Math.min(rootRect.width, 320)),
-          Math.max(filterBarRect.width - 32, 220)
-        );
-        const desiredLeft =
-          nextHorizontalAlign === "right"
-            ? rootRect.right - filterBarRect.left - menuWidth
-            : rootRect.left - filterBarRect.left;
-        const clampedLeft = Math.min(
-          Math.max(desiredLeft, 16),
-          Math.max(filterBarRect.width - menuWidth - 16, 16)
-        );
-        const top = shouldOpenUpward
-          ? Math.max(rootRect.top - filterBarRect.top - menuRect.height - 8, 16)
-          : Math.min(
-              rootRect.bottom - filterBarRect.top + 8,
-              Math.max(filterBarRect.height - menuRect.height - 16, 16)
-            );
-
-        setMenuBoundsPosition({
-          left: clampedLeft,
-          top,
-          width: menuWidth
-        });
-      } else if (preferRightAlignment || (wouldOverflowRight && availableWidthFromRight > availableWidthFromLeft)) {
-        setMenuHorizontalAlign("right");
-        setMenuMaxWidth(availableWidthFromRight);
-      } else if (wouldOverflowLeft && availableWidthFromLeft >= availableWidthFromRight) {
-        setMenuHorizontalAlign("left");
-        setMenuMaxWidth(availableWidthFromLeft);
-      } else {
-        setMenuHorizontalAlign("left");
-        setMenuMaxWidth(availableWidthFromLeft);
-      }
-
-      if (!isBoundsMenu) {
-        setMenuMaxWidth(nextMaxWidth);
-        setMenuHorizontalAlign(nextHorizontalAlign);
-      }
-      setMenuVerticalAlign(shouldOpenUpward ? "top" : "bottom");
-      setMenuOptionsMaxHeight(nextOptionsMaxHeight);
+      setOverlayLayout({
+        compact: isSmallViewport && panelRect.height > availableHeight,
+        panelMaxHeight: availableHeight,
+        optionsMaxHeight: nextOptionsMaxHeight
+      });
     }
 
-    updateMenuAlignment();
-    window.addEventListener("resize", updateMenuAlignment);
-    boundsHost?.addEventListener?.("scroll", updateMenuAlignment, { passive: true });
+    updateOverlayLayout();
+    window.addEventListener("resize", updateOverlayLayout);
 
     return () => {
-      window.removeEventListener("resize", updateMenuAlignment);
-      boundsHost?.removeEventListener?.("scroll", updateMenuAlignment);
+      window.removeEventListener("resize", updateOverlayLayout);
     };
-  }, [isBoundsMenu, isOpen, orderedOptions.length, query]);
+  }, [isOpen, overlayHost, orderedOptions.length, query, searchable, showClearAction]);
 
   const selectedOptionByValue = useMemo(
     () => new Map(options.map((option) => [option.value, option])),
@@ -432,6 +366,23 @@ export function SearchableMultiSelect({
 
   const menuContent = (
     <>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className={fieldTitleClassName}>{label}</div>
+          <p className="m-0 text-[0.88rem] text-[var(--text-muted)]">
+            {searchable ? placeholder || `Search ${label.toLowerCase()}` : `Select ${label.toLowerCase()}`}
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-xl"
+          onClick={() => setIsOpen(false)}
+        >
+          Close
+        </Button>
+      </div>
+
       {searchable ? (
         <input
           className={cn(fieldInputClassName, "multi-select__search")}
@@ -439,6 +390,7 @@ export function SearchableMultiSelect({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={placeholder}
+          autoFocus
         />
       ) : null}
 
@@ -458,7 +410,15 @@ export function SearchableMultiSelect({
 
       <div
         className="multi-select__options app-scrollbar grid gap-1 overflow-y-auto pr-1"
-        style={menuOptionsMaxHeight ? { maxHeight: `${menuOptionsMaxHeight}px` } : undefined}
+        ref={optionsRef}
+        style={{
+          maxHeight:
+            overlayLayout.optionsMaxHeight != null
+              ? `${overlayLayout.optionsMaxHeight}px`
+              : searchable
+                ? "min(58vh,460px)"
+                : "min(56vh,420px)"
+        }}
       >
         {orderedOptions.map((option, index) => {
           const optionValue = option.value;
@@ -512,13 +472,12 @@ export function SearchableMultiSelect({
         labelPlacement === "inline"
           ? "grid grid-cols-[minmax(110px,max-content)_minmax(0,1fr)] items-center gap-3"
           : fieldLabelClassName,
-        fullWidth && "col-span-full",
-        isOpen && "relative z-20"
+        fullWidth && "col-span-full"
       )}
       ref={rootRef}
     >
       <span className={fieldTitleClassName}>{label}</span>
-      <div className={cn("multi-select relative min-w-0", isOpen && "z-20")}>
+      <div className="multi-select relative min-w-0">
         <button
           className={cn(
             fieldBodyClassName,
@@ -564,37 +523,30 @@ export function SearchableMultiSelect({
             ))}
           </div>
         ) : null}
-
-        {isOpen && !isBoundsMenu ? (
-          <div
-            className={cn(
-              "multi-select__menu absolute left-0 top-[calc(100%+0.55rem)] grid min-w-[220px] gap-2 rounded-[22px] border border-[color:var(--surface-border)] bg-[var(--surface-raised)] p-3 shadow-[var(--menu-shadow)]",
-              menuHorizontalAlign === "right" && "left-auto right-0",
-              menuVerticalAlign === "top" && "top-auto bottom-[calc(100%+0.55rem)]"
-            )}
-            ref={menuRef}
-            style={menuMaxWidth ? { maxWidth: `${menuMaxWidth}px` } : undefined}
-          >
-            {menuContent}
-          </div>
-        ) : null}
       </div>
-      {isOpen && isBoundsMenu && boundsPortalHost
+      {isOpen && overlayHost
         ? createPortal(
-            <div
-              className="multi-select__menu absolute z-30 grid min-w-[220px] gap-2 rounded-[22px] border border-[color:var(--surface-border)] bg-[var(--surface-raised)] p-3 shadow-[var(--menu-shadow)]"
-              ref={menuRef}
-              style={{
-                left: `${menuBoundsPosition?.left ?? 16}px`,
-                top: `${menuBoundsPosition?.top ?? Math.max((rootRef.current?.getBoundingClientRect().bottom || 0) - (boundsPortalHost.getBoundingClientRect().top || 0) + 8, 16)}px`,
-                width: `${menuBoundsPosition?.width ?? Math.max(rootRef.current?.getBoundingClientRect().width ?? 220, 220)}px`,
-                maxWidth: `${menuBoundsPosition?.width ?? Math.max(rootRef.current?.getBoundingClientRect().width ?? 220, 220)}px`,
-                visibility: "visible"
-              }}
-            >
-              {menuContent}
-            </div>,
-            boundsPortalHost
+            <CenteredFilterOverlay compact={overlayLayout.compact} onClick={() => setIsOpen(false)}>
+              <Panel
+                ref={panelRef}
+                className={cn(
+                  modalPanelClassName,
+                  "relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full overflow-hidden p-5 bp-1024:w-[min(560px,calc(100%-1.5rem))] bp-1024:p-4"
+                )}
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Select ${label}`}
+                onClick={(event) => event.stopPropagation()}
+                style={
+                  overlayLayout.panelMaxHeight != null
+                    ? { maxHeight: `${overlayLayout.panelMaxHeight}px` }
+                    : undefined
+                }
+              >
+                {menuContent}
+              </Panel>
+            </CenteredFilterOverlay>,
+            overlayHost
           )
         : null}
     </div>
@@ -684,6 +636,15 @@ function BasicFilters({
             left.label.localeCompare(right.label)
         ),
     [equipmentOptions]
+  );
+  const addonMatchOptions = useMemo(
+    () => [
+      { value: "either", label: "Origin or destination", keywords: "either origin destination" },
+      { value: "origin", label: "Origin only", keywords: "origin only" },
+      { value: "destination", label: "Destination only", keywords: "destination only" },
+      { value: "both", label: "Origin and destination", keywords: "both origin destination" }
+    ],
+    []
   );
   const [originIcaoInput, setOriginIcaoInput] = useState(filters.origin[0] || "");
   const [destinationIcaoInput, setDestinationIcaoInput] = useState(filters.destination[0] || "");
@@ -858,74 +819,83 @@ function BasicFilters({
         </Field>
       </div>
 
-      <div className={gridClassNames.advanced}>
-        <RangeSlider
-          label="Flight Length"
-          min={0}
-          max={filterBounds.maxBlockMinutes}
-          step={60}
-          lowValue={filters.flightLengthMin}
-          highValue={filters.flightLengthMax}
-          onChange={([minValue, maxValue]) => {
-            onFilterChange("flightLengthMin", minValue);
-            onFilterChange("flightLengthMax", maxValue);
-          }}
-          formatValue={formatHoursOnly}
-        />
+      <div className="grid gap-3 bp-1024:grid-cols-2 bp-1400:grid-cols-1">
+        <div className="contents bp-1400:grid bp-1400:grid-cols-3 bp-1400:gap-3">
+          <SearchableMultiSelect
+            label="Aircraft"
+            placeholder="Search aircraft"
+            emptyLabel="No matching aircraft"
+            allLabel="All"
+            fullWidth
+            hideChips
+            showClearAction={false}
+            options={equipmentFilterOptions}
+            selectedValues={filters.equipment}
+            onChange={(value) => onFilterChange("equipment", value)}
+          />
 
-        <RangeSlider
-          label="Distance"
-          min={0}
-          max={filterBounds.maxDistanceNm}
-          step={100}
-          lowValue={filters.distanceMin}
-          highValue={filters.distanceMax}
-          onChange={([minValue, maxValue]) => {
-            onFilterChange("distanceMin", minValue);
-            onFilterChange("distanceMax", maxValue);
-          }}
-          formatValue={formatDistanceNm}
-        />
+          <TimeWindowFilter
+            label="Departure"
+            filterKey="localDepartureWindow"
+            filters={filters}
+            onFilterChange={onFilterChange}
+          />
 
-        <SearchableMultiSelect
-          label="Aircraft"
-          placeholder="Search aircraft"
-          emptyLabel="No matching aircraft"
-          allLabel="All"
-          fullWidth
-          hideChips
-          showClearAction={false}
-          options={equipmentFilterOptions}
-          selectedValues={filters.equipment}
-          onChange={(value) => onFilterChange("equipment", value)}
-        />
+          <TimeWindowFilter
+            label="Arrival"
+            filterKey="localArrivalWindow"
+            filters={filters}
+            onFilterChange={onFilterChange}
+          />
+        </div>
 
-        <TimeWindowFilter
-          label="Departure"
-          filterKey="localDepartureWindow"
-          filters={filters}
-          onFilterChange={onFilterChange}
-        />
+        <div className="contents bp-1400:grid bp-1400:grid-cols-2 bp-1400:gap-3">
+          <RangeSlider
+            label="Flight Length"
+            min={0}
+            max={filterBounds.maxBlockMinutes}
+            step={60}
+            lowValue={filters.flightLengthMin}
+            highValue={filters.flightLengthMax}
+            onChange={([minValue, maxValue]) => {
+              onFilterChange("flightLengthMin", minValue);
+              onFilterChange("flightLengthMax", maxValue);
+            }}
+            formatValue={formatHoursOnly}
+          />
 
-        <TimeWindowFilter
-          label="Arrival"
-          filterKey="localArrivalWindow"
-          filters={filters}
-          onFilterChange={onFilterChange}
-        />
+          <RangeSlider
+            label="Distance"
+            min={0}
+            max={filterBounds.maxDistanceNm}
+            step={100}
+            lowValue={filters.distanceMin}
+            highValue={filters.distanceMax}
+            onChange={([minValue, maxValue]) => {
+              onFilterChange("distanceMin", minValue);
+              onFilterChange("distanceMax", maxValue);
+            }}
+            formatValue={formatDistanceNm}
+          />
+        </div>
       </div>
 
       <div className={gridClassNames.addon}>
-        <SelectField
+        <SearchableMultiSelect
           label="Addon Match"
-          value={filters.addonMatchMode}
-          onChange={(event) => onFilterChange("addonMatchMode", event.target.value)}
-        >
-          <option value="either">Origin or destination</option>
-          <option value="origin">Origin only</option>
-          <option value="destination">Destination only</option>
-          <option value="both">Origin and destination</option>
-        </SelectField>
+          placeholder="Search addon match"
+          emptyLabel="No matching addon match modes"
+          allLabel="Origin or destination"
+          allowMultiple={false}
+          hideChips
+          searchable={false}
+          showClearAction={false}
+          showOptionMark={false}
+          showSingleSelectedLabel
+          options={addonMatchOptions}
+          selectedValues={[filters.addonMatchMode]}
+          onChange={(value) => onFilterChange("addonMatchMode", value[0] || "either")}
+        />
 
         <Field label="Addon Results" className="filter-block min-w-0">
           <div className="toggle-row toggle-row--single-line flex flex-nowrap gap-2">
@@ -1060,7 +1030,12 @@ function DutyScheduleFilters({
 
   return (
     <div className="duty-schedule-filters grid gap-3">
-      <div className={gridClassNames.routing}>
+      <div
+        className={cn(
+          gridClassNames.routing,
+          dutyFilters.buildMode === "airline" && "bp-1400:grid-cols-2"
+        )}
+      >
         <SearchableMultiSelect
           label="Build Mode"
           placeholder="Search build modes"
@@ -1162,64 +1137,68 @@ function DutyScheduleFilters({
           dutyFilters.buildMode === "location" ? gridClassNames.advancedDuty : gridClassNames.advanced
         }
       >
-        <RangeSlider
-          label="Flight Length"
-          min={0}
-          max={filterBounds.maxBlockMinutes}
-          step={60}
-          lowValue={dutyFilters.flightLengthMin}
-          highValue={dutyFilters.flightLengthMax}
-          onChange={([minValue, maxValue]) => {
-            onDutyFilterChange("flightLengthMin", minValue);
-            onDutyFilterChange("flightLengthMax", maxValue);
-          }}
-          formatValue={formatHoursOnly}
-        />
+        <div className="contents bp-1400:order-2 bp-1400:col-span-full bp-1400:grid bp-1400:grid-cols-2 bp-1400:gap-3">
+          <RangeSlider
+            label="Flight Length"
+            min={0}
+            max={filterBounds.maxBlockMinutes}
+            step={60}
+            lowValue={dutyFilters.flightLengthMin}
+            highValue={dutyFilters.flightLengthMax}
+            onChange={([minValue, maxValue]) => {
+              onDutyFilterChange("flightLengthMin", minValue);
+              onDutyFilterChange("flightLengthMax", maxValue);
+            }}
+            formatValue={formatHoursOnly}
+          />
 
-        <RangeSlider
-          label="Distance"
-          min={0}
-          max={filterBounds.maxDistanceNm}
-          step={100}
-          lowValue={dutyFilters.distanceMin}
-          highValue={dutyFilters.distanceMax}
-          onChange={([minValue, maxValue]) => {
-            onDutyFilterChange("distanceMin", minValue);
-            onDutyFilterChange("distanceMax", maxValue);
-          }}
-          formatValue={formatDistanceNm}
-        />
+          <RangeSlider
+            label="Distance"
+            min={0}
+            max={filterBounds.maxDistanceNm}
+            step={100}
+            lowValue={dutyFilters.distanceMin}
+            highValue={dutyFilters.distanceMax}
+            onChange={([minValue, maxValue]) => {
+              onDutyFilterChange("distanceMin", minValue);
+              onDutyFilterChange("distanceMax", maxValue);
+            }}
+            formatValue={formatDistanceNm}
+          />
+        </div>
 
-        <SearchableMultiSelect
-          label="Aircraft"
-          placeholder="Search aircraft"
-          emptyLabel="No matching aircraft"
-          allLabel="Select one aircraft"
-          allowMultiple={false}
-          hideChips
-          showClearAction={false}
-          showOptionMark={false}
-          showSingleSelectedLabel
-          options={dutyEquipmentSelectOptions}
-          selectedValues={dutyFilters.selectedEquipment ? [dutyFilters.selectedEquipment] : [""]}
-          onChange={(value) => onDutyFilterChange("selectedEquipment", value[0] || "")}
-        />
+        <div className="contents bp-1400:order-1 bp-1400:col-span-full bp-1400:grid bp-1400:grid-cols-2 bp-1400:gap-3">
+          <SearchableMultiSelect
+            label="Aircraft"
+            placeholder="Search aircraft"
+            emptyLabel="No matching aircraft"
+            allLabel="Select one aircraft"
+            allowMultiple={false}
+            hideChips
+            showClearAction={false}
+            showOptionMark={false}
+            showSingleSelectedLabel
+            options={dutyEquipmentSelectOptions}
+            selectedValues={dutyFilters.selectedEquipment ? [dutyFilters.selectedEquipment] : [""]}
+            onChange={(value) => onDutyFilterChange("selectedEquipment", value[0] || "")}
+          />
 
-        <SearchableMultiSelect
-          label="Duty Length"
-          placeholder="Search duty length"
-          emptyLabel="No matching duty lengths"
-          allLabel="Duty length"
-          allowMultiple={false}
-          hideChips
-          searchable={false}
-          showClearAction={false}
-          showOptionMark={false}
-          showSingleSelectedLabel
-          options={dutyLengthOptions}
-          selectedValues={[String(dutyFilters.dutyLength)]}
-          onChange={(value) => onDutyFilterChange("dutyLength", Number(value[0] || 2))}
-        />
+          <SearchableMultiSelect
+            label="Duty Length"
+            placeholder="Search duty length"
+            emptyLabel="No matching duty lengths"
+            allLabel="Duty length"
+            allowMultiple={false}
+            hideChips
+            searchable={false}
+            showClearAction={false}
+            showOptionMark={false}
+            showSingleSelectedLabel
+            options={dutyLengthOptions}
+            selectedValues={[String(dutyFilters.dutyLength)]}
+            onChange={(value) => onDutyFilterChange("dutyLength", Number(value[0] || 2))}
+          />
+        </div>
       </div>
 
       <div className={gridClassNames.addon}>
@@ -1579,7 +1558,7 @@ export default function FilterBar({
     <Panel
       data-docshot="planner-controls"
       className={cn(
-        "filter-bar app-scrollbar grid content-start gap-3 overflow-x-hidden rounded-[26px] p-5 bp-1024:rounded-[20px] bp-1024:p-4",
+        "filter-bar relative app-scrollbar grid content-start gap-3 overflow-x-hidden rounded-[26px] p-5 bp-1024:rounded-[20px] bp-1024:p-4",
         popupMode
           ? "max-h-none overflow-visible"
           : plannerControlsCollapsed

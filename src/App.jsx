@@ -1,4 +1,4 @@
-import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { DateTime } from "luxon";
 import FilterBar from "./components/FilterBar";
 import { AddonAirportPanel } from "./components/FilterBar";
@@ -68,6 +68,8 @@ const DEV_WINDOW_WIDTH_PRESETS = [
   { width: 1400, height: 900, label: "1400x900" },
   { width: 1024, height: 768, label: "1024x768" }
 ];
+const MAX_FLIGHT_BOARDS = 4;
+const DEFAULT_FLIGHT_BOARD_NAME = "Board 1";
 
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -563,20 +565,51 @@ function buildAddonScanLogReport(addonScan) {
 }
 
 function buildSavedSchedule(schedule, uiState) {
+  const persistedBoards = Array.isArray(uiState?.flightBoards) ? uiState.flightBoards : [];
+  const persistedActiveBoardId = String(uiState?.activeFlightBoardId || "").trim();
+  const activeBoard =
+    persistedBoards.find((board) => String(board?.id || "").trim() === persistedActiveBoardId) ||
+    persistedBoards[0] ||
+    null;
+  const activeBoardEntries = Array.isArray(activeBoard?.entries)
+    ? activeBoard.entries
+    : Array.isArray(uiState?.flightBoard)
+      ? uiState.flightBoard
+      : [];
+
   return {
     importedAt: schedule.importedAt,
     sourceFileName: schedule.importSummary?.sourceFileName || null,
     importSummary: schedule.importSummary,
     flights: schedule.flights,
-    shortlist: (uiState?.flightBoard || [])
+    shortlist: activeBoardEntries
       .map((entry) => entry.linkedFlightId)
       .filter(Boolean),
     uiState
   };
 }
 
+function buildFlightBoardTabId() {
+  return `flight-board:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeFlightBoardName(value, fallback = DEFAULT_FLIGHT_BOARD_NAME) {
+  const normalized = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized || fallback;
+}
+
 function buildBoardEntryId(seed = "") {
   return `board:${seed || "flight"}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createFlightBoard(name = DEFAULT_FLIGHT_BOARD_NAME, entries = []) {
+  return {
+    id: buildFlightBoardTabId(),
+    name: normalizeFlightBoardName(name, DEFAULT_FLIGHT_BOARD_NAME),
+    entries: Array.isArray(entries) ? entries : []
+  };
 }
 
 function normalizeSimBriefAircraftTypeOption(value) {
@@ -723,6 +756,37 @@ function reconcileBoardWithSchedule(currentBoard, nextFlights) {
       });
     })
     .filter(Boolean);
+}
+
+function normalizePersistedFlightBoards(uiState, flights) {
+  const persistedBoards = Array.isArray(uiState?.flightBoards) ? uiState.flightBoards : [];
+  const normalizedBoards = persistedBoards
+    .map((board, index) => {
+      const boardId = String(board?.id || "").trim() || buildFlightBoardTabId();
+      const boardName = normalizeFlightBoardName(board?.name, `Board ${index + 1}`);
+      const boardEntries = reconcileBoardWithSchedule(board?.entries || [], flights);
+      return {
+        id: boardId,
+        name: boardName,
+        entries: boardEntries
+      };
+    })
+    .slice(0, MAX_FLIGHT_BOARDS);
+
+  if (!normalizedBoards.length) {
+    const fallbackEntries = Array.isArray(uiState?.flightBoard)
+      ? reconcileBoardWithSchedule(uiState.flightBoard, flights)
+      : deriveLegacyFlightBoard(flights);
+    normalizedBoards.push(createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, fallbackEntries));
+  }
+
+  const activeFlightBoardId = String(uiState?.activeFlightBoardId || "").trim();
+  const activeBoardExists = normalizedBoards.some((board) => board.id === activeFlightBoardId);
+
+  return {
+    boards: normalizedBoards,
+    activeBoardId: activeBoardExists ? activeFlightBoardId : normalizedBoards[0].id
+  };
 }
 
 function repairBoardEntryAgainstSchedule(entry, flights = []) {
@@ -1095,7 +1159,8 @@ export default function App() {
   const initialViewportSize = readViewportSize();
   const initialBasicFilterSections = getDefaultBasicFilterSectionState(initialViewportSize);
   const [schedule, setSchedule] = useState(null);
-  const [flightBoard, setFlightBoard] = useState([]);
+  const [flightBoards, setFlightBoards] = useState([createFlightBoard()]);
+  const [activeFlightBoardId, setActiveFlightBoardId] = useState("");
   const [selectedFlightId, setSelectedFlightId] = useState(null);
   const [expandedBoardFlightId, setExpandedBoardFlightId] = useState(null);
   const [scheduleTableTimeDisplayMode, setScheduleTableTimeDisplayMode] = useState("local");
@@ -1184,6 +1249,28 @@ export default function App() {
       ? "Sync DVA"
       : "Sync from Delta Virtual";
   const currentWindowSizeLabel = `${viewportSize.width}x${viewportSize.height}`;
+  const activeFlightBoard = useMemo(() => {
+    if (!flightBoards.length) {
+      return null;
+    }
+
+    return (
+      flightBoards.find((board) => board.id === activeFlightBoardId) ||
+      flightBoards[0] ||
+      null
+    );
+  }, [flightBoards, activeFlightBoardId]);
+  const flightBoard = activeFlightBoard?.entries || [];
+
+  useEffect(() => {
+    if (!flightBoards.length) {
+      return;
+    }
+
+    if (!activeFlightBoardId || !flightBoards.some((board) => board.id === activeFlightBoardId)) {
+      setActiveFlightBoardId(flightBoards[0].id);
+    }
+  }, [flightBoards, activeFlightBoardId]);
   useEffect(() => {
     if (!isSettingsOpen) {
       return undefined;
@@ -1353,7 +1440,9 @@ export default function App() {
     if (!nextSchedule?.flights?.length) {
       startTransition(() => {
         setSchedule(null);
-        setFlightBoard([]);
+        const defaultBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
+        setFlightBoards([defaultBoard]);
+        setActiveFlightBoardId(defaultBoard.id);
         setPlannerMode("basic");
         setFilters(DEFAULT_FILTERS);
         setDutyFilters(DEFAULT_DUTY_FILTERS);
@@ -1387,8 +1476,11 @@ export default function App() {
       },
       nextBounds
     );
-    const nextFlightBoard = reconcileBoardWithSchedule(snapshot?.flightBoard || [], nextSchedule.flights);
-    const nextExpandedBoardFlightId = nextFlightBoard.some(
+    const nextFlightBoardState = normalizePersistedFlightBoards(snapshot, nextSchedule.flights);
+    const nextActiveBoard =
+      nextFlightBoardState.boards.find((board) => board.id === nextFlightBoardState.activeBoardId) ||
+      nextFlightBoardState.boards[0];
+    const nextExpandedBoardFlightId = (nextActiveBoard?.entries || []).some(
       (entry) => entry.boardEntryId === snapshot?.expandedBoardFlightId
     )
       ? snapshot.expandedBoardFlightId
@@ -1396,7 +1488,8 @@ export default function App() {
 
     startTransition(() => {
       setSchedule(nextSchedule);
-      setFlightBoard(nextFlightBoard);
+      setFlightBoards(nextFlightBoardState.boards);
+      setActiveFlightBoardId(nextFlightBoardState.activeBoardId);
       setPlannerMode(snapshot?.plannerMode === "duty" ? "duty" : "basic");
       setFilters(nextFilters);
       setDutyFilters(nextDutyFilters);
@@ -1622,7 +1715,9 @@ export default function App() {
 
         setTheme("light");
         setSchedule(null);
-        setFlightBoard([]);
+        const defaultBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
+        setFlightBoards([defaultBoard]);
+        setActiveFlightBoardId(defaultBoard.id);
         setFilters(DEFAULT_FILTERS);
         setDutyFilters(DEFAULT_DUTY_FILTERS);
         setSort(DEFAULT_SORT);
@@ -1731,11 +1826,9 @@ export default function App() {
           flights: savedSchedule.flights,
           importSummary: savedSchedule.importSummary
         });
-        setFlightBoard(
-          Array.isArray(savedUiState.flightBoard) && savedUiState.flightBoard.length
-            ? reconcileBoardWithSchedule(savedUiState.flightBoard, savedSchedule.flights)
-            : deriveLegacyFlightBoard(savedSchedule.flights)
-        );
+        const nextFlightBoardState = normalizePersistedFlightBoards(savedUiState, savedSchedule.flights);
+        setFlightBoards(nextFlightBoardState.boards);
+        setActiveFlightBoardId(nextFlightBoardState.activeBoardId);
         setFilters(
           normalizeFilters(
             {
@@ -1807,6 +1900,8 @@ export default function App() {
       plannerMode,
       filters,
       dutyFilters,
+      flightBoards,
+      activeFlightBoardId,
       flightBoard,
       plannerControlsCollapsed,
       basicAdvancedFiltersOpen,
@@ -1823,6 +1918,8 @@ export default function App() {
     plannerMode,
     filters,
     dutyFilters,
+    flightBoards,
+    activeFlightBoardId,
     flightBoard,
     plannerControlsCollapsed,
     basicAdvancedFiltersOpen,
@@ -2055,6 +2152,37 @@ export default function App() {
     String(simBriefUsername || "").trim() || String(simBriefPilotId || "").trim()
   );
 
+  function updateActiveFlightBoardEntries(nextEntriesOrUpdater) {
+    let resolvedEntries = null;
+    setFlightBoards((current) => {
+      const activeId = activeFlightBoardId && current.some((board) => board.id === activeFlightBoardId)
+        ? activeFlightBoardId
+        : current[0]?.id;
+      if (!activeId) {
+        const fallbackBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
+        resolvedEntries = [];
+        return [fallbackBoard];
+      }
+
+      return current.map((board) => {
+        if (board.id !== activeId) {
+          return board;
+        }
+
+        const nextEntries =
+          typeof nextEntriesOrUpdater === "function"
+            ? nextEntriesOrUpdater(board.entries || [])
+            : nextEntriesOrUpdater;
+        resolvedEntries = Array.isArray(nextEntries) ? nextEntries : [];
+        return {
+          ...board,
+          entries: resolvedEntries
+        };
+      });
+    });
+    return resolvedEntries;
+  }
+
   function persistScheduleSnapshot(nextSchedule, overrides = {}) {
     if (DOCSHOT_ENABLED || !nextSchedule) {
       return;
@@ -2065,6 +2193,8 @@ export default function App() {
         plannerMode: overrides.plannerMode ?? plannerMode,
         filters: overrides.filters ?? filters,
         dutyFilters: overrides.dutyFilters ?? dutyFilters,
+        flightBoards: overrides.flightBoards ?? flightBoards,
+        activeFlightBoardId: overrides.activeFlightBoardId ?? activeFlightBoardId,
         flightBoard: overrides.flightBoard ?? flightBoard,
         plannerControlsCollapsed:
           overrides.plannerControlsCollapsed ?? plannerControlsCollapsed,
@@ -2145,6 +2275,22 @@ export default function App() {
       importIssuesText = imported.importLog || "";
       const nextBounds = buildFilterBounds(imported.flights);
       const nextFlightBoard = reconcileBoardWithSchedule(flightBoard, imported.flights);
+      const effectiveActiveBoardId =
+        activeFlightBoardId && flightBoards.some((board) => board.id === activeFlightBoardId)
+          ? activeFlightBoardId
+          : flightBoards[0]?.id;
+      const baseFlightBoards = flightBoards.length ? flightBoards : [createFlightBoard()];
+      const nextFlightBoards = baseFlightBoards.map((board) =>
+        board.id === effectiveActiveBoardId
+          ? {
+              ...board,
+              entries: nextFlightBoard
+            }
+          : {
+              ...board,
+              entries: reconcileBoardWithSchedule(board.entries || [], imported.flights)
+            }
+      );
       const nextSchedule = {
         importedAt: imported.importedAt,
         flights: imported.flights,
@@ -2156,7 +2302,10 @@ export default function App() {
 
       startTransition(() => {
         setSchedule(nextSchedule);
-        setFlightBoard(nextFlightBoard);
+        setFlightBoards(nextFlightBoards);
+        if (effectiveActiveBoardId) {
+          setActiveFlightBoardId(effectiveActiveBoardId);
+        }
         setPlannerMode("basic");
         setFilters(normalizeFilters(DEFAULT_FILTERS, nextBounds));
         setDutyFilters(buildDefaultDutyFilters(nextBounds));
@@ -2171,6 +2320,8 @@ export default function App() {
         plannerMode: "basic",
         filters: normalizeFilters(DEFAULT_FILTERS, nextBounds),
         dutyFilters: buildDefaultDutyFilters(nextBounds),
+        flightBoards: nextFlightBoards,
+        activeFlightBoardId: effectiveActiveBoardId || nextFlightBoards[0]?.id || "",
         flightBoard: nextFlightBoard,
         sort: DEFAULT_SORT,
         selectedFlightId: imported.flights[0]?.flightId || null
@@ -2315,7 +2466,7 @@ export default function App() {
       .map((flightId) => schedule?.flights.find((flight) => flight.flightId === flightId) || null)
       .filter(Boolean);
     const nextFlightBoard = selectedFlights.map((flight) => buildBoardEntryFromFlight(flight));
-    setFlightBoard(nextFlightBoard);
+    updateActiveFlightBoardEntries(nextFlightBoard);
     setExpandedBoardFlightId(null);
     setSimBriefDispatchState({
       flightId: "",
@@ -2494,7 +2645,7 @@ export default function App() {
     }
 
     let nextFlightBoard = null;
-    setFlightBoard((current) => {
+    updateActiveFlightBoardEntries((current) => {
       if (current.some((entry) => entry.linkedFlightId === flightId)) {
         nextFlightBoard = current;
         return current;
@@ -2509,7 +2660,7 @@ export default function App() {
 
   function handleRemoveFromFlightBoard(flightId) {
     let nextFlightBoard = null;
-    setFlightBoard((current) => {
+    updateActiveFlightBoardEntries((current) => {
       nextFlightBoard = current.filter((entry) => entry.boardEntryId !== flightId);
       return nextFlightBoard;
     });
@@ -2530,7 +2681,7 @@ export default function App() {
       return;
     }
 
-    setFlightBoard((current) => {
+    updateActiveFlightBoardEntries((current) => {
       const sourceIndex = current.findIndex((entry) => entry.boardEntryId === sourceBoardEntryId);
       const targetIndex = current.findIndex((entry) => entry.boardEntryId === targetBoardEntryId);
 
@@ -2576,7 +2727,7 @@ export default function App() {
     const nextFlightBoard = flightBoard.map((item) =>
       item.boardEntryId === boardEntryId ? repairedEntry : item
     );
-    setFlightBoard(nextFlightBoard);
+    updateActiveFlightBoardEntries(nextFlightBoard);
     setStatusMessage(
       `Repaired ${repairedEntry.flightCode} ${repairedEntry.from}-${repairedEntry.to} from the current schedule.`
     );
@@ -2584,6 +2735,91 @@ export default function App() {
       boardEntryId,
       linkedFlightId: repairedEntry.linkedFlightId,
       flightCode: repairedEntry.flightCode
+    });
+  }
+
+  function handleSelectFlightBoard(boardId) {
+    const normalizedBoardId = String(boardId || "").trim();
+    if (!normalizedBoardId) {
+      return;
+    }
+    setActiveFlightBoardId(normalizedBoardId);
+    setExpandedBoardFlightId(null);
+    setSimBriefDispatchState({
+      flightId: "",
+      isDispatching: false,
+      message: ""
+    });
+  }
+
+  function handleCreateFlightBoard() {
+    if (flightBoards.length >= MAX_FLIGHT_BOARDS) {
+      return;
+    }
+
+    const nextBoard = createFlightBoard(`Board ${flightBoards.length + 1}`, []);
+    setFlightBoards((current) => [...current, nextBoard].slice(0, MAX_FLIGHT_BOARDS));
+    setActiveFlightBoardId(nextBoard.id);
+    setExpandedBoardFlightId(null);
+    setSimBriefDispatchState({
+      flightId: "",
+      isDispatching: false,
+      message: ""
+    });
+  }
+
+  function handleRenameFlightBoard(boardId, nextName) {
+    const normalizedBoardId = String(boardId || "").trim();
+    if (!normalizedBoardId) {
+      return;
+    }
+
+    const targetBoard = flightBoards.find((board) => board.id === normalizedBoardId);
+    if (!targetBoard) {
+      return;
+    }
+
+    const normalizedName = normalizeFlightBoardName(nextName, targetBoard.name);
+    if (normalizedName === targetBoard.name) {
+      return;
+    }
+
+    setFlightBoards((current) =>
+      current.map((board) =>
+        board.id === normalizedBoardId
+          ? {
+              ...board,
+              name: normalizedName
+            }
+          : board
+      )
+    );
+  }
+
+  function handleDeleteFlightBoard(boardId) {
+    const normalizedBoardId = String(boardId || "").trim();
+    if (!normalizedBoardId || flightBoards.length <= 1) {
+      return;
+    }
+
+    const boardIndex = flightBoards.findIndex((board) => board.id === normalizedBoardId);
+    if (boardIndex < 0) {
+      return;
+    }
+
+    const nextFlightBoards = flightBoards.filter((board) => board.id !== normalizedBoardId);
+    const nextActiveBoard =
+      activeFlightBoardId === normalizedBoardId
+        ? nextFlightBoards[Math.max(0, boardIndex - 1)] || nextFlightBoards[0] || null
+        : nextFlightBoards.find((board) => board.id === activeFlightBoardId) || nextFlightBoards[0] || null;
+
+    setFlightBoards(nextFlightBoards);
+    setActiveFlightBoardId(nextActiveBoard?.id || "");
+    setExpandedBoardFlightId(null);
+    setSimBriefDispatchState({
+      flightId: "",
+      isDispatching: false,
+      message: ""
     });
   }
 
@@ -3007,7 +3243,7 @@ export default function App() {
           }
         : entry
     );
-    setFlightBoard(nextFlightBoard);
+    updateActiveFlightBoardEntries(nextFlightBoard);
   }
 
   async function handleSimBriefDispatch() {
@@ -3152,7 +3388,7 @@ export default function App() {
             }
           : entry
       );
-      setFlightBoard(nextFlightBoard);
+      updateActiveFlightBoardEntries(nextFlightBoard);
       setSimBriefDispatchState({
         flightId,
         isDispatching: false,
@@ -3241,7 +3477,9 @@ export default function App() {
     try {
       await deleteStoredUserData();
       setSchedule(null);
-      setFlightBoard([]);
+      const defaultBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
+      setFlightBoards([defaultBoard]);
+      setActiveFlightBoardId(defaultBoard.id);
       setSelectedFlightId(null);
       setExpandedBoardFlightId(null);
       setScheduleTableTimeDisplayMode("local");
@@ -3533,7 +3771,7 @@ export default function App() {
 
             <div
               className={cn(
-                "grid min-h-0 gap-3 bp-1024:gap-2.5",
+                "grid min-w-0 min-h-0 gap-3 bp-1024:gap-2.5",
                 isPlannerControlsInlineCollapsed
                   ? "[grid-template-rows:auto_minmax(0,1fr)]"
                   : "grid-rows-[minmax(0,1fr)]"
@@ -3565,6 +3803,8 @@ export default function App() {
               {isPlannerControlsInlineCollapsed ? (
                 <DetailsPanel
                   shortlist={shortlist}
+                  flightBoards={flightBoards}
+                  activeFlightBoardId={activeFlightBoard?.id || ""}
                   expandedBoardFlightId={expandedBoardFlightId}
                   simBriefDispatchState={simBriefDispatchState}
                   simBriefCredentialsConfigured={simBriefCredentialsConfigured}
@@ -3576,6 +3816,10 @@ export default function App() {
                   onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
                   onRepairFlightBoardEntry={handleRepairFlightBoardEntry}
                   onReorderFlightBoard={handleReorderFlightBoard}
+                  onSelectFlightBoard={handleSelectFlightBoard}
+                  onCreateFlightBoard={handleCreateFlightBoard}
+                  onRenameFlightBoard={handleRenameFlightBoard}
+                  onDeleteFlightBoard={handleDeleteFlightBoard}
                   onSimBriefTypeChange={handleSimBriefTypeChange}
                   onSimBriefDispatch={handleSimBriefDispatch}
                   showFlightBoard
