@@ -8,3 +8,4 @@ src-tauri/deltava-pfpxsched-*.xml
 /simbrief/
 AGENTS.md
 git_workflow.md
+release.ps1
