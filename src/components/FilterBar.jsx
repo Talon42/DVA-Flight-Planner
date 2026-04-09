@@ -618,7 +618,7 @@ export function SearchableMultiSelect({
                 ref={panelRef}
                 className={cn(
                   modalPanelClassName,
-                  "relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full overflow-hidden p-5 bp-1024:w-[min(560px,calc(100%-1.5rem))] bp-1024:p-4"
+                  "relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full overflow-hidden border-2 border-[rgba(160,180,202,0.52)] p-5 dark:border-[color:var(--surface-border)] bp-1024:w-[min(560px,calc(100%-1.5rem))] bp-1024:p-4"
                 )}
                 role="dialog"
                 aria-modal="true"
