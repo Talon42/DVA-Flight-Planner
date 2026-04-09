@@ -9,6 +9,7 @@ import { getAirlineLogo } from "../lib/airlineBranding";
 import Panel from "./ui/Panel";
 import { Eyebrow } from "./ui/SectionHeader";
 import { cn } from "./ui/cn";
+import { bodyMdTextClassName, labelTextClassName } from "./ui/typography";
 
 const BODY_CELL_CONTENT_CLASS =
   "flex h-full min-h-0 w-full items-center leading-none";
@@ -22,13 +23,13 @@ function AddonAirportIndicator({ airportCode, addonAirports, missingInDatabase =
   if (missingInDatabase) {
     return (
       <span
-        className={cn(BODY_CELL_CONTENT_CLASS, "gap-1 font-semibold text-[var(--text-primary)]")}
+        className={cn(BODY_CELL_CONTENT_CLASS, bodyMdTextClassName, "gap-1 text-[var(--text-primary)]")}
         title="Airport does not exist in database."
         aria-label={`${normalizedAirportCode} airport does not exist in database`}
       >
         <span>{normalizedAirportCode}</span>
         <span
-          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--status-ambiguous-bg)] px-1 text-[0.62rem] font-bold text-[var(--delta-red)]"
+          className="inline-flex h-4 min-w-4 items-center justify-center rounded-none bg-[var(--status-ambiguous-bg)] px-1 text-[0.62rem] font-bold text-[var(--delta-red)]"
           aria-hidden="true"
         >
           !
@@ -42,10 +43,10 @@ function AddonAirportIndicator({ airportCode, addonAirports, missingInDatabase =
   }
 
   return (
-      <span className={cn(BODY_CELL_CONTENT_CLASS, "gap-1 font-semibold text-[var(--text-primary)]")}>
+      <span className={cn(BODY_CELL_CONTENT_CLASS, bodyMdTextClassName, "gap-1 text-[var(--text-primary)]")}>
       <span>{normalizedAirportCode}</span>
       <span
-        className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--status-resolved-bg)] px-1 text-[0.62rem] font-bold text-[var(--status-resolved-text)]"
+        className="inline-flex h-4 min-w-4 items-center justify-center rounded-none bg-[var(--status-resolved-bg)] px-1 text-[0.62rem] font-bold text-[var(--status-resolved-text)]"
         aria-label={`${normalizedAirportCode} addon airport`}
       >
         ✓
@@ -197,7 +198,7 @@ function buildScheduleColumnWidths(baseColumnSpecs, availableTableWidth, airline
 function getTableDensityConfig(layoutBucket) {
   if (layoutBucket === "compact") {
     return {
-      rowHeight: 36,
+      rowHeight: 46,
       columnScale: 0.82,
       airlineMinWidth: 140,
       airlineMaxWidth: 250,
@@ -207,7 +208,7 @@ function getTableDensityConfig(layoutBucket) {
 
   if (layoutBucket === "standard") {
     return {
-      rowHeight: 42,
+      rowHeight: 46,
       columnScale: 0.94,
       airlineMinWidth: 164,
       airlineMaxWidth: 320,
@@ -325,9 +326,11 @@ function buildColumns(
   addonAirports,
   layoutBucket,
   useNarrowDesktopColumns,
-  availableTableWidth
+  availableTableWidth,
+  viewportWidth
 ) {
   const isLocalMode = timeDisplayMode === "local";
+  const hideTimeColumns = viewportWidth < 1920;
   const useShortFlightLabel = layoutBucket !== "expanded";
   const useMinimalFlightLabel = layoutBucket === "compact";
   const useCompactDistanceLabel = layoutBucket === "compact";
@@ -388,7 +391,7 @@ function buildColumns(
     }
   ];
 
-  if (!useNarrowDesktopColumns) {
+  if (!useNarrowDesktopColumns && !hideTimeColumns) {
     baseColumnSpecs.push(
       {
         key: isLocalMode ? "stdLocal" : "stdUtc",
@@ -480,7 +483,8 @@ function SortButton({ label, sortKey, sort, onSort, isTimeColumn, timeDisplayMod
   return (
     <button
       className={cn(
-        "flex h-full w-full items-center gap-2 overflow-hidden border-b border-[color:transparent] px-3 py-2 text-left text-[0.74rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] transition-colors duration-150 hover:text-[var(--text-heading)] bp-1024:px-2",
+        "flex h-full w-full items-center gap-2 overflow-hidden border-b border-[color:transparent] px-3 py-2 text-left text-[var(--text-muted)] transition-colors duration-150 hover:text-[var(--text-heading)] bp-1024:px-2",
+        labelTextClassName,
         isActive && "border-b-[color:var(--delta-red)] text-[var(--text-heading)]"
       )}
       type="button"
@@ -490,14 +494,14 @@ function SortButton({ label, sortKey, sort, onSort, isTimeColumn, timeDisplayMod
         {isTimeColumn ? (
           <span className="inline-flex min-w-0 max-w-full items-center gap-2 whitespace-nowrap">
             <span className="min-w-0 truncate">{timeColumnTitle}</span>
-            <span className="flex shrink-0 items-center gap-2 text-[0.74rem] tracking-[0.12em]">
+            <span className={cn("flex shrink-0 items-center gap-2", labelTextClassName)}>
               <span className="whitespace-nowrap">{timeColumnModeLabel}</span>
               <span
                 className={cn(
-                  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[var(--text-muted)] transition-colors duration-150 hover:border-[color:var(--button-ghost-hover-border)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)]",
+                  "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-none border border-transparent text-[var(--text-muted)] transition-colors duration-150 hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)]",
                   timeDisplayMode === "local"
-                    ? "border-[color:rgba(62,129,191,0.48)] bg-[var(--chip-bg)] text-[var(--text-heading)]"
-                    : "border-[color:var(--line)] bg-[var(--input-bg)]"
+                    ? "bg-[var(--chip-bg)] text-[var(--text-heading)]"
+                    : "bg-[var(--input-bg)]"
                 )}
                 role="button"
                 tabIndex={0}
@@ -568,7 +572,8 @@ function TableBodyCell({ width, truncate = false, children, onClick, onDoubleCli
       <button
         type="button"
         className={cn(
-          "schedule-body-cell__button block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[0.84rem] font-medium text-[var(--text-primary)] outline-none transition-colors duration-150 hover:bg-[rgba(255,255,255,0.18)]"
+          "schedule-body-cell__button block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[var(--text-primary)] outline-none transition-colors duration-150 hover:bg-[rgba(255,255,255,0.18)]",
+          bodyMdTextClassName
         )}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
@@ -652,6 +657,7 @@ export default function FlightTable({
   sort,
   layoutBucket,
   useNarrowDesktopColumns = false,
+  viewportWidth,
   timeDisplayMode,
   addonAirports,
   onSort,
@@ -666,7 +672,8 @@ export default function FlightTable({
     addonAirports,
     layoutBucket,
     useNarrowDesktopColumns,
-    availableTableWidth
+    availableTableWidth,
+    viewportWidth
   );
   const densityConfig = getTableDensityConfig(layoutBucket);
   const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
@@ -814,7 +821,7 @@ export default function FlightTable({
       padding="none"
       data-docshot="schedule-table"
       className={cn(
-        "table-shell flex min-h-0 flex-col overflow-hidden rounded-[26px] bp-1024:rounded-[20px]",
+        "table-shell flex min-h-0 flex-col overflow-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] dark:border-[color:var(--surface-border)]",
         useNarrowDesktopColumns && "table-shell--narrow-columns"
       )}
     >

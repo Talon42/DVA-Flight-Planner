@@ -16,6 +16,12 @@ import {
 } from "./components/ui/patterns";
 import SectionHeader, { Eyebrow } from "./components/ui/SectionHeader";
 import { cn } from "./components/ui/cn";
+import {
+  bodySmTextClassName,
+  heroTitleTextClassName,
+  sectionTitleTextClassName,
+  supportCopyTextClassName
+} from "./components/ui/typography";
 import { DEFAULT_DUTY_FILTERS, DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
 import {
   getAircraftProfileOptions,
@@ -273,7 +279,8 @@ function FooterStat({ label, value, className = "" }) {
   return (
     <p
       className={cn(
-        "m-0 inline-flex items-baseline gap-1.5 text-[0.78rem] font-medium text-[var(--text-muted)] bp-1024:text-[0.72rem]",
+        "m-0 inline-flex items-baseline gap-1.5 text-[var(--text-muted)] bp-1024:text-[0.76rem]",
+        bodySmTextClassName,
         className
       )}
     >
@@ -289,7 +296,8 @@ function FooterLinkStat({ label, value, onClick, className = "" }) {
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-baseline gap-1.5 border-0 bg-transparent p-0 text-left text-[0.78rem] font-medium text-[var(--delta-red)] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--delta-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-panel)] bp-1024:text-[0.72rem]",
+        "inline-flex items-baseline gap-1.5 border-0 bg-transparent p-0 text-left text-[var(--delta-red)] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--delta-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-panel)] bp-1024:text-[0.76rem]",
+        bodySmTextClassName,
         className
       )}
     >
@@ -302,7 +310,7 @@ function FooterLinkStat({ label, value, onClick, className = "" }) {
 function ModalBackdrop({ children, onClick }) {
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center overflow-auto bg-[rgba(8,20,36,0.42)] p-4 backdrop-blur-md bp-1024:p-3"
+      className="fixed inset-0 z-50 grid place-items-center overflow-auto bg-[rgba(8,20,36,0.42)] p-4 bp-1024:p-3"
       role="presentation"
       onClick={onClick}
     >
@@ -3716,7 +3724,7 @@ export default function App() {
               alt="Delta Virtual Airlines logo"
               className="h-14 w-14 shrink-0 object-contain bp-1024:h-11 bp-1024:w-11"
             />
-            <h1 className="m-0 whitespace-nowrap text-[clamp(1.22rem,3vw,3.6rem)] leading-[0.96] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
+            <h1 className={cn("m-0 whitespace-nowrap text-[var(--text-heading)]", heroTitleTextClassName)}>
               {topbarTitle}
             </h1>
           </div>
@@ -3777,6 +3785,7 @@ export default function App() {
                 sort={sort}
                 layoutBucket={layoutBucket}
                 useNarrowDesktopColumns={usesPlannerControlsModal}
+                viewportWidth={viewportSize.width}
                 timeDisplayMode={scheduleTableTimeDisplayMode}
                 addonAirports={addonAirports}
                 onSort={handleSort}
@@ -3789,12 +3798,12 @@ export default function App() {
                 onAddToFlightBoard={handleAddToFlightBoard}
               />
             ) : (
-              <Panel className="grid content-start gap-3 rounded-[26px] bp-1024:rounded-[20px] bp-1024:p-4">
+              <Panel className="grid content-start gap-3 rounded-none bp-1024:p-4">
                 <Eyebrow>No Active Schedule</Eyebrow>
-                <h2 className="m-0 text-[1.14rem] font-semibold tracking-[-0.04em] bp-1024:text-[1.04rem]">
+                <h2 className={cn("m-0 bp-1024:text-[1.04rem]", sectionTitleTextClassName)}>
                   Import a PFPX XML file to start planning.
                 </h2>
-                <p className="m-0 max-w-[56ch] text-[0.94rem] leading-6 text-[var(--text-muted)] bp-1024:text-[0.88rem]">
+                <p className={cn("m-0 max-w-[56ch] text-[var(--text-muted)] bp-1024:text-[0.88rem]", supportCopyTextClassName)}>
                   The app validates airport coverage, converts local schedule times to
                   UTC, calculates route distance, and filters routes by compatible
                   aircraft families and equipment based on weight, capacity, and range.
@@ -3883,7 +3892,10 @@ export default function App() {
                     aria-expanded={isDevWindowMenuOpen}
                     aria-haspopup="menu"
                     disabled={!isDesktopAddonScanAvailable}
-                    className="inline-flex items-center gap-1 rounded-none border-0 bg-transparent p-0 text-[0.78rem] font-medium text-[var(--text-muted)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] bp-1024:text-[0.74rem]"
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-none border-0 bg-transparent p-0 text-[var(--text-muted)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] bp-1024:text-[0.76rem]",
+                      bodySmTextClassName
+                    )}
                     title={
                       isDesktopAddonScanAvailable
                         ? "Choose a responsive test window width"
@@ -3901,7 +3913,7 @@ export default function App() {
                   </button>
                   {isDevWindowMenuOpen ? (
                     <div
-                      className="absolute left-1/2 bottom-[calc(100%+0.5rem)] z-30 flex min-w-[180px] -translate-x-1/2 flex-col gap-1 rounded-3xl border border-[color:var(--surface-border)] bg-[var(--surface-raised)] p-2 shadow-[var(--menu-shadow)]"
+                      className="absolute left-1/2 bottom-[calc(100%+0.5rem)] z-30 flex min-w-[180px] -translate-x-1/2 flex-col gap-1 rounded-none border border-[color:transparent] bg-[var(--surface-raised)] p-2 shadow-none"
                       role="menu"
                       aria-label="Window size presets"
                     >
@@ -3910,7 +3922,7 @@ export default function App() {
                           key={option.width}
                           variant="ghost"
                           active={devWindowWidth === option.width}
-                          className="justify-start rounded-2xl px-3 py-2 text-[0.8rem]"
+                          className="justify-start rounded-none px-3 py-2 text-[0.8rem]"
                           role="menuitemradio"
                           aria-checked={devWindowWidth === option.width}
                           onClick={() => handleSelectDevWindowWidth(option.width)}
@@ -3923,7 +3935,10 @@ export default function App() {
                 </div>
               ) : null}
               <div
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.78rem] font-medium text-[var(--text-muted)] bp-1024:col-start-3 bp-1024:justify-self-end bp-1024:text-[0.72rem]"
+                className={cn(
+                  "flex flex-wrap items-center gap-x-3 gap-y-1 text-[var(--text-muted)] bp-1024:col-start-3 bp-1024:justify-self-end bp-1024:text-[0.76rem]",
+                  bodySmTextClassName
+                )}
                 aria-label="Copyright © 2026 Talon42"
               >
                 <span>Copyright &copy; 2026</span>
@@ -4028,7 +4043,7 @@ export default function App() {
             <Panel className={insetPanelClassName}>
               <SectionHeader eyebrow="About" title="Developer Information" />
 
-              <div className="grid gap-3 text-sm leading-6 text-[var(--text-muted)]">
+              <div className={cn("grid gap-3 text-[var(--text-muted)]", supportCopyTextClassName)}>
                 <p className="m-0">
                   Created by <strong>Jacob Benjamin (DVA11384)</strong> on GitHub as <strong>Talon42</strong>.
                 </p>
@@ -4087,7 +4102,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className="grid w-[min(520px,100%)] gap-5 rounded-[28px] bg-[var(--surface-raised)] shadow-[var(--menu-shadow)] bp-1024:gap-4"
+            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
             aria-label="Replace Saved Schedule"
@@ -4117,7 +4132,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className="grid w-[min(520px,100%)] gap-5 rounded-[28px] bg-[var(--surface-raised)] shadow-[var(--menu-shadow)] bp-1024:gap-4"
+            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
             aria-label="Delete User Info"
@@ -4147,7 +4162,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className="grid w-[min(520px,100%)] gap-5 rounded-[28px] bg-[var(--surface-raised)] shadow-[var(--menu-shadow)] bp-1024:gap-4"
+            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
             aria-label="Update Available"

@@ -2,8 +2,40 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+@font-face {
+  font-family: "Whitney";
+  src: url("./assets/fonts/whitneybook.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Whitney";
+  src: url("./assets/fonts/whitneymedium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Whitney";
+  src: url("./assets/fonts/whitneysemibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Whitney";
+  src: url("./assets/fonts/whitneybold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
-  --font-sans: "Segoe UI Variable Display", "Bahnschrift", "Segoe UI", sans-serif;
+  --font-sans: "Whitney", "Segoe UI", sans-serif;
   --breakpoint-bp-1024: 64rem;
   --breakpoint-bp-1400: 87.5rem;
   --breakpoint-bp-1920: 120rem;
@@ -21,33 +53,33 @@
   --text-primary: #102136;
   --text-heading: var(--delta-blue-deep);
   --text-muted: #64758a;
-  --line: rgba(10, 25, 46, 0.08);
-  --line-strong: rgba(16, 33, 54, 0.14);
-  --surface: rgba(241, 246, 252, 0.92);
-  --surface-border: rgba(196, 211, 228, 0.98);
-  --surface-raised: rgba(223, 233, 244, 0.98);
-  --surface-soft: rgba(232, 239, 248, 0.88);
-  --surface-panel: rgba(214, 225, 238, 0.97);
-  --surface-table-row: rgba(255, 255, 255, 0.4);
-  --surface-table-row-alt: rgba(248, 252, 255, 0.56);
+  --line: rgba(10, 25, 46, 0.04);
+  --line-strong: rgba(16, 33, 54, 0.08);
+  --surface: rgba(240, 245, 250, 0.98);
+  --surface-border: rgba(196, 211, 228, 0.22);
+  --surface-raised: rgba(229, 237, 245, 0.99);
+  --surface-soft: rgba(236, 242, 248, 0.98);
+  --surface-panel: rgba(221, 231, 241, 0.99);
+  --surface-table-row: rgba(248, 251, 254, 0.94);
+  --surface-table-row-alt: rgba(238, 244, 249, 0.98);
   --surface-table-row-selected:
     linear-gradient(90deg, rgba(0, 58, 112, 0.18), rgba(11, 31, 54, 0.08)),
     rgba(255, 255, 255, 0.84);
-  --surface-option: rgba(210, 222, 236, 0.98);
-  --surface-option-selected: rgba(0, 58, 112, 0.18);
-  --input-bg: rgba(234, 241, 248, 0.98);
+  --surface-option: rgba(224, 232, 241, 0.99);
+  --surface-option-selected: rgba(0, 58, 112, 0.12);
+  --input-bg: rgba(230, 237, 244, 0.99);
   --button-ghost-bg: rgba(223, 233, 244, 0.94);
-  --button-ghost-border: rgba(16, 33, 54, 0.1);
+  --button-ghost-border: rgba(16, 33, 54, 0.04);
   --button-ghost-text: var(--text-primary);
-  --button-ghost-hover-border: rgba(0, 58, 112, 0.25);
-  --button-ghost-hover-bg: rgba(255, 255, 255, 0.9);
+  --button-ghost-hover-border: rgba(0, 58, 112, 0.08);
+  --button-ghost-hover-bg: rgba(242, 247, 251, 1);
   --chip-bg: rgba(0, 58, 112, 0.08);
   --chip-border: rgba(0, 58, 112, 0.14);
   --chip-text: var(--delta-blue);
   --action-bg: rgba(16, 33, 54, 0.06);
   --slider-track: rgba(16, 33, 54, 0.1);
-  --shadow: 0 24px 54px rgba(10, 24, 43, 0.12);
-  --menu-shadow: 0 24px 54px rgba(10, 24, 43, 0.18);
+  --shadow: none;
+  --menu-shadow: none;
   --focus-outline: rgba(0, 58, 112, 0.18);
   --focus-border: rgba(0, 58, 112, 0.28);
   --route-banner:
@@ -65,7 +97,7 @@
   --planner-control-box-min-height: 44px;
   --planner-control-box-padding-y: 12px;
   --planner-control-box-padding-x: 14px;
-  --planner-control-box-radius: 14px;
+  --planner-control-box-radius: 0px;
 }
 
 :root[data-theme="dark"] {
@@ -77,33 +109,33 @@
   --text-primary: #ecf3fb;
   --text-heading: #f4f8fc;
   --text-muted: #99afc7;
-  --line: rgba(182, 204, 229, 0.14);
-  --line-strong: rgba(221, 233, 245, 0.18);
-  --surface: rgba(10, 24, 43, 0.78);
-  --surface-border: rgba(186, 209, 234, 0.14);
-  --surface-raised: rgba(10, 24, 43, 0.88);
-  --surface-soft: rgba(10, 24, 43, 0.74);
-  --surface-panel: rgba(15, 33, 54, 0.84);
-  --surface-table-row: rgba(8, 20, 36, 0.52);
-  --surface-table-row-alt: rgba(11, 26, 45, 0.62);
+  --line: rgba(182, 204, 229, 0.08);
+  --line-strong: rgba(221, 233, 245, 0.12);
+  --surface: rgba(10, 24, 43, 0.96);
+  --surface-border: rgba(186, 209, 234, 0.08);
+  --surface-raised: rgba(12, 28, 47, 0.98);
+  --surface-soft: rgba(13, 29, 49, 0.98);
+  --surface-panel: rgba(15, 33, 54, 0.99);
+  --surface-table-row: rgba(10, 24, 43, 0.96);
+  --surface-table-row-alt: rgba(13, 29, 49, 0.99);
   --surface-table-row-selected:
     linear-gradient(90deg, rgba(200, 16, 46, 0.3), rgba(0, 58, 112, 0.2)),
     rgba(10, 24, 43, 0.9);
-  --surface-option: rgba(12, 27, 45, 0.94);
-  --surface-option-selected: rgba(0, 58, 112, 0.32);
-  --input-bg: rgba(7, 18, 31, 0.88);
+  --surface-option: rgba(13, 29, 48, 0.99);
+  --surface-option-selected: rgba(0, 58, 112, 0.22);
+  --input-bg: rgba(8, 20, 36, 0.99);
   --button-ghost-bg: rgba(8, 20, 36, 0.78);
-  --button-ghost-border: rgba(186, 209, 234, 0.16);
+  --button-ghost-border: rgba(186, 209, 234, 0.08);
   --button-ghost-text: #f0f5fb;
-  --button-ghost-hover-border: rgba(214, 228, 244, 0.28);
-  --button-ghost-hover-bg: rgba(13, 30, 50, 0.94);
+  --button-ghost-hover-border: rgba(214, 228, 244, 0.12);
+  --button-ghost-hover-bg: rgba(16, 34, 55, 1);
   --chip-bg: rgba(0, 58, 112, 0.28);
   --chip-border: rgba(120, 166, 214, 0.28);
   --chip-text: #d4e6fb;
   --action-bg: rgba(236, 243, 251, 0.08);
   --slider-track: rgba(186, 209, 234, 0.2);
-  --shadow: 0 26px 60px rgba(0, 0, 0, 0.34);
-  --menu-shadow: 0 28px 64px rgba(0, 0, 0, 0.38);
+  --shadow: none;
+  --menu-shadow: none;
   --focus-outline: rgba(120, 166, 214, 0.28);
   --focus-border: rgba(150, 192, 235, 0.36);
   --route-banner:
@@ -155,6 +187,14 @@
 
   a {
     color: inherit;
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-sans);
+    font-size: inherit;
   }
 
   input::placeholder,

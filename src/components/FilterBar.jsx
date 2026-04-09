@@ -22,6 +22,13 @@ import {
   gridClassNames,
   toggleButtonClassName
 } from "./ui/forms";
+import {
+  bodySmTextClassName,
+  bodyMdTextClassName,
+  labelTextClassName,
+  sectionTitleTextClassName,
+  supportCopyTextClassName
+} from "./ui/typography";
 
 const TIME_WINDOW_OPTIONS = [
   { value: "", label: "Any time" },
@@ -103,7 +110,7 @@ function CenteredFilterOverlay({ children, onClick, compact = false }) {
   return (
     <div
       className={cn(
-        "absolute inset-0 z-[60] flex min-h-full w-full justify-center bg-[rgba(8,20,36,0.42)] p-4 backdrop-blur-md bp-1024:p-3",
+        "absolute inset-0 z-[60] flex min-h-full w-full justify-center bg-[rgba(8,20,36,0.42)] p-4 bp-1024:p-3",
         compact ? "items-start overflow-y-auto" : "items-center overflow-hidden"
       )}
       role="presentation"
@@ -142,15 +149,20 @@ function RangeSlider({
   return (
     <Field label={label} className="filter-block min-w-0">
       <div className={cn(fieldBodyClassName, "grid gap-3 px-4 py-3")}>
-        <div className="flex items-center justify-between gap-3 text-[0.82rem] text-[var(--text-heading)]">
-          <strong>{formatValue(lowValue)}</strong>
-          <strong>{formatValue(safeHighValue)}</strong>
+        <div
+          className={cn(
+            "flex items-center justify-between gap-3 text-[var(--text-heading)]",
+            bodySmTextClassName
+          )}
+        >
+          <span className="font-normal">{formatValue(lowValue)}</span>
+          <span className="font-normal">{formatValue(safeHighValue)}</span>
         </div>
 
         <div className="relative h-6">
-          <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[var(--slider-track)]" />
+          <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-none bg-[var(--slider-track)]" />
           <div
-            className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[var(--range-track-active)]"
+            className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-none bg-[var(--range-track-active)]"
             style={{
               left: `${lowPercent}%`,
               width: `${Math.max(highPercent - lowPercent, 0)}%`
@@ -369,14 +381,14 @@ export function SearchableMultiSelect({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className={fieldTitleClassName}>{label}</div>
-          <p className="m-0 text-[0.88rem] text-[var(--text-muted)]">
+          <p className={cn("m-0 text-[var(--text-muted)]", supportCopyTextClassName)}>
             {searchable ? placeholder || `Search ${label.toLowerCase()}` : `Select ${label.toLowerCase()}`}
           </p>
         </div>
         <Button
           variant="ghost"
           size="sm"
-          className="rounded-xl"
+          className="rounded-none"
           onClick={() => setIsOpen(false)}
         >
           Close
@@ -399,7 +411,7 @@ export function SearchableMultiSelect({
           <Button
             variant="ghost"
             size="sm"
-            className="multi-select__action rounded-xl"
+            className="multi-select__action rounded-none"
             onClick={() => onChange([])}
             disabled={!selectedValues.length}
           >
@@ -432,22 +444,23 @@ export function SearchableMultiSelect({
           return (
             <Fragment key={optionValue}>
               {showGroupLabel ? (
-                <div className="multi-select__group-label px-2 pb-1 pt-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                <div className={cn("multi-select__group-label px-2 pb-1 pt-2 text-[var(--text-muted)]", labelTextClassName)}>
                   {option.groupLabel}
                 </div>
               ) : null}
               <button
                 className={cn(
-                  "multi-select__option flex items-center justify-between gap-3 rounded-2xl border border-transparent px-3 py-2 text-left text-[0.82rem] font-semibold text-[var(--text-primary)] transition-colors duration-150 hover:border-[color:var(--button-ghost-hover-border)] hover:bg-[var(--surface-option)]",
+                  "multi-select__option flex items-center justify-between gap-3 rounded-none border border-transparent px-3 py-2 text-left text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-option)]",
+                  bodySmTextClassName,
                   selected &&
-                    "border-[color:rgba(62,129,191,0.36)] bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
+                    "bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
                 )}
                 type="button"
                 onClick={() => toggleValue(optionValue)}
               >
                 <span>{option.label}</span>
                 {showOptionMark ? (
-                  <span className="multi-select__option-mark text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  <span className={cn("multi-select__option-mark text-[var(--text-muted)]", labelTextClassName)}>
                     {selected ? "Selected" : "Add"}
                   </span>
                 ) : null}
@@ -457,7 +470,7 @@ export function SearchableMultiSelect({
         })}
 
         {!filteredOptions.length ? (
-          <div className="multi-select__empty rounded-2xl bg-[var(--surface-option)] px-3 py-4 text-center text-[0.78rem] font-semibold text-[var(--text-muted)]">
+          <div className={cn("multi-select__empty rounded-none bg-[var(--surface-option)] px-3 py-4 text-center text-[var(--text-muted)]", bodySmTextClassName)}>
             {emptyLabel}
           </div>
         ) : null}
@@ -512,7 +525,7 @@ export function SearchableMultiSelect({
             {selectedValues.map((value) => (
               <button
                 key={value}
-                className="multi-select__chip inline-flex items-center gap-1 rounded-full border border-[color:var(--chip-border)] bg-[var(--chip-bg)] px-2.5 py-1 text-[0.72rem] font-semibold text-[var(--chip-text)]"
+                className={cn("multi-select__chip inline-flex items-center gap-1 rounded-none border border-[color:transparent] bg-[var(--chip-bg)] px-2.5 py-1 text-[var(--chip-text)]", bodySmTextClassName)}
                 type="button"
                 onClick={() => removeValue(value)}
                 title={`Remove ${value}`}
@@ -903,14 +916,14 @@ function BasicFilters({
           />
 
           <TimeWindowFilter
-            label="Departure"
+            label="Departure Time"
             filterKey="localDepartureWindow"
             filters={filters}
             onFilterChange={onFilterChange}
           />
 
           <TimeWindowFilter
-            label="Arrival"
+            label="Arrival Time"
             filterKey="localArrivalWindow"
             filters={filters}
             onFilterChange={onFilterChange}
@@ -968,14 +981,14 @@ function BasicFilters({
         <Field label="Addon Results" className="filter-block min-w-0">
           <div className="toggle-row toggle-row--single-line flex flex-nowrap gap-2">
             <button
-              className={toggleButtonClassName(filters.addonFilterEnabled)}
+              className={toggleButtonClassName(filters.addonFilterEnabled, "addon")}
               type="button"
               onClick={() => onFilterChange("addonFilterEnabled", !filters.addonFilterEnabled)}
             >
               Addon Only
             </button>
             <button
-              className={toggleButtonClassName(filters.addonPriorityEnabled)}
+              className={toggleButtonClassName(filters.addonPriorityEnabled, "addon")}
               type="button"
               onClick={() => onFilterChange("addonPriorityEnabled", !filters.addonPriorityEnabled)}
             >
@@ -1100,8 +1113,9 @@ function DutyScheduleFilters({
     <div className="duty-schedule-filters grid gap-3">
       <div
         className={cn(
-          gridClassNames.routing,
-          dutyFilters.buildMode === "airline" && "bp-1400:grid-cols-2"
+          dutyFilters.buildMode === "airline"
+            ? "grid gap-3 bp-1400:grid-cols-2"
+            : gridClassNames.routing
         )}
       >
         <SearchableMultiSelect
@@ -1125,12 +1139,11 @@ function DutyScheduleFilters({
             label="Airline"
             placeholder="Search airlines"
             emptyLabel="No matching airlines"
-          allLabel="Select an airline"
-          allowMultiple={false}
-          fullWidth
-          hideChips
-          showClearAction={false}
-          showOptionMark={false}
+            allLabel="Select an airline"
+            allowMultiple={false}
+            hideChips
+            showClearAction={false}
+            showOptionMark={false}
             showSingleSelectedLabel
             options={dutyAirlineOptions}
             selectedValues={dutyFilters.selectedAirline ? [dutyFilters.selectedAirline] : [""]}
@@ -1190,7 +1203,7 @@ function DutyScheduleFilters({
       </div>
 
       {dutyFilters.buildMode === "location" && hasLocationSelection ? (
-        <div className="rounded-2xl border border-[color:var(--line)] bg-[var(--surface-panel)] px-4 py-3 text-sm leading-6 text-[var(--text-muted)]">
+        <div className={cn("rounded-none border border-[color:transparent] bg-[var(--surface-panel)] px-4 py-3 text-[var(--text-muted)]", supportCopyTextClassName)}>
           {dutyFilters.resolvedAirline ? (
             <p className="m-0">
               Random airline selected for this location: <strong>{dutyFilters.resolvedAirline}</strong>
@@ -1289,7 +1302,7 @@ function DutyScheduleFilters({
         <Field label="Addon Results" className="filter-block min-w-0">
           <div className="toggle-row toggle-row--single-line flex flex-nowrap gap-2">
             <button
-              className={toggleButtonClassName(dutyFilters.addonFilterEnabled)}
+              className={toggleButtonClassName(dutyFilters.addonFilterEnabled, "addon")}
               type="button"
               onClick={() =>
                 onDutyFilterChange("addonFilterEnabled", !dutyFilters.addonFilterEnabled)
@@ -1298,7 +1311,7 @@ function DutyScheduleFilters({
               Addon Only
             </button>
             <button
-              className={toggleButtonClassName(dutyFilters.addonPriorityEnabled)}
+              className={toggleButtonClassName(dutyFilters.addonPriorityEnabled, "addon")}
               type="button"
               onClick={() =>
                 onDutyFilterChange("addonPriorityEnabled", !dutyFilters.addonPriorityEnabled)
@@ -1364,15 +1377,15 @@ export function AddonAirportPanel({
           addonScan.roots.map((root) => (
             <div
               key={root}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] bg-[var(--input-bg)] px-4 py-3"
+              className="flex items-center justify-between gap-3 rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-4 py-3"
             >
-              <code className="[overflow-wrap:anywhere] text-[0.78rem] font-medium text-[var(--text-primary)]">
+              <code className={cn("[overflow-wrap:anywhere] text-[var(--text-primary)]", bodySmTextClassName)}>
                 {root}
               </code>
               <Button
                 variant="ghost"
                 size="sm"
-                className="rounded-xl"
+                className="rounded-none"
                 onClick={() => onRemoveAddonRoot(root)}
                 disabled={isAddonScanBusy}
               >
@@ -1480,7 +1493,7 @@ export function SimBriefSettingsPanel({
       </Field>
 
       <div
-        className="grid gap-4 rounded-[18px] border border-[color:var(--line)] bg-[var(--surface)] p-4"
+        className="grid gap-4 rounded-none border border-[color:transparent] bg-[var(--surface)] p-4"
         data-docshot="simbrief-custom-airframes"
       >
         <SectionHeader
@@ -1558,16 +1571,16 @@ export function SimBriefSettingsPanel({
               return (
                 <div
                   key={entry.internalId}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--line)] bg-[var(--input-bg)] px-4 py-3"
+                  className="flex items-center justify-between gap-3 rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-4 py-3"
                 >
                   <div className="min-w-0">
                     <strong>{entry.name || matchedType}</strong>
-                    <p className="m-0 [overflow-wrap:anywhere] text-[0.78rem] text-[var(--text-muted)]">{entry.internalId}</p>
+                    <p className={cn("m-0 [overflow-wrap:anywhere] text-[var(--text-muted)]", bodySmTextClassName)}>{entry.internalId}</p>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="rounded-xl"
+                    className="rounded-none"
                     onClick={() => onRemoveCustomAirframe(entry.internalId)}
                   >
                     Remove
@@ -1626,7 +1639,7 @@ export default function FilterBar({
     <Panel
       data-docshot="planner-controls"
       className={cn(
-        "filter-bar relative app-scrollbar grid content-start gap-3 overflow-x-hidden rounded-[26px] p-5 bp-1024:rounded-[20px] bp-1024:p-4",
+        "filter-bar relative app-scrollbar grid content-start gap-3 overflow-x-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] dark:border-[color:var(--surface-border)] p-5 bp-1024:p-4",
         popupMode
           ? "max-h-none overflow-visible"
           : plannerControlsCollapsed
@@ -1635,7 +1648,7 @@ export default function FilterBar({
       )}
     >
       <div
-        className="filter-heading filter-heading--planner-toggle flex items-start justify-between gap-3 rounded-2xl"
+        className="filter-heading filter-heading--planner-toggle flex items-start justify-between gap-3 rounded-none"
         onClick={handlePlannerHeaderClick}
         onKeyDown={handlePlannerHeaderKeyDown}
         role="button"
@@ -1644,22 +1657,24 @@ export default function FilterBar({
       >
         <div>
           <Eyebrow>Planner Controls</Eyebrow>
-          <h2 className="m-0 text-[1.2rem] font-semibold tracking-[-0.04em] bp-1024:text-[1rem]">
-            {plannerMode === "duty" ? "Build a generated duty schedule" : "Filter the active schedule"}
-          </h2>
         </div>
         <div
           className="filter-heading__actions flex flex-wrap items-center gap-2"
         >
           {!plannerControlsCollapsed ? (
-            <Button variant="ghost" size="sm" className="rounded-full" onClick={onReset}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-none !bg-[var(--delta-blue)] !text-white hover:!bg-[var(--delta-blue)] dark:!bg-[var(--delta-red)] dark:!text-white dark:hover:!bg-[var(--delta-red)]"
+              onClick={onReset}
+            >
               Reset
             </Button>
           ) : null}
           <Button
             variant="ghost"
             size="icon"
-            className="h-[34px] w-[34px] rounded-[10px] border-[color:var(--line)] bg-[var(--input-bg)] p-0 text-[var(--text-muted)] shadow-none bp-1024:h-8 bp-1024:w-8"
+            className="h-[34px] w-[34px] rounded-none border-[color:transparent] !bg-[var(--delta-blue)] p-0 !text-white hover:!bg-[var(--delta-blue)] shadow-none dark:!bg-[var(--delta-red)] dark:!text-white dark:hover:!bg-[var(--delta-red)] bp-1024:h-8 bp-1024:w-8"
             onClick={onTogglePlannerControls}
             aria-label={plannerControlsCollapsed ? "Show planner controls" : "Hide planner controls"}
             title={plannerControlsCollapsed ? "Show planner controls" : "Hide planner controls"}
@@ -1683,40 +1698,38 @@ export default function FilterBar({
       ) : (
         <>
           <div
-            className="planner-tabs inline-flex w-fit max-w-full flex-nowrap gap-1 rounded-full border border-[color:var(--line)] bg-[var(--surface-panel)] p-1"
+            className="planner-tabs flex w-fit max-w-full flex-nowrap items-end gap-6 border-b border-[color:var(--line)]"
             role="tablist"
             aria-label="Planner control tabs"
           >
-            <Button
-              variant="ghost"
-              active={plannerMode === "basic"}
+            <button
+              type="button"
               className={cn(
-                "planner-tab min-h-9 min-w-[160px] rounded-full border px-3 py-2 text-[0.9rem]",
+                "planner-tab -mb-px min-h-9 border-b-2 border-transparent px-0 pb-2 pt-1 text-[0.94rem] font-semibold leading-[1.2] tracking-[0.01em] transition-[color,opacity,border-color] duration-150",
                 plannerMode === "basic"
-                  ? "border-[color:rgba(62,129,191,0.5)] bg-[rgba(9,62,109,0.62)] text-white"
-                  : "border-transparent bg-transparent text-[var(--text-muted)]"
+                  ? "border-b-[color:var(--delta-red)] text-[var(--text-heading)] opacity-100"
+                  : "text-[color:color-mix(in srgb,var(--text-heading) 72%, transparent)] opacity-90 hover:text-[var(--text-heading)] hover:opacity-100"
               )}
               role="tab"
               aria-selected={plannerMode === "basic"}
               onClick={() => onPlannerModeChange("basic")}
             >
               Basic Filters
-            </Button>
-            <Button
-              variant="ghost"
-              active={plannerMode === "duty"}
+            </button>
+            <button
+              type="button"
               className={cn(
-                "planner-tab min-h-9 min-w-[160px] rounded-full border px-3 py-2 text-[0.9rem]",
+                "planner-tab -mb-px min-h-9 border-b-2 border-transparent px-0 pb-2 pt-1 text-[0.94rem] font-semibold leading-[1.2] tracking-[0.01em] transition-[color,opacity,border-color] duration-150",
                 plannerMode === "duty"
-                  ? "border-[color:rgba(62,129,191,0.5)] bg-[rgba(9,62,109,0.62)] text-white"
-                  : "border-transparent bg-transparent text-[var(--text-muted)]"
+                  ? "border-b-[color:var(--delta-red)] text-[var(--text-heading)] opacity-100"
+                  : "text-[color:color-mix(in srgb,var(--text-heading) 72%, transparent)] opacity-90 hover:text-[var(--text-heading)] hover:opacity-100"
               )}
               role="tab"
               aria-selected={plannerMode === "duty"}
               onClick={() => onPlannerModeChange("duty")}
             >
               Duty Schedule
-            </Button>
+            </button>
           </div>
 
           {plannerMode === "duty" ? (

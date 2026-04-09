@@ -15,14 +15,20 @@ import {
 import { modalPanelClassName, mutedTextClassName } from "./ui/patterns";
 import { Eyebrow } from "./ui/SectionHeader";
 import { cn } from "./ui/cn";
+import {
+  bodySmTextClassName,
+  bodyMdTextClassName,
+  labelTextClassName,
+  supportCopyTextClassName
+} from "./ui/typography";
 
 function DetailRow({ label, value }) {
   return (
-    <div className="grid gap-1 rounded-2xl border border-[color:var(--line)] bg-[var(--input-bg)] px-4 py-3">
-      <span className="text-[0.64rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+    <div className="grid gap-1 rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-4 py-3">
+      <span className={cn("text-[var(--text-muted)]", labelTextClassName)}>
         {label}
       </span>
-      <strong className="text-[0.88rem] font-semibold text-[var(--text-heading)]">{value}</strong>
+      <strong className={cn("text-[var(--text-heading)]", bodyMdTextClassName, "font-semibold")}>{value}</strong>
     </div>
   );
 }
@@ -41,7 +47,7 @@ function simplifyAirportName(value) {
 }
 
 const ROUTE_LINE_CLASS =
-  "route-banner__line h-px w-[clamp(2.25rem,72%,5.25rem)] bg-[var(--delta-red)]";
+  "route-banner__line h-[2px] w-[clamp(2.25rem,72%,5.25rem)] bg-[var(--delta-red)]";
 
 function FlightBoardAirline({ flight }) {
   const logoSrc = getAirlineLogo({
@@ -54,13 +60,13 @@ function FlightBoardAirline({ flight }) {
     <div className="flex min-w-0 items-center gap-2">
       {logoSrc ? (
         <img
-          className="h-4 w-4 shrink-0 object-contain"
+          className="h-6 w-6 shrink-0 object-contain"
           src={logoSrc}
           alt=""
           aria-hidden="true"
         />
       ) : null}
-      <span className="truncate text-[0.84rem] font-semibold text-[var(--text-primary)] dark:text-white">
+      <span className={cn("truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName, "font-semibold")}>
         {flight.flightCode}
       </span>
     </div>
@@ -74,7 +80,7 @@ function SimBriefLink({ href, children }) {
 
   return (
     <a
-      className="inline-flex min-h-9 items-center justify-center rounded-[14px] border border-[color:var(--button-ghost-border)] bg-[var(--button-ghost-bg)] px-3 py-2 text-[0.78rem] font-semibold text-[var(--button-ghost-text)] no-underline transition-colors duration-150 hover:border-[color:var(--button-ghost-hover-border)] hover:bg-[var(--button-ghost-hover-bg)]"
+      className={cn("inline-flex min-h-9 items-center justify-center rounded-none border border-transparent bg-[var(--button-ghost-bg)] px-3 py-2 text-[var(--button-ghost-text)] no-underline transition-colors duration-150 hover:bg-[var(--button-ghost-hover-bg)]", bodySmTextClassName, "font-medium")}
       href={href}
       target="_blank"
       rel="noreferrer"
@@ -116,7 +122,7 @@ function SimBriefSummary({ flight }) {
 function ModalBackdrop({ children, onClick }) {
   return (
     <div
-      className="absolute inset-0 z-[60] flex min-h-full w-full items-center justify-center overflow-hidden bg-[rgba(8,20,36,0.42)] p-4 backdrop-blur-md bp-1024:p-3"
+      className="absolute inset-0 z-[60] flex min-h-full w-full items-center justify-center overflow-hidden bg-[rgba(8,20,36,0.42)] p-4 bp-1024:p-3"
       role="presentation"
       onClick={onClick}
     >
@@ -221,14 +227,14 @@ function FlightCardAircraftSelector({
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className={fieldTitleClassName}>SimBrief aircraft</div>
-                    <p className="m-0 text-[0.88rem] text-[var(--text-muted)]">
+                    <p className={cn("m-0 text-[var(--text-muted)]", supportCopyTextClassName)}>
                       Search and apply one aircraft type to this flight card.
                     </p>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="rounded-xl"
+                    className="rounded-none"
                     onClick={() => setIsOpen(false)}
                   >
                     Close
@@ -254,15 +260,16 @@ function FlightCardAircraftSelector({
                     return (
                       <Fragment key={option.value}>
                         {showGroupLabel ? (
-                          <div className="px-2 pb-1 pt-2 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                          <div className={cn("px-2 pb-1 pt-2 text-[var(--text-muted)]", labelTextClassName)}>
                             {option.groupLabel}
                           </div>
                         ) : null}
                         <button
                           className={cn(
-                            "flex items-center justify-between gap-3 rounded-2xl border border-transparent px-3 py-2 text-left text-[0.82rem] font-semibold text-[var(--text-primary)] transition-colors duration-150 hover:border-[color:var(--button-ghost-hover-border)] hover:bg-[var(--surface-option)]",
+                            "flex items-center justify-between gap-3 rounded-none border border-transparent px-3 py-2 text-left text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-option)]",
+                            bodySmTextClassName,
                             isSelected &&
-                              "border-[color:rgba(62,129,191,0.36)] bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
+                              "bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
                           )}
                           type="button"
                           onClick={() => {
@@ -272,7 +279,7 @@ function FlightCardAircraftSelector({
                           }}
                         >
                           <span className="min-w-0 truncate">{option.label}</span>
-                          <span className="shrink-0 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                          <span className={cn("shrink-0 text-[var(--text-muted)]", labelTextClassName)}>
                             {isSelected ? "Selected" : "Add"}
                           </span>
                         </button>
@@ -281,7 +288,7 @@ function FlightCardAircraftSelector({
                   })}
 
                   {!filteredOptions.length ? (
-                    <div className="rounded-2xl bg-[var(--surface-option)] px-3 py-4 text-center text-[0.78rem] font-semibold text-[var(--text-muted)]">
+                    <div className={cn("rounded-none bg-[var(--surface-option)] px-3 py-4 text-center text-[var(--text-muted)]", bodySmTextClassName)}>
                       No matching aircraft
                     </div>
                   ) : null}
@@ -341,7 +348,7 @@ function SimBriefInlinePanel({
 
   return (
     <div
-      className="grid min-w-0 max-w-full gap-3 rounded-[18px] border border-[color:var(--line)] bg-[var(--surface-panel)] p-3"
+      className="grid min-w-0 max-w-full gap-3 rounded-none border border-[color:transparent] bg-[var(--surface-panel)] p-3"
       data-docshot="simbrief-dispatch-panel"
     >
       <FlightCardAircraftSelector
@@ -373,7 +380,7 @@ function SimBriefInlinePanel({
 
 function RepairInlinePanel({ flight, onRemoveFromFlightBoard, onRepairFlightBoardEntry }) {
   return (
-    <div className="grid min-w-0 max-w-full gap-3 rounded-[18px] border border-[color:var(--line)] bg-[var(--surface-panel)] p-3">
+    <div className="grid min-w-0 max-w-full gap-3 rounded-none border border-[color:transparent] bg-[var(--surface-panel)] p-3">
       <p className={mutedTextClassName}>
         This flight board entry is from a previous schedule and needs repair.
       </p>
@@ -396,8 +403,8 @@ function RepairInlinePanel({ flight, onRemoveFromFlightBoard, onRepairFlightBoar
 
 function FlightBoardCardSummary({ flight }) {
   return (
-    <div className="route-banner route-banner--board grid min-w-0 gap-2 rounded-[18px] bg-[var(--route-banner)] px-3 py-2.5 text-[var(--text-primary)] bp-1024:gap-1.5 bp-1024:px-2.5 bp-1024:py-2 dark:text-white">
-      <div className="route-banner__meta flex flex-wrap items-center justify-between gap-2 text-[0.78rem] bp-1024:gap-1.5">
+    <div className="route-banner route-banner--board grid min-w-0 gap-2 rounded-none bg-[var(--route-banner)] px-3 py-2.5 text-[var(--text-primary)] bp-1024:gap-1.5 bp-1024:px-2.5 bp-1024:py-2 dark:text-white">
+      <div className={cn("route-banner__meta flex flex-wrap items-center justify-between gap-2 bp-1024:gap-1.5", bodySmTextClassName)}>
         <FlightBoardAirline flight={flight} />
         <small className="text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]">
           {formatUtc(flight.stdUtc)}
@@ -405,7 +412,7 @@ function FlightBoardCardSummary({ flight }) {
       </div>
       <div className="grid min-w-0 gap-2 bp-1024:gap-1.5">
         <div className="grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_3.7rem] items-center gap-2.5 bp-1024:gap-2" aria-hidden="true">
-          <span className="text-left text-[1.1rem] font-semibold tracking-[-0.04em]">
+          <span className={cn("text-left text-[1.1rem] font-semibold tracking-[-0.03em]")}>
             {flight.from}
           </span>
           <span className="flex min-w-0 items-center gap-2">
@@ -417,19 +424,19 @@ function FlightBoardCardSummary({ flight }) {
             />
             <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
           </span>
-          <span className="text-right text-[1.1rem] font-semibold tracking-[-0.04em]">
+          <span className={cn("text-right text-[1.1rem] font-semibold tracking-[-0.03em]")}>
             {flight.to}
           </span>
         </div>
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 bp-1024:gap-2">
-          <small className="min-w-0 truncate text-[0.82rem] text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]">
+          <small className={cn("min-w-0 truncate text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
             {simplifyAirportName(flight.fromAirport)}
           </small>
-          <div className="grid shrink-0 grid-cols-2 items-center gap-4 whitespace-nowrap text-[0.82rem] text-[var(--text-muted)] bp-1024:gap-3 dark:text-[var(--route-banner-muted)]">
+          <div className={cn("grid shrink-0 grid-cols-2 items-center gap-4 whitespace-nowrap text-[var(--text-muted)] bp-1024:gap-3 dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
             <small>{formatDistanceNm(flight.distanceNm)}</small>
             <small>{formatDuration(flight.blockMinutes)}</small>
           </div>
-          <small className="min-w-0 truncate text-right text-[0.82rem] text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]">
+          <small className={cn("min-w-0 truncate text-right text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
             {simplifyAirportName(flight.toAirport)}
           </small>
         </div>
@@ -735,7 +742,7 @@ export default function DetailsPanel({
     <aside className="details-panel min-w-0 min-h-0">
       <Panel
         ref={panelRef}
-        className="details-card relative isolate flex h-full min-h-0 flex-col rounded-[26px] p-4 bp-1024:rounded-[20px] bp-1024:p-4"
+        className="details-card relative isolate flex h-full min-h-0 flex-col rounded-none border-2 border-[rgba(160,180,202,0.52)] dark:border-[color:var(--surface-border)] p-4 bp-1024:p-4"
         data-docshot="flight-board"
         data-menu-bounds
       >
@@ -758,7 +765,9 @@ export default function DetailsPanel({
                     <button
                       type="button"
                       className={cn(
-                        "min-w-0 w-full rounded-md px-2 py-0.5 text-[0.78rem] font-semibold whitespace-nowrap transition-colors",
+                        "min-w-0 w-full rounded-none px-2 py-0.5 whitespace-nowrap transition-colors",
+                        bodySmTextClassName,
+                        "font-medium",
                         isActive
                           ? "text-[var(--text-heading)] dark:text-white"
                           : "text-[var(--text-primary)] hover:text-[var(--text-heading)] dark:text-[var(--text-primary)] dark:hover:text-white"
@@ -776,7 +785,7 @@ export default function DetailsPanel({
                     </button>
                     <button
                       type="button"
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:text-[var(--text-heading)]"
+                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-none text-[var(--text-muted)] transition-colors hover:text-[var(--text-heading)]"
                       aria-label={`Rename ${board.name}`}
                       onClick={() => openRenameModal(board)}
                     >
@@ -789,7 +798,7 @@ export default function DetailsPanel({
                     </button>
                     <button
                       type="button"
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:text-[var(--delta-red)] disabled:cursor-not-allowed disabled:opacity-45"
+                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-none text-[var(--text-muted)] transition-colors hover:text-[var(--delta-red)] disabled:cursor-not-allowed disabled:opacity-45"
                       aria-label={`Delete ${board.name}`}
                       onClick={() => onDeleteFlightBoard?.(board.id)}
                       disabled={!canDeleteBoard}
@@ -806,7 +815,7 @@ export default function DetailsPanel({
               })}
               <button
                 type="button"
-                className="inline-flex h-7 w-7 flex-none shrink-0 items-center justify-center rounded-md border border-transparent text-[var(--text-muted)] transition-colors hover:border-[color:var(--line)] hover:text-[var(--text-heading)] disabled:cursor-not-allowed disabled:opacity-45"
+                className="inline-flex h-7 w-7 flex-none shrink-0 items-center justify-center rounded-none border border-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] disabled:cursor-not-allowed disabled:opacity-45"
                 aria-label="Add flight board"
                 onClick={() => onCreateFlightBoard?.()}
                 disabled={!canCreateBoard}
@@ -828,7 +837,7 @@ export default function DetailsPanel({
               <div key={`slot-${flight.boardEntryId}`} className="grid gap-3">
                 {placeholderIndex === index ? (
                   <div
-                    className="rounded-[20px] border border-dashed border-[color:rgba(62,129,191,0.34)] bg-[rgba(62,129,191,0.08)] transition-[height,opacity] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1.12)]"
+                    className="rounded-none border border-dashed border-[color:rgba(62,129,191,0.18)] bg-[rgba(62,129,191,0.06)] transition-[height,opacity] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1.12)]"
                     style={{ height: `${placeholderHeight}px`, opacity: placeholderHeight > 0 ? 1 : 0.55 }}
                     aria-hidden="true"
                   />
@@ -837,10 +846,10 @@ export default function DetailsPanel({
                   key={flight.boardEntryId}
                   ref={(node) => setItemRef(flight.boardEntryId, node)}
                   className={cn(
-                    "shortlist-item relative grid min-w-0 gap-1.5 rounded-[22px] border border-[color:var(--text-muted)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface-raised)_78%,white_22%),color-mix(in_srgb,var(--surface)_82%,var(--delta-blue)_8%))] px-2 py-1.5 text-[var(--text-primary)] transition-[transform,opacity,filter,border-color,background] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1.12)] bp-1024:gap-1 bp-1024:px-1.5 bp-1024:py-1.25 dark:border-[color:var(--line-strong)] dark:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--delta-blue-deep)_68%,var(--surface-raised)_32%),color-mix(in_srgb,var(--delta-blue)_30%,var(--surface)_70%))]",
+                    "shortlist-item relative grid min-w-0 gap-1.5 rounded-none border-2 border-[rgba(160,180,202,0.52)] bg-[var(--surface-raised)] px-2 py-1.5 text-[var(--text-primary)] transition-[transform,opacity,filter,background] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1.12)] dark:border-[color:var(--surface-border)] bp-1024:gap-1 bp-1024:px-1.5 bp-1024:py-1.25 dark:bg-[var(--surface-raised)]",
                     expandedBoardFlightId === flight.boardEntryId &&
-                      "z-20 border-[color:rgba(62,129,191,0.4)] shadow-[0_14px_30px_rgba(0,58,112,0.14)]",
-                    flight.isStale && "border-[color:rgba(200,16,46,0.26)]",
+                      "z-20 bg-[var(--surface-soft)]",
+                    flight.isStale && "bg-[color:rgba(200,16,46,0.08)]",
                     draggedBoardEntryId && "opacity-70 saturate-[0.82]"
                   )}
                   style={
@@ -850,14 +859,14 @@ export default function DetailsPanel({
                   }
                 >
                   <button
-                    className="shortlist-item__handle absolute left-1/2 top-0 z-10 flex h-5 w-12 -translate-x-1/2 -translate-y-px cursor-grab items-end justify-center rounded-b-[14px] border-x border-b border-[color:var(--text-muted)] bg-[color-mix(in_srgb,var(--surface-raised)_84%,white_16%)] pb-1 text-[var(--text-muted)] opacity-85 shadow-none hover:text-[var(--text-heading)] active:cursor-grabbing dark:border-[color:var(--line-strong)] dark:bg-[color-mix(in_srgb,var(--delta-blue-deep)_74%,var(--surface)_26%)] dark:text-[var(--route-banner-muted)] dark:hover:text-white"
+                    className="shortlist-item__handle absolute left-1/2 top-0 z-10 flex h-4 w-10 -translate-x-1/2 -translate-y-[2px] cursor-grab items-center justify-center rounded-b-[2px] border-x-2 border-b-2 border-[rgba(160,180,202,0.52)] bg-[var(--surface-raised)] text-[var(--text-muted)] opacity-95 shadow-none transition-colors hover:text-[var(--text-heading)] active:cursor-grabbing dark:border-[color:var(--surface-border)] dark:bg-[var(--surface-raised)] dark:text-[var(--route-banner-muted)] dark:hover:text-white"
                     type="button"
                     aria-label={`Reorder ${flight.flightCode}`}
                     onPointerDown={(event) => handleReorderHandlePointerDown(flight.boardEntryId, event)}
                   >
                     <span className="grid gap-0.5">
-                      <span className="block h-0.5 w-4 rounded-full bg-current/75" />
-                      <span className="block h-0.5 w-4 rounded-full bg-current/75" />
+                      <span className="block h-px w-3 rounded-none bg-current/70" />
+                      <span className="block h-px w-3 rounded-none bg-current/70" />
                     </span>
                   </button>
                   <div
@@ -911,7 +920,7 @@ export default function DetailsPanel({
             ))}
             {placeholderIndex === visibleShortlist.length ? (
               <div
-                className="rounded-[20px] border border-dashed border-[color:rgba(62,129,191,0.34)] bg-[rgba(62,129,191,0.08)] transition-[height,opacity] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1.12)]"
+                className="rounded-none border border-dashed border-[color:rgba(62,129,191,0.18)] bg-[rgba(62,129,191,0.06)] transition-[height,opacity] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1.12)]"
                 style={{ height: `${placeholderHeight}px`, opacity: placeholderHeight > 0 ? 1 : 0.55 }}
                 aria-hidden="true"
               />
@@ -938,7 +947,7 @@ export default function DetailsPanel({
                 <form className="grid gap-4" onSubmit={handleRenameSubmit}>
                   <div className="min-w-0">
                     <div className={fieldTitleClassName}>Rename flight board</div>
-                    <p className="m-0 text-[0.88rem] text-[var(--text-muted)]">
+                    <p className={cn("m-0 text-[var(--text-muted)]", supportCopyTextClassName)}>
                       Update the tab name shown in the flight board card.
                     </p>
                   </div>
@@ -975,11 +984,11 @@ export default function DetailsPanel({
           }}
           aria-hidden="true"
         >
-          <div className="relative rounded-[22px] border border-[color:var(--text-muted)] bg-[color:rgba(236,243,250,0.98)] px-2 py-1.5 text-[var(--text-primary)] shadow-[0_28px_60px_rgba(10,24,43,0.28)] ring-1 ring-[rgba(255,255,255,0.08)] [transform:scale(1.02)] dark:border-[color:var(--line-strong)] dark:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--delta-blue-deep)_68%,var(--surface-raised)_32%),color-mix(in_srgb,var(--delta-blue)_30%,var(--surface)_70%))] dark:text-white">
-            <div className="pointer-events-none absolute left-1/2 top-0 z-10 flex h-5 w-12 -translate-x-1/2 -translate-y-px items-end justify-center rounded-b-[14px] border-x border-b border-[color:var(--text-muted)] bg-[color:rgba(236,243,250,0.98)] pb-1 text-[var(--text-muted)] opacity-85 dark:border-[color:var(--line-strong)] dark:bg-[color-mix(in_srgb,var(--delta-blue-deep)_74%,var(--surface)_26%)] dark:text-[var(--route-banner-muted)]">
+          <div className="relative rounded-none border border-[color:transparent] bg-[var(--surface-raised)] px-2 py-1.5 text-[var(--text-primary)] shadow-none ring-0 [transform:scale(1.02)] dark:bg-[var(--surface-raised)] dark:text-white">
+            <div className="pointer-events-none absolute left-1/2 top-0 z-10 flex h-5 w-12 -translate-x-1/2 -translate-y-px items-end justify-center rounded-none border-x border-b border-[color:transparent] bg-[var(--surface-soft)] pb-1 text-[var(--text-muted)] opacity-85 dark:bg-[var(--surface-soft)] dark:text-[var(--route-banner-muted)]">
               <span className="grid gap-0.5">
-                <span className="block h-0.5 w-4 rounded-full bg-current/80" />
-                <span className="block h-0.5 w-4 rounded-full bg-current/80" />
+                <span className="block h-0.5 w-4 rounded-none bg-current/80" />
+                <span className="block h-0.5 w-4 rounded-none bg-current/80" />
               </span>
             </div>
             <FlightBoardCardSummary flight={draggedFlight} />

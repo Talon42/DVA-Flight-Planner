@@ -1,14 +1,15 @@
 import { cn } from "./cn";
+import { buttonTextClassName } from "./typography";
 
 const VARIANT_CLASSES = {
   primary:
-    "border-transparent bg-[var(--delta-blue)] text-white shadow-[0_10px_22px_rgba(0,58,112,0.2)] hover:brightness-105 disabled:brightness-100 dark:border-[color:rgba(255,255,255,0.06)] dark:bg-[linear-gradient(135deg,var(--delta-red)_0%,#7d0f24_100%)] dark:shadow-[0_10px_24px_rgba(125,15,36,0.28)]",
+    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 disabled:opacity-100 dark:bg-[var(--delta-red)]",
   ghost:
-    "border-[color:var(--button-ghost-border)] bg-[var(--button-ghost-bg)] text-[var(--button-ghost-text)] hover:border-[color:var(--button-ghost-hover-border)] hover:bg-[var(--button-ghost-hover-bg)]",
+    "border-transparent bg-[var(--button-ghost-bg)] text-[var(--button-ghost-text)] hover:bg-[var(--button-ghost-hover-bg)]",
   danger:
-    "border-transparent bg-[linear-gradient(135deg,var(--delta-red)_0%,#7d0f24_100%)] text-white shadow-[0_10px_22px_rgba(125,15,36,0.24)] hover:brightness-105 disabled:brightness-100",
+    "border-transparent bg-[var(--delta-red)] text-white hover:opacity-94 disabled:opacity-100",
   board:
-    "border-transparent bg-[var(--delta-blue)] text-white shadow-[0_8px_18px_rgba(0,58,112,0.18)] hover:brightness-105 disabled:brightness-100 dark:border-[color:rgba(255,255,255,0.06)] dark:bg-[linear-gradient(135deg,var(--delta-red)_0%,#7d0f24_100%)] dark:shadow-[0_8px_20px_rgba(125,15,36,0.24)]"
+    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 disabled:opacity-100 dark:bg-[var(--delta-red)]"
 };
 
 const SIZE_CLASSES = {
@@ -29,12 +30,13 @@ export default function Button({
   return (
     <Component
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-[14px] border font-semibold tracking-[-0.01em] transition-[background,border-color,color,box-shadow,transform] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex items-center justify-center gap-2 rounded-none border border-transparent transition-[background,color,opacity] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-60",
+        buttonTextClassName,
         SIZE_CLASSES[size],
         VARIANT_CLASSES[variant],
         active &&
           variant === "ghost" &&
-          "border-[color:rgba(0,58,112,0.25)] bg-[var(--chip-bg)] text-[var(--text-heading)]",
+          "bg-[var(--surface-option-selected)] text-[var(--text-heading)]",
         className
       )}
       type={Component === "button" ? type || "button" : undefined}

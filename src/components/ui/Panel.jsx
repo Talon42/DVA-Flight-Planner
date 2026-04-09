@@ -20,7 +20,7 @@ const Panel = forwardRef(function Panel({
     <Component
       ref={ref}
       className={cn(
-        "max-w-full overflow-hidden rounded-[26px] border border-[color:var(--surface-border)] bg-[var(--surface)] bg-clip-padding shadow-[var(--shadow)] ring-1 ring-inset ring-[rgba(255,255,255,0.04)] backdrop-blur-[18px]",
+        "max-w-full overflow-hidden rounded-none border border-[color:transparent] bg-[var(--surface)] bg-clip-padding shadow-none ring-0 backdrop-blur-none",
         paddingClass,
         className
       )}
