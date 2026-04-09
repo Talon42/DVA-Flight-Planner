@@ -148,10 +148,10 @@ function RangeSlider({
 
   return (
     <Field label={label} className="filter-block min-w-0">
-      <div className={cn(fieldBodyClassName, "grid gap-3 px-4 py-3")}>
+      <div className={cn(fieldBodyClassName, "grid min-h-[36px] gap-1.5 px-4 py-1.5")}>
         <div
           className={cn(
-            "flex items-center justify-between gap-3 text-[var(--text-heading)]",
+            "flex items-center justify-between gap-3 text-[var(--text-heading)] leading-none",
             bodySmTextClassName
           )}
         >
@@ -159,7 +159,7 @@ function RangeSlider({
           <span className="font-normal">{formatValue(safeHighValue)}</span>
         </div>
 
-        <div className="relative h-6">
+        <div className="relative h-4.5">
           <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-none bg-[var(--slider-track)]" />
           <div
             className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-none bg-[var(--range-track-active)]"
