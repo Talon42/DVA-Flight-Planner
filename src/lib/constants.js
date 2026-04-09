@@ -13,6 +13,8 @@ export const DEFAULT_FILTERS = {
   origin: [],
   destinationAirport: "",
   destination: [],
+  originOrDestinationAirport: "",
+  originOrDestination: [],
   route: "",
   aircraftFamily: "ALL",
   equipment: [],

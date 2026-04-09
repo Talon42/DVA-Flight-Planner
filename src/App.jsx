@@ -1083,8 +1083,12 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
   nextFilters.country = toSelectionArray(nextFilters.country);
   nextFilters.origin = toSelectionArray(nextFilters.origin, { uppercase: true });
   nextFilters.destination = toSelectionArray(nextFilters.destination, { uppercase: true });
+  nextFilters.originOrDestination = toSelectionArray(nextFilters.originOrDestination, {
+    uppercase: true
+  });
   nextFilters.originAirport = String(nextFilters.originAirport || "").trim();
   nextFilters.destinationAirport = String(nextFilters.destinationAirport || "").trim();
+  nextFilters.originOrDestinationAirport = String(nextFilters.originOrDestinationAirport || "").trim();
   nextFilters.addonFilterEnabled = Boolean(nextFilters.addonFilterEnabled);
   nextFilters.addonPriorityEnabled = Boolean(nextFilters.addonPriorityEnabled);
   nextFilters.addonMatchMode = ["either", "origin", "destination", "both"].includes(
@@ -1101,6 +1105,12 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
     nextFilters.destination = [String(nextFilters.destinationAirport).trim().toUpperCase()].filter(
       Boolean
     );
+  }
+
+  if (!nextFilters.originOrDestination.length && nextFilters.originOrDestinationAirport) {
+    nextFilters.originOrDestination = [
+      String(nextFilters.originOrDestinationAirport).trim().toUpperCase()
+    ].filter(Boolean);
   }
 
   if (!Array.isArray(nextFilters.equipment)) {
@@ -2000,6 +2010,18 @@ export default function App() {
         }
 
         if (
+          normalizedDeferredFilters.originOrDestination.length &&
+          !normalizedDeferredFilters.originOrDestination.includes(
+            String(flight.from || "").trim().toUpperCase()
+          ) &&
+          !normalizedDeferredFilters.originOrDestination.includes(
+            String(flight.to || "").trim().toUpperCase()
+          )
+        ) {
+          return false;
+        }
+
+        if (
           normalizedDeferredFilters.route &&
           !flight.route.includes(normalizedDeferredFilters.route.trim().toUpperCase())
         ) {
@@ -2516,6 +2538,17 @@ export default function App() {
           return {
             ...current,
             destination: icao ? [icao] : []
+          };
+        }
+
+        if (key === "originOrDestinationIcao") {
+          const icao = String(value || "")
+            .toUpperCase()
+            .replace(/[^A-Z]/g, "")
+            .slice(0, 4);
+          return {
+            ...current,
+            originOrDestination: icao ? [icao] : []
           };
         }
 

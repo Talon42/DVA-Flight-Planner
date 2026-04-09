@@ -614,6 +614,18 @@ function BasicFilters({
         })),
     [airportOptions]
   );
+  const originOrDestinationAirportOptions = useMemo(
+    () =>
+      airportOptions
+        .filter((airport) => airport.usedAsOrigin || airport.usedAsDestination)
+        .map((airport) => ({
+          value: airport.icao,
+          label: airport.name,
+          selectedLabel: airport.name,
+          keywords: `${airport.icao} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
+        })),
+    [airportOptions]
+  );
   const equipmentFilterOptions = useMemo(
     () =>
       [...equipmentOptions]
@@ -648,6 +660,9 @@ function BasicFilters({
   );
   const [originIcaoInput, setOriginIcaoInput] = useState(filters.origin[0] || "");
   const [destinationIcaoInput, setDestinationIcaoInput] = useState(filters.destination[0] || "");
+  const [originOrDestinationIcaoInput, setOriginOrDestinationIcaoInput] = useState(
+    filters.originOrDestination[0] || ""
+  );
 
   useEffect(() => {
     setOriginIcaoInput(filters.origin.length === 1 ? filters.origin[0] : "");
@@ -656,6 +671,12 @@ function BasicFilters({
   useEffect(() => {
     setDestinationIcaoInput(filters.destination.length === 1 ? filters.destination[0] : "");
   }, [filters.destination]);
+
+  useEffect(() => {
+    setOriginOrDestinationIcaoInput(
+      filters.originOrDestination.length === 1 ? filters.originOrDestination[0] : ""
+    );
+  }, [filters.originOrDestination]);
 
   function handleIcaoFieldChange(value, setInputValue) {
     const icao = String(value || "")
@@ -814,6 +835,53 @@ function BasicFilters({
               )
             }
             placeholder="KLAX"
+            maxLength={4}
+          />
+        </Field>
+
+        <SearchableMultiSelect
+          label="Orgin or Destination"
+          placeholder="Search airports"
+          emptyLabel="No matching airports"
+          allLabel="All"
+          allowMultiple={false}
+          hideChips
+          showClearAction={false}
+          showSingleSelectedLabel
+          filterQuery={originOrDestinationIcaoInput}
+          options={originOrDestinationAirportOptions}
+          selectedValues={filters.originOrDestination}
+          onChange={(value) => {
+            setOriginOrDestinationIcaoInput(value.length === 1 ? value[0] : "");
+            onFilterChange("originOrDestination", value);
+          }}
+        />
+        <Field label="ICAO" className="filter-block filter-block--icao min-w-0">
+          <input
+            className={fieldInputClassName}
+            type="text"
+            value={originOrDestinationIcaoInput}
+            onChange={(event) =>
+              handleIcaoFieldChange(event.target.value, setOriginOrDestinationIcaoInput)
+            }
+            onBlur={() =>
+              commitIcaoFieldValue(
+                "originOrDestination",
+                originOrDestinationIcaoInput,
+                originOrDestinationAirportOptions,
+                setOriginOrDestinationIcaoInput
+              )
+            }
+            onKeyDown={(event) =>
+              handleIcaoFieldKeyDown(
+                event,
+                "originOrDestination",
+                originOrDestinationIcaoInput,
+                originOrDestinationAirportOptions,
+                setOriginOrDestinationIcaoInput
+              )
+            }
+            placeholder="KATL"
             maxLength={4}
           />
         </Field>
