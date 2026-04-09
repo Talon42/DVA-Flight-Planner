@@ -1948,35 +1948,56 @@ export default function App() {
     isHydrating
   ]);
 
-  const airlines = schedule
-    ? [...new Set(schedule.flights.map((flight) => flight.airlineName))].sort()
-    : [];
+  const scheduleFlights = schedule?.flights || [];
+  const airlines = useMemo(
+    () => [...new Set(scheduleFlights.map((flight) => flight.airlineName))].sort(),
+    [scheduleFlights]
+  );
 
-  const equipmentOptions = schedule
-    ? [...new Set(schedule.flights.flatMap((flight) => flight.compatibleEquipment || []))]
+  const equipmentOptions = useMemo(
+    () =>
+      [...new Set(scheduleFlights.flatMap((flight) => flight.compatibleEquipment || []))]
         .filter(Boolean)
-        .sort()
-    : [];
+        .sort(),
+    [scheduleFlights]
+  );
   const dutyEquipmentOptions = getAircraftProfileOptions();
-  const airportOptions = buildAirportOptions(schedule?.flights || []);
-  const geoOptions = buildGeoOptions(airportOptions);
+  const airportOptions = useMemo(() => buildAirportOptions(scheduleFlights), [scheduleFlights]);
+  const geoOptions = useMemo(() => buildGeoOptions(airportOptions), [airportOptions]);
 
-  const filterBounds = buildFilterBounds(schedule?.flights || []);
-  const normalizedDeferredFilters = normalizeFilters(deferredFilters, filterBounds);
-  const normalizedDutyFilters = normalizeDutyFilters(dutyFilters, filterBounds);
-  const normalizedDeferredDutyFilters = normalizeDutyFilters(deferredDutyFilters, filterBounds);
-  const addonAirports = new Set(addonScan.airports);
+  const filterBounds = useMemo(() => buildFilterBounds(scheduleFlights), [scheduleFlights]);
+  const normalizedDeferredFilters = useMemo(
+    () => normalizeFilters(deferredFilters, filterBounds),
+    [deferredFilters, filterBounds]
+  );
+  const normalizedDutyFilters = useMemo(
+    () => normalizeDutyFilters(dutyFilters, filterBounds),
+    [dutyFilters, filterBounds]
+  );
+  const normalizedDeferredDutyFilters = useMemo(
+    () => normalizeDutyFilters(deferredDutyFilters, filterBounds),
+    [deferredDutyFilters, filterBounds]
+  );
+  const addonAirports = useMemo(() => new Set(addonScan.airports), [addonScan.airports]);
   const simBriefDispatchOptions = buildSimBriefDispatchOptions(
     simBriefAircraftTypes,
     simBriefCustomAirframes
   );
-  const qualifyingDutyAirlines = getDutyQualifyingAirlines(
-    schedule?.flights || [],
-    normalizedDutyFilters
+  const qualifyingDutyAirlines = useMemo(
+    () =>
+      getDutyQualifyingAirlines(
+        scheduleFlights,
+        normalizedDutyFilters
+      ),
+    [scheduleFlights, normalizedDutyFilters]
   );
 
-  const basicFilteredFlights = schedule
-    ? schedule.flights.filter((flight) => {
+  const basicFilteredFlights = useMemo(() => {
+    if (!schedule) {
+      return [];
+    }
+
+    return scheduleFlights.filter((flight) => {
         const fromAirport = getAirportByIcao(flight.from);
         const toAirport = getAirportByIcao(flight.to);
 
@@ -2092,11 +2113,15 @@ export default function App() {
         }
 
         return true;
-      })
-    : [];
+      });
+  }, [addonAirports, normalizedDeferredFilters, schedule, scheduleFlights]);
 
-  const dutyFilteredFlights = schedule
-    ? schedule.flights.filter((flight) => {
+  const dutyFilteredFlights = useMemo(() => {
+    if (!schedule) {
+      return [];
+    }
+
+    return scheduleFlights.filter((flight) => {
         if (normalizedDeferredDutyFilters.buildMode === "airline") {
           if (!normalizedDeferredDutyFilters.selectedAirline) {
             return false;
@@ -2155,12 +2180,12 @@ export default function App() {
         }
 
         return true;
-      })
-    : [];
+      });
+  }, [addonAirports, normalizedDeferredDutyFilters, schedule, scheduleFlights]);
 
   const activeFlights = plannerMode === "duty" ? dutyFilteredFlights : basicFilteredFlights;
 
-  const sortedFlights = (() => {
+  const sortedFlights = useMemo(() => {
     const sorted = sortFlights(activeFlights, sort);
     if (plannerMode === "duty") {
       return normalizedDeferredDutyFilters.addonPriorityEnabled
@@ -2173,7 +2198,15 @@ export default function App() {
     }
 
     return prioritizeAddonFlights(sorted, addonAirports, normalizedDeferredFilters.addonMatchMode);
-  })();
+  }, [
+    activeFlights,
+    addonAirports,
+    normalizedDeferredDutyFilters.addonPriorityEnabled,
+    normalizedDeferredFilters.addonMatchMode,
+    normalizedDeferredFilters.addonPriorityEnabled,
+    plannerMode,
+    sort
+  ]);
 
   const shortlist = flightBoard;
   const selectedShortlistFlight =

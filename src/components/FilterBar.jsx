@@ -30,6 +30,8 @@ import {
   supportCopyTextClassName
 } from "./ui/typography";
 
+const SLIDER_COMMIT_DELAY_MS = 250;
+
 const TIME_WINDOW_OPTIONS = [
   { value: "", label: "Any time" },
   { value: "red-eye", label: "Red Eye" },
@@ -129,6 +131,7 @@ function RangeSlider({
   lowValue,
   highValue,
   onChange,
+  onCommit,
   formatValue
 }) {
   const safeHighValue = Math.max(lowValue, highValue);
@@ -176,6 +179,7 @@ function RangeSlider({
             step={step}
             value={lowValue}
             onChange={handleLowChange}
+            onPointerUp={onCommit}
             aria-label={`${label} minimum`}
           />
           <input
@@ -186,12 +190,82 @@ function RangeSlider({
             step={step}
             value={safeHighValue}
             onChange={handleHighChange}
+            onPointerUp={onCommit}
             aria-label={`${label} maximum`}
           />
         </div>
       </div>
     </Field>
   );
+}
+
+function useTransientRangeSlider(lowValue, highValue, onCommit) {
+  const [draftValues, setDraftValues] = useState([lowValue, highValue]);
+  const commitTimeoutRef = useRef(null);
+  const latestDraftValuesRef = useRef([lowValue, highValue]);
+  const lastCommittedValuesRef = useRef([lowValue, highValue]);
+
+  useEffect(() => {
+    const nextValues = [lowValue, highValue];
+    latestDraftValuesRef.current = nextValues;
+    lastCommittedValuesRef.current = nextValues;
+    setDraftValues((current) =>
+      current[0] === nextValues[0] && current[1] === nextValues[1] ? current : nextValues
+    );
+  }, [highValue, lowValue]);
+
+  useEffect(() => {
+    return () => {
+      if (commitTimeoutRef.current) {
+        clearTimeout(commitTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function commitValues(values) {
+    if (
+      lastCommittedValuesRef.current[0] === values[0] &&
+      lastCommittedValuesRef.current[1] === values[1]
+    ) {
+      return;
+    }
+
+    lastCommittedValuesRef.current = values;
+    onCommit(values);
+  }
+
+  function scheduleCommit(values) {
+    if (commitTimeoutRef.current) {
+      clearTimeout(commitTimeoutRef.current);
+    }
+
+    commitTimeoutRef.current = setTimeout(() => {
+      commitTimeoutRef.current = null;
+      commitValues(values);
+    }, SLIDER_COMMIT_DELAY_MS);
+  }
+
+  function handleChange(nextValues) {
+    latestDraftValuesRef.current = nextValues;
+    setDraftValues(nextValues);
+    scheduleCommit(nextValues);
+  }
+
+  function flushCommit() {
+    if (commitTimeoutRef.current) {
+      clearTimeout(commitTimeoutRef.current);
+      commitTimeoutRef.current = null;
+    }
+
+    commitValues(latestDraftValuesRef.current);
+  }
+
+  return {
+    lowValue: draftValues[0],
+    highValue: draftValues[1],
+    onChange: handleChange,
+    onCommit: flushCommit
+  };
 }
 
 export function SearchableMultiSelect({
@@ -676,6 +750,22 @@ function BasicFilters({
   const [originOrDestinationIcaoInput, setOriginOrDestinationIcaoInput] = useState(
     filters.originOrDestination[0] || ""
   );
+  const flightLengthSlider = useTransientRangeSlider(
+    filters.flightLengthMin,
+    filters.flightLengthMax,
+    ([minValue, maxValue]) => {
+      onFilterChange("flightLengthMin", minValue);
+      onFilterChange("flightLengthMax", maxValue);
+    }
+  );
+  const distanceSlider = useTransientRangeSlider(
+    filters.distanceMin,
+    filters.distanceMax,
+    ([minValue, maxValue]) => {
+      onFilterChange("distanceMin", minValue);
+      onFilterChange("distanceMax", maxValue);
+    }
+  );
 
   useEffect(() => {
     setOriginIcaoInput(filters.origin.length === 1 ? filters.origin[0] : "");
@@ -936,12 +1026,10 @@ function BasicFilters({
             min={0}
             max={filterBounds.maxBlockMinutes}
             step={60}
-            lowValue={filters.flightLengthMin}
-            highValue={filters.flightLengthMax}
-            onChange={([minValue, maxValue]) => {
-              onFilterChange("flightLengthMin", minValue);
-              onFilterChange("flightLengthMax", maxValue);
-            }}
+            lowValue={flightLengthSlider.lowValue}
+            highValue={flightLengthSlider.highValue}
+            onChange={flightLengthSlider.onChange}
+            onCommit={flightLengthSlider.onCommit}
             formatValue={formatHoursOnly}
           />
 
@@ -950,12 +1038,10 @@ function BasicFilters({
             min={0}
             max={filterBounds.maxDistanceNm}
             step={100}
-            lowValue={filters.distanceMin}
-            highValue={filters.distanceMax}
-            onChange={([minValue, maxValue]) => {
-              onFilterChange("distanceMin", minValue);
-              onFilterChange("distanceMax", maxValue);
-            }}
+            lowValue={distanceSlider.lowValue}
+            highValue={distanceSlider.highValue}
+            onChange={distanceSlider.onChange}
+            onCommit={distanceSlider.onCommit}
             formatValue={formatDistanceNm}
           />
         </div>
@@ -1108,6 +1194,22 @@ function DutyScheduleFilters({
     ],
     []
   );
+  const flightLengthSlider = useTransientRangeSlider(
+    dutyFilters.flightLengthMin,
+    dutyFilters.flightLengthMax,
+    ([minValue, maxValue]) => {
+      onDutyFilterChange("flightLengthMin", minValue);
+      onDutyFilterChange("flightLengthMax", maxValue);
+    }
+  );
+  const distanceSlider = useTransientRangeSlider(
+    dutyFilters.distanceMin,
+    dutyFilters.distanceMax,
+    ([minValue, maxValue]) => {
+      onDutyFilterChange("distanceMin", minValue);
+      onDutyFilterChange("distanceMax", maxValue);
+    }
+  );
 
   return (
     <div className="duty-schedule-filters grid gap-3">
@@ -1224,12 +1326,10 @@ function DutyScheduleFilters({
             min={0}
             max={filterBounds.maxBlockMinutes}
             step={60}
-            lowValue={dutyFilters.flightLengthMin}
-            highValue={dutyFilters.flightLengthMax}
-            onChange={([minValue, maxValue]) => {
-              onDutyFilterChange("flightLengthMin", minValue);
-              onDutyFilterChange("flightLengthMax", maxValue);
-            }}
+            lowValue={flightLengthSlider.lowValue}
+            highValue={flightLengthSlider.highValue}
+            onChange={flightLengthSlider.onChange}
+            onCommit={flightLengthSlider.onCommit}
             formatValue={formatHoursOnly}
           />
 
@@ -1238,12 +1338,10 @@ function DutyScheduleFilters({
             min={0}
             max={filterBounds.maxDistanceNm}
             step={100}
-            lowValue={dutyFilters.distanceMin}
-            highValue={dutyFilters.distanceMax}
-            onChange={([minValue, maxValue]) => {
-              onDutyFilterChange("distanceMin", minValue);
-              onDutyFilterChange("distanceMax", maxValue);
-            }}
+            lowValue={distanceSlider.lowValue}
+            highValue={distanceSlider.highValue}
+            onChange={distanceSlider.onChange}
+            onCommit={distanceSlider.onCommit}
             formatValue={formatDistanceNm}
           />
         </div>

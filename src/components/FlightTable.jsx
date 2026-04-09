@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { FixedSizeList as List } from "react-window";
 import {
   formatDistanceNm,
@@ -666,17 +666,32 @@ export default function FlightTable({
   onAddToFlightBoard
 }) {
   const [availableTableWidth, setAvailableTableWidth] = useState(0);
-  const columns = buildColumns(
-    timeDisplayMode,
-    flights,
-    addonAirports,
-    layoutBucket,
-    useNarrowDesktopColumns,
-    availableTableWidth,
-    viewportWidth
+  const columns = useMemo(
+    () =>
+      buildColumns(
+        timeDisplayMode,
+        flights,
+        addonAirports,
+        layoutBucket,
+        useNarrowDesktopColumns,
+        availableTableWidth,
+        viewportWidth
+      ),
+    [
+      addonAirports,
+      availableTableWidth,
+      flights,
+      layoutBucket,
+      timeDisplayMode,
+      useNarrowDesktopColumns,
+      viewportWidth
+    ]
   );
   const densityConfig = getTableDensityConfig(layoutBucket);
-  const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
+  const totalWidth = useMemo(
+    () => columns.reduce((sum, column) => sum + column.width, 0),
+    [columns]
+  );
   const tableShellRef = useRef(null);
   const headerScrollRef = useRef(null);
   const listOuterRef = useRef(null);
@@ -805,14 +820,21 @@ export default function FlightTable({
     );
   }
 
-  const itemData = {
-    columns,
-    totalWidth,
-    flights: flights.slice(0, visibleFlightCount),
-    selectedFlightId,
-    onSelectFlight,
-    onAddToFlightBoard
-  };
+  const visibleFlights = useMemo(
+    () => flights.slice(0, visibleFlightCount),
+    [flights, visibleFlightCount]
+  );
+  const itemData = useMemo(
+    () => ({
+      columns,
+      totalWidth,
+      flights: visibleFlights,
+      selectedFlightId,
+      onSelectFlight,
+      onAddToFlightBoard
+    }),
+    [columns, onAddToFlightBoard, onSelectFlight, selectedFlightId, totalWidth, visibleFlights]
+  );
 
   return (
     <Panel
