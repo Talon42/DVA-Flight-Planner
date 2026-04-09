@@ -23,7 +23,11 @@ function AddonAirportIndicator({ airportCode, addonAirports, missingInDatabase =
   if (missingInDatabase) {
     return (
       <span
-        className={cn(BODY_CELL_CONTENT_CLASS, bodyMdTextClassName, "gap-1 text-[var(--text-primary)]")}
+        className={cn(
+          BODY_CELL_CONTENT_CLASS,
+          bodyMdTextClassName,
+          "gap-1 text-[var(--text-primary)] dark:text-[rgb(255,255,255)]"
+        )}
         title="Airport does not exist in database."
         aria-label={`${normalizedAirportCode} airport does not exist in database`}
       >
@@ -43,7 +47,13 @@ function AddonAirportIndicator({ airportCode, addonAirports, missingInDatabase =
   }
 
   return (
-      <span className={cn(BODY_CELL_CONTENT_CLASS, bodyMdTextClassName, "gap-1 text-[var(--text-primary)]")}>
+    <span
+      className={cn(
+        BODY_CELL_CONTENT_CLASS,
+        bodyMdTextClassName,
+        "gap-1 text-[var(--text-primary)] dark:text-[rgb(255,255,255)]"
+      )}
+    >
       <span>{normalizedAirportCode}</span>
       <span
         className="inline-flex h-4 min-w-4 items-center justify-center rounded-none bg-[var(--status-resolved-bg)] px-1 text-[0.62rem] font-bold text-[var(--status-resolved-text)]"
@@ -572,7 +582,7 @@ function TableBodyCell({ width, truncate = false, children, onClick, onDoubleCli
       <button
         type="button"
         className={cn(
-          "schedule-body-cell__button block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[var(--text-primary)] outline-none transition-colors duration-150 hover:bg-[rgba(255,255,255,0.18)]",
+          "schedule-body-cell__button block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[var(--text-primary)] outline-none transition-colors duration-150 hover:bg-[rgba(255,255,255,0.18)] dark:text-[rgb(255,255,255)]",
           bodyMdTextClassName
         )}
         onClick={onClick}
