@@ -30,7 +30,7 @@ import {
   supportCopyTextClassName
 } from "./ui/typography";
 
-const SLIDER_COMMIT_DELAY_MS = 250;
+const SLIDER_COMMIT_DELAY_MS = 500;
 
 const TIME_WINDOW_OPTIONS = [
   { value: "", label: "Any time" },
