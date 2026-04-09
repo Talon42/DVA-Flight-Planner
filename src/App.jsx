@@ -4027,7 +4027,7 @@ export default function App() {
               >
                 <span>Copyright &copy; 2026</span>
                 <a
-                  className="text-[var(--delta-blue)] no-underline hover:underline"
+                  className="text-[var(--delta-blue)] no-underline hover:underline dark:text-[rgb(255,255,255)]"
                   href="https://github.com/Talon42/DVA-Flight-Planner"
                   target="_blank"
                   rel="noreferrer"
