@@ -428,23 +428,28 @@ function FlightBoardCardSummary({ flight }) {
             {flight.to}
           </span>
         </div>
-        <div className="grid min-w-0 grid-cols-2 items-start gap-3 bp-1024:gap-2 bp-1400:hidden">
-          <small
-            className={cn(
-              "min-w-0 text-center text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]",
-              bodySmTextClassName
-            )}
-          >
-            {formatDistanceNm(flight.distanceNm)}
-          </small>
-          <small
-            className={cn(
-              "min-w-0 text-center text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]",
-              bodySmTextClassName
-            )}
-          >
-            {formatDuration(flight.blockMinutes)}
-          </small>
+        <div className="grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_3.7rem] items-start gap-2.5 bp-1024:gap-2 bp-1400:hidden">
+          <span aria-hidden="true" />
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_34px_minmax(0,1fr)] items-start gap-2">
+            <small
+              className={cn(
+                "min-w-0 text-center text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]",
+                bodySmTextClassName
+              )}
+            >
+              {formatDistanceNm(flight.distanceNm)}
+            </small>
+            <span aria-hidden="true" />
+            <small
+              className={cn(
+                "min-w-0 text-center text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]",
+                bodySmTextClassName
+              )}
+            >
+              {formatDuration(flight.blockMinutes)}
+            </small>
+          </div>
+          <span aria-hidden="true" />
         </div>
         <div className="hidden min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 bp-1400:grid">
           <small className={cn("min-w-0 truncate text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
