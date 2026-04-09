@@ -428,11 +428,29 @@ function FlightBoardCardSummary({ flight }) {
             {flight.to}
           </span>
         </div>
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 bp-1024:gap-2">
+        <div className="grid min-w-0 grid-cols-2 items-start gap-3 bp-1024:gap-2 bp-1400:hidden">
+          <small
+            className={cn(
+              "min-w-0 text-center text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]",
+              bodySmTextClassName
+            )}
+          >
+            {formatDistanceNm(flight.distanceNm)}
+          </small>
+          <small
+            className={cn(
+              "min-w-0 text-center text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]",
+              bodySmTextClassName
+            )}
+          >
+            {formatDuration(flight.blockMinutes)}
+          </small>
+        </div>
+        <div className="hidden min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 bp-1400:grid">
           <small className={cn("min-w-0 truncate text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
             {simplifyAirportName(flight.fromAirport)}
           </small>
-          <div className={cn("grid shrink-0 grid-cols-2 items-center gap-4 whitespace-nowrap text-[var(--text-muted)] bp-1024:gap-3 dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
+          <div className={cn("grid shrink-0 grid-cols-2 items-center gap-4 whitespace-nowrap text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
             <small>{formatDistanceNm(flight.distanceNm)}</small>
             <small>{formatDuration(flight.blockMinutes)}</small>
           </div>
