@@ -76,6 +76,7 @@ const DEV_WINDOW_WIDTH_PRESETS = [
 ];
 const MAX_FLIGHT_BOARDS = 4;
 const DEFAULT_FLIGHT_BOARD_NAME = "Board 1";
+const BOOT_SPLASH_HIDE_DELAY_MS = 200;
 
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -1225,6 +1226,7 @@ export default function App() {
   const [isImporting, setIsImporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
+  const [shouldAwaitRestoredScheduleStartup, setShouldAwaitRestoredScheduleStartup] = useState(false);
   const [isAddonScanBusy, setIsAddonScanBusy] = useState(false);
   const [isSimBriefSaving, setIsSimBriefSaving] = useState(false);
   const [isDeletingUserData, setIsDeletingUserData] = useState(false);
@@ -1279,6 +1281,15 @@ export default function App() {
     );
   }, [flightBoards, activeFlightBoardId]);
   const flightBoard = activeFlightBoard?.entries || [];
+  const haveDeferredStartupFiltersSettled =
+    deferredFilters === filters && deferredDutyFilters === dutyFilters;
+  const hasRestoredScheduleStartupSettled =
+    Boolean(schedule?.flights?.length) &&
+    haveDeferredStartupFiltersSettled &&
+    Boolean(activeFlightBoard);
+  const isStartupReady =
+    !isHydrating &&
+    (!shouldAwaitRestoredScheduleStartup || hasRestoredScheduleStartupSettled);
 
   useEffect(() => {
     if (!flightBoards.length) {
@@ -1289,6 +1300,45 @@ export default function App() {
       setActiveFlightBoardId(flightBoards[0].id);
     }
   }, [flightBoards, activeFlightBoardId]);
+
+  useEffect(() => {
+    if (!shouldAwaitRestoredScheduleStartup || !hasRestoredScheduleStartupSettled) {
+      return;
+    }
+
+    setShouldAwaitRestoredScheduleStartup(false);
+  }, [hasRestoredScheduleStartupSettled, shouldAwaitRestoredScheduleStartup]);
+
+  useEffect(() => {
+    let timeoutHandle = null;
+    const splash = typeof document !== "undefined" ? document.getElementById("boot-splash") : null;
+
+    if (!isStartupReady) {
+      if (typeof document !== "undefined") {
+        delete document.body.dataset.appReady;
+      }
+      if (splash) {
+        splash.hidden = false;
+      }
+      return undefined;
+    }
+
+    if (typeof document !== "undefined") {
+      document.body.dataset.appReady = "true";
+    }
+
+    timeoutHandle = window.setTimeout(() => {
+      if (splash) {
+        splash.hidden = true;
+      }
+    }, BOOT_SPLASH_HIDE_DELAY_MS);
+
+    return () => {
+      if (timeoutHandle !== null) {
+        window.clearTimeout(timeoutHandle);
+      }
+    };
+  }, [isStartupReady]);
   useEffect(() => {
     if (!isSettingsOpen) {
       return undefined;
@@ -1839,6 +1889,7 @@ export default function App() {
             ? uiStateResult.value
             : savedSchedule.uiState || {};
         const defaultBasicFilterSections = getDefaultBasicFilterSectionState(readViewportSize());
+        setShouldAwaitRestoredScheduleStartup(true);
         setSchedule({
           importedAt: savedSchedule.importedAt,
           flights: savedSchedule.flights,

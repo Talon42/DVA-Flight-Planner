@@ -8,6 +8,27 @@
     />
     <link rel="icon" type="image/png" href="/src/data/images/DAL.png" />
     <link rel="preload" as="image" href="/src/data/images/DAL.png" />
+    <link
+      rel="preload"
+      href="/src/assets/fonts/whitneybook.otf"
+      as="font"
+      type="font/otf"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/src/assets/fonts/whitneysemibold.otf"
+      as="font"
+      type="font/otf"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/src/assets/fonts/whitneybold.otf"
+      as="font"
+      type="font/otf"
+      crossorigin
+    />
     <title>Flight Planner</title>
     <script>
       (function () {
@@ -20,9 +41,44 @@
       })();
     </script>
     <style>
+      @font-face {
+        font-family: "Whitney Boot";
+        src: url("/src/assets/fonts/whitneybook.otf") format("opentype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: "Whitney Boot";
+        src: url("/src/assets/fonts/whitneysemibold.otf") format("opentype");
+        font-weight: 600;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: "Whitney Boot";
+        src: url("/src/assets/fonts/whitneybold.otf") format("opentype");
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+
       :root {
+        --boot-font-sans: "Whitney Boot", "Whitney", "Segoe UI", sans-serif;
+        --boot-splash-width: 720px;
+        --boot-card-width: 560px;
+        --boot-eyebrow-size: 0.78rem;
+        --boot-eyebrow-line-height: 1.2;
+        --boot-title-size: clamp(1.75rem, 2.5vw, 2.7rem);
+        --boot-title-line-height: 0.96;
+        --boot-copy-size: 0.9rem;
+        --boot-copy-line-height: 1.6;
+        --boot-brand-size: clamp(2rem, 3vw, 3.6rem);
+        --boot-brand-line-height: 0.96;
         color-scheme: light;
-        font-family: "Segoe UI Variable Display", "Bahnschrift", "Segoe UI", sans-serif;
+        font-family: var(--boot-font-sans);
         background:
           radial-gradient(circle at top left, rgba(11, 31, 54, 0.34), transparent 22%),
           radial-gradient(circle at top right, rgba(0, 58, 112, 0.24), transparent 24%),
@@ -37,8 +93,20 @@
         min-height: 100%;
       }
 
+      html,
       body {
         min-height: 100vh;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top left, rgba(11, 31, 54, 0.34), transparent 22%),
+          radial-gradient(circle at top right, rgba(0, 58, 112, 0.24), transparent 24%),
+          linear-gradient(155deg, #e4ebf4 0%, #dbe4ef 48%, #d1dce9 100%);
+      }
+
+      #root {
+        position: relative;
+        min-height: 100vh;
+        background: transparent;
       }
 
       #boot-splash {
@@ -48,6 +116,7 @@
         align-content: center;
         justify-items: center;
         padding: 24px;
+        font-family: var(--boot-font-sans);
         background:
           radial-gradient(circle at top left, rgba(11, 31, 54, 0.34), transparent 22%),
           radial-gradient(circle at top right, rgba(0, 58, 112, 0.24), transparent 24%),
@@ -63,6 +132,14 @@
           radial-gradient(circle at top right, rgba(0, 58, 112, 0.16), transparent 30%),
           linear-gradient(155deg, #070f1b 0%, #121528 48%, #0f2135 100%);
         color: #ecf3fb;
+      }
+
+      :root[data-theme="dark"] html,
+      :root[data-theme="dark"] body {
+        background:
+          radial-gradient(circle at top left, rgba(200, 16, 46, 0.3), transparent 28%),
+          radial-gradient(circle at top right, rgba(0, 58, 112, 0.16), transparent 30%),
+          linear-gradient(155deg, #070f1b 0%, #121528 48%, #0f2135 100%);
       }
 
       :root[data-theme="dark"] #boot-splash {
@@ -98,7 +175,7 @@
       }
 
       .boot-layout {
-        width: min(720px, 100%);
+        width: min(var(--boot-splash-width), calc(100vw - 48px));
         display: grid;
         gap: 24px;
         justify-items: center;
@@ -120,8 +197,10 @@
 
       .boot-brand__title {
         margin: 0;
-        font-size: clamp(2rem, 3vw, 3.6rem);
-        line-height: 0.96;
+        font-family: var(--boot-font-sans);
+        font-size: var(--boot-brand-size);
+        font-weight: 600;
+        line-height: var(--boot-brand-line-height);
         letter-spacing: -0.06em;
         color: #0b1f36;
         text-align: center;
@@ -129,7 +208,10 @@
       }
 
       .boot-card {
-        width: min(560px, 100%);
+        width: min(var(--boot-card-width), calc(100vw - 48px));
+        min-width: min(var(--boot-card-width), calc(100vw - 48px));
+        max-width: min(var(--boot-card-width), calc(100vw - 48px));
+        box-sizing: border-box;
         padding: 28px 30px;
         border: 1px solid rgba(255, 255, 255, 0.6);
         border-radius: 28px;
@@ -141,8 +223,10 @@
 
       .boot-eyebrow {
         margin: 0 0 10px;
-        font-size: 0.78rem;
+        font-family: var(--boot-font-sans);
+        font-size: var(--boot-eyebrow-size);
         font-weight: 700;
+        line-height: var(--boot-eyebrow-line-height);
         letter-spacing: 0.18em;
         text-transform: uppercase;
         color: #c8102e;
@@ -150,16 +234,21 @@
 
       .boot-title {
         margin: 0;
-        font-size: clamp(1.75rem, 2.5vw, 2.7rem);
-        line-height: 0.96;
+        font-family: var(--boot-font-sans);
+        font-size: var(--boot-title-size);
+        font-weight: 600;
+        line-height: var(--boot-title-line-height);
         letter-spacing: -0.06em;
         color: #0b1f36;
       }
 
       .boot-copy {
         margin: 14px 0 0;
+        font-family: var(--boot-font-sans);
+        font-size: var(--boot-copy-size);
+        font-weight: 400;
         color: #64758a;
-        line-height: 1.6;
+        line-height: var(--boot-copy-line-height);
       }
 
       .boot-ellipsis {
@@ -236,7 +325,7 @@
         </section>
       </div>
     </div>
-    <div id="root"></div>
+    <div id="root" aria-hidden="true"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

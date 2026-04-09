@@ -16,6 +16,7 @@
                                     "title":  "DVA Flight Planner",
                                     "width":  1680,
                                     "height":  1020,
+                                    "backgroundColor":  "#DBE4EF",
                                     "minWidth":  1024,
                                     "minHeight":  768,
                                     "resizable":  true,
