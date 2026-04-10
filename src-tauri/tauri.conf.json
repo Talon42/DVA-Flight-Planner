@@ -1,7 +1,7 @@
 {
     "$schema":  "https://schema.tauri.app/config/2",
     "productName":  "DVA Flight Planner",
-    "version":  "0.1.7-alpha",
+    "version":  "0.2.0-alpha",
     "identifier":  "dvaflightplanner",
     "build":  {
                   "beforeDevCommand":  "npm run dev",
