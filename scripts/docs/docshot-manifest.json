@@ -68,6 +68,33 @@
     "updateReadme": true
   },
   {
+    "id": "tours-schedule-tabs",
+    "scenarioId": "tours-schedule-tabs",
+    "selector": "[data-docshot='planner-workspace']",
+    "outputFile": "tours-schedule-tabs.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "tours-flight-card",
+    "scenarioId": "tours-flight-card",
+    "selector": "[data-docshot='flight-board']",
+    "outputFile": "tours-flight-card.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
+    "id": "tours-flight-completed",
+    "scenarioId": "tours-flight-completed",
+    "selector": "[data-docshot='planner-workspace']",
+    "outputFile": "tours-flight-completed.png",
+    "windowWidth": 1680,
+    "windowHeight": 1020,
+    "updateReadme": true
+  },
+  {
     "id": "simbrief-how-it-works",
     "scenarioId": "simbrief-how-it-works",
     "selector": "[data-docshot='simbrief-dispatch-panel']",

@@ -8,6 +8,8 @@ const VARIANT_CLASSES = {
     "border-transparent bg-[var(--button-ghost-bg)] text-[var(--button-ghost-text)] hover:bg-[var(--button-ghost-hover-bg)]",
   danger:
     "border-transparent bg-[var(--delta-red)] text-white hover:opacity-94 disabled:opacity-100",
+  success:
+    "border-transparent bg-[#126835] text-white hover:opacity-94 disabled:opacity-100",
   board:
     "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 disabled:opacity-100 dark:bg-[var(--delta-red)]"
 };

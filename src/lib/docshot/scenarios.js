@@ -5,6 +5,10 @@ const scheduleXmlLoaders = import.meta.glob("../../../test-data/pfpxsched.xml", 
   query: "?raw",
   import: "default"
 });
+const tourJsonLoaders = import.meta.glob("../../data/tours/*.json", {
+  eager: true,
+  import: "default"
+});
 
 const BASE_ADDON_SCAN = {
   roots: [
@@ -46,6 +50,8 @@ const DOCSHOT_FLIGHT_PREFERENCES = [
   { route: "KDTW-KATL" },
   { route: "KLAX-KATL" }
 ];
+const DOCSHOT_TOUR_SOURCE_PATH = "../../data/tours/Pan_Am_1952_The_Americas_Tour.json";
+const DOCSHOT_TOUR_APP_PATH = "./data/tours/Pan_Am_1952_The_Americas_Tour.json";
 
 let parsedSchedulePromise = null;
 
@@ -71,6 +77,79 @@ function getParsedSchedule() {
   }
 
   return parsedSchedulePromise;
+}
+
+function getDocshotTourRows() {
+  const rows = tourJsonLoaders[DOCSHOT_TOUR_SOURCE_PATH];
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new Error(
+      "Docshot tour source was not found. Expected src/data/tours/Pan_Am_1952_The_Americas_Tour.json to be available for docshot builds."
+    );
+  }
+
+  return rows;
+}
+
+function buildDocshotTourRowId(row, index) {
+  const explicitId = String(row?.id || row?.flightId || "").trim();
+  if (explicitId) {
+    return `${DOCSHOT_TOUR_APP_PATH}:${explicitId}`;
+  }
+
+  if (Number.isFinite(row?.leg)) {
+    return `${DOCSHOT_TOUR_APP_PATH}:leg:${row.leg}`;
+  }
+
+  const segment = String(row?.segment || "").trim();
+  if (segment) {
+    return `${DOCSHOT_TOUR_APP_PATH}:segment:${segment}`;
+  }
+
+  return `${DOCSHOT_TOUR_APP_PATH}:fallback:${String(row?.flight || "").trim()}:${String(row?.route || "").trim()}:${index}`;
+}
+
+function buildDocshotTourBoardEntry({ boardEntryId, tourRowId, simbriefSelectedType = "" }) {
+  return {
+    boardEntryId,
+    linkedFlightId: tourRowId,
+    flightId: tourRowId,
+    isTourFlight: true,
+    tourPath: DOCSHOT_TOUR_APP_PATH,
+    tourRowId,
+    simbriefSelectedType
+  };
+}
+
+function buildDocshotTourScenarioState({ completed = false, expandedBoardFlightId = null } = {}) {
+  const rows = getDocshotTourRows();
+  const targetRowId = buildDocshotTourRowId(rows[0], 0);
+  const boardEntryId = "docshot-tour-board-1";
+
+  return {
+    scheduleView: "tours",
+    selectedTourPath: DOCSHOT_TOUR_APP_PATH,
+    selectedFlightId: null,
+    flightBoard: [
+      buildDocshotTourBoardEntry({
+        boardEntryId,
+        tourRowId: targetRowId
+      })
+    ],
+    expandedBoardFlightId: expandedBoardFlightId || null,
+    tourProgress: completed
+      ? {
+          [DOCSHOT_TOUR_APP_PATH]: {
+            rows: {
+              [targetRowId]: {
+                completed: true,
+                completedAt: "2026-04-09T14:12:00.000Z",
+                completionOrder: 1
+              }
+            }
+          }
+        }
+      : {}
+  };
 }
 
 function getFlightDeterministicRank(flight) {
@@ -262,6 +341,30 @@ const SCENARIO_BUILDERS = {
       })),
       expandedBoardFlightId: null
     };
+  },
+  "tours-schedule-tabs": async () =>
+    buildBaseSnapshot({
+      ...buildDocshotTourScenarioState(),
+      plannerControlsCollapsed: false,
+      statusMessage: "Tour schedule ready."
+    }),
+  "tours-flight-card": async () =>
+    buildBaseSnapshot({
+      ...buildDocshotTourScenarioState(),
+      plannerControlsCollapsed: true,
+      statusMessage: "Tour flight added to the board."
+    }),
+  "tours-flight-completed": async () => {
+    const boardEntryId = "docshot-tour-board-1";
+
+    return buildBaseSnapshot({
+      ...buildDocshotTourScenarioState({
+        completed: true,
+        expandedBoardFlightId: boardEntryId
+      }),
+      plannerControlsCollapsed: true,
+      statusMessage: "Tour flight completed."
+    });
   },
   "simbrief-how-it-works": async () => {
     const snapshot = await buildBaseSnapshot({

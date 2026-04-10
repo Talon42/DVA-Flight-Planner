@@ -1,0 +1,632 @@
+[
+  {
+    "leg": 1,
+    "segment": "Leg 1",
+    "flight": "DL9525 Leg 1",
+    "aircraft": "A320",
+    "route": "Miami FL (KMIA) - Providenciales Turks and Caicos (MBPV)",
+    "distance_mi": 579,
+    "schedule": "12:00 ET - 13:15 ET (1h 15m)"
+  },
+  {
+    "leg": 2,
+    "segment": "Leg 2",
+    "flight": "DL9525 Leg 2",
+    "aircraft": "A320",
+    "route": "Providenciales Turks and Caicos (MBPV) - Princess Juliana Intl Sint Maarten (TNCM)",
+    "distance_mi": 649,
+    "schedule": "14:30 ET - 15:54 CBT (1h 24m)"
+  },
+  {
+    "leg": 3,
+    "segment": "Leg 3",
+    "flight": "DL9525 Leg 3",
+    "aircraft": "B737-800",
+    "route": "Princess Juliana Intl Sint Maarten (TNCM) - Hewanorra Saint Lucia (TLPL)",
+    "distance_mi": 331,
+    "schedule": "18:10 CBT - 19:49 AT (0h 39m)"
+  },
+  {
+    "leg": 4,
+    "segment": "Leg 4",
+    "flight": "DL9525 Leg 4",
+    "aircraft": "B737-800",
+    "route": "Hewanorra Saint Lucia (TLPL) - Margarita Island Venezuela (SVMG)",
+    "distance_mi": 282,
+    "schedule": "12:00 AT - 11:33 CBT (0h 33m)"
+  },
+  {
+    "leg": 5,
+    "segment": "Leg 5",
+    "flight": "DL9525 Leg 5",
+    "aircraft": "B727-200",
+    "route": "Margarita Island Venezuela (SVMG) - Bogota Colombia (SKBO)",
+    "distance_mi": 819,
+    "schedule": "12:30 CBT - 14:04 ET (1h 34m)"
+  },
+  {
+    "leg": 6,
+    "segment": "Leg 6",
+    "flight": "DL9525 Leg 6",
+    "aircraft": "B737-800",
+    "route": "Bogota Colombia (SKBO) - Iquitos Peru (SPQT)",
+    "distance_mi": 590,
+    "schedule": "12:00 ET - 13:10 AMZT (1h 10m)"
+  },
+  {
+    "leg": 7,
+    "segment": "Leg 7",
+    "flight": "DL9525 Leg 7",
+    "aircraft": "B737-800",
+    "route": "Iquitos Peru (SPQT) - Cusco Peru (SPZO)",
+    "distance_mi": 681,
+    "schedule": "14:10 AMZT - 14:31 ECT (1h 21m)"
+  },
+  {
+    "leg": 8,
+    "segment": "Leg 8",
+    "flight": "DL9525 Leg 8",
+    "aircraft": "B737-800",
+    "route": "Cusco Peru (SPZO) - Antofagasta Chile (SCFA)",
+    "distance_mi": 692,
+    "schedule": "15:31 ECT - 18:53 CHST (2h 22m)"
+  },
+  {
+    "leg": 9,
+    "segment": "Leg 9",
+    "flight": "DL9526 Leg 1",
+    "aircraft": "B737-800",
+    "route": "Antofagasta Chile (SCFA) - Santiago Chile (SCEL)",
+    "distance_mi": 688,
+    "schedule": "19:53 CHST - 21:14 CHST (1h 21m)"
+  },
+  {
+    "leg": 10,
+    "segment": "Leg 10",
+    "flight": "DL9526 Leg 2",
+    "aircraft": "B737-800",
+    "route": "Santiago Chile (SCEL) - San Carlos de Bariloche Argentina (SAZS)",
+    "distance_mi": 537,
+    "schedule": "10:10 CHST - 11:14 BT (0h 4m)"
+  },
+  {
+    "leg": 11,
+    "segment": "Leg 11",
+    "flight": "DL9526 Leg 3",
+    "aircraft": "B737-700",
+    "route": "San Carlos de Bariloche Argentina (SAZS) - Ushuaia Argentina (SAWH)",
+    "distance_mi": 956,
+    "schedule": "12:14 BT - 14:11 BT (1h 57m)"
+  },
+  {
+    "leg": 12,
+    "segment": "Leg 12",
+    "flight": "DL9526 Leg 4",
+    "aircraft": "B737-700",
+    "route": "Ushuaia Argentina (SAWH) - Mount Pleasant Falkland Islands (EGYP)",
+    "distance_mi": 457,
+    "schedule": "15:11 BT - 16:07 GMT-3 (0h 56m)"
+  },
+  {
+    "leg": 13,
+    "segment": "Leg 13",
+    "flight": "DL9526 Leg 5",
+    "aircraft": "B737-700",
+    "route": "Mount Pleasant Falkland Islands (EGYP) - Trelew Argentina (SAVT)",
+    "distance_mi": 675,
+    "schedule": "17:07 GMT-3 - 18:29 GMT-3 (1h 22m)"
+  },
+  {
+    "leg": 14,
+    "segment": "Leg 14",
+    "flight": "AR1803 Leg 1",
+    "aircraft": "B737 MAX 8",
+    "route": "Trelew Argentina (SAVT) - Buenos Aires-Ezeiza Intl Argentina (SAEZ)",
+    "distance_mi": 683,
+    "schedule": "08:45 GMT-3 - 10:40 GMT-3 (1h 55m)"
+  },
+  {
+    "leg": 15,
+    "segment": "Leg 15",
+    "flight": "GLO7657 Leg 1",
+    "aircraft": "B737 MAX 8",
+    "route": "Buenos Aires-Ezeiza Intl Argentina (SAEZ) - Rio de Janeiro–Galeao Brazil (SBGL)",
+    "distance_mi": 1241,
+    "schedule": "12:20 GMT-3 - 15:20 BT (3h 0m)"
+  },
+  {
+    "leg": 16,
+    "segment": "Leg 16",
+    "flight": "GLO2002 Leg 1",
+    "aircraft": "B737-800",
+    "route": "Rio de Janeiro–Galeao Brazil (SBGL) - Recife Brazil (SBRF)",
+    "distance_mi": 1156,
+    "schedule": "08:05 BT - 10:55 GYT (2h 50m)"
+  },
+  {
+    "leg": 17,
+    "segment": "Leg 17",
+    "flight": "PAH5105 Leg 5",
+    "aircraft": "Constellation",
+    "route": "Recife Brazil (SBRF) - Ascension Island St Helena (FHAW)",
+    "distance_mi": 1406,
+    "schedule": "06:00 GYT - 17:30 GMT (8h 30m)"
+  },
+  {
+    "leg": 18,
+    "segment": "Leg 18",
+    "flight": "PAH5105 Leg 6",
+    "aircraft": "Constellation",
+    "route": "Ascension Island St Helena (FHAW) - Windhoek Namibia (FYWH)",
+    "distance_mi": 2343,
+    "schedule": "18:00 GMT - 04:00 WAT (9h 0m)"
+  },
+  {
+    "leg": 19,
+    "segment": "Leg 19",
+    "flight": "DL9527 Leg 1",
+    "aircraft": "A321",
+    "route": "Windhoek Namibia (FYWH) - Cape Town South Africa (FACT)",
+    "distance_mi": 798,
+    "schedule": "05:00 WAT - 07:32 SAT (1h 32m)"
+  },
+  {
+    "leg": 20,
+    "segment": "Leg 20",
+    "flight": "DL9527 Leg 2",
+    "aircraft": "A321",
+    "route": "Cape Town South Africa (FACT) - Bloemfontein South Africa (FABL)",
+    "distance_mi": 565,
+    "schedule": "08:32 SAT - 09:37 SAT (1h 5m)"
+  },
+  {
+    "leg": 21,
+    "segment": "Leg 21",
+    "flight": "DL9527 Leg 3",
+    "aircraft": "A321",
+    "route": "Bloemfontein South Africa (FABL) - Victoria Falls Zimbabwe (FVFA)",
+    "distance_mi": 761,
+    "schedule": "10:37 SAT - 12:05 CAT (1h 28m)"
+  },
+  {
+    "leg": 22,
+    "segment": "Leg 22",
+    "flight": "DL9527 Leg 4",
+    "aircraft": "A321",
+    "route": "Victoria Falls Zimbabwe (FVFA) - Lilongwe Malawi (FWKI)",
+    "distance_mi": 606,
+    "schedule": "13:05 CAT - 14:15 CAT (1h 10m)"
+  },
+  {
+    "leg": 23,
+    "segment": "Leg 23",
+    "flight": "DL9527 Leg 5",
+    "aircraft": "A321",
+    "route": "Lilongwe Malawi (FWKI) - Moroni Comoros (FMCH)",
+    "distance_mi": 659,
+    "schedule": "15:15 CAT - 17:31 EAT (1h 16m)"
+  },
+  {
+    "leg": 24,
+    "segment": "Leg 24",
+    "flight": "DL9527 Leg 6",
+    "aircraft": "B757-200",
+    "route": "Moroni Comoros (FMCH) - Maye Island Seychelles (FSIA)",
+    "distance_mi": 963,
+    "schedule": "18:31 EAT - 21:17 SYCHT (1h 46m)"
+  },
+  {
+    "leg": 25,
+    "segment": "Leg 25",
+    "flight": "KQH246 Leg 1",
+    "aircraft": "B707-320",
+    "route": "Maye Island Seychelles (FSIA) - Mombasa Kenya (HKMO)",
+    "distance_mi": 1099,
+    "schedule": "17:00 SYCHT - 18:30 EAT (2h 30m)"
+  },
+  {
+    "leg": 26,
+    "segment": "Leg 26",
+    "flight": "DL9528 Leg 1",
+    "aircraft": "B757-200",
+    "route": "Mombasa Kenya (HKMO) - Entebbe Uganda (HUEN)",
+    "distance_mi": 569,
+    "schedule": "19:30 EAT - 20:31 EAT (1h 1m)"
+  },
+  {
+    "leg": 27,
+    "segment": "Leg 27",
+    "flight": "DL9528 Leg 2",
+    "aircraft": "B757-200",
+    "route": "Entebbe Uganda (HUEN) - N'Djamena Chad (FTTJ)",
+    "distance_mi": 1458,
+    "schedule": "21:31 EAT - 22:12 WAT (2h 41m)"
+  },
+  {
+    "leg": 28,
+    "segment": "Leg 28",
+    "flight": "DL9528 Leg 3",
+    "aircraft": "B757-200",
+    "route": "N'Djamena Chad (FTTJ) - Tamanrasset Algeria (DAAT)",
+    "distance_mi": 971,
+    "schedule": "23:12 WAT - 00:59 WAT (1h 47m)"
+  },
+  {
+    "leg": 29,
+    "segment": "Leg 29",
+    "flight": "DL9528 Leg 4",
+    "aircraft": "B757-200",
+    "route": "Tamanrasset Algeria (DAAT) - Sebha Libya (HLLS)",
+    "distance_mi": 635,
+    "schedule": "01:59 WAT - 04:09 IST (0h 10m)"
+  },
+  {
+    "leg": 30,
+    "segment": "Leg 30",
+    "flight": "DL9528 Leg 5",
+    "aircraft": "B757-200",
+    "route": "Sebha Libya (HLLS) - Cairo Egypt (HECA)",
+    "distance_mi": 1050,
+    "schedule": "05:09 IST - 07:05 CAT (2h 56m)"
+  },
+  {
+    "leg": 31,
+    "segment": "Leg 31",
+    "flight": "DL9528 Leg 6",
+    "aircraft": "CRJ-700",
+    "route": "Cairo Egypt (HECA) - Hail Saudi Arabia (OEHL)",
+    "distance_mi": 650,
+    "schedule": "08:05 CAT - 10:21 ARBT (1h 16m)"
+  },
+  {
+    "leg": 32,
+    "segment": "Leg 32",
+    "flight": "SV1336 Leg 1",
+    "aircraft": "A321",
+    "route": "Hail Saudi Arabia (OEHL) - Riyadh Saudi Arabia (OERK)",
+    "distance_mi": 355,
+    "schedule": "00:15 ARBT - 01:35 ARBT (1h 20m)"
+  },
+  {
+    "leg": 33,
+    "segment": "Leg 33",
+    "flight": "SV592 Leg 1",
+    "aircraft": "A320",
+    "route": "Riyadh Saudi Arabia (OERK) - Dubai United Arab Emirates (OMDB)",
+    "distance_mi": 543,
+    "schedule": "00:05 ARBT - 03:00 GLFT (1h 55m)"
+  },
+  {
+    "leg": 34,
+    "segment": "Leg 34",
+    "flight": "DL9529 Leg 1",
+    "aircraft": "A320",
+    "route": "Dubai United Arab Emirates (OMDB) - Multan Pakistan (OPMT)",
+    "distance_mi": 1040,
+    "schedule": "04:00 GLFT - 07:15 FSAT (2h 15m)"
+  },
+  {
+    "leg": 35,
+    "segment": "Leg 35",
+    "flight": "DL9529 Leg 2",
+    "aircraft": "A320",
+    "route": "Multan Pakistan (OPMT) - Delhi-Indira Gandhi India (VIDP)",
+    "distance_mi": 361,
+    "schedule": "08:15 FSAT - 09:01 INDT (0h 16m)"
+  },
+  {
+    "leg": 36,
+    "segment": "Leg 36",
+    "flight": "DL9529 Leg 3",
+    "aircraft": "A320",
+    "route": "Delhi-Indira Gandhi India (VIDP) - Kathmandu Nepal (VNKT)",
+    "distance_mi": 507,
+    "schedule": "10:01 INDT - 11:07 NPLT (0h 51m)"
+  },
+  {
+    "leg": 37,
+    "segment": "Leg 37",
+    "flight": "DL9529 Leg 4",
+    "aircraft": "A320",
+    "route": "Kathmandu Nepal (VNKT) - Calcutta India (VECC)",
+    "distance_mi": 399,
+    "schedule": "12:07 NPLT - 12:58 INDT (1h 6m)"
+  },
+  {
+    "leg": 38,
+    "segment": "Leg 38",
+    "flight": "KLH007 Leg 5",
+    "aircraft": "DC-3",
+    "route": "Calcutta India (VECC) - Yangon Myanmar (VYYY)",
+    "distance_mi": 639,
+    "schedule": "12:45 INDT - 17:30 GMT+630 (3h 45m)"
+  },
+  {
+    "leg": 39,
+    "segment": "Leg 39",
+    "flight": "KLH009 Leg 1",
+    "aircraft": "DC-3",
+    "route": "Yangon Myanmar (VYYY) - Bangkok-Don Mueang Thailand (VTBD)",
+    "distance_mi": 363,
+    "schedule": "05:30 GMT+630 - 08:15 INCT (2h 15m)"
+  },
+  {
+    "leg": 40,
+    "segment": "Leg 40",
+    "flight": "KLH821 Leg 1",
+    "aircraft": "DC-8-63",
+    "route": "Bangkok-Don Mueang Thailand (VTBD) - Kuala Lumpur Malaysia (WMKK)",
+    "distance_mi": 776,
+    "schedule": "08:45 INCT - 11:05 SNGT (1h 20m)"
+  },
+  {
+    "leg": 41,
+    "segment": "Leg 41",
+    "flight": "KL809 Leg 1",
+    "aircraft": "B787-9",
+    "route": "Kuala Lumpur Malaysia (WMKK) - Jakarta Indonesia (WIII)",
+    "distance_mi": 702,
+    "schedule": "17:05 SNGT - 18:10 INCT (2h 5m)"
+  },
+  {
+    "leg": 42,
+    "segment": "Leg 42",
+    "flight": "GA404 Leg 1",
+    "aircraft": "B737-800",
+    "route": "Jakarta Indonesia (WIII) - Bali Indonesia (WADD)",
+    "distance_mi": 611,
+    "schedule": "09:40 INCT - 12:35 CIT (1h 55m)"
+  },
+  {
+    "leg": 43,
+    "segment": "Leg 43",
+    "flight": "DL9530 Leg 1",
+    "aircraft": "B717-200",
+    "route": "Bali Indonesia (WADD) - Ambon Indonesia (WAPP)",
+    "distance_mi": 954,
+    "schedule": "13:35 CIT - 16:28 KST (1h 53m)"
+  },
+  {
+    "leg": 44,
+    "segment": "Leg 44",
+    "flight": "DL9530 Leg 2",
+    "aircraft": "B717-200",
+    "route": "Ambon Indonesia (WAPP) - Jayapura Indonesia (WAJJ)",
+    "distance_mi": 862,
+    "schedule": "17:28 KST - 19:10 KST (1h 42m)"
+  },
+  {
+    "leg": 45,
+    "segment": "Leg 45",
+    "flight": "DL9530 Leg 3",
+    "aircraft": "B737-800",
+    "route": "Jayapura Indonesia (WAJJ) - Port Moresby Papua New Guinea (AYPY)",
+    "distance_mi": 662,
+    "schedule": "20:10 KST - 22:29 PNGT (1h 19m)"
+  },
+  {
+    "leg": 46,
+    "segment": "Leg 46",
+    "flight": "DL9530 Leg 4",
+    "aircraft": "B737-800",
+    "route": "Port Moresby Papua New Guinea (AYPY) - Honiara Intl Solomon Islands (AGGH)",
+    "distance_mi": 876,
+    "schedule": "11:00 PNGT - 13:44 SIT (1h 44m)"
+  },
+  {
+    "leg": 47,
+    "segment": "Leg 47",
+    "flight": "DL9530 Leg 5",
+    "aircraft": "B737-800",
+    "route": "Honiara Intl Solomon Islands (AGGH) - Bonriki Kiribati (NGTA)",
+    "distance_mi": 1171,
+    "schedule": "14:44 SIT - 19:04 GMT+13 (2h 20m)"
+  },
+  {
+    "leg": 48,
+    "segment": "Leg 48",
+    "flight": "DL9530 Leg 6",
+    "aircraft": "B737-800",
+    "route": "Bonriki Kiribati (NGTA) - Canton Island Kiribati (PCIS)",
+    "distance_mi": 1085,
+    "schedule": "20:04 GMT+13 - 22:13 GMT+13 (2h 9m)"
+  },
+  {
+    "leg": 49,
+    "segment": "Leg 49",
+    "flight": "DL9530 Leg 7",
+    "aircraft": "B737-900",
+    "route": "Canton Island Kiribati (PCIS) - Cassidy Kiribati (PLCH)",
+    "distance_mi": 1046,
+    "schedule": "07:00 GMT+13 - 10:03 HST (2h 3m)"
+  },
+  {
+    "leg": 50,
+    "segment": "Leg 50",
+    "flight": "DL9530 Leg 8",
+    "aircraft": "B737-900",
+    "route": "Cassidy Kiribati (PLCH) - Honolulu HI (PHNL)",
+    "distance_mi": 1338,
+    "schedule": "11:03 HST - 13:41 HST (2h 38m)"
+  },
+  {
+    "leg": 51,
+    "segment": "Leg 51",
+    "flight": "PAH3777 Leg 3",
+    "aircraft": "DC-6",
+    "route": "Honolulu HI (PHNL) - Midway Island HI (PMDY)",
+    "distance_mi": 1309,
+    "schedule": "12:30 HST - 19:30 SMT (8h 0m)"
+  },
+  {
+    "leg": 52,
+    "segment": "Leg 52",
+    "flight": "PAH3777 Leg 4",
+    "aircraft": "DC-6",
+    "route": "Midway Island HI (PMDY) - Wake Island Airfield USMOI (PWAK)",
+    "distance_mi": 1183,
+    "schedule": "19:45 SMT - 12:30 FJST (6h 15m)"
+  },
+  {
+    "leg": 53,
+    "segment": "Leg 53",
+    "flight": "PAH1210 Leg 1",
+    "aircraft": "B707-320",
+    "route": "Wake Island Airfield USMOI (PWAK) - Guam International Guam (PGUM)",
+    "distance_mi": 1502,
+    "schedule": "04:50 FJST - 06:00 PNGT (3h 10m)"
+  },
+  {
+    "leg": 54,
+    "segment": "Leg 54",
+    "flight": "PAH1216 Leg 1",
+    "aircraft": "B707-320",
+    "route": "Guam International Guam (PGUM) - Manila Philippines (RPLL)",
+    "distance_mi": 1597,
+    "schedule": "06:25 PNGT - 07:40 PLT (3h 15m)"
+  },
+  {
+    "leg": 55,
+    "segment": "Leg 55",
+    "flight": "NW6605 Leg 1",
+    "aircraft": "B747-200",
+    "route": "Manila Philippines (RPLL) - Okinawa Japan (ROAH)",
+    "distance_mi": 915,
+    "schedule": "08:50 PLT - 12:00 JST (2h 10m)"
+  },
+  {
+    "leg": 56,
+    "segment": "Leg 56",
+    "flight": "NW6701 Leg 2",
+    "aircraft": "B707-320",
+    "route": "Okinawa Japan (ROAH) - Osaka-International Japan (RJOO)",
+    "distance_mi": 753,
+    "schedule": "17:35 JST - 19:35 JST (2h 0m)"
+  },
+  {
+    "leg": 57,
+    "segment": "Leg 57",
+    "flight": "DL9531 Leg 1",
+    "aircraft": "A321",
+    "route": "Osaka-International Japan (RJOO) - Kushiro Japan (RJCK)",
+    "distance_mi": 739,
+    "schedule": "08:10 JST - 09:35 JST (1h 25m)"
+  },
+  {
+    "leg": 58,
+    "segment": "Leg 58",
+    "flight": "DL9531 Leg 2",
+    "aircraft": "A321",
+    "route": "Kushiro Japan (RJCK) - Eareckson Air Station AK (PASY)",
+    "distance_mi": 1526,
+    "schedule": "10:35 JST - 19:31 HAT (2h 56m)"
+  },
+  {
+    "leg": 59,
+    "segment": "Leg 59",
+    "flight": "DL9531 Leg 3",
+    "aircraft": "A321",
+    "route": "Eareckson Air Station AK (PASY) - Adak AK (PADK)",
+    "distance_mi": 395,
+    "schedule": "20:31 HAT - 21:16 HAT (0h 45m)"
+  },
+  {
+    "leg": 60,
+    "segment": "Leg 60",
+    "flight": "DL9531 Leg 4",
+    "aircraft": "A321",
+    "route": "Adak AK (PADK) - Cold Bay AK (PACD)",
+    "distance_mi": 615,
+    "schedule": "09:00 HAT - 11:11 ALT (1h 11m)"
+  },
+  {
+    "leg": 61,
+    "segment": "Leg 61",
+    "flight": "DL9531 Leg 5",
+    "aircraft": "A321",
+    "route": "Cold Bay AK (PACD) - Kodiak AK (PADQ)",
+    "distance_mi": 428,
+    "schedule": "12:11 ALT - 13:00 ALT (0h 49m)"
+  },
+  {
+    "leg": 62,
+    "segment": "Leg 62",
+    "flight": "DL9531 Leg 6",
+    "aircraft": "A319",
+    "route": "Kodiak AK (PADQ) - Sitka AK (PASI)",
+    "distance_mi": 639,
+    "schedule": "14:00 ALT - 15:12 ALT (1h 12m)"
+  },
+  {
+    "leg": 63,
+    "segment": "Leg 63",
+    "flight": "DVH4813 Leg 1",
+    "aircraft": "CRJ-700",
+    "route": "Sitka AK (PASI) - Seattle-Tacoma WA (KSEA)",
+    "distance_mi": 861,
+    "schedule": "06:40 ALT - 10:02 PT (2h 22m)"
+  },
+  {
+    "leg": 64,
+    "segment": "Leg 64",
+    "flight": "DVH2812 Leg 1",
+    "aircraft": "A320",
+    "route": "Seattle-Tacoma WA (KSEA) - Kalispell/Columbia Falls MT (KGPI)",
+    "distance_mi": 379,
+    "schedule": "12:10 PT - 15:00 MT (1h 50m)"
+  },
+  {
+    "leg": 65,
+    "segment": "Leg 65",
+    "flight": "DL9532 Leg 1",
+    "aircraft": "B717-200",
+    "route": "Kalispell/Columbia Falls MT (KGPI) - Devils Lake ND (KDVL)",
+    "distance_mi": 705,
+    "schedule": "16:00 MT - 18:23 CT (1h 23m)"
+  },
+  {
+    "leg": 66,
+    "segment": "Leg 66",
+    "flight": "DL9532 Leg 2",
+    "aircraft": "B717-200",
+    "route": "Devils Lake ND (KDVL) - Oshkosh WI (KOSH)",
+    "distance_mi": 572,
+    "schedule": "19:23 CT - 20:31 CT (1h 8m)"
+  },
+  {
+    "leg": 67,
+    "segment": "Leg 67",
+    "flight": "DL9532 Leg 3",
+    "aircraft": "MD-88",
+    "route": "Oshkosh WI (KOSH) - Clarksburg WV (KCKB)",
+    "distance_mi": 538,
+    "schedule": "10:05 CT - 12:08 ET (1h 3m)"
+  },
+  {
+    "leg": 68,
+    "segment": "Leg 68",
+    "flight": "DL9532 Leg 4",
+    "aircraft": "MD-88",
+    "route": "Clarksburg WV (KCKB) - Myrtle Beach SC (KMYR)",
+    "distance_mi": 395,
+    "schedule": "13:08 ET - 13:54 ET (0h 46m)"
+  },
+  {
+    "leg": 69,
+    "segment": "Leg 69",
+    "flight": "DVH4801 Leg 2",
+    "aircraft": "CRJ-200",
+    "route": "Myrtle Beach SC (KMYR) - Orlando FL (KMCO)",
+    "distance_mi": 390,
+    "schedule": "14:00 ET - 15:30 ET (1h 30m)"
+  },
+  {
+    "leg": 70,
+    "segment": "Leg 70",
+    "flight": "DL2127 Leg 1",
+    "aircraft": "A319",
+    "route": "Orlando FL (KMCO) - Miami FL (KMIA)",
+    "distance_mi": 193,
+    "schedule": "07:10 ET - 08:29 ET (1h 19m)"
+  }
+]

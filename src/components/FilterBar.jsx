@@ -19,7 +19,10 @@ import {
   fieldLabelClassName,
   fieldSelectClassName,
   fieldTitleClassName,
+  getPlannerTabStateClassName,
   gridClassNames,
+  plannerTabClassName,
+  plannerTabsListClassName,
   toggleButtonClassName
 } from "./ui/forms";
 import {
@@ -271,6 +274,7 @@ function useTransientRangeSlider(lowValue, highValue, onCommit) {
 export function SearchableMultiSelect({
   label,
   labelPlacement = "stacked",
+  hideLabel = false,
   placeholder,
   emptyLabel,
   allLabel = "All",
@@ -300,7 +304,10 @@ export function SearchableMultiSelect({
   });
   const overlayHost =
     typeof document !== "undefined"
-      ? rootRef.current?.closest('[data-docshot="planner-controls"]') || rootRef.current?.closest(".filter-bar") || null
+      ? rootRef.current?.closest('[data-overlay-host="true"]') ||
+        rootRef.current?.closest('[data-docshot="planner-controls"]') ||
+        rootRef.current?.closest(".filter-bar") ||
+        null
       : null;
 
   useEffect(() => {
@@ -563,8 +570,8 @@ export function SearchableMultiSelect({
       )}
       ref={rootRef}
     >
-      <span className={fieldTitleClassName}>{label}</span>
-      <div className="multi-select relative min-w-0">
+      {hideLabel ? null : <span className={fieldTitleClassName}>{label}</span>}
+      <div className={cn("multi-select relative min-w-0", hideLabel && "col-span-full")}>
         <button
           className={cn(
             fieldBodyClassName,
@@ -1796,17 +1803,15 @@ export default function FilterBar({
       ) : (
         <>
           <div
-            className="planner-tabs flex w-fit max-w-full flex-nowrap items-end gap-6 border-b border-[color:var(--line)]"
+            className={plannerTabsListClassName}
             role="tablist"
             aria-label="Planner control tabs"
           >
             <button
               type="button"
               className={cn(
-                "planner-tab -mb-px min-h-9 border-b-2 border-transparent px-0 pb-2 pt-1 text-[0.94rem] font-semibold leading-[1.2] tracking-[0.01em] transition-[color,opacity,border-color] duration-150",
-                plannerMode === "basic"
-                  ? "border-b-[color:var(--delta-red)] text-[var(--text-heading)] opacity-100"
-                  : "text-[color:color-mix(in srgb,var(--text-heading) 72%, transparent)] opacity-90 hover:text-[var(--text-heading)] hover:opacity-100"
+                plannerTabClassName,
+                getPlannerTabStateClassName(plannerMode === "basic")
               )}
               role="tab"
               aria-selected={plannerMode === "basic"}
@@ -1817,10 +1822,8 @@ export default function FilterBar({
             <button
               type="button"
               className={cn(
-                "planner-tab -mb-px min-h-9 border-b-2 border-transparent px-0 pb-2 pt-1 text-[0.94rem] font-semibold leading-[1.2] tracking-[0.01em] transition-[color,opacity,border-color] duration-150",
-                plannerMode === "duty"
-                  ? "border-b-[color:var(--delta-red)] text-[var(--text-heading)] opacity-100"
-                  : "text-[color:color-mix(in srgb,var(--text-heading) 72%, transparent)] opacity-90 hover:text-[var(--text-heading)] hover:opacity-100"
+                plannerTabClassName,
+                getPlannerTabStateClassName(plannerMode === "duty")
               )}
               role="tab"
               aria-selected={plannerMode === "duty"}

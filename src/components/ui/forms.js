@@ -32,6 +32,17 @@ export const fieldSelectClassName = cn(
   "appearance-none pr-10"
 );
 
+export const plannerTabsListClassName =
+  "planner-tabs flex w-fit max-w-full flex-nowrap items-end gap-6 border-b border-[color:var(--line)]";
+
+export const plannerTabClassName =
+  "planner-tab -mb-px min-h-9 border-b-2 border-transparent px-0 pb-2 pt-1 text-[0.94rem] font-semibold leading-[1.2] tracking-[0.01em] transition-[color,opacity,border-color] duration-150";
+
+export const getPlannerTabStateClassName = (active) =>
+  active
+    ? "border-b-[color:var(--delta-red)] text-[var(--text-heading)] opacity-100"
+    : "text-[color:color-mix(in srgb,var(--text-heading) 72%, transparent)] opacity-90 hover:text-[var(--text-heading)] hover:opacity-100";
+
 export const toggleButtonClassName = (active, variant = "default") =>
   cn(
     fieldShellClassName,
@@ -62,5 +73,7 @@ export const gridClassNames = {
   boardActions:
     "grid gap-2 bp-1024:grid-cols-3",
   boardActionsDual:
-    "grid gap-2 bp-1024:grid-cols-2"
+    "grid gap-2 min-[1025px]:grid-cols-2",
+  boardActionsQuad:
+    "grid gap-2 min-[1025px]:grid-cols-2"
 };

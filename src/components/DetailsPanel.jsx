@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { formatDistanceNm, formatDuration, formatUtc } from "../lib/formatters";
+import { formatDistanceNm, formatDuration, formatNumber, formatUtc } from "../lib/formatters";
 import { getAirlineLogo } from "../lib/airlineBranding";
 import { groupSimBriefAircraftTypesByManufacturer } from "../lib/simbrief";
 import planeLight from "../data/images/plane_light.png";
@@ -49,12 +49,30 @@ function simplifyAirportName(value) {
 const ROUTE_LINE_CLASS =
   "route-banner__line h-[2px] w-[clamp(2.25rem,72%,5.25rem)] bg-[var(--delta-red)]";
 
+function TourBadge() {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-none bg-[var(--delta-red)] px-1.5 text-white",
+        labelTextClassName
+      )}
+      aria-label="Tour flight"
+      title="Tour flight"
+    >
+      T
+    </span>
+  );
+}
+
 function FlightBoardAirline({ flight }) {
   const logoSrc = getAirlineLogo({
     airlineName: flight?.airlineName,
     airlineIata: flight?.airline,
     airlineIcao: flight?.airlineIcao
   });
+  const flightLabel = flight?.isTourFlight
+    ? String(flight?.flightCode || flight?.tourFlightNumber || flight?.flightNumber || "").trim()
+    : String(flight?.flightCode || "").trim();
 
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -66,9 +84,12 @@ function FlightBoardAirline({ flight }) {
           aria-hidden="true"
         />
       ) : null}
-      <span className={cn("truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName, "font-semibold")}>
-        {flight.flightCode}
-      </span>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className={cn("truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName, "font-semibold")}>
+          {flightLabel}
+        </span>
+        {flight?.isTourFlight ? <TourBadge /> : null}
+      </div>
     </div>
   );
 }
@@ -311,6 +332,7 @@ function SimBriefInlinePanel({
   isSimBriefAircraftTypesLoading,
   simBriefAircraftTypesError,
   onRemoveFromFlightBoard,
+  onCompleteTourFlight,
   onSimBriefTypeChange,
   onSimBriefDispatch
 }) {
@@ -345,6 +367,7 @@ function SimBriefInlinePanel({
     !selectedType ||
     !selectedTypeSupported ||
     !simBriefCredentialsConfigured;
+  const showCompleteAction = Boolean(flight?.isTourFlight);
 
   return (
     <div
@@ -358,22 +381,52 @@ function SimBriefInlinePanel({
         onChange={(value) => onSimBriefTypeChange(flight.boardEntryId, value || "")}
       />
 
-      <div className="grid min-w-0 gap-2 min-[1401px]:grid-cols-3">
-        <Button className="min-w-0 w-full" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
-          {isDispatching ? "Dispatching..." : "SimBrief Dispatch"}
-        </Button>
-        <Button className="min-w-0 w-full" variant="board" size="sm" disabled>
-          Push to ACARS
-        </Button>
-        <Button
-          className="min-w-0 w-full"
-          variant="danger"
-          size="sm"
-          onClick={() => onRemoveFromFlightBoard(flight.boardEntryId)}
-        >
-          Remove from Flight Board
-        </Button>
-      </div>
+      {showCompleteAction ? (
+        <div className={gridClassNames.boardActionsQuad}>
+          <Button className="min-w-0 w-full dark:!bg-[var(--delta-blue)]" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
+            {isDispatching ? "Dispatching..." : "SimBrief Dispatch"}
+          </Button>
+          <Button className="min-w-0 w-full dark:!bg-[var(--delta-blue)]" variant="board" size="sm" disabled>
+            Push to ACARS
+          </Button>
+          <Button
+            className={cn(
+              "min-w-0 w-full",
+              flight.isCompleted && "!bg-[var(--delta-blue)] !text-white dark:!bg-[var(--delta-blue)] dark:!text-white"
+            )}
+            variant={flight.isCompleted ? "ghost" : "success"}
+            size="sm"
+            onClick={() => onCompleteTourFlight(flight.boardEntryId)}
+          >
+            {flight.isCompleted ? "Click to Revert Status" : "Complete Flight"}
+          </Button>
+          <Button
+            className="min-w-0 w-full"
+            variant="danger"
+            size="sm"
+            onClick={() => onRemoveFromFlightBoard(flight.boardEntryId)}
+          >
+            Remove from Flight Board
+          </Button>
+        </div>
+      ) : (
+        <div className="grid min-w-0 gap-2 min-[1401px]:grid-cols-3">
+          <Button className="min-w-0 w-full dark:!bg-[var(--delta-blue)]" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
+            {isDispatching ? "Dispatching..." : "SimBrief Dispatch"}
+          </Button>
+          <Button className="min-w-0 w-full dark:!bg-[var(--delta-blue)]" variant="board" size="sm" disabled>
+            Push to ACARS
+          </Button>
+          <Button
+            className="min-w-0 w-full"
+            variant="danger"
+            size="sm"
+            onClick={() => onRemoveFromFlightBoard(flight.boardEntryId)}
+          >
+            Remove from Flight Board
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -402,12 +455,30 @@ function RepairInlinePanel({ flight, onRemoveFromFlightBoard, onRepairFlightBoar
 }
 
 function FlightBoardCardSummary({ flight }) {
+  const isCompletedTourFlight = Boolean(flight?.isTourFlight && flight?.isCompleted);
+  const boardDistanceLabel = flight?.isTourFlight
+    ? Number.isFinite(flight?.distanceMi)
+      ? `${formatNumber(flight.distanceMi)} mi`
+      : "N/A"
+    : formatDistanceNm(flight.distanceNm);
+  const boardTimeLabel = flight?.isTourFlight
+    ? String(flight?.blockTimeLabel || "").trim() || formatDuration(flight.blockMinutes)
+    : formatDuration(flight.blockMinutes);
+  const boardMetaTimeLabel = flight?.isTourFlight
+    ? String(flight?.departureTimeLabel || "").trim() || "N/A"
+    : formatUtc(flight.stdUtc);
+
   return (
-    <div className="route-banner route-banner--board grid min-w-0 gap-2 rounded-none bg-[var(--route-banner)] px-3 py-2.5 text-[var(--text-primary)] bp-1024:gap-1.5 bp-1024:px-2.5 bp-1024:py-2 dark:text-white">
+    <div
+      className={cn(
+        "route-banner route-banner--board grid min-w-0 gap-2 rounded-none bg-[var(--route-banner)] px-3 py-2.5 text-[var(--text-primary)] bp-1024:gap-1.5 bp-1024:px-2.5 bp-1024:py-2 dark:text-white",
+        isCompletedTourFlight && "opacity-45"
+      )}
+    >
       <div className={cn("route-banner__meta flex flex-wrap items-center justify-between gap-2 bp-1024:gap-1.5", bodySmTextClassName)}>
         <FlightBoardAirline flight={flight} />
         <small className="text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]">
-          {formatUtc(flight.stdUtc)}
+          {boardMetaTimeLabel}
         </small>
       </div>
       <div className="grid min-w-0 gap-2 bp-1024:gap-1.5">
@@ -415,15 +486,23 @@ function FlightBoardCardSummary({ flight }) {
           <span className={cn("text-left text-[1.1rem] font-semibold tracking-[-0.03em]")}>
             {flight.from}
           </span>
-          <span className="flex min-w-0 items-center gap-2">
-            <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
-            <img
-              src={planeLight}
-              alt=""
-              className="route-banner__plane h-[18px] w-[34px] shrink-0 object-contain brightness-0 opacity-80 dark:brightness-100 dark:opacity-100"
-            />
-            <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
-          </span>
+          {isCompletedTourFlight ? (
+            <span className="flex min-w-0 items-center justify-center">
+              <span className={cn("rounded-none bg-[var(--status-resolved-bg)] px-3 py-1 text-[var(--status-resolved-text)]", labelTextClassName)}>
+                Completed
+              </span>
+            </span>
+          ) : (
+            <span className="flex min-w-0 items-center gap-2">
+              <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
+              <img
+                src={planeLight}
+                alt=""
+                className="route-banner__plane h-[18px] w-[34px] shrink-0 object-contain brightness-0 opacity-80 dark:brightness-100 dark:opacity-100"
+              />
+              <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
+            </span>
+          )}
           <span className={cn("text-right text-[1.1rem] font-semibold tracking-[-0.03em]")}>
             {flight.to}
           </span>
@@ -437,7 +516,7 @@ function FlightBoardCardSummary({ flight }) {
                 bodySmTextClassName
               )}
             >
-              {formatDistanceNm(flight.distanceNm)}
+              {boardDistanceLabel}
             </small>
             <span aria-hidden="true" />
             <small
@@ -446,7 +525,7 @@ function FlightBoardCardSummary({ flight }) {
                 bodySmTextClassName
               )}
             >
-              {formatDuration(flight.blockMinutes)}
+              {boardTimeLabel}
             </small>
           </div>
           <span aria-hidden="true" />
@@ -456,8 +535,8 @@ function FlightBoardCardSummary({ flight }) {
             {simplifyAirportName(flight.fromAirport)}
           </small>
           <div className={cn("grid shrink-0 grid-cols-2 items-center gap-4 whitespace-nowrap text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
-            <small>{formatDistanceNm(flight.distanceNm)}</small>
-            <small>{formatDuration(flight.blockMinutes)}</small>
+            <small>{boardDistanceLabel}</small>
+            <small>{boardTimeLabel}</small>
           </div>
           <small className={cn("min-w-0 truncate text-right text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
             {simplifyAirportName(flight.toAirport)}
@@ -503,6 +582,7 @@ export default function DetailsPanel({
   onDeleteFlightBoard,
   onSimBriefTypeChange,
   onSimBriefDispatch,
+  onCompleteTourFlight,
   showFlightBoard = true
 }) {
   const panelRef = useRef(null);
@@ -933,6 +1013,7 @@ export default function DetailsPanel({
                         isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
                         simBriefAircraftTypesError={simBriefAircraftTypesError}
                         onRemoveFromFlightBoard={onRemoveFromFlightBoard}
+                        onCompleteTourFlight={onCompleteTourFlight}
                         onSimBriefTypeChange={onSimBriefTypeChange}
                         onSimBriefDispatch={onSimBriefDispatch}
                       />

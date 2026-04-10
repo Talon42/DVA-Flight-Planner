@@ -1,0 +1,362 @@
+[
+  {
+    "leg": 1,
+    "segment": "Leg 1",
+    "flight": "DVH5821 Leg 2",
+    "aircraft": "Constellation",
+    "route": "Nome AK (PAOM) - Fairbanks-Intl AK (PAFA)",
+    "distance_mi": 519,
+    "schedule": "12:00 ALT - 14:00 ALT (2h 0m)"
+  },
+  {
+    "leg": 2,
+    "segment": "Leg 2",
+    "flight": "DL9570 Leg 1",
+    "aircraft": "A320",
+    "route": "Fairbanks-Intl AK (PAFA) - Whitehorse Yukon Canada (CYXY)",
+    "distance_mi": 493,
+    "schedule": "06:15 ALT - 08:19 PT (1h 4m)"
+  },
+  {
+    "leg": 3,
+    "segment": "Leg 3",
+    "flight": "DL9570 Leg 2",
+    "aircraft": "B727-200",
+    "route": "Whitehorse Yukon Canada (CYXY) - Juneau AK (PAJN)",
+    "distance_mi": 164,
+    "schedule": "09:57 PT - 09:15 ALT (0h 18m)"
+  },
+  {
+    "leg": 4,
+    "segment": "Leg 4",
+    "flight": "DVH8925 Leg 1",
+    "aircraft": "B737-800",
+    "route": "Juneau AK (PAJN) - Seattle-Tacoma WA (KSEA)",
+    "distance_mi": 908,
+    "schedule": "06:45 ALT - 10:11 PT (2h 26m)"
+  },
+  {
+    "leg": 5,
+    "segment": "Leg 5",
+    "flight": "NW5867 Leg 2",
+    "aircraft": "DC-7",
+    "route": "Seattle-Tacoma WA (KSEA) - Portland OR (KPDX)",
+    "distance_mi": 129,
+    "schedule": "20:30 PT - 21:20 PT (0h 50m)"
+  },
+  {
+    "leg": 6,
+    "segment": "Leg 6",
+    "flight": "NW217 Leg 1",
+    "aircraft": "B757-300",
+    "route": "Portland OR (KPDX) - Honolulu HI (PHNL)",
+    "distance_mi": 2605,
+    "schedule": "12:40 PT - 15:31 HST (5h 51m)"
+  },
+  {
+    "leg": 7,
+    "segment": "Leg 7",
+    "flight": "PAH2301 Leg 5",
+    "aircraft": "B747-100",
+    "route": "Honolulu HI (PHNL) - Los Angeles CA (KLAX)",
+    "distance_mi": 2555,
+    "schedule": "09:00 HST - 17:10 PT (5h 10m)"
+  },
+  {
+    "leg": 8,
+    "segment": "Leg 8",
+    "flight": "AM647 Leg 1",
+    "aircraft": "B787-9",
+    "route": "Los Angeles CA (KLAX) - Mexico City Mexico (MMMX)",
+    "distance_mi": 1555,
+    "schedule": "11:30 PT - 17:05 CT (3h 35m)"
+  },
+  {
+    "leg": 9,
+    "segment": "Leg 9",
+    "flight": "KLH684 Leg 1",
+    "aircraft": "DC-8-63",
+    "route": "Mexico City Mexico (MMMX) - Houston-Bush Intercontinental TX (KIAH)",
+    "distance_mi": 766,
+    "schedule": "11:10 CT - 13:05 CT (1h 55m)"
+  },
+  {
+    "leg": 10,
+    "segment": "Leg 10",
+    "flight": "DVH8800 Leg 1",
+    "aircraft": "CV-880",
+    "route": "Houston-Bush Intercontinental TX (KIAH) - New Orleans LA (KMSY)",
+    "distance_mi": 304,
+    "schedule": "16:55 CT - 17:47 CT (0h 52m)"
+  },
+  {
+    "leg": 11,
+    "segment": "Leg 11",
+    "flight": "DL9571 Leg 1",
+    "aircraft": "DC-8-61",
+    "route": "New Orleans LA (KMSY) - Merida Mexico (MMMD)",
+    "distance_mi": 627,
+    "schedule": "11:17 CT - 12:25 CT (1h 8m)"
+  },
+  {
+    "leg": 12,
+    "segment": "Leg 12",
+    "flight": "DL9571 Leg 2",
+    "aircraft": "MD-87",
+    "route": "Merida Mexico (MMMD) - Guatemala City Guatemala (MGGT)",
+    "distance_mi": 443,
+    "schedule": "11:59 CT - 11:51 CST (0h 52m)"
+  },
+  {
+    "leg": 13,
+    "segment": "Leg 13",
+    "flight": "DL9571 Leg 3",
+    "aircraft": "B707-320",
+    "route": "Guatemala City Guatemala (MGGT) - Managua Nicaragua (MNMG)",
+    "distance_mi": 338,
+    "schedule": "15:28 CST - 17:04 CT (0h 36m)"
+  },
+  {
+    "leg": 14,
+    "segment": "Leg 14",
+    "flight": "DL9571 Leg 4",
+    "aircraft": "A330-300",
+    "route": "Managua Nicaragua (MNMG) - Panama City Panama (MPTO)",
+    "distance_mi": 508,
+    "schedule": "04:25 CT - 05:21 ACST (0h 56m)"
+  },
+  {
+    "leg": 15,
+    "segment": "Leg 15",
+    "flight": "PAH1240 Leg 2",
+    "aircraft": "B707-320",
+    "route": "Panama City Panama (MPTO) - Miami FL (KMIA)",
+    "distance_mi": 1158,
+    "schedule": "16:45 ACST - 15:35 ET (21h 50m)"
+  },
+  {
+    "leg": 16,
+    "segment": "Leg 16",
+    "flight": "PAH3711 Leg 1",
+    "aircraft": "DC-6",
+    "route": "Miami FL (KMIA) - Havana Cuba (MUHA)",
+    "distance_mi": 235,
+    "schedule": "08:00 ET - 09:00 ET (1h 0m)"
+  },
+  {
+    "leg": 17,
+    "segment": "Leg 17",
+    "flight": "PAH3781 Leg 3",
+    "aircraft": "DC-6",
+    "route": "Havana Cuba (MUHA) - Hamilton Bermuda (TXKF)",
+    "distance_mi": 1262,
+    "schedule": "09:00 ET - 14:40 AT (4h 40m)"
+  },
+  {
+    "leg": 18,
+    "segment": "Leg 18",
+    "flight": "DL9572 Leg 1",
+    "aircraft": "B767-300ER",
+    "route": "Hamilton Bermuda (TXKF) - Port au Prince Haiti (MTPP)",
+    "distance_mi": 1064,
+    "schedule": "08:33 AT - 09:33 ET (2h 0m)"
+  },
+  {
+    "leg": 19,
+    "segment": "Leg 19",
+    "flight": "PAH1219 Leg 3",
+    "aircraft": "B707-320",
+    "route": "Port au Prince Haiti (MTPP) - Kingston Jamaica (MKJP)",
+    "distance_mi": 299,
+    "schedule": "09:30 ET - 09:30 JT (1h 0m)"
+  },
+  {
+    "leg": 20,
+    "segment": "Leg 20",
+    "flight": "PAH6037 Leg 3",
+    "aircraft": "CV-340",
+    "route": "Kingston Jamaica (MKJP) - Barranquilla Colombia (SKBQ)",
+    "distance_mi": 505,
+    "schedule": "11:15 JT - 13:35 ACST (2h 20m)"
+  },
+  {
+    "leg": 21,
+    "segment": "Leg 21",
+    "flight": "DL9573 Leg 1",
+    "aircraft": "CRJ-700",
+    "route": "Barranquilla Colombia (SKBQ) - Bogota Colombia (SKBO)",
+    "distance_mi": 431,
+    "schedule": "09:36 ACST - 11:27 ET (0h 51m)"
+  },
+  {
+    "leg": 22,
+    "segment": "Leg 22",
+    "flight": "DL9573 Leg 2",
+    "aircraft": "DHC-8-Q400",
+    "route": "Bogota Colombia (SKBO) - Cali Colombia (SKCL)",
+    "distance_mi": 174,
+    "schedule": "12:15 ET - 12:40 ET (0h 25m)"
+  },
+  {
+    "leg": 23,
+    "segment": "Leg 23",
+    "flight": "DL9573 Leg 3",
+    "aircraft": "MD-82",
+    "route": "Cali Colombia (SKCL) - Quito Ecuador (SEQM)",
+    "distance_mi": 288,
+    "schedule": "14:47 ET - 14:21 ECT (0h 34m)"
+  },
+  {
+    "leg": 24,
+    "segment": "Leg 24",
+    "flight": "KL755 Leg 2",
+    "aircraft": "B777-200ER",
+    "route": "Quito Ecuador (SEQM) - Guayaquil Ecuador (SEGU)",
+    "distance_mi": 176,
+    "schedule": "17:30 ECT - 18:30 ECT (1h 0m)"
+  },
+  {
+    "leg": 25,
+    "segment": "Leg 25",
+    "flight": "DL9574 Leg 1",
+    "aircraft": "DC-9-32",
+    "route": "Guayaquil Ecuador (SEGU) - Talara Peru (SPYL)",
+    "distance_mi": 192,
+    "schedule": "16:04 ECT - 16:26 ACST (0h 22m)"
+  },
+  {
+    "leg": 26,
+    "segment": "Leg 26",
+    "flight": "PAH3901 Leg 2",
+    "aircraft": "DC-7",
+    "route": "Talara Peru (SPYL) - Lima Peru (SPJC)",
+    "distance_mi": 588,
+    "schedule": "07:05 ACST - 09:20 ACST (2h 15m)"
+  },
+  {
+    "leg": 27,
+    "segment": "Leg 27",
+    "flight": "DL9575 Leg 1",
+    "aircraft": "A310",
+    "route": "Lima Peru (SPJC) - Antofagasta Chile (SCFA)",
+    "distance_mi": 903,
+    "schedule": "06:51 ACST - 09:35 CHST (1h 44m)"
+  },
+  {
+    "leg": 28,
+    "segment": "Leg 28",
+    "flight": "DL9575 Leg 2",
+    "aircraft": "MD-11",
+    "route": "Antofagasta Chile (SCFA) - Santiago Chile (SCEL)",
+    "distance_mi": 688,
+    "schedule": "09:23 CHST - 10:38 CHST (1h 15m)"
+  },
+  {
+    "leg": 29,
+    "segment": "Leg 29",
+    "flight": "KLH792 Leg 3",
+    "aircraft": "DC-8-63",
+    "route": "Santiago Chile (SCEL) - Buenos Aires-Ezeiza Intl Argentina (SAEZ)",
+    "distance_mi": 709,
+    "schedule": "09:20 CHST - 11:00 GMT-3 (0h 40m)"
+  },
+  {
+    "leg": 30,
+    "segment": "Leg 30",
+    "flight": "PAH3704 Leg 2",
+    "aircraft": "DC-6",
+    "route": "Buenos Aires-Ezeiza Intl Argentina (SAEZ) - Montevideo Uruguay (SUMU)",
+    "distance_mi": 142,
+    "schedule": "12:00 GMT-3 - 12:50 GMT-3 (0h 50m)"
+  },
+  {
+    "leg": 31,
+    "segment": "Leg 31",
+    "flight": "KLH793 Leg 1",
+    "aircraft": "DC-8-63",
+    "route": "Montevideo Uruguay (SUMU) - Rio de Janeiro–Galeao Brazil (SBGL)",
+    "distance_mi": 1135,
+    "schedule": "12:55 GMT-3 - 16:25 BT (3h 30m)"
+  },
+  {
+    "leg": 32,
+    "segment": "Leg 32",
+    "flight": "GLO2002 Leg 1",
+    "aircraft": "B737-800",
+    "route": "Rio de Janeiro–Galeao Brazil (SBGL) - Recife Brazil (SBRF)",
+    "distance_mi": 1156,
+    "schedule": "08:05 BT - 10:55 GYT (2h 50m)"
+  },
+  {
+    "leg": 33,
+    "segment": "Leg 33",
+    "flight": "DVH7402 Leg 1",
+    "aircraft": "B757-200",
+    "route": "Recife Brazil (SBRF) - Fortaleza Brazil (SBFZ)",
+    "distance_mi": 390,
+    "schedule": "09:23 GYT - 10:45 GYT (1h 22m)"
+  },
+  {
+    "leg": 34,
+    "segment": "Leg 34",
+    "flight": "DL9576 Leg 1",
+    "aircraft": "ERJ-175",
+    "route": "Fortaleza Brazil (SBFZ) - Belem Brazil (SBBE)",
+    "distance_mi": 707,
+    "schedule": "07:28 GYT - 08:48 GYT (1h 20m)"
+  },
+  {
+    "leg": 35,
+    "segment": "Leg 35",
+    "flight": "DL9576 Leg 2",
+    "aircraft": "L-1011-500",
+    "route": "Belem Brazil (SBBE) - Caracas Venezuela (SVMI)",
+    "distance_mi": 1520,
+    "schedule": "11:27 GYT - 13:19 VET (2h 52m)"
+  },
+  {
+    "leg": 36,
+    "segment": "Leg 36",
+    "flight": "KLH773 Leg 6",
+    "aircraft": "DC-8-63",
+    "route": "Caracas Venezuela (SVMI) - Hato International Curacao (TNCC)",
+    "distance_mi": 173,
+    "schedule": "21:50 VET - 22:30 CBT (0h 40m)"
+  },
+  {
+    "leg": 37,
+    "segment": "Leg 37",
+    "flight": "DL9577 Leg 1",
+    "aircraft": "B737-600",
+    "route": "Hato International Curacao (TNCC) - San Juan Puerto Rico (TJSJ)",
+    "distance_mi": 475,
+    "schedule": "14:53 CBT - 16:52 AT (0h 59m)"
+  },
+  {
+    "leg": 38,
+    "segment": "Leg 38",
+    "flight": "PAH3716 Leg 1",
+    "aircraft": "DC-6",
+    "route": "San Juan Puerto Rico (TJSJ) - New York-Kennedy NY (KJFK)",
+    "distance_mi": 1603,
+    "schedule": "10:00 AT - 15:05 ET (6h 5m)"
+  },
+  {
+    "leg": 39,
+    "segment": "Leg 39",
+    "flight": "DL2639 Leg 1",
+    "aircraft": "A220-100",
+    "route": "New York-Kennedy NY (KJFK) - Boston MA (KBOS)",
+    "distance_mi": 187,
+    "schedule": "21:00 ET - 22:27 ET (1h 27m)"
+  },
+  {
+    "leg": 40,
+    "segment": "Leg 40",
+    "flight": "DL9578 Leg 1",
+    "aircraft": "A330-300",
+    "route": "Boston MA (KBOS) - Gander NF Canada (CYQX)",
+    "distance_mi": 913,
+    "schedule": "06:39 ET - 10:21 NT (2h 12m)"
+  }
+]

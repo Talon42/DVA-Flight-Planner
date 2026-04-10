@@ -19,6 +19,7 @@ For flight simulation purposes only. Not a commercial application. In no way is 
 - Builds a connected duty schedule
 - Lets you maintain a persistent Flight Board between sessions
 - Lets you drag Flight Board cards to reorder your working sequence
+- Includes a Tours tab with DVA tour legs and local completion tracking
 - Supports direct schedule sync from the Delta Virtual website
 - Supports SimBrief dispatch from Flight Board entries
 - Supports saved custom SimBrief airframes mapped to specific aircraft types
@@ -218,6 +219,48 @@ The schedule table is the main working view.
 - Click the same header again to reverse the sort
 
 The table shows airline, route, departure, arrival, block time, and distance. Airports found in your addon scan are marked in the schedule.
+
+## Tours Tab
+
+Use the `Tours` tab to work through bundled Delta Virtual tour legs inside the schedule area.
+
+### How to use it
+
+1. Click `Tours` in the schedule panel.
+2. Use the `Tour` picker to choose the tour you want to fly.
+3. Work from the top of the table downward. Incomplete legs stay in their original leg order.
+4. Double-click a tour leg to add it to the Flight Board.
+
+<!-- docshot: tours-schedule-tabs -->
+<img width="1000" alt="image" src="./readme-images/tours-schedule-tabs.png" />
+
+Tour flights added to the Flight Board show a red `T` badge so you can tell them apart from normal schedule flights.
+
+<!-- docshot: tours-flight-card -->
+<img width="1000" alt="image" src="./readme-images/tours-flight-card.png" />
+
+### Completing tour flights
+
+1. Add a tour leg to the Flight Board.
+2. Expand that Flight Board entry.
+3. Click `Complete Flight`.
+
+When a tour leg is completed:
+
+- the Flight Board entry stays on the board
+- the `Complete Flight` button changes to `Click to Revert Status`
+- the completed leg moves to the bottom of the Tours schedule table
+- completed legs at the bottom are ordered by the sequence you completed them, not by original leg number
+
+<!-- docshot: tours-flight-completed -->
+<img width="1000" alt="image" src="./readme-images/tours-flight-completed.png" />
+
+### Important note about tour progress
+
+- Tour data comes from Delta Virtual tour content included in the app.
+- Tour completion is tracked locally inside Flight Planner.
+- Flight Planner does not sync your DVA logbook.
+- If you complete a tour flight outside Flight Planner, that completed status will not appear in the app automatically.
 
 ## Flight Board
 

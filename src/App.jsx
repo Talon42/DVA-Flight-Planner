@@ -3,8 +3,8 @@ import { DateTime } from "luxon";
 import FilterBar from "./components/FilterBar";
 import { AddonAirportPanel } from "./components/FilterBar";
 import { SimBriefSettingsPanel } from "./components/FilterBar";
-import FlightTable from "./components/FlightTable";
 import DetailsPanel from "./components/DetailsPanel";
+import ScheduleTablePanel from "./components/ScheduleTablePanel";
 import Button from "./components/ui/Button";
 import IconButton from "./components/ui/IconButton";
 import Panel from "./components/ui/Panel";
@@ -27,6 +27,7 @@ import {
   getAircraftProfileOptions,
   supportsFlightByOperationalLimits
 } from "./lib/aircraftCatalog";
+import { getAirlineIcao, getAirlineNameByIata } from "./lib/airlineBranding";
 import { buildAirportOptions, getAirportByIcao } from "./lib/airportCatalog";
 import dalLogo from "./data/images/DAL.png";
 import {
@@ -74,9 +75,143 @@ const DEV_WINDOW_WIDTH_PRESETS = [
   { width: 1400, height: 900, label: "1400x900" },
   { width: 1024, height: 768, label: "1024x768" }
 ];
+const TOUR_FILE_MODULES = import.meta.glob("./data/tours/*.json", {
+  eager: true,
+  import: "default"
+});
 const MAX_FLIGHT_BOARDS = 4;
 const DEFAULT_FLIGHT_BOARD_NAME = "Board 1";
 const BOOT_SPLASH_HIDE_DELAY_MS = 200;
+
+function formatTourLabelFromPath(path) {
+  const fileName = String(path || "").split("/").pop() || "";
+  const stem = fileName.replace(/\.json$/i, "");
+  return stem
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
+
+function buildTourRowIdentity(path, row, index) {
+  const explicitId = String(row?.id || row?.flightId || "").trim();
+  if (explicitId) {
+    return `${path}:${explicitId}`;
+  }
+
+  if (Number.isFinite(row?.leg)) {
+    return `${path}:leg:${row.leg}`;
+  }
+
+  const segment = String(row?.segment || "").trim();
+  if (segment) {
+    return `${path}:segment:${segment}`;
+  }
+
+  return `${path}:fallback:${String(row?.flight || "").trim()}:${String(row?.route || "").trim()}:${index}`;
+}
+
+function parseTourRoute(route) {
+  const normalizedRoute = String(route || "").trim();
+  if (!normalizedRoute) {
+    return {
+      from: "",
+      to: "",
+      fromAirport: "",
+      toAirport: ""
+    };
+  }
+
+  const [fromAirport = "", toAirport = ""] = normalizedRoute.split(" - ");
+  const airportMatches = [...normalizedRoute.matchAll(/\(([A-Z0-9]{4})\)/g)];
+
+  return {
+    from: airportMatches[0]?.[1] || "",
+    to: airportMatches[airportMatches.length - 1]?.[1] || "",
+    fromAirport: fromAirport.trim(),
+    toAirport: toAirport.trim()
+  };
+}
+
+function parseTourFlightCode(flightLabel) {
+  const normalizedLabel = String(flightLabel || "").trim().toUpperCase();
+  const iataMatch = normalizedLabel.match(/^([A-Z]{2,3})(?=\d)/);
+  const flightNumberMatch = normalizedLabel.match(/^[A-Z]{2,3}(\d+)/);
+  const airline = iataMatch?.[1] || "";
+  const airlineName = getAirlineNameByIata(airline);
+  const airlineIcao = getAirlineIcao({ airlineName, airlineIata: airline });
+
+  return {
+    airline,
+    airlineName: airlineName || airline,
+    airlineIcao,
+    flightNumber: flightNumberMatch?.[1] || ""
+  };
+}
+
+function parseTourDepartureTimeLabel(scheduleLabel) {
+  const normalizedLabel = String(scheduleLabel || "").trim();
+  if (!normalizedLabel) {
+    return "";
+  }
+
+  return normalizedLabel.split(" - ")[0]?.trim() || "";
+}
+
+function normalizeTourRows(path, rows, progressById = {}) {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows.map((row, index) => {
+    const identity = buildTourRowIdentity(path, row, index);
+    const parsedRoute = parseTourRoute(row?.route);
+    const parsedFlightCode = parseTourFlightCode(row?.flight);
+    const normalizedTourFlightNumber = String(
+      parsedFlightCode.flightNumber || row?.flightNumber || ""
+    ).trim();
+    const normalizedTourFlightCode =
+      parsedFlightCode.airline && normalizedTourFlightNumber
+        ? `${parsedFlightCode.airline}${normalizedTourFlightNumber}`
+        : String(row?.flight || "").trim();
+    const progressEntry = progressById?.[identity];
+    const blockMinutesMatch = String(row?.schedule || "").match(/\((\d+)h\s+(\d+)m\)/i);
+    const blockMinutes = blockMinutesMatch
+      ? Number(blockMinutesMatch[1]) * 60 + Number(blockMinutesMatch[2])
+      : null;
+    const blockTimeLabel = blockMinutesMatch
+      ? `${Number(blockMinutesMatch[1])}h ${Number(blockMinutesMatch[2])}m`
+      : String(row?.schedule || "").trim();
+    const departureTimeLabel = parseTourDepartureTimeLabel(row?.schedule);
+
+    return {
+      ...row,
+      sourceIndex: index,
+      ...parsedRoute,
+      flightId: identity,
+      linkedFlightId: identity,
+      flightCode: normalizedTourFlightCode,
+      flightNumber: normalizedTourFlightNumber,
+      tourFlightNumber: normalizedTourFlightNumber,
+      airline: parsedFlightCode.airline,
+      airlineName: parsedFlightCode.airlineName,
+      airlineIcao: parsedFlightCode.airlineIcao,
+      route: String(row?.route || "").trim(),
+      blockMinutes,
+      blockTimeLabel,
+      departureTimeLabel,
+      distanceNm: null,
+      distanceMi: Number.isFinite(row?.distance_mi) ? row.distance_mi : null,
+      isTourFlight: true,
+      tourPath: path,
+      tourRowId: identity,
+      isCompleted: Boolean(progressEntry?.completed),
+      completedAt: progressEntry?.completedAt || null,
+      completionOrder: Number.isFinite(progressEntry?.completionOrder)
+        ? progressEntry.completionOrder
+        : null
+    };
+  });
+}
 
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -675,6 +810,87 @@ function buildBoardEntryFromFlight(flight, overrides = {}) {
   };
 }
 
+function buildBoardEntryFromTourFlight(flight, overrides = {}) {
+  const parsedRoute = parseTourRoute(flight?.route);
+  const parsedFlightCode = parseTourFlightCode(flight?.flightCode || flight?.flight);
+  const normalizedFlightNumber = String(
+    flight?.tourFlightNumber || parsedFlightCode.flightNumber || flight?.flightNumber || ""
+  ).trim();
+  const normalizedAirline = String(flight?.airline || parsedFlightCode.airline || "")
+    .trim()
+    .toUpperCase();
+  const normalizedFlightCode =
+    normalizedAirline && normalizedFlightNumber
+      ? `${normalizedAirline}${normalizedFlightNumber}`
+      : String(flight?.flightCode || flight?.flight || "").trim();
+  const normalizedAirlineName = String(
+    flight?.airlineName || parsedFlightCode.airlineName || normalizedAirline
+  ).trim();
+  const normalizedAirlineIcao = String(
+    flight?.airlineIcao || parsedFlightCode.airlineIcao || ""
+  )
+    .trim()
+    .toUpperCase();
+  const normalizedCallsign =
+    normalizedFlightNumber && (normalizedAirlineIcao || normalizedAirline)
+      ? `${normalizedAirlineIcao || normalizedAirline}${normalizedFlightNumber}`
+      : normalizedFlightCode;
+
+  return {
+    boardEntryId: overrides.boardEntryId || buildBoardEntryId(flight?.flightId),
+    linkedFlightId: String(flight?.flightId || "").trim() || null,
+    isStale: false,
+    isTourFlight: true,
+    tourPath: String(flight?.tourPath || "").trim(),
+    tourRowId: String(flight?.tourRowId || flight?.flightId || "").trim(),
+    isCompleted: Boolean(overrides.isCompleted ?? flight?.isCompleted),
+    completedAt: overrides.completedAt ?? flight?.completedAt ?? null,
+    completionOrder: Number.isFinite(overrides.completionOrder ?? flight?.completionOrder)
+      ? overrides.completionOrder ?? flight?.completionOrder
+      : null,
+    flightId: String(flight?.flightId || "").trim(),
+    flightCode: normalizedFlightCode,
+    flightNumber: normalizedFlightNumber,
+    tourFlightNumber: normalizedFlightNumber,
+    airline: normalizedAirline,
+    airlineName: normalizedAirlineName,
+    airlineIcao: normalizedAirlineIcao,
+    callsign: normalizedCallsign,
+    from: parsedRoute.from,
+    to: parsedRoute.to,
+    route: String(flight?.route || "").trim(),
+    fromAirport: parsedRoute.fromAirport,
+    toAirport: parsedRoute.toAirport,
+    missingAirportIcaos: [],
+    hasMissingAirportData: false,
+    fromTimezone: "",
+    toTimezone: "",
+    stdLocal: "",
+    staLocal: "",
+    stdUtc: "",
+    staUtc: "",
+    localDepartureClock: "",
+    utcDepartureClock: "",
+    stdUtcMillis: 0,
+    staUtcMillis: 0,
+    blockMinutes: Number.isFinite(flight?.blockMinutes) ? flight.blockMinutes : null,
+    blockTimeLabel: String(flight?.blockTimeLabel || "").trim(),
+    departureTimeLabel: String(flight?.departureTimeLabel || "").trim(),
+    distanceNm: null,
+    distanceMi: Number.isFinite(flight?.distanceMi ?? flight?.distance_mi)
+      ? flight?.distanceMi ?? flight?.distance_mi
+      : null,
+    compatibleEquipment: [],
+    simbriefSelectedType: String(
+      overrides.simbriefSelectedType ?? flight?.simbriefSelectedType ?? ""
+    )
+      .trim()
+      .toUpperCase(),
+    simbriefPlan:
+      overrides.simbriefPlan !== undefined ? overrides.simbriefPlan : flight?.simbriefPlan ?? null
+  };
+}
+
 function normalizeBoardEntry(entry) {
   if (!entry || typeof entry !== "object") {
     return null;
@@ -689,6 +905,13 @@ function normalizeBoardEntry(entry) {
     boardEntryId: String(entry.boardEntryId || "").trim() || buildBoardEntryId(entry.flightId),
     linkedFlightId: normalizedLinkedFlightId,
     isStale: Boolean(entry.isStale),
+    isTourFlight: Boolean(entry.isTourFlight),
+    tourPath: String(entry.tourPath || "").trim(),
+    tourRowId: String(entry.tourRowId || normalizedLinkedFlightId || "").trim(),
+    tourFlightNumber: String(entry.tourFlightNumber || "").trim(),
+    isCompleted: Boolean(entry.isCompleted),
+    completedAt: entry.completedAt || null,
+    completionOrder: Number.isFinite(entry.completionOrder) ? entry.completionOrder : null,
     flightId: String(entry.flightId || normalizedLinkedFlightId || "").trim(),
     flightCode: String(entry.flightCode || "").trim(),
     flightNumber: deriveFlightNumber(entry),
@@ -714,7 +937,10 @@ function normalizeBoardEntry(entry) {
     stdUtcMillis: Number(entry.stdUtcMillis) || 0,
     staUtcMillis: Number(entry.staUtcMillis) || 0,
     blockMinutes: Number.isFinite(entry.blockMinutes) ? entry.blockMinutes : null,
+    blockTimeLabel: String(entry.blockTimeLabel || "").trim(),
+    departureTimeLabel: String(entry.departureTimeLabel || "").trim(),
     distanceNm: Number.isFinite(entry.distanceNm) ? entry.distanceNm : null,
+    distanceMi: Number.isFinite(entry.distanceMi) ? entry.distanceMi : null,
     compatibleEquipment: Array.isArray(entry.compatibleEquipment) ? [...entry.compatibleEquipment] : [],
     simbriefSelectedType: String(entry.simbriefSelectedType || "").trim().toUpperCase(),
     simbriefPlan: entry.simbriefPlan || null
@@ -743,6 +969,10 @@ function reconcileBoardWithSchedule(currentBoard, nextFlights) {
       const normalizedEntry = normalizeBoardEntry(entry);
       if (!normalizedEntry) {
         return null;
+      }
+
+      if (normalizedEntry.isTourFlight) {
+        return normalizedEntry;
       }
 
       const matchedFlight = normalizedEntry.linkedFlightId
@@ -1181,13 +1411,17 @@ export default function App() {
   const [flightBoards, setFlightBoards] = useState([createFlightBoard()]);
   const [activeFlightBoardId, setActiveFlightBoardId] = useState("");
   const [selectedFlightId, setSelectedFlightId] = useState(null);
+  const [selectedTourRowId, setSelectedTourRowId] = useState(null);
   const [expandedBoardFlightId, setExpandedBoardFlightId] = useState(null);
   const [scheduleTableTimeDisplayMode, setScheduleTableTimeDisplayMode] = useState("local");
+  const [scheduleView, setScheduleView] = useState("flights");
   const [plannerMode, setPlannerMode] = useState("basic");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [dutyFilters, setDutyFilters] = useState(DEFAULT_DUTY_FILTERS);
   const [filterUiVersion, setFilterUiVersion] = useState(0);
   const [sort, setSort] = useState(DEFAULT_SORT);
+  const [selectedTourPath, setSelectedTourPath] = useState("");
+  const [tourProgress, setTourProgress] = useState({});
   const [theme, setTheme] = useState(readSavedTheme);
   const [isDevToolsEnabled, setIsDevToolsEnabled] = useState(readSavedDevToolsEnabled);
   const [devWindowWidth, setDevWindowWidth] = useState(readSavedDevWindowWidth);
@@ -1269,6 +1503,7 @@ export default function App() {
       ? "Sync DVA"
       : "Sync from Delta Virtual";
   const currentWindowSizeLabel = `${viewportSize.width}x${viewportSize.height}`;
+
   const activeFlightBoard = useMemo(() => {
     if (!flightBoards.length) {
       return null;
@@ -1281,15 +1516,40 @@ export default function App() {
     );
   }, [flightBoards, activeFlightBoardId]);
   const flightBoard = activeFlightBoard?.entries || [];
+  const availableTours = useMemo(
+    () =>
+      Object.entries(TOUR_FILE_MODULES)
+        .map(([path, rows]) => ({
+          path,
+          label: formatTourLabelFromPath(path),
+          rows: normalizeTourRows(path, rows, tourProgress?.[path]?.rows)
+        }))
+        .sort((left, right) => left.label.localeCompare(right.label)),
+    [tourProgress]
+  );
+  const selectedTour = useMemo(() => {
+    if (!availableTours.length) {
+      return null;
+    }
+
+    return availableTours.find((tour) => tour.path === selectedTourPath) || availableTours[0];
+  }, [availableTours, selectedTourPath]);
+  const tourFlightsById = useMemo(
+    () =>
+      new Map(
+        availableTours.flatMap((tour) =>
+          tour.rows.map((row) => [row.tourRowId, row])
+        )
+      ),
+    [availableTours]
+  );
   const haveDeferredStartupFiltersSettled =
     deferredFilters === filters && deferredDutyFilters === dutyFilters;
   const hasRestoredScheduleStartupSettled =
     Boolean(schedule?.flights?.length) &&
     haveDeferredStartupFiltersSettled &&
     Boolean(activeFlightBoard);
-  const isStartupReady =
-    !isHydrating &&
-    (!shouldAwaitRestoredScheduleStartup || hasRestoredScheduleStartupSettled);
+  const isStartupReady = !isHydrating;
 
   useEffect(() => {
     if (!flightBoards.length) {
@@ -1302,12 +1562,54 @@ export default function App() {
   }, [flightBoards, activeFlightBoardId]);
 
   useEffect(() => {
+    if (!availableTours.length) {
+      if (scheduleView === "tours") {
+        setScheduleView("flights");
+      }
+      if (selectedTourPath) {
+        setSelectedTourPath("");
+      }
+      return;
+    }
+
+    if (!selectedTourPath || !availableTours.some((tour) => tour.path === selectedTourPath)) {
+      setSelectedTourPath(availableTours[0].path);
+    }
+  }, [availableTours, scheduleView, selectedTourPath]);
+
+  useEffect(() => {
+    if (scheduleView !== "tours") {
+      return;
+    }
+
+    setSelectedTourRowId((current) =>
+      selectedTour?.rows.some((row) => row.flightId === current)
+        ? current
+        : selectedTour?.rows[0]?.flightId || null
+    );
+  }, [scheduleView, selectedTour]);
+
+  useEffect(() => {
     if (!shouldAwaitRestoredScheduleStartup || !hasRestoredScheduleStartupSettled) {
       return;
     }
 
     setShouldAwaitRestoredScheduleStartup(false);
   }, [hasRestoredScheduleStartupSettled, shouldAwaitRestoredScheduleStartup]);
+
+  useEffect(() => {
+    if (!shouldAwaitRestoredScheduleStartup) {
+      return undefined;
+    }
+
+    const timeoutHandle = window.setTimeout(() => {
+      setShouldAwaitRestoredScheduleStartup(false);
+    }, 1500);
+
+    return () => {
+      window.clearTimeout(timeoutHandle);
+    };
+  }, [shouldAwaitRestoredScheduleStartup]);
 
   useEffect(() => {
     let timeoutHandle = null;
@@ -1515,6 +1817,10 @@ export default function App() {
         setFilters(DEFAULT_FILTERS);
         setDutyFilters(DEFAULT_DUTY_FILTERS);
         setSort(DEFAULT_SORT);
+        setScheduleView("flights");
+        setSelectedTourPath("");
+        setSelectedTourRowId(null);
+        setTourProgress({});
         setPlannerControlsCollapsed(getDefaultPlannerControlsCollapsed());
         setBasicAdvancedFiltersOpen(false);
         setBasicAddonFiltersOpen(false);
@@ -1562,6 +1868,14 @@ export default function App() {
       setFilters(nextFilters);
       setDutyFilters(nextDutyFilters);
       setSort(snapshot?.sort || DEFAULT_SORT);
+      setScheduleView(snapshot?.scheduleView === "tours" ? "tours" : "flights");
+      setSelectedTourPath(String(snapshot?.selectedTourPath || "").trim());
+      setSelectedTourRowId(null);
+      setTourProgress(
+        snapshot?.tourProgress && typeof snapshot.tourProgress === "object"
+          ? snapshot.tourProgress
+          : {}
+      );
       setPlannerControlsCollapsed(
         typeof snapshot?.plannerControlsCollapsed === "boolean"
           ? snapshot.plannerControlsCollapsed
@@ -1921,6 +2235,10 @@ export default function App() {
           savedUiState.scheduleTableTimeDisplayMode === "utc" ? "utc" : "local"
         );
         setSort(savedUiState.sort || DEFAULT_SORT);
+        setScheduleView(savedUiState.scheduleView === "tours" ? "tours" : "flights");
+        setSelectedTourPath(String(savedUiState.selectedTourPath || "").trim());
+        setSelectedTourRowId(null);
+        setTourProgress(savedUiState.tourProgress && typeof savedUiState.tourProgress === "object" ? savedUiState.tourProgress : {});
         setPlannerControlsCollapsed(
           typeof savedUiState.plannerControlsCollapsed === "boolean"
             ? savedUiState.plannerControlsCollapsed
@@ -1977,7 +2295,10 @@ export default function App() {
       basicAddonFiltersOpen,
       scheduleTableTimeDisplayMode,
       sort,
-      selectedFlightId
+      selectedFlightId,
+      scheduleView,
+      selectedTourPath,
+      tourProgress
     }).catch((error) => {
       setStatusMessage(error.message || "Unable to persist the current planner state.");
       logAppError("persist-ui-state-failed", error).catch(() => {});
@@ -1996,6 +2317,9 @@ export default function App() {
     scheduleTableTimeDisplayMode,
     sort,
     selectedFlightId,
+    scheduleView,
+    selectedTourPath,
+    tourProgress,
     isHydrating
   ]);
 
@@ -2235,6 +2559,7 @@ export default function App() {
   }, [addonAirports, normalizedDeferredDutyFilters, schedule, scheduleFlights]);
 
   const activeFlights = plannerMode === "duty" ? dutyFilteredFlights : basicFilteredFlights;
+  const activeTourRows = selectedTour?.rows || [];
 
   const sortedFlights = useMemo(() => {
     const sorted = sortFlights(activeFlights, sort);
@@ -2258,8 +2583,56 @@ export default function App() {
     plannerMode,
     sort
   ]);
+  const sortedTourRows = useMemo(
+    () => {
+      const incompleteRows = [];
+      const completedRows = [];
 
-  const shortlist = flightBoard;
+      for (const row of activeTourRows) {
+        if (row.isCompleted) {
+          completedRows.push(row);
+        } else {
+          incompleteRows.push(row);
+        }
+      }
+
+      incompleteRows.sort(
+        (left, right) => (left.sourceIndex ?? 0) - (right.sourceIndex ?? 0)
+      );
+      completedRows.sort(
+        (left, right) =>
+          (left.completionOrder ?? Number.MAX_SAFE_INTEGER) -
+            (right.completionOrder ?? Number.MAX_SAFE_INTEGER) ||
+          (left.sourceIndex ?? 0) - (right.sourceIndex ?? 0)
+      );
+
+      return [...incompleteRows, ...completedRows];
+    },
+    [activeTourRows]
+  );
+  const shortlist = useMemo(
+    () =>
+      flightBoard.map((entry) => {
+        if (!entry?.isTourFlight) {
+          return entry;
+        }
+
+        const sourceFlight = tourFlightsById.get(entry.tourRowId);
+        if (!sourceFlight) {
+          return entry;
+        }
+
+        return buildBoardEntryFromTourFlight(sourceFlight, {
+          boardEntryId: entry.boardEntryId,
+          simbriefSelectedType: entry.simbriefSelectedType,
+          simbriefPlan: entry.simbriefPlan,
+          isCompleted: sourceFlight.isCompleted,
+          completionOrder: sourceFlight.completionOrder
+        });
+      }
+      ),
+    [flightBoard, tourFlightsById]
+  );
   const selectedShortlistFlight =
     shortlist.find((flight) => flight.boardEntryId === expandedBoardFlightId) || null;
   const simBriefCredentialsConfigured = Boolean(
@@ -2318,7 +2691,10 @@ export default function App() {
         scheduleTableTimeDisplayMode:
           overrides.scheduleTableTimeDisplayMode ?? scheduleTableTimeDisplayMode,
         sort: overrides.sort ?? sort,
-        selectedFlightId: overrides.selectedFlightId ?? selectedFlightId
+        selectedFlightId: overrides.selectedFlightId ?? selectedFlightId,
+        scheduleView: overrides.scheduleView ?? scheduleView,
+        selectedTourPath: overrides.selectedTourPath ?? selectedTourPath,
+        tourProgress: overrides.tourProgress ?? tourProgress
       })
     ).catch((error) => {
       setStatusMessage(error.message || "Unable to persist the current schedule.");
@@ -2740,6 +3116,10 @@ export default function App() {
   }
 
   function handleSort(sortKey) {
+    if (scheduleView === "tours") {
+      return;
+    }
+
     setSort((current) => {
       if (current.key === sortKey) {
         return {
@@ -2755,7 +3135,23 @@ export default function App() {
     });
   }
 
+  function handleScheduleViewChange(nextView) {
+    const nextScheduleView =
+      nextView === "tours" && availableTours.length ? "tours" : "flights";
+
+    setScheduleView(nextScheduleView);
+
+    if (nextScheduleView === "tours") {
+      setPlannerControlsCollapsed(true);
+    }
+  }
+
   function handleSelectFlight(flightId) {
+    if (scheduleView === "tours") {
+      setSelectedTourRowId(flightId);
+      return;
+    }
+
     setSelectedFlightId(flightId);
   }
 
@@ -2764,6 +3160,31 @@ export default function App() {
   }
 
   function handleAddToFlightBoard(flightId) {
+    if (scheduleView === "tours") {
+      const matchedTourFlight = activeTourRows.find((flight) => flight.flightId === flightId);
+      if (!matchedTourFlight) {
+        return;
+      }
+
+      updateActiveFlightBoardEntries((current) => {
+        if (
+          current.some(
+            (entry) =>
+              entry.isTourFlight &&
+              String(entry.tourPath || "").trim() === matchedTourFlight.tourPath &&
+              String(entry.tourRowId || "").trim() === matchedTourFlight.tourRowId
+          )
+        ) {
+          return current;
+        }
+
+        return [buildBoardEntryFromTourFlight(matchedTourFlight), ...current];
+      });
+      setExpandedBoardFlightId(null);
+      setPlannerControlsCollapsed(true);
+      return;
+    }
+
     const matchedFlight = schedule?.flights.find((flight) => flight.flightId === flightId);
     if (!matchedFlight) {
       return;
@@ -2781,6 +3202,55 @@ export default function App() {
     });
     setExpandedBoardFlightId(null);
     setPlannerControlsCollapsed(true);
+  }
+
+  function handleCompleteTourFlight(boardEntryId) {
+    const entry = flightBoard.find((item) => item.boardEntryId === boardEntryId);
+    if (!entry?.isTourFlight || !entry.tourPath || !entry.tourRowId) {
+      return;
+    }
+
+    setTourProgress((current) => {
+      const currentTourProgress = current?.[entry.tourPath]?.rows || {};
+      const currentRowProgress = currentTourProgress[entry.tourRowId] || {};
+      const isCurrentlyCompleted = Boolean(currentRowProgress.completed);
+
+      if (isCurrentlyCompleted) {
+        return {
+          ...current,
+          [entry.tourPath]: {
+            rows: {
+              ...currentTourProgress,
+              [entry.tourRowId]: {
+                completed: false,
+                completedAt: null,
+                completionOrder: null
+              }
+            }
+          }
+        };
+      }
+
+      const nextCompletionOrder =
+        Object.values(currentTourProgress).reduce((maxOrder, progressEntry) => {
+          const order = Number(progressEntry?.completionOrder);
+          return Number.isFinite(order) ? Math.max(maxOrder, order) : maxOrder;
+        }, 0) + 1;
+
+      return {
+        ...current,
+        [entry.tourPath]: {
+          rows: {
+            ...currentTourProgress,
+            [entry.tourRowId]: {
+              completed: true,
+              completedAt: new Date().toISOString(),
+              completionOrder: nextCompletionOrder
+            }
+          }
+        }
+      };
+    });
   }
 
   function handleRemoveFromFlightBoard(flightId) {
@@ -3863,23 +4333,28 @@ export default function App() {
         >
           <div className="grid min-h-0 gap-4 [grid-template-columns:minmax(0,1.42fr)_minmax(224px,0.9fr)] bp-1024:gap-3 bp-1024:[grid-template-columns:minmax(0,1.48fr)_minmax(248px,0.9fr)] bp-1400:[grid-template-columns:minmax(0,1.55fr)_minmax(260px,0.92fr)]">
             {schedule ? (
-              <FlightTable
-                flights={sortedFlights}
-                selectedFlightId={selectedFlightId}
-                sort={sort}
-                layoutBucket={layoutBucket}
-                useNarrowDesktopColumns={usesPlannerControlsModal}
+              <ScheduleTablePanel
+                scheduleView={scheduleView}
+                availableTours={availableTours}
+                selectedTourPath={selectedTour?.path || ""}
                 viewportWidth={viewportSize.width}
+                flightRows={sortedFlights}
+                selectedFlightRowId={selectedFlightId}
+                flightSort={sort}
                 timeDisplayMode={scheduleTableTimeDisplayMode}
                 addonAirports={addonAirports}
-                onSort={handleSort}
+                tourRows={sortedTourRows}
+                selectedTourRowId={selectedTourRowId}
+                onScheduleViewChange={handleScheduleViewChange}
+                onSelectTourPath={setSelectedTourPath}
+                onSortFlights={handleSort}
                 onToggleTimeDisplayMode={() =>
                   setScheduleTableTimeDisplayMode((current) =>
                     current === "local" ? "utc" : "local"
                   )
                 }
-                onSelectFlight={handleSelectFlight}
-                onAddToFlightBoard={handleAddToFlightBoard}
+                onSelectRow={handleSelectFlight}
+                onActivateRow={handleAddToFlightBoard}
               />
             ) : (
               <Panel className="grid content-start gap-3 rounded-none bp-1024:p-4">
@@ -3903,28 +4378,30 @@ export default function App() {
                   : "grid-rows-[minmax(0,1fr)]"
               )}
             >
-              <FilterBar
-                key={`filters-${filterUiVersion}`}
-                plannerMode={plannerMode}
-                popupMode={false}
-                filters={normalizeFilters(filters, filterBounds)}
-                dutyFilters={normalizeDutyFilters(dutyFilters, filterBounds)}
-                airlines={airlines}
-                airportOptions={airportOptions}
-                regionOptions={geoOptions.regions}
-                countryOptions={geoOptions.countries}
-                equipmentOptions={equipmentOptions}
-                dutyEquipmentOptions={dutyEquipmentOptions}
-                qualifyingDutyAirlines={qualifyingDutyAirlines}
-                filterBounds={filterBounds}
-                onPlannerModeChange={handlePlannerModeChange}
-                onFilterChange={handleFilterChange}
-                onDutyFilterChange={handleDutyFilterChange}
-                plannerControlsCollapsed={isPlannerControlsInlineCollapsed}
-                onTogglePlannerControls={() => setPlannerControlsCollapsed((current) => !current)}
-                onBuildDutySchedule={handleBuildDutySchedule}
-                onReset={handleResetFilters}
-              />
+              <div className={cn(scheduleView === "tours" && "pointer-events-none opacity-60")}>
+                <FilterBar
+                  key={`filters-${filterUiVersion}`}
+                  plannerMode={plannerMode}
+                  popupMode={false}
+                  filters={normalizeFilters(filters, filterBounds)}
+                  dutyFilters={normalizeDutyFilters(dutyFilters, filterBounds)}
+                  airlines={airlines}
+                  airportOptions={airportOptions}
+                  regionOptions={geoOptions.regions}
+                  countryOptions={geoOptions.countries}
+                  equipmentOptions={equipmentOptions}
+                  dutyEquipmentOptions={dutyEquipmentOptions}
+                  qualifyingDutyAirlines={qualifyingDutyAirlines}
+                  filterBounds={filterBounds}
+                  onPlannerModeChange={handlePlannerModeChange}
+                  onFilterChange={handleFilterChange}
+                  onDutyFilterChange={handleDutyFilterChange}
+                  plannerControlsCollapsed={isPlannerControlsInlineCollapsed}
+                  onTogglePlannerControls={() => setPlannerControlsCollapsed((current) => !current)}
+                  onBuildDutySchedule={handleBuildDutySchedule}
+                  onReset={handleResetFilters}
+                />
+              </div>
 
               {isPlannerControlsInlineCollapsed ? (
                 <DetailsPanel
@@ -3948,6 +4425,7 @@ export default function App() {
                   onDeleteFlightBoard={handleDeleteFlightBoard}
                   onSimBriefTypeChange={handleSimBriefTypeChange}
                   onSimBriefDispatch={handleSimBriefDispatch}
+                  onCompleteTourFlight={handleCompleteTourFlight}
                   showFlightBoard
                 />
               ) : null}
@@ -3969,53 +4447,55 @@ export default function App() {
                 ) : null}
               </div>
               {isDevToolsEnabled ? (
-                <div className="relative justify-self-center" ref={devWindowMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsDevWindowMenuOpen((current) => !current)}
-                    aria-expanded={isDevWindowMenuOpen}
-                    aria-haspopup="menu"
-                    disabled={!isDesktopAddonScanAvailable}
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-none border-0 bg-transparent p-0 text-[var(--text-muted)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] bp-1024:text-[0.76rem]",
-                      bodySmTextClassName
-                    )}
-                    title={
-                      isDesktopAddonScanAvailable
-                        ? "Choose a responsive test window width"
-                        : "Window size presets are only available in the desktop app"
-                    }
-                  >
-                    <span>Window Size:</span>
-                    <strong className="font-semibold text-[var(--text-heading)]">
-                      {selectedDevWindowPreset?.label || "Choose"}
-                    </strong>
-                    <span>| Current Size:</span>
-                    <strong className="font-semibold text-[var(--text-heading)]">
-                      {currentWindowSizeLabel}
-                    </strong>
-                  </button>
-                  {isDevWindowMenuOpen ? (
-                    <div
-                      className="absolute left-1/2 bottom-[calc(100%+0.5rem)] z-30 flex min-w-[180px] -translate-x-1/2 flex-col gap-1 rounded-none border border-[color:transparent] bg-[var(--surface-raised)] p-2 shadow-none"
-                      role="menu"
-                      aria-label="Window size presets"
+                <div className="flex items-center gap-3 justify-self-center">
+                  <div className="relative" ref={devWindowMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsDevWindowMenuOpen((current) => !current)}
+                      aria-expanded={isDevWindowMenuOpen}
+                      aria-haspopup="menu"
+                      disabled={!isDesktopAddonScanAvailable}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-none border-0 bg-transparent p-0 text-[var(--text-muted)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] bp-1024:text-[0.76rem]",
+                        bodySmTextClassName
+                      )}
+                      title={
+                        isDesktopAddonScanAvailable
+                          ? "Choose a responsive test window width"
+                          : "Window size presets are only available in the desktop app"
+                      }
                     >
-                      {DEV_WINDOW_WIDTH_PRESETS.map((option) => (
-                        <Button
-                          key={option.width}
-                          variant="ghost"
-                          active={devWindowWidth === option.width}
-                          className="justify-start rounded-none px-3 py-2 text-[0.8rem]"
-                          role="menuitemradio"
-                          aria-checked={devWindowWidth === option.width}
-                          onClick={() => handleSelectDevWindowWidth(option.width)}
-                        >
-                          {option.label}
-                        </Button>
-                      ))}
-                    </div>
-                  ) : null}
+                      <span>Window Size:</span>
+                      <strong className="font-semibold text-[var(--text-heading)]">
+                        {selectedDevWindowPreset?.label || "Choose"}
+                      </strong>
+                      <span>| Current Size:</span>
+                      <strong className="font-semibold text-[var(--text-heading)]">
+                        {currentWindowSizeLabel}
+                      </strong>
+                    </button>
+                    {isDevWindowMenuOpen ? (
+                      <div
+                        className="absolute left-1/2 bottom-[calc(100%+0.5rem)] z-30 flex min-w-[180px] -translate-x-1/2 flex-col gap-1 rounded-none border border-[color:transparent] bg-[var(--surface-raised)] p-2 shadow-none"
+                        role="menu"
+                        aria-label="Window size presets"
+                      >
+                        {DEV_WINDOW_WIDTH_PRESETS.map((option) => (
+                          <Button
+                            key={option.width}
+                            variant="ghost"
+                            active={devWindowWidth === option.width}
+                            className="justify-start rounded-none px-3 py-2 text-[0.8rem]"
+                            role="menuitemradio"
+                            aria-checked={devWindowWidth === option.width}
+                            onClick={() => handleSelectDevWindowWidth(option.width)}
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
               <div
