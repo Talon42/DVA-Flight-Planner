@@ -20,7 +20,8 @@ For flight simulation purposes only. Not a commercial application. In no way is 
 - Lets you maintain a persistent Flight Board between sessions
 - Lets you drag Flight Board cards to reorder your working sequence
 - Includes a Tours tab with DVA tour legs and local completion tracking
-- Supports direct schedule sync from the Delta Virtual website
+- Includes an Accomplishments tab with DVA accomplishment airport checklist tracking
+- Supports direct schedule and logbook sync from the Delta Virtual website
 - Supports SimBrief dispatch from Flight Board entries
 - Supports saved custom SimBrief airframes mapped to specific aircraft types
 
@@ -83,14 +84,18 @@ If you already have a schedule loaded, importing a new one replaces the current 
    <!-- docshot: sync-import-status -->
    <img width="1000" alt="image" src="./readme-images/sync-import-status.png" />
 
+When the sync succeeds, the app also saves a local copy of the Delta Virtual logbook JSON export. That logbook data powers Accomplishments airport completion tracking.
+
 
 ### Security and privacy
 
 - The sync window is restricted to `https://www.deltava.org`.
 - The app fetches the same schedule XML from the official DVA schedule endpoint: `https://www.deltava.org/pfpxsched.ws`.
+- The app fetches the official DVA logbook JSON export so it can identify completed departure and arrival airports for Accomplishments.
 - The React frontend does not ask for, store, or transmit your DVA username/password itself.
 - The app only accepts the returned XML if it looks like a valid schedule and contains flight data.
 - The downloaded XML is stored locally only long enough to complete the import, then the app prunes it after a successful sync.
+- The downloaded logbook JSON is stored locally so Accomplishments can keep tracking progress between sessions.
 - Temporary WebView cache and browsing data used for sync are pruned automatically on startup and after sync cleanup.
 
 ### Terms of use note
@@ -106,6 +111,7 @@ The app stores its local data under the app data folder in a `flight-planner` di
 - import log
 - SimBrief settings
 - addon airport cache
+- Delta Virtual logbook progress data
 
 To clear app data completely, close the app and delete the local `flight-planner` app-data folder.
 
@@ -259,8 +265,39 @@ When a tour leg is completed:
 
 - Tour data comes from Delta Virtual tour content included in the app.
 - Tour completion is tracked locally inside Flight Planner.
-- Flight Planner does not sync your DVA logbook.
-- If you complete a tour flight outside Flight Planner, that completed status will not appear in the app automatically.
+- Tour completion does not use your DVA logbook.
+- If you complete a tour flight outside Flight Planner, that tour completed status will not appear in the app automatically.
+
+## Accomplishments Tab
+
+Use the `Accomplishments` tab to track Delta Virtual accomplishment airport lists inside the schedule area.
+
+### How to use it
+
+1. Click `Accomplishments` in the schedule panel.
+2. Use the accomplishment picker to choose the accomplishment you want to review.
+3. Review the airport checklist and completion counter.
+4. Click `Find a Flight` on an incomplete airport to switch back to `Flights` with the matching airport filter applied.
+
+Accomplishment progress is based on the locally saved Delta Virtual logbook JSON from `Sync from Delta Virtual`.
+
+### Matching rules
+
+- `airports visited` accomplishments count an airport when it appears as either the departure or arrival airport in your synced logbook.
+- `arrival airports` accomplishments count an airport only when it appears as the arrival airport in your synced logbook.
+- The app uses ICAO codes from the logbook airport blocks, such as `airportD.icao` for departure and `airportA.icao` for arrival.
+
+### Ordering and completed view
+
+- Incomplete airports appear first, sorted alphabetically by ICAO.
+- Completed airports move to the bottom, also sorted alphabetically by ICAO.
+- When an accomplishment is fully complete, the tab shows a completed summary and a completed airport grid.
+
+### Important note about accomplishment progress
+
+- Accomplishment definitions come from `src/data/accomplishments/accomplishments.json`.
+- Accomplishment completion comes from the last locally saved Delta Virtual logbook sync.
+- If you fly an accomplishment airport after your last sync, run `Sync from Delta Virtual` again to refresh the completion state.
 
 ## Flight Board
 

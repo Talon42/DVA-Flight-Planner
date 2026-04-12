@@ -2,8 +2,13 @@
 
 mod simbrief;
 
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use simbrief::{
+    close_simbrief_dispatch_window, fetch_simbrief_aircraft_types, start_simbrief_dispatch,
+    SimBriefDispatchManager,
+};
 use std::{
     collections::BTreeSet,
     fs,
@@ -24,10 +29,6 @@ use webview2_com::{
 };
 #[cfg(windows)]
 use windows::core::{Interface, PWSTR};
-use simbrief::{
-    close_simbrief_dispatch_window, fetch_simbrief_aircraft_types, start_simbrief_dispatch,
-    SimBriefDispatchManager,
-};
 
 const DELTAVA_LOGIN_URL: &str = "https://www.deltava.org/login.do";
 const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
@@ -35,6 +36,7 @@ const DELTAVA_SYNC_TIMEOUT_SECONDS: u64 = 300;
 const DELTAVA_CLOSE_AFTER_PROMPT_WAIT_SECONDS: u64 = 30;
 const DELTAVA_FOCUS_LOSS_RECENT_WINDOW_MILLIS: u64 = 3000;
 const DELTAVA_XML_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_PFPX_XML__";
+const DELTAVA_SYNC_RESULT_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_RESULT__";
 const DELTAVA_DEBUG_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_DEBUG__";
 const APP_STORAGE_DIR: &str = "flight-planner";
 const APP_LOG_FILE: &str = "log.txt";
@@ -42,6 +44,7 @@ const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
 const MAIN_WINDOW_STATE_FILE: &str = "main-window-state.json";
 const APP_LOG_MAX_BYTES: u64 = 262_144;
 const DELTAVA_SYNC_DOWNLOAD_FILE: &str = "deltava-pfpxsched.xml";
+const DELTAVA_LOGBOOK_FALLBACK_FILE: &str = "dva-logbook.json";
 const SIMBRIEF_WEBVIEW_DIR: &str = "simbrief-webview";
 static DELTAVA_SYNC_LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 const WEBVIEW_ROOT_PRUNE_DIRS: &[&str] = &[
@@ -119,8 +122,10 @@ const WEBVIEW_PROFILE_PRUNE_FILES: &[&str] = &[
 const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
 (() => {
   const targetUrl = 'https://www.deltava.org/pfpxsched.ws';
+  const logbookPageUrl = 'https://www.deltava.org/logbook.do';
+  const logbookExportUrl = 'https://www.deltava.org/mylogbook.ws';
   const syncFlagKey = 'flightPlannerDeltaSyncRequested';
-  const xmlMessagePrefix = '__FLIGHT_PLANNER_PFPX_XML__';
+  const syncResultPrefix = '__FLIGHT_PLANNER_SYNC_RESULT__';
   const debugPrefix = '__FLIGHT_PLANNER_SYNC_DEBUG__';
   const emitDebug = (message) => {
     if (window.chrome?.webview?.postMessage) {
@@ -176,6 +181,113 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
     const overlay = ensureSyncOverlay();
     overlay.style.display = 'flex';
   };
+  const parseLogbookExportIdFromUrl = (url) => {
+    try {
+      return new URL(url).searchParams.get('id') || '';
+    } catch (_) {
+      return '';
+    }
+  };
+  const parseLogbookExportIdFromHtml = (html) => {
+    const doc = new DOMParser().parseFromString(html || '', 'text/html');
+    return doc.querySelector('input[name="id"]')?.value || '';
+  };
+  const fetchScheduleXml = async () => {
+    const response = await fetch(targetUrl, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    });
+    const xml = await response.text();
+    emitDebug(`xml:fetch-status:${response.status}:${xml.length}`);
+    if (!response.ok) {
+      throw new Error(`Schedule XML request failed with HTTP ${response.status}.`);
+    }
+    if (!xml || !xml.trimStart().startsWith('<')) {
+      throw new Error('Delta Virtual returned a non-schedule XML response.');
+    }
+    return xml;
+  };
+  const fetchLogbookJsonExport = async () => {
+    emitDebug('logbook:page-fetch-start');
+    const pageResponse = await fetch(logbookPageUrl, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    });
+    const pageHtml = await pageResponse.text();
+    emitDebug(`logbook:page-status:${pageResponse.status}:${pageResponse.url}`);
+    if (!pageResponse.ok) {
+      throw new Error(`Logbook page request failed with HTTP ${pageResponse.status}.`);
+    }
+
+    let exportId = parseLogbookExportIdFromUrl(pageResponse.url);
+    if (exportId) {
+      emitDebug('logbook:id-source:url');
+    } else {
+      exportId = parseLogbookExportIdFromHtml(pageHtml);
+      emitDebug(exportId ? 'logbook:id-source:hidden-input' : 'logbook:id-missing');
+    }
+    if (!exportId) {
+      throw new Error('Unable to find Delta Virtual logbook export id.');
+    }
+    emitDebug(`logbook:id-parsed:${exportId}`);
+
+    const exportResponse = await fetch(logbookExportUrl, {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        export: 'JSONExport',
+        id: exportId
+      })
+    });
+    const filename = exportResponse.headers.get('X-Logbook-Filename') || '';
+    const contentType = exportResponse.headers.get('Content-Type') || '';
+    const jsonText = await exportResponse.text();
+    emitDebug(`logbook:export-status:${exportResponse.status}:${jsonText.length}`);
+    if (!exportResponse.ok) {
+      throw new Error(`Logbook JSON export failed with HTTP ${exportResponse.status}.`);
+    }
+    return { jsonText, filename, contentType };
+  };
+  const postSyncResult = (payload) => {
+    if (window.chrome?.webview?.postMessage) {
+      window.chrome.webview.postMessage(syncResultPrefix + JSON.stringify(payload));
+    }
+  };
+  const runSyncDownloads = async () => {
+    if (window.__flightPlannerDeltaDownloadsPosted) {
+      emitDebug('state:downloads-already-posted');
+      return true;
+    }
+    window.__flightPlannerDeltaDownloadsPosted = true;
+
+    const payload = {
+      xml: { ok: false },
+      logbook: { ok: false }
+    };
+
+    try {
+      payload.xml = { ok: true, xmlText: await fetchScheduleXml() };
+    } catch (error) {
+      payload.xml = { ok: false, error: error?.message || 'Schedule XML download failed.' };
+      emitDebug(`xml:error:${payload.xml.error}`);
+    }
+
+    try {
+      payload.logbook = { ok: true, ...(await fetchLogbookJsonExport()) };
+    } catch (error) {
+      payload.logbook = { ok: false, error: error?.message || 'Logbook JSON download failed.' };
+      emitDebug(`logbook:error:${payload.logbook.error}`);
+    }
+
+    postSyncResult(payload);
+    return true;
+  };
   if (window.location.origin !== 'https://www.deltava.org') {
     return;
   }
@@ -215,35 +327,12 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
   if (window.location.href === targetUrl) {
     emitDebug('state:at-pfpx');
     showSyncOverlay();
-    if (window.__flightPlannerDeltaXmlPosted) {
-      emitDebug('state:xml-already-posted');
+    if (window.__flightPlannerDeltaDownloadsPosted) {
+      emitDebug('state:downloads-already-posted');
       return;
     }
-    window.__flightPlannerDeltaXmlPosted = true;
     window.setTimeout(async () => {
-      if (!window.chrome?.webview?.postMessage) {
-        return;
-      }
-      let xml = '';
-      try {
-        const response = await fetch(targetUrl, {
-          method: 'GET',
-          credentials: 'include',
-          cache: 'no-store'
-        });
-        xml = await response.text();
-        emitDebug(`fetch:ok:${response.status}:${xml.length}`);
-      } catch (_) {}
-
-      if (!xml) {
-        xml = document.documentElement ? document.documentElement.outerHTML : '';
-        emitDebug(`fetch:fallback-dom:${xml.length}`);
-      }
-
-      if (xml) {
-        window.chrome.webview.postMessage(xmlMessagePrefix + xml);
-        emitDebug('xml:posted');
-      }
+      await runSyncDownloads();
     }, 100);
     return;
   }
@@ -277,29 +366,11 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
   emitDebug(`state:fetching:${targetUrl}`);
   showSyncOverlay();
   window.setTimeout(async () => {
-    if (!window.chrome?.webview?.postMessage) {
-      return;
+    const posted = await runSyncDownloads();
+    if (!posted) {
+      emitDebug(`state:redirecting-fallback:${targetUrl}`);
+      window.location.assign(targetUrl);
     }
-    try {
-      const response = await fetch(targetUrl, {
-        method: 'GET',
-        credentials: 'include',
-        cache: 'no-store'
-      });
-      const xml = await response.text();
-      emitDebug(`fetch:post-auth:${response.status}:${xml.length}`);
-      if (xml && xml.trimStart().startsWith('<')) {
-        window.chrome.webview.postMessage(xmlMessagePrefix + xml);
-        emitDebug('xml:posted-from-home');
-        return;
-      }
-      emitDebug('fetch:post-auth-non-xml');
-    } catch (error) {
-      emitDebug(`fetch:post-auth-error:${error?.message || 'unknown'}`);
-    }
-
-    emitDebug(`state:redirecting-fallback:${targetUrl}`);
-    window.location.assign(targetUrl);
   }, 250);
 })();
 "#;
@@ -366,8 +437,61 @@ struct SavedWindowState {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DeltaSyncPayload {
+    file_name: Option<String>,
+    xml_text: Option<String>,
+    status: String,
+    xml_status: String,
+    logbook_status: String,
+    logbook_json: Option<DeltaLogbookArtifact>,
+    warnings: Vec<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeltaLogbookArtifact {
     file_name: String,
-    xml_text: String,
+    path: String,
+    bytes: usize,
+    content_type: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeltaLogbookMetadata {
+    date_iso: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeltaLogbookProgress {
+    date_iso: Option<String>,
+    visited_airports: Vec<String>,
+    arrival_airports: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeltaWebSyncResult {
+    xml: DeltaWebXmlResult,
+    logbook: DeltaWebLogbookResult,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeltaWebXmlResult {
+    ok: bool,
+    xml_text: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeltaWebLogbookResult {
+    ok: bool,
+    json_text: Option<String>,
+    filename: Option<String>,
+    content_type: Option<String>,
+    error: Option<String>,
 }
 
 impl DeltaSyncManager {
@@ -529,31 +653,24 @@ fn center_window_state_on_monitor(
     let centered_y = i64::from(monitor_y) + ((i64::from(monitor_height) - i64::from(height)) / 2);
 
     SavedWindowState {
-        x: centered_x
-            .clamp(i64::from(i32::MIN), i64::from(i32::MAX))
-            as i32,
-        y: centered_y
-            .clamp(i64::from(i32::MIN), i64::from(i32::MAX))
-            as i32,
+        x: centered_x.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32,
+        y: centered_y.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32,
         width,
         height,
         maximized: state.maximized,
     }
 }
 
-fn sanitize_saved_main_window_state(window: &WebviewWindow, state: SavedWindowState) -> SavedWindowState {
+fn sanitize_saved_main_window_state(
+    window: &WebviewWindow,
+    state: SavedWindowState,
+) -> SavedWindowState {
     let monitors = window.available_monitors().ok().unwrap_or_default();
 
     if monitors.iter().any(|monitor| {
         let position = monitor.position();
         let size = monitor.size();
-        window_state_intersects_monitor(
-            &state,
-            position.x,
-            position.y,
-            size.width,
-            size.height,
-        )
+        window_state_intersects_monitor(&state, position.x, position.y, size.width, size.height)
     }) {
         return state;
     }
@@ -571,13 +688,7 @@ fn sanitize_saved_main_window_state(window: &WebviewWindow, state: SavedWindowSt
     let position = monitor.position();
     let size = monitor.size();
 
-    center_window_state_on_monitor(
-        &state,
-        position.x,
-        position.y,
-        size.width,
-        size.height,
-    )
+    center_window_state_on_monitor(&state, position.x, position.y, size.width, size.height)
 }
 
 fn restore_main_window_state(window: &WebviewWindow) {
@@ -697,10 +808,7 @@ fn build_idle_addon_airport_cache(roots: Vec<String>) -> AddonAirportCache {
     }
 }
 
-fn collect_airports_from_json(
-    value: &Value,
-    airports: &mut Vec<String>,
-) {
+fn collect_airports_from_json(value: &Value, airports: &mut Vec<String>) {
     match value {
         Value::Array(values) => {
             for entry in values {
@@ -934,6 +1042,451 @@ fn build_download_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(download_dir.join(DELTAVA_SYNC_DOWNLOAD_FILE))
 }
 
+fn build_logbook_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let base_dir = app.path().app_local_data_dir().map_err(|error| {
+        format!("download_failed: Unable to resolve logbook storage path: {error}")
+    })?;
+    let logbook_dir = base_dir.join("deltava-sync").join("logbook");
+    fs::create_dir_all(&logbook_dir)
+        .map_err(|error| format!("download_failed: Unable to create logbook storage: {error}"))?;
+    Ok(logbook_dir)
+}
+
+fn resolve_existing_logbook_json_path(app: &AppHandle) -> Option<PathBuf> {
+    let logbook_dir = build_logbook_dir(app).ok()?;
+    let fallback_path = logbook_dir.join(DELTAVA_LOGBOOK_FALLBACK_FILE);
+    if fallback_path.is_file() {
+        return Some(fallback_path);
+    }
+
+    fs::read_dir(logbook_dir)
+        .ok()?
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let is_json = path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .map(|extension| extension.eq_ignore_ascii_case("json"))
+                .unwrap_or(false);
+            if !path.is_file() || !is_json {
+                return None;
+            }
+
+            let modified = entry.metadata().ok()?.modified().ok()?;
+            Some((modified, path))
+        })
+        .max_by_key(|(modified, _)| *modified)
+        .map(|(_, path)| path)
+}
+
+fn get_json_field_i32(value: &Value, key: &str) -> Option<i32> {
+    value
+        .get(key)
+        .and_then(Value::as_i64)
+        .and_then(|number| i32::try_from(number).ok())
+}
+
+fn extract_logbook_date_parts(entry: &Value) -> Option<(i32, u32, u32)> {
+    let date = entry.get("date")?;
+    let year = get_json_field_i32(date, "y")?;
+    let month = get_json_field_i32(date, "m")?;
+    let day = get_json_field_i32(date, "d")?;
+
+    if month < 0 || day < 1 {
+        return None;
+    }
+
+    Some((year, month as u32, day as u32))
+}
+
+fn find_logbook_entries(json: &Value) -> Option<&Vec<Value>> {
+    json.as_array()
+        .or_else(|| json.get("flights").and_then(Value::as_array))
+}
+
+fn normalize_dva_logbook_month(raw_month: u32) -> Option<u32> {
+    if raw_month <= 11 {
+        return raw_month.checked_add(1);
+    }
+
+    if raw_month == 12 {
+        return Some(12);
+    }
+
+    None
+}
+
+fn extract_latest_logbook_date_iso(json: &Value) -> Option<String> {
+    let entries = find_logbook_entries(json)?;
+    let latest_entry = entries.last()?;
+    let (year, raw_month, day) = extract_logbook_date_parts(latest_entry)?;
+    let month = normalize_dva_logbook_month(raw_month)?;
+
+    NaiveDate::from_ymd_opt(year, month, day).map(|date| date.format("%Y-%m-%d").to_string())
+}
+
+fn read_deltava_logbook_metadata_internal(app: &AppHandle) -> DeltaLogbookMetadata {
+    let Some(path) = resolve_existing_logbook_json_path(app) else {
+        return DeltaLogbookMetadata { date_iso: None };
+    };
+
+    let Ok(text) = fs::read_to_string(&path) else {
+        append_sync_log(&format!("logbook:metadata-read-failed {}", path.display()));
+        return DeltaLogbookMetadata { date_iso: None };
+    };
+
+    let Ok(json) = serde_json::from_str::<Value>(&text) else {
+        append_sync_log(&format!("logbook:metadata-invalid-json {}", path.display()));
+        return DeltaLogbookMetadata { date_iso: None };
+    };
+
+    let date_iso = extract_latest_logbook_date_iso(&json);
+    if date_iso.is_none() {
+        append_sync_log(&format!("logbook:metadata-date-missing {}", path.display()));
+    }
+
+    DeltaLogbookMetadata { date_iso }
+}
+
+fn normalize_logbook_airport_code(value: &str) -> Option<String> {
+    value
+        .split(|character: char| !character.is_ascii_alphanumeric())
+        .map(|part| part.trim().to_ascii_uppercase())
+        .find(|part| {
+            (3..=5).contains(&part.len()) && part.chars().all(|ch| ch.is_ascii_alphanumeric())
+        })
+}
+
+fn is_departure_airport_key(key: &str) -> bool {
+    matches!(
+        key,
+        "dep"
+            | "departure"
+            | "depart"
+            | "origin"
+            | "from"
+            | "fromicao"
+            | "depicao"
+            | "departureicao"
+            | "departureairport"
+            | "airportd"
+            | "dairport"
+            | "icaodep"
+            | "icaodeparture"
+    )
+}
+
+fn is_arrival_airport_key(key: &str) -> bool {
+    matches!(
+        key,
+        "arr"
+            | "arrival"
+            | "destination"
+            | "dest"
+            | "to"
+            | "toicao"
+            | "arricao"
+            | "arrivalicao"
+            | "arrivalairport"
+            | "airporta"
+            | "aairport"
+            | "icaoarr"
+            | "icaoarrival"
+    )
+}
+
+fn normalize_logbook_key(key: &str) -> String {
+    key.chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_ascii_lowercase()
+}
+
+fn collect_airport_codes_from_value(value: &Value, airports: &mut BTreeSet<String>) {
+    match value {
+        Value::String(text) => {
+            if let Some(code) = normalize_logbook_airport_code(text) {
+                airports.insert(code);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                collect_airport_codes_from_value(item, airports);
+            }
+        }
+        Value::Object(map) => {
+            for value in map.values() {
+                collect_airport_codes_from_value(value, airports);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_airport_codes_from_airport_object(value: &Value, airports: &mut BTreeSet<String>) {
+    let Value::Object(map) = value else {
+        collect_airport_codes_from_value(value, airports);
+        return;
+    };
+
+    for key in ["icao", "icaoCode", "fsIcao", "code", "iata"] {
+        if let Some(code) = map
+            .get(key)
+            .and_then(Value::as_str)
+            .and_then(normalize_logbook_airport_code)
+        {
+            airports.insert(code);
+            return;
+        }
+    }
+}
+
+fn collect_logbook_airport_progress(
+    value: &Value,
+    visited_airports: &mut BTreeSet<String>,
+    arrival_airports: &mut BTreeSet<String>,
+) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                collect_logbook_airport_progress(item, visited_airports, arrival_airports);
+            }
+        }
+        Value::Object(map) => {
+            for (key, value) in map {
+                let normalized_key = normalize_logbook_key(key);
+                if is_departure_airport_key(&normalized_key) {
+                    collect_airport_codes_from_airport_object(value, visited_airports);
+                } else if is_arrival_airport_key(&normalized_key) {
+                    let mut arrivals = BTreeSet::new();
+                    collect_airport_codes_from_airport_object(value, &mut arrivals);
+                    for airport in arrivals {
+                        arrival_airports.insert(airport.clone());
+                        visited_airports.insert(airport);
+                    }
+                } else {
+                    collect_logbook_airport_progress(value, visited_airports, arrival_airports);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn read_deltava_logbook_progress_internal(app: &AppHandle) -> DeltaLogbookProgress {
+    let Some(path) = resolve_existing_logbook_json_path(app) else {
+        return DeltaLogbookProgress {
+            date_iso: None,
+            visited_airports: Vec::new(),
+            arrival_airports: Vec::new(),
+        };
+    };
+
+    let Ok(text) = fs::read_to_string(&path) else {
+        append_sync_log(&format!("logbook:progress-read-failed {}", path.display()));
+        return DeltaLogbookProgress {
+            date_iso: None,
+            visited_airports: Vec::new(),
+            arrival_airports: Vec::new(),
+        };
+    };
+
+    let Ok(json) = serde_json::from_str::<Value>(&text) else {
+        append_sync_log(&format!("logbook:progress-invalid-json {}", path.display()));
+        return DeltaLogbookProgress {
+            date_iso: None,
+            visited_airports: Vec::new(),
+            arrival_airports: Vec::new(),
+        };
+    };
+
+    let mut visited_airports = BTreeSet::new();
+    let mut arrival_airports = BTreeSet::new();
+    if let Some(entries) = find_logbook_entries(&json) {
+        for entry in entries {
+            collect_logbook_airport_progress(entry, &mut visited_airports, &mut arrival_airports);
+        }
+    }
+
+    DeltaLogbookProgress {
+        date_iso: extract_latest_logbook_date_iso(&json),
+        visited_airports: visited_airports.into_iter().collect(),
+        arrival_airports: arrival_airports.into_iter().collect(),
+    }
+}
+
+fn sanitize_logbook_filename(filename_hint: Option<&str>) -> String {
+    let raw_name = filename_hint
+        .and_then(|value| Path::new(value).file_name())
+        .and_then(|value| value.to_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(DELTAVA_LOGBOOK_FALLBACK_FILE);
+
+    let sanitized = raw_name
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_') {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+
+    let sanitized = sanitized.trim_matches(&['.', '-', '_'][..]).to_string();
+    let final_name = if sanitized.is_empty() {
+        DELTAVA_LOGBOOK_FALLBACK_FILE.to_string()
+    } else {
+        sanitized
+    };
+
+    if final_name.to_ascii_lowercase().ends_with(".json") {
+        final_name
+    } else {
+        format!("{final_name}.json")
+    }
+}
+
+async fn store_logbook_json(
+    app: &AppHandle,
+    json_text: &str,
+    filename_hint: Option<&str>,
+    content_type: Option<String>,
+) -> Result<DeltaLogbookArtifact, String> {
+    let trimmed = json_text.trim();
+    if trimmed.is_empty() {
+        return Err("download_failed: Delta Virtual logbook JSON export was empty.".into());
+    }
+
+    serde_json::from_str::<Value>(trimmed).map_err(|error| {
+        format!("invalid_json: Delta Virtual logbook JSON was invalid: {error}")
+    })?;
+    append_sync_log("logbook:json-valid");
+
+    let logbook_dir = build_logbook_dir(app)?;
+    let file_name = sanitize_logbook_filename(filename_hint);
+    let final_path = logbook_dir.join(&file_name);
+    let temp_path = logbook_dir.join(format!("{file_name}.tmp"));
+
+    tokio::fs::write(&temp_path, trimmed.as_bytes())
+        .await
+        .map_err(|error| format!("download_failed: Unable to write logbook JSON: {error}"))?;
+    if final_path.exists() {
+        let _ = tokio::fs::remove_file(&final_path).await;
+    }
+    tokio::fs::rename(&temp_path, &final_path)
+        .await
+        .map_err(|error| format!("download_failed: Unable to store logbook JSON: {error}"))?;
+
+    append_sync_log(&format!("logbook:write {}", final_path.display()));
+
+    Ok(DeltaLogbookArtifact {
+        file_name,
+        path: final_path.to_string_lossy().into_owned(),
+        bytes: trimmed.as_bytes().len(),
+        content_type,
+    })
+}
+
+async fn build_delta_sync_payload_from_web_result(
+    app: &AppHandle,
+    result: DeltaWebSyncResult,
+) -> Result<DeltaSyncPayload, String> {
+    let mut warnings = Vec::new();
+
+    let xml_text = if result.xml.ok {
+        let xml_text = result.xml.xml_text.unwrap_or_default();
+        let trimmed = xml_text.trim_start();
+        if !trimmed.starts_with('<') || !xml_text.contains("<FLIGHT>") {
+            warnings.push("Delta Virtual returned an invalid schedule XML response.".into());
+            None
+        } else {
+            Some(xml_text)
+        }
+    } else {
+        warnings.push(
+            result
+                .xml
+                .error
+                .unwrap_or_else(|| "Delta Virtual schedule XML download failed.".into()),
+        );
+        None
+    };
+
+    let logbook_json = if result.logbook.ok {
+        let json_text = result.logbook.json_text.unwrap_or_default();
+        append_sync_log(&format!(
+            "logbook:received len={} filename={}",
+            json_text.len(),
+            result.logbook.filename.as_deref().unwrap_or("none")
+        ));
+        match store_logbook_json(
+            app,
+            &json_text,
+            result.logbook.filename.as_deref(),
+            result.logbook.content_type,
+        )
+        .await
+        {
+            Ok(artifact) => Some(artifact),
+            Err(error) => {
+                warnings.push(error);
+                None
+            }
+        }
+    } else {
+        warnings.push(
+            result
+                .logbook
+                .error
+                .unwrap_or_else(|| "Delta Virtual logbook JSON download failed.".into()),
+        );
+        None
+    };
+
+    let xml_status = if xml_text.is_some() {
+        "success"
+    } else {
+        "failed"
+    }
+    .to_string();
+    let logbook_status = if logbook_json.is_some() {
+        "success"
+    } else {
+        "failed"
+    }
+    .to_string();
+
+    if xml_text.is_none() && logbook_json.is_none() {
+        return Err(format!(
+            "download_failed: Delta Virtual sync failed. {}",
+            summarize_warnings(&warnings)
+                .unwrap_or_else(|| "No sync artifacts were downloaded.".into())
+        ));
+    }
+
+    let status = if xml_text.is_some() && logbook_json.is_some() {
+        "success"
+    } else {
+        "partial"
+    }
+    .to_string();
+
+    Ok(DeltaSyncPayload {
+        file_name: xml_text
+            .as_ref()
+            .map(|_| DELTAVA_SYNC_DOWNLOAD_FILE.to_string()),
+        xml_text,
+        status,
+        xml_status,
+        logbook_status,
+        logbook_json,
+        warnings,
+    })
+}
+
 fn resolve_default_log_path() -> Option<PathBuf> {
     let storage_dir = std::env::temp_dir().join(APP_STORAGE_DIR);
     let _ = fs::create_dir_all(&storage_dir);
@@ -967,7 +1520,6 @@ fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
 fn append_sync_log(message: &str) {
     let now = chrono_like_timestamp();
     let line = format!("[{now}] [DeltaSync] {message}\n");
-    eprintln!("[deltava-sync] {message}");
 
     let log_path = DELTAVA_SYNC_LOG_PATH
         .get()
@@ -1167,6 +1719,16 @@ fn prune_deltava_storage(app: AppHandle, remove_downloaded_schedule: bool) {
 }
 
 #[tauri::command]
+fn read_deltava_logbook_metadata(app: AppHandle) -> DeltaLogbookMetadata {
+    read_deltava_logbook_metadata_internal(&app)
+}
+
+#[tauri::command]
+fn read_deltava_logbook_progress(app: AppHandle) -> DeltaLogbookProgress {
+    read_deltava_logbook_progress_internal(&app)
+}
+
+#[tauri::command]
 fn clear_user_data(app: AppHandle) -> Result<(), String> {
     clear_user_data_internal(&app)
 }
@@ -1253,6 +1815,29 @@ fn attach_windows_xml_message_handler(
                                 return Ok(());
                             }
 
+                            if let Some(payload_text) = message.strip_prefix(DELTAVA_SYNC_RESULT_MESSAGE_PREFIX) {
+                                let payload_text = payload_text.to_string();
+                                let app_handle = app_handle.clone();
+                                append_sync_log(&format!("sync-result:received len={}", payload_text.len()));
+
+                                tauri::async_runtime::spawn(async move {
+                                    let result = match serde_json::from_str::<DeltaWebSyncResult>(&payload_text) {
+                                        Ok(web_result) => {
+                                            build_delta_sync_payload_from_web_result(&app_handle, web_result).await
+                                        }
+                                        Err(error) => Err(format!(
+                                            "download_failed: Unable to parse Delta Virtual sync result: {error}"
+                                        )),
+                                    };
+                                    append_sync_log("sync-result:processed");
+
+                                    app_handle
+                                        .state::<DeltaSyncManager>()
+                                        .finish(DELTAVA_SYNC_LABEL, result);
+                                });
+                                return Ok(());
+                            }
+
                             if let Some(xml_text) = message.strip_prefix(DELTAVA_XML_MESSAGE_PREFIX) {
                                 let xml_text = xml_text.to_string();
                                 let app_handle = app_handle.clone();
@@ -1272,8 +1857,15 @@ fn attach_windows_xml_message_handler(
                                     } else {
                                         match tokio::fs::write(&xml_path, &xml_text).await {
                                             Ok(_) => Ok(DeltaSyncPayload {
-                                                file_name: "deltava-pfpxsched.xml".into(),
-                                                xml_text,
+                                                file_name: Some(DELTAVA_SYNC_DOWNLOAD_FILE.into()),
+                                                xml_text: Some(xml_text),
+                                                status: "partial".into(),
+                                                xml_status: "success".into(),
+                                                logbook_status: "failed".into(),
+                                                logbook_json: None,
+                                                warnings: vec![
+                                                    "Delta Virtual logbook JSON was not downloaded by the fallback XML capture path.".into(),
+                                                ],
                                             }),
                                             Err(error) => Err(format!(
                                                 "download_failed: Unable to persist Delta Virtual XML: {error}"
@@ -1402,8 +1994,15 @@ async fn start_deltava_sync(
                             } else {
                                 append_sync_log("download:xml-valid");
                                 Ok(DeltaSyncPayload {
-                                    file_name: "deltava-pfpxsched.xml".into(),
-                                    xml_text,
+                                    file_name: Some(DELTAVA_SYNC_DOWNLOAD_FILE.into()),
+                                    xml_text: Some(xml_text),
+                                    status: "partial".into(),
+                                    xml_status: "success".into(),
+                                    logbook_status: "failed".into(),
+                                    logbook_json: None,
+                                    warnings: vec![
+                                        "Delta Virtual logbook JSON was not downloaded by the fallback XML download path.".into(),
+                                    ],
                                 })
                             }
                         }
@@ -1556,16 +2155,82 @@ mod tests {
             .any(|detail| detail.status == "partial-duplicate"
                 && detail.airports == vec!["KATL".to_string()]
                 && detail.duplicate_airports == vec!["KATL".to_string()]));
-        assert!(cache
-            .scan_details
-            .iter()
-            .any(|detail| detail.status == "cached" && detail.airports == vec!["KBOS".to_string()]));
+        assert!(
+            cache
+                .scan_details
+                .iter()
+                .any(|detail| detail.status == "cached"
+                    && detail.airports == vec!["KBOS".to_string()])
+        );
         assert!(cache
             .scan_details
             .iter()
             .any(|detail| detail.status == "malformed-json"));
 
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn extract_latest_logbook_date_uses_last_entry_date_object() {
+        let json: Value = serde_json::from_str(
+            r#"{"flights": [
+                {"date":{"y":2026,"m":3,"d":1},"time":"2099-01-01T00:00:00Z"},
+                {"date":{"y":2026,"m":4,"d":11},"time":"2000-01-01T00:00:00Z"}
+            ]}"#,
+        )
+        .expect("json");
+
+        assert_eq!(
+            extract_latest_logbook_date_iso(&json),
+            Some("2026-05-11".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_latest_logbook_date_uses_zero_based_months() {
+        let json: Value = serde_json::from_str(
+            r#"{"flights": [
+                {"date":{"y":2026,"m":0,"d":31}},
+                {"date":{"y":2026,"m":3,"d":11}}
+            ]}"#,
+        )
+        .expect("json");
+
+        assert_eq!(
+            extract_latest_logbook_date_iso(&json),
+            Some("2026-04-11".to_string())
+        );
+    }
+
+    #[test]
+    fn collect_logbook_airport_progress_tracks_departures_and_arrivals() {
+        let json: Value = serde_json::from_str(
+            r#"{"flights": [
+                {"departureAirport":{"icao":"katl"},"arrivalAirport":{"icao":"KJFK"}},
+                {"airportD":{"icao":"KLAX","name":"Los Angeles"},"airportA":{"icao":"KSFO","name":"San Francisco"}}
+            ]}"#,
+        )
+        .expect("json");
+        let mut visited_airports = BTreeSet::new();
+        let mut arrival_airports = BTreeSet::new();
+
+        for entry in find_logbook_entries(&json).expect("entries") {
+            collect_logbook_airport_progress(entry, &mut visited_airports, &mut arrival_airports);
+        }
+
+        assert_eq!(
+            visited_airports.into_iter().collect::<Vec<_>>(),
+            vec![
+                "KATL".to_string(),
+                "KJFK".to_string(),
+                "KLAX".to_string(),
+                "KSFO".to_string()
+            ]
+        );
+        assert_eq!(
+            arrival_airports.into_iter().collect::<Vec<_>>(),
+            vec!["KJFK".to_string(), "KSFO".to_string()]
+        );
     }
 }
 
@@ -1600,6 +2265,8 @@ fn main() {
             start_deltava_sync,
             close_deltava_sync_window,
             prune_deltava_storage,
+            read_deltava_logbook_metadata,
+            read_deltava_logbook_progress,
             clear_user_data,
             start_simbrief_dispatch,
             fetch_simbrief_aircraft_types,

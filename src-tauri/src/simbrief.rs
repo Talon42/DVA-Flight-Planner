@@ -432,7 +432,6 @@ fn append_simbrief_log(app: &AppHandle, message: &str) {
         simbrief_log_timestamp(),
         message
     );
-    eprintln!("[simbrief-dispatch] {message}");
 
     let Some(log_path) = resolve_simbrief_log_path(app) else {
         return;

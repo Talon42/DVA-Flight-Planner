@@ -40,6 +40,7 @@ import {
 import {
   closeDeltaVirtualSyncWindow,
   pruneDeltaVirtualStorage,
+  readDeltaVirtualLogbookProgress,
   syncScheduleFromDeltaVirtual
 } from "./lib/deltaVirtualSync";
 import { formatNumber } from "./lib/formatters";
@@ -64,6 +65,12 @@ import {
   writeSavedUiState
 } from "./lib/storage";
 import { checkForAppUpdate, GITHUB_RELEASES_PAGE_URL } from "./lib/updateCheck";
+import accomplishmentsData from "./data/accomplishments/accomplishments.json";
+import {
+  ACCOMPLISHMENT_REQUIREMENTS,
+  buildAccomplishmentRows,
+  normalizeAccomplishments
+} from "./lib/accomplishments";
 
 const THEME_STORAGE_KEY = "flight-planner.theme";
 const DEV_TOOLS_STORAGE_KEY = "flight-planner.dev-tools-enabled";
@@ -79,6 +86,7 @@ const TOUR_FILE_MODULES = import.meta.glob("./data/tours/*.json", {
   eager: true,
   import: "default"
 });
+const ACCOMPLISHMENTS = normalizeAccomplishments(accomplishmentsData);
 const MAX_FLIGHT_BOARDS = 4;
 const DEFAULT_FLIGHT_BOARD_NAME = "Board 1";
 const BOOT_SPLASH_HIDE_DELAY_MS = 200;
@@ -352,6 +360,11 @@ function buildScheduleDateLabel(flights = []) {
   return earliest.year !== latest.year
     ? effectiveScheduleDate.toFormat("MMMM d, yyyy")
     : effectiveScheduleDate.toFormat("MMMM d");
+}
+
+function buildFooterDateLabel(dateIso) {
+  const date = DateTime.fromISO(String(dateIso || ""));
+  return date.isValid ? date.toFormat("MMMM d") : "--";
 }
 
 function getScheduleSourceLabel(importSummary) {
@@ -1421,6 +1434,7 @@ export default function App() {
   const [filterUiVersion, setFilterUiVersion] = useState(0);
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [selectedTourPath, setSelectedTourPath] = useState("");
+  const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
   const [tourProgress, setTourProgress] = useState({});
   const [theme, setTheme] = useState(readSavedTheme);
   const [isDevToolsEnabled, setIsDevToolsEnabled] = useState(readSavedDevToolsEnabled);
@@ -1471,6 +1485,11 @@ export default function App() {
   const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState(null);
   const [statusMessage, setStatusMessage] = useState("Ready");
+  const [logbookAirportProgress, setLogbookAirportProgress] = useState({
+    dateIso: null,
+    visitedAirports: [],
+    arrivalAirports: []
+  });
   const replaceScheduleConfirmResolverRef = useRef(null);
   const deleteUserDataConfirmResolverRef = useRef(null);
   const hasPerformedStartupUpdateCheckRef = useRef(false);
@@ -1481,6 +1500,15 @@ export default function App() {
   const isDesktopAddonScanAvailable = isTauriRuntime();
   const isDesktopSimBriefAvailable = isDesktopAddonScanAvailable;
   const scheduleDateLabel = buildScheduleDateLabel(schedule?.flights || []);
+  const logbookDateLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
+  const footerMetadataItems = schedule?.importSummary
+    ? [
+        { label: "Source", value: getScheduleSourceLabel(schedule.importSummary) },
+        { label: "Schedule Date", value: scheduleDateLabel },
+        { label: "Imported Flights", value: formatNumber(schedule.importSummary.importedRows ?? 0) },
+        { label: "Logbook", value: logbookDateLabel }
+      ]
+    : [];
   const layoutBucket = getLayoutBucket(viewportSize);
   const usesPlannerControlsModal = shouldUsePlannerControlsModal(viewportSize);
   const isPlannerControlsInlineCollapsed = plannerControlsCollapsed;
@@ -1534,6 +1562,21 @@ export default function App() {
 
     return availableTours.find((tour) => tour.path === selectedTourPath) || availableTours[0];
   }, [availableTours, selectedTourPath]);
+  const selectedAccomplishment = useMemo(() => {
+    if (!ACCOMPLISHMENTS.length) {
+      return null;
+    }
+
+    return (
+      ACCOMPLISHMENTS.find(
+        (accomplishment) => accomplishment.name === selectedAccomplishmentName
+      ) || ACCOMPLISHMENTS[0]
+    );
+  }, [selectedAccomplishmentName]);
+  const accomplishmentRows = useMemo(
+    () => buildAccomplishmentRows(selectedAccomplishment, logbookAirportProgress),
+    [logbookAirportProgress, selectedAccomplishment]
+  );
   const tourFlightsById = useMemo(
     () =>
       new Map(
@@ -1576,6 +1619,27 @@ export default function App() {
       setSelectedTourPath(availableTours[0].path);
     }
   }, [availableTours, scheduleView, selectedTourPath]);
+
+  useEffect(() => {
+    if (!ACCOMPLISHMENTS.length) {
+      if (scheduleView === "accomplishments") {
+        setScheduleView("flights");
+      }
+      if (selectedAccomplishmentName) {
+        setSelectedAccomplishmentName("");
+      }
+      return;
+    }
+
+    if (
+      !selectedAccomplishmentName ||
+      !ACCOMPLISHMENTS.some(
+        (accomplishment) => accomplishment.name === selectedAccomplishmentName
+      )
+    ) {
+      setSelectedAccomplishmentName(ACCOMPLISHMENTS[0].name);
+    }
+  }, [scheduleView, selectedAccomplishmentName]);
 
   useEffect(() => {
     if (scheduleView !== "tours") {
@@ -1819,6 +1883,7 @@ export default function App() {
         setSort(DEFAULT_SORT);
         setScheduleView("flights");
         setSelectedTourPath("");
+        setSelectedAccomplishmentName("");
         setSelectedTourRowId(null);
         setTourProgress({});
         setPlannerControlsCollapsed(getDefaultPlannerControlsCollapsed());
@@ -1868,8 +1933,13 @@ export default function App() {
       setFilters(nextFilters);
       setDutyFilters(nextDutyFilters);
       setSort(snapshot?.sort || DEFAULT_SORT);
-      setScheduleView(snapshot?.scheduleView === "tours" ? "tours" : "flights");
+      setScheduleView(
+        snapshot?.scheduleView === "tours" || snapshot?.scheduleView === "accomplishments"
+          ? snapshot.scheduleView
+          : "flights"
+      );
       setSelectedTourPath(String(snapshot?.selectedTourPath || "").trim());
+      setSelectedAccomplishmentName(String(snapshot?.selectedAccomplishmentName || "").trim());
       setSelectedTourRowId(null);
       setTourProgress(
         snapshot?.tourProgress && typeof snapshot.tourProgress === "object"
@@ -2125,6 +2195,7 @@ export default function App() {
         });
         setSimBriefAircraftTypes([]);
         setSimBriefAircraftTypesError("");
+        setLogbookAirportProgress({ dateIso: null, visitedAirports: [], arrivalAirports: [] });
         setIsSettingsOpen(false);
         setStatusMessage("Ready");
         setIsHydrating(false);
@@ -2132,11 +2203,18 @@ export default function App() {
         return;
       }
 
-      const [scheduleResult, addonCacheResult, simBriefResult, uiStateResult] = await Promise.allSettled([
+      const [
+        scheduleResult,
+        addonCacheResult,
+        simBriefResult,
+        uiStateResult,
+        logbookProgressResult
+      ] = await Promise.allSettled([
         readSavedSchedule(),
         readAddonAirportCache(),
         readSimBriefSettings(),
-        readSavedUiState()
+        readSavedUiState(),
+        readDeltaVirtualLogbookProgress()
       ]);
 
       try {
@@ -2180,6 +2258,16 @@ export default function App() {
           });
         } else {
           await logAppError("simbrief-settings-hydrate-failed", simBriefResult.reason);
+        }
+
+        if (logbookProgressResult.status === "fulfilled") {
+          setLogbookAirportProgress(
+            logbookProgressResult.value || {
+              dateIso: null,
+              visitedAirports: [],
+              arrivalAirports: []
+            }
+          );
         }
 
         if (
@@ -2235,8 +2323,16 @@ export default function App() {
           savedUiState.scheduleTableTimeDisplayMode === "utc" ? "utc" : "local"
         );
         setSort(savedUiState.sort || DEFAULT_SORT);
-        setScheduleView(savedUiState.scheduleView === "tours" ? "tours" : "flights");
+        setScheduleView(
+          savedUiState.scheduleView === "tours" ||
+            savedUiState.scheduleView === "accomplishments"
+            ? savedUiState.scheduleView
+            : "flights"
+        );
         setSelectedTourPath(String(savedUiState.selectedTourPath || "").trim());
+        setSelectedAccomplishmentName(
+          String(savedUiState.selectedAccomplishmentName || "").trim()
+        );
         setSelectedTourRowId(null);
         setTourProgress(savedUiState.tourProgress && typeof savedUiState.tourProgress === "object" ? savedUiState.tourProgress : {});
         setPlannerControlsCollapsed(
@@ -2298,6 +2394,7 @@ export default function App() {
       selectedFlightId,
       scheduleView,
       selectedTourPath,
+      selectedAccomplishmentName,
       tourProgress
     }).catch((error) => {
       setStatusMessage(error.message || "Unable to persist the current planner state.");
@@ -2319,6 +2416,7 @@ export default function App() {
     selectedFlightId,
     scheduleView,
     selectedTourPath,
+    selectedAccomplishmentName,
     tourProgress,
     isHydrating
   ]);
@@ -2694,6 +2792,8 @@ export default function App() {
         selectedFlightId: overrides.selectedFlightId ?? selectedFlightId,
         scheduleView: overrides.scheduleView ?? scheduleView,
         selectedTourPath: overrides.selectedTourPath ?? selectedTourPath,
+        selectedAccomplishmentName:
+          overrides.selectedAccomplishmentName ?? selectedAccomplishmentName,
         tourProgress: overrides.tourProgress ?? tourProgress
       })
     ).catch((error) => {
@@ -2928,15 +3028,28 @@ export default function App() {
       shouldCloseSyncWindow = true;
       await logAppEvent("deltava-sync-download-complete", {
         file: syncedFile.fileName,
-        bytes: syncedFile.xmlText?.length || 0
+        bytes: syncedFile.xmlText?.length || 0,
+        logbookJson: syncedFile.logbookJson?.fileName || null,
+        warnings: syncedFile.warnings || []
       });
       setStatusMessage("Processing Delta Virtual schedule...");
       await processImportedSchedule(syncedFile, "deltava-sync");
+      setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
+      if (syncedFile.warnings?.length) {
+        setStatusMessage(`Delta Virtual schedule synced with warning: ${syncedFile.warnings[0]}`);
+      }
       shouldRemoveDownloadedSchedule = true;
     } catch (error) {
       if (error?.kind === "cancelled") {
         setStatusMessage("Delta Virtual sync canceled.");
         await logAppEvent("deltava-sync-cancelled-window");
+      } else if (error?.kind === "partial_success") {
+        setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
+        setStatusMessage(error.message || "Delta Virtual sync partially completed.");
+        await logAppEvent("deltava-sync-partial", {
+          logbookJson: error.syncResult?.logbookJson?.fileName || null,
+          warnings: error.syncResult?.warnings || []
+        });
       } else {
         setStatusMessage(error.message || "Delta Virtual sync failed.");
         await logAppError("deltava-sync-failed", error);
@@ -3111,12 +3224,42 @@ export default function App() {
     setFilterUiVersion((current) => current + 1);
   }
 
+  function handleShowAccomplishmentFlights(airport, requirement) {
+    const normalizedAirport = String(airport || "").trim().toUpperCase();
+    if (!normalizedAirport) {
+      return;
+    }
+
+    const filterKey =
+      String(requirement || "").trim().toLowerCase() ===
+      ACCOMPLISHMENT_REQUIREMENTS.ARRIVAL_AIRPORTS
+        ? "destination"
+        : "originOrDestination";
+    const nextFilters = normalizeFilters(
+      {
+        ...DEFAULT_FILTERS,
+        ...buildRangeDefaults(filterBounds),
+        [filterKey]: [normalizedAirport]
+      },
+      filterBounds
+    );
+
+    startTransition(() => {
+      setScheduleView("flights");
+      setPlannerMode("basic");
+      setFilters(nextFilters);
+      setDutyFilters(buildDefaultDutyFilters(filterBounds));
+      setSelectedFlightId(null);
+      setFilterUiVersion((current) => current + 1);
+    });
+  }
+
   function handlePlannerModeChange(nextMode) {
     setPlannerMode(nextMode === "duty" ? "duty" : "basic");
   }
 
   function handleSort(sortKey) {
-    if (scheduleView === "tours") {
+    if (scheduleView !== "flights") {
       return;
     }
 
@@ -3137,11 +3280,15 @@ export default function App() {
 
   function handleScheduleViewChange(nextView) {
     const nextScheduleView =
-      nextView === "tours" && availableTours.length ? "tours" : "flights";
+      nextView === "tours" && availableTours.length
+        ? "tours"
+        : nextView === "accomplishments" && ACCOMPLISHMENTS.length
+          ? "accomplishments"
+          : "flights";
 
     setScheduleView(nextScheduleView);
 
-    if (nextScheduleView === "tours") {
+    if (nextScheduleView !== "flights") {
       setPlannerControlsCollapsed(true);
     }
   }
@@ -4105,6 +4252,7 @@ export default function App() {
       setSimBriefCustomAirframesDraft([]);
       setSimBriefCustomAirframeIdDraft("");
       setSimBriefCustomAirframeMatchTypeDraft("");
+      setLogbookAirportProgress({ dateIso: null, visitedAirports: [], arrivalAirports: [] });
       setSimBriefDispatchState({
         flightId: "",
         isDispatching: false,
@@ -4337,6 +4485,10 @@ export default function App() {
                 scheduleView={scheduleView}
                 availableTours={availableTours}
                 selectedTourPath={selectedTour?.path || ""}
+                accomplishmentOptions={ACCOMPLISHMENTS}
+                selectedAccomplishmentName={selectedAccomplishment?.name || ""}
+                selectedAccomplishment={selectedAccomplishment}
+                accomplishmentRows={accomplishmentRows}
                 viewportWidth={viewportSize.width}
                 flightRows={sortedFlights}
                 selectedFlightRowId={selectedFlightId}
@@ -4347,6 +4499,8 @@ export default function App() {
                 selectedTourRowId={selectedTourRowId}
                 onScheduleViewChange={handleScheduleViewChange}
                 onSelectTourPath={setSelectedTourPath}
+                onSelectAccomplishmentName={setSelectedAccomplishmentName}
+                onShowAccomplishmentFlights={handleShowAccomplishmentFlights}
                 onSortFlights={handleSort}
                 onToggleTimeDisplayMode={() =>
                   setScheduleTableTimeDisplayMode((current) =>
@@ -4378,7 +4532,7 @@ export default function App() {
                   : "grid-rows-[minmax(0,1fr)]"
               )}
             >
-              <div className={cn(scheduleView === "tours" && "pointer-events-none opacity-60")}>
+              <div className={cn(scheduleView !== "flights" && "pointer-events-none opacity-60")}>
                 <FilterBar
                   key={`filters-${filterUiVersion}`}
                   plannerMode={plannerMode}
@@ -4437,12 +4591,9 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 bp-1024:justify-self-start bp-1024:gap-x-3">
                 {schedule?.importSummary ? (
                   <>
-                    <FooterStat label="Source" value={getScheduleSourceLabel(schedule.importSummary)} />
-                    <FooterStat label="Schedule Date" value={scheduleDateLabel} />
-                    <FooterStat
-                      label="Imported Flights"
-                      value={formatNumber(schedule.importSummary.importedRows ?? 0)}
-                    />
+                    {footerMetadataItems.map((item) => (
+                      <FooterStat key={item.label} label={item.label} value={item.value} />
+                    ))}
                   </>
                 ) : null}
               </div>

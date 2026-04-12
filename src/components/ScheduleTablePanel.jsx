@@ -7,13 +7,18 @@ import {
 } from "./ui/forms";
 import { cn } from "./ui/cn";
 import { SearchableMultiSelect } from "./FilterBar";
+import AccomplishmentsPanel from "./AccomplishmentsPanel";
 import FlightsTable from "./tables/FlightsTable";
 import ToursTable from "./tables/ToursTable";
 
 export default function ScheduleTablePanel({
   scheduleView,
-  availableTours,
+  availableTours = [],
   selectedTourPath,
+  accomplishmentOptions = [],
+  selectedAccomplishmentName,
+  selectedAccomplishment,
+  accomplishmentRows = [],
   viewportWidth,
   flightRows,
   selectedFlightRowId,
@@ -24,12 +29,15 @@ export default function ScheduleTablePanel({
   selectedTourRowId,
   onScheduleViewChange,
   onSelectTourPath,
+  onSelectAccomplishmentName,
+  onShowAccomplishmentFlights,
   onSortFlights,
   onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow
 }) {
   const hasTours = availableTours.length > 0;
+  const hasAccomplishments = accomplishmentOptions.length > 0;
   const selectedTourOption = selectedTourPath
     ? availableTours.find((tour) => tour.path === selectedTourPath)
     : availableTours[0] || null;
@@ -38,6 +46,12 @@ export default function ScheduleTablePanel({
     label: tour.label,
     selectedLabel: tour.label,
     keywords: tour.label
+  }));
+  const accomplishmentSelectOptions = accomplishmentOptions.map((accomplishment) => ({
+    value: accomplishment.name,
+    label: accomplishment.name,
+    selectedLabel: accomplishment.name,
+    keywords: `${accomplishment.name} ${accomplishment.requirement} ${accomplishment.airports.join(" ")}`
   }));
 
   return (
@@ -84,6 +98,22 @@ export default function ScheduleTablePanel({
             >
               Tours
             </button>
+            <button
+              type="button"
+              className={cn(
+                plannerTabClassName,
+                getPlannerTabStateClassName(scheduleView === "accomplishments"),
+                !hasAccomplishments &&
+                  "cursor-not-allowed opacity-50 hover:text-[color:color-mix(in srgb,var(--text-heading) 72%, transparent)]"
+              )}
+              role="tab"
+              aria-selected={scheduleView === "accomplishments"}
+              aria-disabled={!hasAccomplishments}
+              disabled={!hasAccomplishments}
+              onClick={() => onScheduleViewChange?.("accomplishments")}
+            >
+              Accomplishments
+            </button>
           </div>
         </div>
         {scheduleView === "tours" && hasTours ? (
@@ -104,10 +134,34 @@ export default function ScheduleTablePanel({
             />
           </div>
         ) : null}
+        {scheduleView === "accomplishments" && hasAccomplishments ? (
+          <div className="mt-3">
+            <SearchableMultiSelect
+              label="Accomplishment"
+              hideLabel
+              placeholder="Search accomplishments"
+              emptyLabel="No accomplishments available."
+              allowMultiple={false}
+              allowSingleDeselect={false}
+              hideChips
+              showClearAction={false}
+              showSingleSelectedLabel
+              options={accomplishmentSelectOptions}
+              selectedValues={selectedAccomplishmentName ? [selectedAccomplishmentName] : []}
+              onChange={(values) => onSelectAccomplishmentName?.(values[0] || "")}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="flex min-h-0 flex-1 px-5 pb-5 bp-1024:px-4 bp-1024:pb-4">
-        {scheduleView === "tours" ? (
+        {scheduleView === "accomplishments" ? (
+          <AccomplishmentsPanel
+            accomplishment={selectedAccomplishment}
+            rows={accomplishmentRows}
+            onShowFlights={onShowAccomplishmentFlights}
+          />
+        ) : scheduleView === "tours" ? (
           <ToursTable
             rows={tourRows}
             selectedRowId={selectedTourRowId}
