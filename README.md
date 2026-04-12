@@ -195,6 +195,17 @@ Use the `Basic Filters` tab for normal schedule filtering.
 
 Use the `Duty Schedule` tab when you want the app to build a connected sequence of flights for you.
 
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/guty_schedule.png" width="100%" alt="duty schedule" />
+    </td>
+    <td align="center">
+      <img src="docs/images/duty_schedule_board.png" width="100%" alt="duty schedule flight board" />
+    </td>
+  </tr>
+</table>
+
 ### Airline mode
 
 1. Choose `By Airline`.
