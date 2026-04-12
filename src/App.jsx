@@ -76,7 +76,6 @@ const THEME_STORAGE_KEY = "flight-planner.theme";
 const DEV_TOOLS_STORAGE_KEY = "flight-planner.dev-tools-enabled";
 const DEV_WINDOW_WIDTH_STORAGE_KEY = "flight-planner.dev-window-width";
 const APP_BUILD_GIT_TAG = String(import.meta.env.VITE_BUILD_GIT_TAG || "").trim() || "local-dev";
-const DOCSHOT_ENABLED = String(import.meta.env.VITE_DOCSHOT || "").trim() === "true";
 const DEV_WINDOW_WIDTH_PRESETS = [
   { width: 1920, height: 900, label: "1920x900" },
   { width: 1400, height: 900, label: "1400x900" },
@@ -230,10 +229,6 @@ function readSavedTheme() {
     return "light";
   }
 
-  if (DOCSHOT_ENABLED) {
-    return "light";
-  }
-
   return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
 }
 
@@ -242,19 +237,11 @@ function readSavedDevToolsEnabled() {
     return false;
   }
 
-  if (DOCSHOT_ENABLED) {
-    return false;
-  }
-
   return window.localStorage.getItem(DEV_TOOLS_STORAGE_KEY) === "true";
 }
 
 function readSavedDevWindowWidth() {
   if (typeof window === "undefined") {
-    return null;
-  }
-
-  if (DOCSHOT_ENABLED) {
     return null;
   }
 
@@ -1494,7 +1481,6 @@ export default function App() {
   const deleteUserDataConfirmResolverRef = useRef(null);
   const hasPerformedStartupUpdateCheckRef = useRef(false);
   const devWindowMenuRef = useRef(null);
-  const docshotApplySnapshotRef = useRef(() => Promise.resolve());
   const deferredFilters = useDeferredValue(filters);
   const deferredDutyFilters = useDeferredValue(dutyFilters);
   const isDesktopAddonScanAvailable = isTauriRuntime();
@@ -1762,7 +1748,7 @@ export default function App() {
   }, [isReplaceScheduleConfirmOpen, isDeleteUserDataConfirmOpen]);
 
   useEffect(() => {
-    if (DOCSHOT_ENABLED || !isDesktopAddonScanAvailable || hasPerformedStartupUpdateCheckRef.current) {
+    if (!isDesktopAddonScanAvailable || hasPerformedStartupUpdateCheckRef.current) {
       return;
     }
 
@@ -1772,240 +1758,16 @@ export default function App() {
   }, [isDesktopAddonScanAvailable]);
 
   useEffect(() => {
-    const effectiveTheme = DOCSHOT_ENABLED ? "light" : theme;
-    document.documentElement.dataset.theme = effectiveTheme;
-    document.documentElement.style.colorScheme = effectiveTheme;
-
-    if (!DOCSHOT_ENABLED) {
-      window.localStorage.setItem(THEME_STORAGE_KEY, effectiveTheme);
-    }
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
-  function setDocshotCaptureMode(active) {
-    if (active) {
-      document.documentElement.dataset.docshotCapture = "true";
-      document.activeElement?.blur?.();
-      window.getSelection?.()?.removeAllRanges?.();
-      return;
-    }
-
-    delete document.documentElement.dataset.docshotCapture;
-  }
-
-  async function applyDocshotSnapshot(snapshot) {
-    const nextSchedule =
-      snapshot?.schedule && Array.isArray(snapshot.schedule.flights)
-        ? {
-            importedAt: snapshot.schedule.importedAt,
-            flights: snapshot.schedule.flights,
-            importSummary: snapshot.schedule.importSummary || null
-          }
-        : null;
-    const nextTheme = "light";
-    const nextAddonScan = snapshot?.addonScan
-      ? {
-          ...createEmptyAddonAirportScan(),
-          ...snapshot.addonScan,
-          roots: Array.isArray(snapshot.addonScan.roots) ? snapshot.addonScan.roots : [],
-          airports: Array.isArray(snapshot.addonScan.airports) ? snapshot.addonScan.airports : [],
-          warnings: Array.isArray(snapshot.addonScan.warnings) ? snapshot.addonScan.warnings : [],
-          scanDetails: Array.isArray(snapshot.addonScan.scanDetails)
-            ? snapshot.addonScan.scanDetails
-            : []
-        }
-      : createEmptyAddonAirportScan();
-    const nextSimBriefSettings = {
-      username: String(snapshot?.simBriefSettings?.username || "").trim(),
-      pilotId: String(snapshot?.simBriefSettings?.pilotId || "").trim(),
-      dispatchUnits:
-        String(snapshot?.simBriefSettings?.dispatchUnits || "").trim().toUpperCase() === "KGS"
-          ? "KGS"
-          : "LBS",
-      customAirframes: Array.isArray(snapshot?.simBriefSettings?.customAirframes)
-        ? snapshot.simBriefSettings.customAirframes.map(normalizeSimBriefCustomAirframe).filter(Boolean)
-        : []
-    };
-    const nextSimBriefAircraftTypes = Array.isArray(snapshot?.simBriefAircraftTypes)
-      ? snapshot.simBriefAircraftTypes.map(normalizeSimBriefAircraftTypeOption).filter(Boolean)
-      : [];
-    const nextDispatchState = {
-      flightId: String(snapshot?.simBriefDispatchState?.flightId || "").trim(),
-      isDispatching: Boolean(snapshot?.simBriefDispatchState?.isDispatching),
-      message: String(snapshot?.simBriefDispatchState?.message || "").trim()
-    };
-
-    setTheme(nextTheme);
-    setIsDevToolsEnabled(Boolean(snapshot?.isDevToolsEnabled));
-    setDevWindowWidth(
-      DEV_WINDOW_WIDTH_PRESETS.some((option) => option.width === snapshot?.devWindowWidth)
-        ? snapshot.devWindowWidth
-        : null
-    );
-    setIsDevWindowMenuOpen(false);
-    setAddonScan(nextAddonScan);
-    setSimBriefUsername(nextSimBriefSettings.username);
-    setSimBriefUsernameDraft(nextSimBriefSettings.username);
-    setSimBriefPilotId(nextSimBriefSettings.pilotId);
-    setSimBriefPilotIdDraft(nextSimBriefSettings.pilotId);
-    setSimBriefDispatchUnits(nextSimBriefSettings.dispatchUnits);
-    setSavedSimBriefDispatchUnits(nextSimBriefSettings.dispatchUnits);
-    setSimBriefCustomAirframes(nextSimBriefSettings.customAirframes);
-    setSimBriefCustomAirframesDraft(nextSimBriefSettings.customAirframes);
-    setSimBriefCustomAirframeIdDraft("");
-    setSimBriefCustomAirframeNameDraft("");
-    setSimBriefCustomAirframeMatchTypeDraft("");
-    setSimBriefAircraftTypes(nextSimBriefAircraftTypes);
-    setSimBriefAircraftTypesError("");
-    setIsSimBriefAircraftTypesLoading(false);
-    setSimBriefDispatchState(nextDispatchState);
-    setIsImporting(false);
-    setIsSyncing(false);
-    setIsHydrating(false);
-    setIsAddonScanBusy(false);
-    setIsSimBriefSaving(false);
-    setIsDeletingUserData(false);
-    setIsReplaceScheduleConfirmOpen(false);
-    setIsDeleteUserDataConfirmOpen(false);
-    setIsUpdatePromptOpen(false);
-    setIsCheckingForUpdates(false);
-    setAvailableUpdate(null);
-    setStatusMessage(String(snapshot?.statusMessage || "Ready"));
-
-    if (!nextSchedule?.flights?.length) {
-      startTransition(() => {
-        setSchedule(null);
-        const defaultBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
-        setFlightBoards([defaultBoard]);
-        setActiveFlightBoardId(defaultBoard.id);
-        setPlannerMode("basic");
-        setFilters(DEFAULT_FILTERS);
-        setDutyFilters(DEFAULT_DUTY_FILTERS);
-        setSort(DEFAULT_SORT);
-        setScheduleView("flights");
-        setSelectedTourPath("");
-        setSelectedAccomplishmentName("");
-        setSelectedTourRowId(null);
-        setTourProgress({});
-        setPlannerControlsCollapsed(getDefaultPlannerControlsCollapsed());
-        setBasicAdvancedFiltersOpen(false);
-        setBasicAddonFiltersOpen(false);
-        setScheduleTableTimeDisplayMode("local");
-        setSelectedFlightId(null);
-        setExpandedBoardFlightId(null);
-        setFilterUiVersion((current) => current + 1);
-      });
-      setIsSettingsOpen(Boolean(snapshot?.isSettingsOpen));
-      return;
-    }
-
-    const nextBounds = buildFilterBounds(nextSchedule.flights);
-    const nextFilters = normalizeFilters(
-      {
-        ...DEFAULT_FILTERS,
-        ...buildRangeDefaults(nextBounds),
-        ...(snapshot?.filters || {})
-      },
-      nextBounds
-    );
-    const nextDutyFilters = normalizeDutyFilters(
-      {
-        ...DEFAULT_DUTY_FILTERS,
-        ...buildRangeDefaults(nextBounds),
-        ...(snapshot?.dutyFilters || {})
-      },
-      nextBounds
-    );
-    const nextFlightBoardState = normalizePersistedFlightBoards(snapshot, nextSchedule.flights);
-    const nextActiveBoard =
-      nextFlightBoardState.boards.find((board) => board.id === nextFlightBoardState.activeBoardId) ||
-      nextFlightBoardState.boards[0];
-    const nextExpandedBoardFlightId = (nextActiveBoard?.entries || []).some(
-      (entry) => entry.boardEntryId === snapshot?.expandedBoardFlightId
-    )
-      ? snapshot.expandedBoardFlightId
-      : null;
-
-    startTransition(() => {
-      setSchedule(nextSchedule);
-      setFlightBoards(nextFlightBoardState.boards);
-      setActiveFlightBoardId(nextFlightBoardState.activeBoardId);
-      setPlannerMode(snapshot?.plannerMode === "duty" ? "duty" : "basic");
-      setFilters(nextFilters);
-      setDutyFilters(nextDutyFilters);
-      setSort(snapshot?.sort || DEFAULT_SORT);
-      setScheduleView(
-        snapshot?.scheduleView === "tours" || snapshot?.scheduleView === "accomplishments"
-          ? snapshot.scheduleView
-          : "flights"
-      );
-      setSelectedTourPath(String(snapshot?.selectedTourPath || "").trim());
-      setSelectedAccomplishmentName(String(snapshot?.selectedAccomplishmentName || "").trim());
-      setSelectedTourRowId(null);
-      setTourProgress(
-        snapshot?.tourProgress && typeof snapshot.tourProgress === "object"
-          ? snapshot.tourProgress
-          : {}
-      );
-      setPlannerControlsCollapsed(
-        typeof snapshot?.plannerControlsCollapsed === "boolean"
-          ? snapshot.plannerControlsCollapsed
-          : getDefaultPlannerControlsCollapsed()
-      );
-      setBasicAdvancedFiltersOpen(Boolean(snapshot?.basicAdvancedFiltersOpen));
-      setBasicAddonFiltersOpen(Boolean(snapshot?.basicAddonFiltersOpen));
-      setScheduleTableTimeDisplayMode(
-        snapshot?.scheduleTableTimeDisplayMode === "utc" ? "utc" : "local"
-      );
-      setSelectedFlightId(snapshot?.selectedFlightId || nextSchedule.flights[0]?.flightId || null);
-      setExpandedBoardFlightId(nextExpandedBoardFlightId);
-      setFilterUiVersion((current) => current + 1);
-    });
-    setIsSettingsOpen(Boolean(snapshot?.isSettingsOpen));
-  }
-
-  docshotApplySnapshotRef.current = applyDocshotSnapshot;
-
   useEffect(() => {
-    if (!DOCSHOT_ENABLED) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    let dispose = () => {};
-
-    import("./lib/docshot/runtime")
-      .then(({ installDocshotRuntime }) => {
-        if (cancelled) {
-          return;
-        }
-
-        dispose = installDocshotRuntime({
-          applySnapshot: (snapshot) => docshotApplySnapshotRef.current(snapshot),
-          setCaptureMode: setDocshotCaptureMode
-        });
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-      dispose();
-      setDocshotCaptureMode(false);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (DOCSHOT_ENABLED) {
-      return;
-    }
-
     window.localStorage.setItem(DEV_TOOLS_STORAGE_KEY, isDevToolsEnabled ? "true" : "false");
   }, [isDevToolsEnabled]);
 
   useEffect(() => {
-    if (DOCSHOT_ENABLED) {
-      return;
-    }
-
     if (devWindowWidth === null) {
       window.localStorage.removeItem(DEV_WINDOW_WIDTH_STORAGE_KEY);
       return;
@@ -2072,11 +1834,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (DOCSHOT_ENABLED) {
-      setIsSimBriefAircraftTypesLoading(false);
-      return;
-    }
-
     if (!isDesktopSimBriefAvailable) {
       setSimBriefAircraftTypes([]);
       setSimBriefAircraftTypesError("");
@@ -2150,59 +1907,6 @@ export default function App() {
     logAppEvent("app-start").catch(() => {});
 
     async function hydrate() {
-      if (DOCSHOT_ENABLED) {
-        if (typeof window !== "undefined") {
-          for (const key of [
-            THEME_STORAGE_KEY,
-            DEV_TOOLS_STORAGE_KEY,
-            DEV_WINDOW_WIDTH_STORAGE_KEY,
-            "flight-planner.saved-schedule",
-            "flight-planner.ui-state",
-            "flight-planner.simbrief-settings",
-            "flight-planner.import-log"
-          ]) {
-            window.localStorage.removeItem(key);
-          }
-        }
-
-        setTheme("light");
-        setSchedule(null);
-        const defaultBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
-        setFlightBoards([defaultBoard]);
-        setActiveFlightBoardId(defaultBoard.id);
-        setFilters(DEFAULT_FILTERS);
-        setDutyFilters(DEFAULT_DUTY_FILTERS);
-        setSort(DEFAULT_SORT);
-        setPlannerMode("basic");
-        setSelectedFlightId(null);
-        setExpandedBoardFlightId(null);
-        setAddonScan(createEmptyAddonAirportScan());
-        setSimBriefUsername("");
-        setSimBriefUsernameDraft("");
-        setSimBriefPilotId("");
-        setSimBriefPilotIdDraft("");
-        setSimBriefDispatchUnits("LBS");
-        setSavedSimBriefDispatchUnits("LBS");
-        setSimBriefCustomAirframes([]);
-        setSimBriefCustomAirframesDraft([]);
-        setSimBriefCustomAirframeIdDraft("");
-        setSimBriefCustomAirframeNameDraft("");
-        setSimBriefCustomAirframeMatchTypeDraft("");
-        setSimBriefDispatchState({
-          flightId: "",
-          isDispatching: false,
-          message: ""
-        });
-        setSimBriefAircraftTypes([]);
-        setSimBriefAircraftTypesError("");
-        setLogbookAirportProgress({ dateIso: null, visitedAirports: [], arrivalAirports: [] });
-        setIsSettingsOpen(false);
-        setStatusMessage("Ready");
-        setIsHydrating(false);
-        await logAppEvent("docshot-hydrate-skipped");
-        return;
-      }
-
       const [
         scheduleResult,
         addonCacheResult,
@@ -2375,7 +2079,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (DOCSHOT_ENABLED || !schedule || isHydrating) {
+    if (!schedule || isHydrating) {
       return;
     }
 
@@ -2769,7 +2473,7 @@ export default function App() {
   }
 
   function persistScheduleSnapshot(nextSchedule, overrides = {}) {
-    if (DOCSHOT_ENABLED || !nextSchedule) {
+    if (!nextSchedule) {
       return;
     }
 
@@ -4410,14 +4114,8 @@ export default function App() {
   }
 
   return (
-    <div
-      className="flex h-screen min-h-screen flex-col gap-6 overflow-hidden p-6 bp-1024:gap-3 bp-1024:p-3.5"
-      data-docshot="app-shell"
-    >
-      <header
-        className="flex min-w-0 flex-wrap items-end justify-between gap-4 bp-1024:items-start bp-1024:gap-3"
-        data-docshot="app-header"
-      >
+    <div className="flex h-screen min-h-screen flex-col gap-6 overflow-hidden p-6 bp-1024:gap-3 bp-1024:p-3.5">
+      <header className="flex min-w-0 flex-wrap items-end justify-between gap-4 bp-1024:items-start bp-1024:gap-3">
         <div className="max-w-[720px] min-w-0">
           <Eyebrow>Flight Planner</Eyebrow>
           <div className="flex items-center gap-3 bp-1024:gap-2.5">
@@ -4432,15 +4130,11 @@ export default function App() {
           </div>
         </div>
 
-        <div
-          className="flex min-w-0 flex-wrap items-center justify-end gap-3 self-end bp-1024:gap-2"
-          data-docshot="header-actions"
-        >
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-3 self-end bp-1024:gap-2">
           <Button
             onClick={handleImport}
             disabled={isImporting || isSyncing || isAddonScanBusy || isHydrating}
             className="bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
-            data-docshot="import-button"
           >
             {isImporting ? "Importing..." : importButtonLabel}
           </Button>
@@ -4448,7 +4142,6 @@ export default function App() {
             onClick={handleDeltaVirtualSync}
             disabled={isImporting || isSyncing || isAddonScanBusy || isHydrating}
             className="bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
-            data-docshot="sync-button"
           >
             {isSyncing ? "Syncing..." : syncButtonLabel}
           </Button>
@@ -4457,7 +4150,6 @@ export default function App() {
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             className="size-9 bp-1024:size-8"
-            data-docshot="theme-toggle"
           >
             <ThemeToggleIcon theme={theme} />
           </IconButton>
@@ -4467,7 +4159,6 @@ export default function App() {
             aria-label="Open settings"
             aria-expanded={isSettingsOpen}
             className="size-9 bp-1024:size-8"
-            data-docshot="open-settings"
           >
             <SettingsIcon />
           </IconButton>
@@ -4475,10 +4166,7 @@ export default function App() {
       </header>
 
       <main className="min-h-0 flex-1 overflow-hidden">
-        <div
-          className="grid h-full min-h-0 gap-4 [grid-template-rows:minmax(0,1fr)_auto] bp-1024:gap-3"
-          data-docshot="planner-workspace"
-        >
+        <div className="grid h-full min-h-0 gap-4 [grid-template-rows:minmax(0,1fr)_auto] bp-1024:gap-3">
           <div className="grid min-h-0 gap-4 [grid-template-columns:minmax(0,1.42fr)_minmax(224px,0.9fr)] bp-1024:gap-3 bp-1024:[grid-template-columns:minmax(0,1.48fr)_minmax(248px,0.9fr)] bp-1400:[grid-template-columns:minmax(0,1.55fr)_minmax(260px,0.92fr)]">
             {schedule ? (
               <ScheduleTablePanel
@@ -4692,7 +4380,6 @@ export default function App() {
             role="dialog"
             aria-modal="true"
             aria-label="Settings"
-            data-docshot="settings-modal"
             onClick={(event) => event.stopPropagation()}
           >
             <SectionHeader

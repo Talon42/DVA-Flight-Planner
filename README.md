@@ -2,9 +2,6 @@
 
 Desktop flight planning tool for Delta Virtual Airlines schedules.
 
-<!-- docshot: hero-overview -->
-<img width="1000" alt="image" src="./readme-images/hero-overview.png" />
-
 Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, and I built this app to make schedule filtering, flight selection, and board management faster, more practical, and fun for day-to-day planning.
 
 ## Disclaimer
@@ -47,9 +44,6 @@ If you downloaded the release from this repository, click `More info`, then clic
 6. Drag Flight Board cards to reorder them if needed.
 7. Expand a Flight Board entry to dispatch, repair, or remove it.
 
-<!-- docshot: quick-start-overview -->
-<img width="1000" alt="image" src="./readme-images/quick-start-overview.png" />
-
 ## Importing a PFPX XML Manually
 
 1. Download your PFPX schedule XML from the Delta Virtual Airlines website.
@@ -69,20 +63,9 @@ If you already have a schedule loaded, importing a new one replaces the current 
 ### How it works
 
 1. Click `Sync from Delta Virtual`.
-   
-   <!-- docshot: sync-entry -->
-   <img width="1000" alt="image" src="./readme-images/sync-entry.png" />
-   
-3. A Delta Virtual login window opens.
-   
-   <!-- docshot: sync-login-window -->
-   <img width="1000" alt="image" src="https://github.com/user-attachments/assets/7aea0dd6-34a1-46be-b341-b7e854b82846" />
-   
-5. Sign in with your own DVA credentials on the official DVA site.
-6. The app waits for the official schedule XML download and imports it automatically.
-   
-   <!-- docshot: sync-import-status -->
-   <img width="1000" alt="image" src="./readme-images/sync-import-status.png" />
+2. A Delta Virtual login window opens.
+3. Sign in with your own DVA credentials on the official DVA site.
+4. The app waits for the official schedule XML download and imports it automatically.
 
 When the sync succeeds, the app also saves a local copy of the Delta Virtual logbook JSON export. That logbook data powers Accomplishments airport completion tracking.
 
@@ -130,16 +113,10 @@ Addon folder support is for matching your installed scenery coverage against the
 
 1. Open `Settings`.
 
-<!-- docshot: settings-trigger -->
-<img width="1000" alt="image" src="./readme-images/settings-trigger.png" />
+2. In `Addon Airports`, click `Add Folder`.
 
-3. In `Addon Airports`, click `Add Folder`.
-
-<!-- docshot: addon-airports-panel -->
-<img width="1000" alt="image" src="./readme-images/addon-airports-panel.png" />
-
-4. Select one or more top-level addon roots such as your MSFS `Community` folder or another addon root.
-5. Click `Scan Now`.
+3. Select one or more top-level addon roots such as your MSFS `Community` folder or another addon root.
+4. Click `Scan Now`.
 
 The app recursively scans for `ContentHistory.json` files and builds a cached airport list from airport entries it finds.
 
@@ -192,9 +169,6 @@ Use the `Basic Filters` tab for normal schedule filtering.
 
 Use the `Duty Schedule` tab when you want the app to build a connected sequence of flights for you.
 
-<!-- docshot: duty-schedule-builder -->
-<img width="1000" alt="image" src="./readme-images/duty-schedule-builder.png" />
-
 ### Airline mode
 
 1. Choose `By Airline`.
@@ -237,13 +211,7 @@ Use the `Tours` tab to work through bundled Delta Virtual tour legs inside the s
 3. Work from the top of the table downward. Incomplete legs stay in their original leg order.
 4. Double-click a tour leg to add it to the Flight Board.
 
-<!-- docshot: tours-schedule-tabs -->
-<img width="1000" alt="image" src="./readme-images/tours-schedule-tabs.png" />
-
 Tour flights added to the Flight Board show a red `T` badge so you can tell them apart from normal schedule flights.
-
-<!-- docshot: tours-flight-card -->
-<img width="1000" alt="image" src="./readme-images/tours-flight-card.png" />
 
 ### Completing tour flights
 
@@ -257,9 +225,6 @@ When a tour leg is completed:
 - the `Complete Flight` button changes to `Click to Revert Status`
 - the completed leg moves to the bottom of the Tours schedule table
 - completed legs at the bottom are ordered by the sequence you completed them, not by original leg number
-
-<!-- docshot: tours-flight-completed -->
-<img width="1000" alt="image" src="./readme-images/tours-flight-completed.png" />
 
 ### Important note about tour progress
 
@@ -302,9 +267,6 @@ Accomplishment progress is based on the locally saved Delta Virtual logbook JSON
 ## Flight Board
 
 The Flight Board is your working shortlist.
-
-<!-- docshot: flight-board-overview -->
-<img width="1000" alt="image" src="./readme-images/flight-board-overview.png" />
 
 ### Adding flights
 
@@ -371,9 +333,6 @@ SimBrief dispatch is available from Flight Board entries in the desktop app.
 7. Sign in to SimBrief/Navigraph in the popup window if prompted.
 8. The app sends the dispatch request for that board entry using the selected aircraft type, route, and planned departure time.
 
-<!-- docshot: simbrief-how-it-works -->
-<img width="1000" alt="image" src="./readme-images/simbrief-how-it-works.png" />
-
 ### SimBrief settings
 
 The `Settings` screen supports:
@@ -384,9 +343,6 @@ The `Settings` screen supports:
 - saved custom airframes
 
 The app can load available SimBrief aircraft types and present them in the Flight Board aircraft selector.
-
-<!-- docshot: simbrief-settings-overview -->
-<img width="1000" alt="image" src="./readme-images/simbrief-settings-overview.png" />
 
 ### Custom airframes
 
@@ -405,12 +361,7 @@ To add one:
 
 The custom airframe internal ID is the SimBrief airframe's internal identifier. You can find it in SimBrief when you edit an airframe, where it appears as the `Internal ID` value.
 
-<img width="1000" alt="SimBrief airframe internal ID shown in the SimBrief edit airframe screen" src="./readme-images/simbrief-airframe-internal-id.png" />
-
 Saved custom airframes are then available as dispatch choices on Flight Board entries.
-
-<!-- docshot: simbrief-custom-airframes -->
-<img width="1000" alt="image" src="./readme-images/simbrief-custom-airframes.png" />
 
 ### Notes
 

@@ -7,9 +7,7 @@
     "dev": "vite --host 0.0.0.0 --port 1420",
     "build": "vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "docs:readme:screenshots": "powershell -ExecutionPolicy Bypass -File ./scripts/docs/capture-readme-screenshots.ps1",
-    "docs:readme:screenshots:update": "powershell -ExecutionPolicy Bypass -File ./scripts/docs/capture-readme-screenshots.ps1 -UpdateReadme"
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

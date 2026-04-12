@@ -305,7 +305,7 @@ export function SearchableMultiSelect({
   const overlayHost =
     typeof document !== "undefined"
       ? rootRef.current?.closest('[data-overlay-host="true"]') ||
-        rootRef.current?.closest('[data-docshot="planner-controls"]') ||
+        rootRef.current?.closest('[data-planner-controls="true"]') ||
         rootRef.current?.closest(".filter-bar") ||
         null
       : null;
@@ -1447,7 +1447,7 @@ export function AddonAirportPanel({
   onScanAddonAirports
 }) {
   return (
-    <Panel className={insetPanelClassName} data-docshot="addon-airports-panel">
+    <Panel className={insetPanelClassName}>
       <SectionHeader
         eyebrow="Addon Airports"
         title="Manage installed scenery coverage"
@@ -1557,7 +1557,7 @@ export function SimBriefSettingsPanel({
   };
 
   return (
-    <Panel className={insetPanelClassName} data-docshot="simbrief-settings-panel">
+    <Panel className={insetPanelClassName}>
       <SectionHeader eyebrow="SimBrief" title="Configure SimBrief integration" />
 
       <div className={gridClassNames.twoColumn}>
@@ -1599,7 +1599,6 @@ export function SimBriefSettingsPanel({
 
       <div
         className="grid gap-4 rounded-none border border-[color:transparent] bg-[var(--surface)] p-4"
-        data-docshot="simbrief-custom-airframes"
       >
         <SectionHeader
           title="Saved custom airframes"
@@ -1742,7 +1741,7 @@ export default function FilterBar({
 
   return (
     <Panel
-      data-docshot="planner-controls"
+      data-planner-controls="true"
       className={cn(
         "filter-bar relative app-scrollbar grid content-start gap-3 overflow-x-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] dark:border-[color:var(--surface-border)] p-5 bp-1024:p-4",
         popupMode

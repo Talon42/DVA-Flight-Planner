@@ -59,7 +59,6 @@ export default function ScheduleTablePanel({
       as="section"
       data-overlay-host="true"
       padding="none"
-      data-docshot="schedule-table"
       className="relative flex min-h-0 flex-col overflow-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] dark:border-[color:var(--surface-border)]"
     >
       <div className="px-5 pb-0 pt-5 bp-1024:px-4 bp-1024:pt-4">

@@ -195,7 +195,7 @@ function FlightCardAircraftSelector({
   const selectionLabel = selectedOption?.selectedLabel || selectedOption?.label || "Select aircraft";
   const overlayHost =
     typeof document !== "undefined"
-      ? rootRef.current?.closest('[data-docshot="flight-board"]') || null
+      ? rootRef.current?.closest('[data-flight-board="true"]') || null
       : null;
 
   return (
@@ -372,7 +372,6 @@ function SimBriefInlinePanel({
   return (
     <div
       className="grid min-w-0 max-w-full gap-3 rounded-none border border-[color:transparent] bg-[var(--surface-panel)] p-3"
-      data-docshot="simbrief-dispatch-panel"
     >
       <FlightCardAircraftSelector
         options={aircraftTypeOptions}
@@ -846,7 +845,7 @@ export default function DetailsPanel({
       <Panel
         ref={panelRef}
         className="details-card relative isolate flex h-full min-h-0 flex-col rounded-none border-2 border-[rgba(160,180,202,0.52)] dark:border-[color:var(--surface-border)] p-4 bp-1024:p-4"
-        data-docshot="flight-board"
+        data-flight-board="true"
         data-menu-bounds
       >
         <div className="details-card__header mb-3">
