@@ -198,7 +198,7 @@ Use the `Duty Schedule` tab when you want the app to build a connected sequence 
 <table>
   <tr>
     <td align="center">
-      <img src="docs/images/guty_schedule.png" width="100%" alt="duty schedule" />
+      <img src="docs/images/duty_schedule.png" width="100%" alt="duty schedule" />
     </td>
     <td align="center">
       <img src="docs/images/duty_schedule_board.png" width="100%" alt="duty schedule flight board" />
