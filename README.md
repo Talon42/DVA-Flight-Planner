@@ -6,8 +6,6 @@ Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, 
 
 ## Table of Contents
 
-## Table of Contents
-
 - [What It Does](#what-it-does)
 - [Quick Start](#quick-start)
 - [Syncing from Delta Virtual](#syncing-from-delta-virtual)
