@@ -37,6 +37,17 @@ For flight simulation purposes only. Not a commercial application. In no way is 
 - Supports SimBrief dispatch from Flight Board entries
 - Supports saved custom SimBrief airframes mapped to specific aircraft types
 
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/lightmode_main.png" width="100%" alt="light mode" />
+    </td>
+    <td align="center">
+      <img src="docs/images/darkmode_main.png" width="100%" alt="dark mode" />
+    </td>
+  </tr>
+</table>
+
 ## Windows SmartScreen Warning
 
 When you launch the `.exe`, Windows may show a `Microsoft Defender SmartScreen` warning such as `Windows protected your PC`.
