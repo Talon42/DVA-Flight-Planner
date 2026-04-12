@@ -20,7 +20,6 @@ Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, 
 - [Flight Board](#flight-board)
 - [Flight Board Repair](#flight-board-repair)
 - [SimBrief Dispatch](#simbrief-dispatch)
-- [Logs](#logs)
 
 ## Disclaimer
 
