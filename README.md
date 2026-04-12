@@ -241,6 +241,17 @@ The table shows airline, route, departure, arrival, block time, and distance. Ai
 
 Use the `Tours` tab to work through bundled Delta Virtual tour legs inside the schedule area.
 
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/tours.png" width="100%" alt="tours" />
+    </td>
+    <td align="center">
+      <img src="docs/images/tours_flightboard.png" width="100%" alt="tours flight board" />
+    </td>
+  </tr>
+</table>
+
 ### How to use it
 
 1. Click `Tours` in the schedule panel.
@@ -274,6 +285,17 @@ When a tour leg is completed:
 
 Use the `Accomplishments` tab to track Delta Virtual accomplishment airport lists inside the schedule area.
 
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/accomplishments.png" width="100%" alt="accomplishments" />
+    </td>
+    <td align="center">
+      <img src="docs/images/accomp_completed.png" width="100%" alt="completed accomplishments" />
+    </td>
+  </tr>
+</table>
+
 ### How to use it
 
 1. Click `Accomplishments` in the schedule panel.
@@ -304,6 +326,10 @@ Accomplishment progress is based on the locally saved Delta Virtual logbook JSON
 ## Flight Board
 
 The Flight Board is your working shortlist.
+
+<p align="center">
+  <img src="docs/images/flight_board.png" width="1200" alt="flight board" />
+</p>
 
 ### Adding flights
 
