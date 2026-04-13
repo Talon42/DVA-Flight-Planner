@@ -4861,48 +4861,47 @@ export default function App() {
 
       {isSyncing ? (
         <ModalBackdrop>
-          <Panel
-            as="section"
-            padding="lg"
-            className={cn(
-              "grid w-full max-w-[360px] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4",
-              modalPanelClassName
-            )}
-            role="status"
-            aria-live="polite"
-            aria-label="Delta Virtual sync in progress"
-          >
-            <SectionHeader
-              eyebrow="Delta Virtual Sync"
-              title="Syncing data from Delta Virtual"
-              description="Refreshing your schedule and logbook data."
-              className="w-full"
-            />
-            <div className="flex w-full items-center gap-3">
-              <svg
-                viewBox="0 0 24 24"
-                className="h-5 w-5 shrink-0 animate-spin text-[var(--delta-red)]"
-                aria-hidden="true"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="9"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeOpacity="0.18"
-                  strokeWidth="2.25"
-                />
-                <path
-                  d="M21 12a9 9 0 0 0-9-9"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeWidth="2.25"
-                />
-              </svg>
-            </div>
-          </Panel>
+          <div className="w-full px-4 bp-1024:px-3">
+            <Panel
+              as="section"
+              padding="lg"
+              className="mx-auto grid w-full max-w-[32rem] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+              role="status"
+              aria-live="polite"
+              aria-label="Delta Virtual sync in progress"
+            >
+              <SectionHeader
+                eyebrow="Delta Virtual Sync"
+                title="Syncing data from Delta Virtual"
+                description="Refreshing your schedule and logbook data."
+                className="w-full"
+              />
+              <div className="flex w-full items-center gap-3">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5 shrink-0 animate-spin text-[var(--delta-red)]"
+                  aria-hidden="true"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeOpacity="0.18"
+                    strokeWidth="2.25"
+                  />
+                  <path
+                    d="M21 12a9 9 0 0 0-9-9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeWidth="2.25"
+                  />
+                </svg>
+              </div>
+            </Panel>
+          </div>
         </ModalBackdrop>
       ) : null}
     </div>
