@@ -31,7 +31,7 @@ pub struct DeltaVirtualAuthSettings {
     pub first_name: String,
     pub last_name: String,
     pub remember_mode: DeltaVirtualRememberMode,
-    #[serde(default, skip_serializing)]
+    #[serde(default)]
     pub has_password: bool,
 }
 

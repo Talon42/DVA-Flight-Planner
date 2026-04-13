@@ -4591,13 +4591,6 @@ export default function App() {
                     className={fieldInputClassName}
                     value={dvaFirstNameDraft}
                     onChange={(event) => setDvaFirstNameDraft(event.target.value)}
-                    onBlur={() => handleSaveDeltaVirtualCredentials()}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleSaveDeltaVirtualCredentials();
-                      }
-                    }}
                     placeholder="Enter first name"
                   />
                 </label>
@@ -4609,13 +4602,6 @@ export default function App() {
                     className={fieldInputClassName}
                     value={dvaLastNameDraft}
                     onChange={(event) => setDvaLastNameDraft(event.target.value)}
-                    onBlur={() => handleSaveDeltaVirtualCredentials()}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleSaveDeltaVirtualCredentials();
-                      }
-                    }}
                     placeholder="Enter last name"
                   />
                 </label>
@@ -4633,7 +4619,7 @@ export default function App() {
                       key={option.value}
                       type="button"
                       className={toggleButtonClassName(dvaRememberMode === option.value)}
-                      onClick={() => handleSaveDeltaVirtualCredentials({ rememberMode: option.value })}
+                      onClick={() => setDvaRememberMode(option.value)}
                       disabled={isDvaCredentialsSaving}
                     >
                       {option.label}
@@ -4650,13 +4636,6 @@ export default function App() {
                     className={fieldInputClassName}
                     value={dvaPasswordDraft}
                     onChange={(event) => setDvaPasswordDraft(event.target.value)}
-                    onBlur={() => handleSaveDeltaVirtualCredentials()}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleSaveDeltaVirtualCredentials();
-                      }
-                    }}
                     placeholder={
                       dvaHasPassword ? "Enter a new password to replace the stored one" : "Enter password to store"
                     }
