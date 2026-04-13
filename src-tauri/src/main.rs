@@ -1,10 +1,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod deltava_auth;
+mod deltava_login;
 mod simbrief;
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use deltava_auth::{
+    clear_auth_settings_internal, clear_deltava_auth_settings, read_auth_context_internal,
+    read_deltava_auth_settings, save_deltava_auth_settings, save_password_to_credential_manager,
+};
 use simbrief::{
     close_simbrief_dispatch_window, fetch_simbrief_aircraft_types, start_simbrief_dispatch,
     SimBriefDispatchManager,
@@ -38,6 +44,7 @@ const DELTAVA_FOCUS_LOSS_RECENT_WINDOW_MILLIS: u64 = 3000;
 const DELTAVA_XML_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_PFPX_XML__";
 const DELTAVA_SYNC_RESULT_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_RESULT__";
 const DELTAVA_DEBUG_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_DEBUG__";
+const DELTAVA_AUTH_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_DVA_AUTH__";
 const APP_STORAGE_DIR: &str = "flight-planner";
 const APP_LOG_FILE: &str = "log.txt";
 const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
@@ -474,6 +481,14 @@ struct DeltaLogbookProgress {
 struct DeltaWebSyncResult {
     xml: DeltaWebXmlResult,
     logbook: DeltaWebLogbookResult,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum DeltaWebAuthMessage {
+    LoginSuccess,
+    StorePassword { password: String },
+    LoginFailed { reason: Option<String> },
 }
 
 #[derive(Deserialize)]
@@ -1002,7 +1017,7 @@ fn is_schedule_download_url(url: &tauri::webview::Url) -> bool {
 }
 
 fn should_probe_for_schedule(url: &tauri::webview::Url) -> bool {
-    is_allowed_deltava_url(url) && url.path() != "/pfpxsched.ws"
+    is_allowed_deltava_url(url)
 }
 
 fn is_legacy_download_file(path: &Path) -> bool {
@@ -1644,6 +1659,8 @@ fn clear_user_data_internal(app: &AppHandle) -> Result<(), String> {
         remove_path_if_exists(&app_data_dir.join(APP_STORAGE_DIR));
     }
 
+    let _ = clear_auth_settings_internal(app);
+
     if let Ok(local_data_dir) = app.path().app_local_data_dir() {
         remove_path_if_exists(&local_data_dir.join("deltava-sync"));
         remove_path_if_exists(&local_data_dir.join("deltava-webview"));
@@ -1815,6 +1832,43 @@ fn attach_windows_xml_message_handler(
                                 return Ok(());
                             }
 
+                            if let Some(payload_text) = message.strip_prefix(DELTAVA_AUTH_MESSAGE_PREFIX) {
+                                let payload_text = payload_text.to_string();
+                                let app_handle = app_handle.clone();
+                                append_sync_log(&format!("auth-message:received len={}", payload_text.len()));
+
+                                tauri::async_runtime::spawn(async move {
+                                    match serde_json::from_str::<DeltaWebAuthMessage>(&payload_text) {
+                                        Ok(DeltaWebAuthMessage::LoginSuccess) => {
+                                            append_sync_log("auth:login-success");
+                                        }
+                                        Ok(DeltaWebAuthMessage::StorePassword { password }) => {
+                                            match save_password_to_credential_manager(&password) {
+                                                Ok(()) => append_sync_log("auth:password-stored"),
+                                                Err(error) => append_sync_log(&format!("auth:password-store-failed {error}")),
+                                            }
+                                        }
+                                        Ok(DeltaWebAuthMessage::LoginFailed { reason }) => {
+                                            let message = reason
+                                                .as_deref()
+                                                .unwrap_or("Delta Virtual login failed.");
+                                            append_sync_log(&format!("auth:login-failed {message}"));
+                                            app_handle.state::<DeltaSyncManager>().finish(
+                                                DELTAVA_SYNC_LABEL,
+                                                Err(format!("auth_failed: {message}")),
+                                            );
+                                            close_sync_window(&app_handle);
+                                        }
+                                        Err(error) => {
+                                            append_sync_log(&format!(
+                                                "auth:message-parse-failed {error}"
+                                            ));
+                                        }
+                                    }
+                                });
+                                return Ok(());
+                            }
+
                             if let Some(payload_text) = message.strip_prefix(DELTAVA_SYNC_RESULT_MESSAGE_PREFIX) {
                                 let payload_text = payload_text.to_string();
                                 let app_handle = app_handle.clone();
@@ -1936,6 +1990,24 @@ async fn start_deltava_sync(
     let app_for_close = app.clone();
     let focus_lost_at = std::sync::Arc::new(Mutex::new(None::<Instant>));
     let focus_lost_at_for_events = focus_lost_at.clone();
+    let auth_context = match read_auth_context_internal(&app) {
+        Ok(context) => context,
+        Err(error) => {
+            append_sync_log(&format!("auth:load-failed {error}"));
+            deltava_auth::DeltaVirtualAuthContext {
+                settings: Default::default(),
+                password: None,
+            }
+        }
+    };
+    append_sync_log(&format!(
+        "auth:loaded remember_mode={:?} has_password={} first_name_saved={} last_name_saved={}",
+        auth_context.settings.remember_mode,
+        auth_context.settings.has_password,
+        !auth_context.settings.first_name.is_empty(),
+        !auth_context.settings.last_name.is_empty()
+    ));
+    let login_automation_script = deltava_login::build_deltava_login_automation_script(&auth_context);
 
     let login_url = DELTAVA_LOGIN_URL
         .parse()
@@ -1958,6 +2030,7 @@ async fn start_deltava_sync(
             && should_probe_for_schedule(payload.url())
         {
             append_sync_log(&format!("page:finished {}", payload.url()));
+            let _ = webview_window.eval(&login_automation_script);
             let _ = webview_window.eval(DELTAVA_AUTO_SYNC_SCRIPT);
         }
     })
@@ -2267,6 +2340,9 @@ fn main() {
             prune_deltava_storage,
             read_deltava_logbook_metadata,
             read_deltava_logbook_progress,
+            read_deltava_auth_settings,
+            save_deltava_auth_settings,
+            clear_deltava_auth_settings,
             clear_user_data,
             start_simbrief_dispatch,
             fetch_simbrief_aircraft_types,

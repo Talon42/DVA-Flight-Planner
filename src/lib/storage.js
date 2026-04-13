@@ -685,7 +685,7 @@ export async function confirmOverwriteSchedule() {
 
 export async function confirmDeleteUserData() {
   const message =
-    "Delete all saved user data for this app? This removes saved schedules, SimBrief settings, addon folder roots, logs, and stored Delta Virtual login data.";
+    "Delete all saved user data for this app? This removes saved schedules, SimBrief settings, addon folder roots, logs, and stored Delta Virtual login settings.";
 
   if (isTauriRuntime()) {
     const { confirm } = await import("@tauri-apps/plugin-dialog");
@@ -709,6 +709,7 @@ export async function deleteStoredUserData() {
     "flight-planner.saved-schedule",
     "flight-planner.ui-state",
     "flight-planner.simbrief-settings",
+    "flight-planner.deltava-auth",
     "flight-planner.import-log",
     "flight-planner.theme",
     "flight-planner.dev-tools-enabled",

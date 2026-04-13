@@ -22,6 +22,13 @@ import {
   sectionTitleTextClassName,
   supportCopyTextClassName
 } from "./components/ui/typography";
+import {
+  fieldInputClassName,
+  fieldLabelClassName,
+  fieldTitleClassName,
+  gridClassNames,
+  toggleButtonClassName
+} from "./components/ui/forms";
 import { DEFAULT_DUTY_FILTERS, DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
 import {
   getAircraftProfileOptions,
@@ -64,6 +71,12 @@ import {
   writeSavedSchedule,
   writeSavedUiState
 } from "./lib/storage";
+import {
+  clearDeltaVirtualCredentials,
+  getDefaultDeltaVirtualCredentials,
+  readDeltaVirtualCredentials,
+  saveDeltaVirtualCredentials
+} from "./lib/deltaVirtualCredentials";
 import { checkForAppUpdate, GITHUB_RELEASES_PAGE_URL } from "./lib/updateCheck";
 import accomplishmentsData from "./data/accomplishments/accomplishments.json";
 import {
@@ -1438,6 +1451,14 @@ export default function App() {
     initialBasicFilterSections.basicAddonFiltersOpen
   );
   const [addonScan, setAddonScan] = useState(createEmptyAddonAirportScan);
+  const [dvaFirstName, setDvaFirstName] = useState("");
+  const [dvaFirstNameDraft, setDvaFirstNameDraft] = useState("");
+  const [dvaLastName, setDvaLastName] = useState("");
+  const [dvaLastNameDraft, setDvaLastNameDraft] = useState("");
+  const [dvaRememberMode, setDvaRememberMode] = useState("none");
+  const [dvaHasPassword, setDvaHasPassword] = useState(false);
+  const [dvaPasswordDraft, setDvaPasswordDraft] = useState("");
+  const [isDvaCredentialsSaving, setIsDvaCredentialsSaving] = useState(false);
   const [simBriefUsername, setSimBriefUsername] = useState("");
   const [simBriefUsernameDraft, setSimBriefUsernameDraft] = useState("");
   const [simBriefPilotId, setSimBriefPilotId] = useState("");
@@ -1910,12 +1931,14 @@ export default function App() {
       const [
         scheduleResult,
         addonCacheResult,
+        dvaCredentialsResult,
         simBriefResult,
         uiStateResult,
         logbookProgressResult
       ] = await Promise.allSettled([
         readSavedSchedule(),
         readAddonAirportCache(),
+        readDeltaVirtualCredentials(),
         readSimBriefSettings(),
         readSavedUiState(),
         readDeltaVirtualLogbookProgress()
@@ -1934,6 +1957,31 @@ export default function App() {
             addonCacheResult.reason?.message || "Unable to load addon airport cache."
           );
           await logAppError("addon-cache-hydrate-failed", addonCacheResult.reason);
+        }
+
+        if (dvaCredentialsResult.status === "fulfilled") {
+          const firstName = String(dvaCredentialsResult.value?.firstName || "").trim();
+          const lastName = String(dvaCredentialsResult.value?.lastName || "").trim();
+          const rememberMode =
+            dvaCredentialsResult.value?.rememberMode === "full" ||
+            dvaCredentialsResult.value?.rememberMode === "nameOnly"
+              ? dvaCredentialsResult.value.rememberMode
+              : "none";
+          const hasPassword = Boolean(dvaCredentialsResult.value?.hasPassword);
+          setDvaFirstName(firstName);
+          setDvaFirstNameDraft(firstName);
+          setDvaLastName(lastName);
+          setDvaLastNameDraft(lastName);
+          setDvaRememberMode(rememberMode);
+          setDvaHasPassword(hasPassword);
+          await logAppEvent("deltava-auth-loaded", {
+            firstNameSaved: Boolean(firstName),
+            lastNameSaved: Boolean(lastName),
+            rememberMode,
+            hasPassword
+          });
+        } else {
+          await logAppError("deltava-auth-hydrate-failed", dvaCredentialsResult.reason);
         }
 
         if (simBriefResult.status === "fulfilled") {
@@ -2739,6 +2787,12 @@ export default function App() {
       setStatusMessage("Processing Delta Virtual schedule...");
       await processImportedSchedule(syncedFile, "deltava-sync");
       setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
+      try {
+        const refreshedDeltaCredentials = await readDeltaVirtualCredentials();
+        setDvaHasPassword(Boolean(refreshedDeltaCredentials.hasPassword));
+      } catch {
+        // Best-effort refresh only.
+      }
       if (syncedFile.warnings?.length) {
         setStatusMessage(`Delta Virtual schedule synced with warning: ${syncedFile.warnings[0]}`);
       }
@@ -2747,8 +2801,19 @@ export default function App() {
       if (error?.kind === "cancelled") {
         setStatusMessage("Delta Virtual sync canceled.");
         await logAppEvent("deltava-sync-cancelled-window");
+      } else if (error?.kind === "auth_failed") {
+        setStatusMessage(error.message || "Delta Virtual login failed.");
+        await logAppEvent("deltava-sync-auth-failed", {
+          message: error.message || ""
+        });
       } else if (error?.kind === "partial_success") {
         setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
+        try {
+          const refreshedDeltaCredentials = await readDeltaVirtualCredentials();
+          setDvaHasPassword(Boolean(refreshedDeltaCredentials.hasPassword));
+        } catch {
+          // Best-effort refresh only.
+        }
         setStatusMessage(error.message || "Delta Virtual sync partially completed.");
         await logAppEvent("deltava-sync-partial", {
           logbookJson: error.syncResult?.logbookJson?.fileName || null,
@@ -3576,6 +3641,99 @@ export default function App() {
     }
   }
 
+  async function handleSaveDeltaVirtualCredentials(overrides = {}) {
+    if (isDvaCredentialsSaving) {
+      return;
+    }
+
+    const nextFirstName = String(
+      overrides.firstName !== undefined ? overrides.firstName : dvaFirstNameDraft || ""
+    ).trim();
+    const nextLastName = String(
+      overrides.lastName !== undefined ? overrides.lastName : dvaLastNameDraft || ""
+    ).trim();
+    const nextRememberMode = ["none", "nameOnly", "full"].includes(
+      overrides.rememberMode !== undefined ? overrides.rememberMode : dvaRememberMode
+    )
+      ? overrides.rememberMode !== undefined
+        ? overrides.rememberMode
+        : dvaRememberMode
+      : "none";
+    const nextPasswordDraft =
+      overrides.password !== undefined ? String(overrides.password || "") : dvaPasswordDraft;
+    const shouldSavePassword = nextRememberMode === "full" && nextPasswordDraft.length > 0;
+
+    if (
+      nextFirstName === dvaFirstName &&
+      nextLastName === dvaLastName &&
+      nextRememberMode === dvaRememberMode &&
+      !shouldSavePassword
+    ) {
+      return;
+    }
+
+    setIsDvaCredentialsSaving(true);
+
+    try {
+      const savedCredentials = await saveDeltaVirtualCredentials({
+        firstName: nextFirstName,
+        lastName: nextLastName,
+        rememberMode: nextRememberMode,
+        password: shouldSavePassword ? nextPasswordDraft : undefined
+      });
+      setDvaFirstName(savedCredentials.firstName);
+      setDvaFirstNameDraft(savedCredentials.firstName);
+      setDvaLastName(savedCredentials.lastName);
+      setDvaLastNameDraft(savedCredentials.lastName);
+      setDvaRememberMode(savedCredentials.rememberMode);
+      setDvaHasPassword(savedCredentials.hasPassword);
+      setDvaPasswordDraft("");
+      setStatusMessage(
+        savedCredentials.firstName || savedCredentials.lastName || savedCredentials.rememberMode !== "none"
+          ? "Delta Virtual login settings saved."
+          : "Delta Virtual login settings cleared."
+      );
+      await logAppEvent("deltava-auth-saved", {
+        firstNameSaved: Boolean(savedCredentials.firstName),
+        lastNameSaved: Boolean(savedCredentials.lastName),
+        rememberMode: savedCredentials.rememberMode,
+        hasPassword: savedCredentials.hasPassword
+      });
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to save Delta Virtual login settings.");
+      await logAppError("deltava-auth-save-failed", error);
+    } finally {
+      setIsDvaCredentialsSaving(false);
+    }
+  }
+
+  async function handleClearDeltaVirtualCredentials() {
+    if (isDvaCredentialsSaving) {
+      return;
+    }
+
+    setIsDvaCredentialsSaving(true);
+
+    try {
+      await clearDeltaVirtualCredentials();
+      const clearedCredentials = getDefaultDeltaVirtualCredentials();
+      setDvaFirstName(clearedCredentials.firstName);
+      setDvaFirstNameDraft(clearedCredentials.firstName);
+      setDvaLastName(clearedCredentials.lastName);
+      setDvaLastNameDraft(clearedCredentials.lastName);
+      setDvaRememberMode(clearedCredentials.rememberMode);
+      setDvaHasPassword(clearedCredentials.hasPassword);
+      setDvaPasswordDraft("");
+      setStatusMessage("Delta Virtual login settings cleared.");
+      await logAppEvent("deltava-auth-cleared");
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to clear Delta Virtual login settings.");
+      await logAppError("deltava-auth-clear-failed", error);
+    } finally {
+      setIsDvaCredentialsSaving(false);
+    }
+  }
+
   async function handleAddCustomAirframeDraft() {
     const normalizedEntry = normalizeSimBriefCustomAirframe({
       internalId: simBriefCustomAirframeIdDraft,
@@ -3946,6 +4104,12 @@ export default function App() {
         getDefaultBasicFilterSectionState(viewportSize).basicAddonFiltersOpen
       );
       setAddonScan(createEmptyAddonAirportScan());
+      setDvaFirstName("");
+      setDvaFirstNameDraft("");
+      setDvaLastName("");
+      setDvaLastNameDraft("");
+      setDvaRememberMode("none");
+      setDvaHasPassword(false);
       setSimBriefUsername("");
       setSimBriefUsernameDraft("");
       setSimBriefPilotId("");
@@ -4398,6 +4562,126 @@ export default function App() {
               onScanAddonAirports={handleScanAddonAirports}
             />
 
+            <Panel className={insetPanelClassName}>
+              <SectionHeader eyebrow="Delta Virtual" title="Login Credentials" />
+
+              <div className={cn("grid gap-3", supportCopyTextClassName)}>
+                <p className="m-0">
+                  Save the first and last name fields in app settings. When remember mode is Full, the password is stored in Windows Credential Manager after a successful login.
+                </p>
+                <p className="m-0">
+                  Status:{" "}
+                  <strong className="text-[var(--text-heading)]">
+                    {dvaRememberMode === "full"
+                      ? dvaHasPassword
+                        ? "Password stored"
+                        : "Password not stored"
+                      : dvaRememberMode === "nameOnly"
+                        ? "Names saved"
+                        : "Not saved"}
+                  </strong>
+                </p>
+              </div>
+
+              <div className={gridClassNames.twoColumn}>
+                <label className={fieldLabelClassName}>
+                  <span className={fieldTitleClassName}>First Name</span>
+                  <input
+                    type="text"
+                    className={fieldInputClassName}
+                    value={dvaFirstNameDraft}
+                    onChange={(event) => setDvaFirstNameDraft(event.target.value)}
+                    onBlur={() => handleSaveDeltaVirtualCredentials()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleSaveDeltaVirtualCredentials();
+                      }
+                    }}
+                    placeholder="Enter first name"
+                  />
+                </label>
+
+                <label className={fieldLabelClassName}>
+                  <span className={fieldTitleClassName}>Last Name</span>
+                  <input
+                    type="text"
+                    className={fieldInputClassName}
+                    value={dvaLastNameDraft}
+                    onChange={(event) => setDvaLastNameDraft(event.target.value)}
+                    onBlur={() => handleSaveDeltaVirtualCredentials()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleSaveDeltaVirtualCredentials();
+                      }
+                    }}
+                    placeholder="Enter last name"
+                  />
+                </label>
+              </div>
+
+              <div className={fieldLabelClassName}>
+                <span className={fieldTitleClassName}>Remember Mode</span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "none", label: "None" },
+                    { value: "nameOnly", label: "Name Only" },
+                    { value: "full", label: "Full" }
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={toggleButtonClassName(dvaRememberMode === option.value)}
+                      onClick={() => handleSaveDeltaVirtualCredentials({ rememberMode: option.value })}
+                      disabled={isDvaCredentialsSaving}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {dvaRememberMode === "full" ? (
+                <label className={fieldLabelClassName}>
+                  <span className={fieldTitleClassName}>Password</span>
+                  <input
+                    type="password"
+                    className={fieldInputClassName}
+                    value={dvaPasswordDraft}
+                    onChange={(event) => setDvaPasswordDraft(event.target.value)}
+                    onBlur={() => handleSaveDeltaVirtualCredentials()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleSaveDeltaVirtualCredentials();
+                      }
+                    }}
+                    placeholder={
+                      dvaHasPassword ? "Enter a new password to replace the stored one" : "Enter password to store"
+                    }
+                    autoComplete="new-password"
+                  />
+                </label>
+              ) : null}
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => handleSaveDeltaVirtualCredentials()}
+                  disabled={isDvaCredentialsSaving || isImporting || isSyncing}
+                >
+                  {isDvaCredentialsSaving ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleClearDeltaVirtualCredentials}
+                  disabled={isDvaCredentialsSaving || isImporting || isSyncing}
+                >
+                  Clear Saved Credentials
+                </Button>
+              </div>
+            </Panel>
+
             <SimBriefSettingsPanel
               username={simBriefUsernameDraft}
               pilotId={simBriefPilotIdDraft}
@@ -4427,7 +4711,7 @@ export default function App() {
               <div className={mutedTextStackClassName}>
                 <p className="m-0">
                   Removes saved schedules, UI state, SimBrief settings, addon folder roots,
-                  logs, and stored Delta Virtual webview login data from this device.
+                  logs, and stored Delta Virtual login settings from this device.
                 </p>
               </div>
 
@@ -4544,7 +4828,7 @@ export default function App() {
 
             <p className={mutedTextClassName}>
               This removes saved schedules, UI state, SimBrief settings, addon folder roots, logs,
-              and stored Delta Virtual webview login data from this device.
+              and stored Delta Virtual login settings from this device.
             </p>
 
             <div className="flex justify-end gap-2">
