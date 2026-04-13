@@ -4860,12 +4860,15 @@ export default function App() {
       ) : null}
 
       {isSyncing ? (
-        <ModalBackdrop>
-          <div className="w-full px-4 bp-1024:px-3">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-[rgba(8,20,36,0.42)] px-4 bp-1024:px-3"
+          role="presentation"
+        >
+          <div className="w-full max-w-[32rem]">
             <Panel
               as="section"
               padding="lg"
-              className="mx-auto grid w-full max-w-[32rem] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+              className="grid w-full gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
               role="status"
               aria-live="polite"
               aria-label="Delta Virtual sync in progress"
@@ -4902,7 +4905,7 @@ export default function App() {
               </div>
             </Panel>
           </div>
-        </ModalBackdrop>
+        </div>
       ) : null}
     </div>
   );
