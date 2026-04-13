@@ -4865,7 +4865,7 @@ export default function App() {
             as="section"
             padding="lg"
             className={cn(
-              "grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4",
+              "grid w-full max-w-[360px] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4",
               modalPanelClassName
             )}
             role="status"
