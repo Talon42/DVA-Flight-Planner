@@ -2022,6 +2022,7 @@ async fn start_deltava_sync(
     .inner_size(520.0, 760.0)
     .min_inner_size(460.0, 680.0)
     .resizable(true)
+    .visible(false)
     .center()
     .data_directory(webview_data_directory)
     .on_navigation(|url| is_allowed_deltava_url(url))

@@ -2770,12 +2770,12 @@ export default function App() {
     }
 
     setIsSyncing(true);
-    setStatusMessage("Opening Delta Virtual login...");
+    setStatusMessage("Syncing data from Delta Virtual.");
     let shouldCloseSyncWindow = false;
     let shouldRemoveDownloadedSchedule = false;
 
     try {
-      setStatusMessage("Waiting for Delta Virtual login and schedule download...");
+      setStatusMessage("Syncing data from Delta Virtual.");
       const syncedFile = await syncScheduleFromDeltaVirtual();
       shouldCloseSyncWindow = true;
       await logAppEvent("deltava-sync-download-complete", {
@@ -4855,6 +4855,24 @@ export default function App() {
                 Open Release Page
               </Button>
             </div>
+          </Panel>
+        </ModalBackdrop>
+      ) : null}
+
+      {isSyncing ? (
+        <ModalBackdrop>
+          <Panel
+            as="section"
+            padding="lg"
+            className={cn(
+              "grid w-[min(420px,calc(100vw-24px))] place-items-center text-center shadow-none",
+              modalPanelClassName
+            )}
+            role="status"
+            aria-live="polite"
+            aria-label="Delta Virtual sync in progress"
+          >
+            <p className="m-0 text-[var(--text-heading)]">Syncing data from Delta Virtual.</p>
           </Panel>
         </ModalBackdrop>
       ) : null}
