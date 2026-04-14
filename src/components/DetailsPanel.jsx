@@ -389,10 +389,7 @@ function SimBriefInlinePanel({
             Push to ACARS
           </Button>
           <Button
-            className={cn(
-              "min-w-0 w-full",
-              flight.isCompleted && "!bg-[var(--delta-blue)] !text-white dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F]"
-            )}
+            className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
             variant={flight.isCompleted ? "ghost" : "success"}
             size="sm"
             onClick={() => onCompleteTourFlight(flight.boardEntryId)}
