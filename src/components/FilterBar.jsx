@@ -1768,7 +1768,7 @@ export default function FilterBar({
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-none !bg-[var(--delta-blue)] !text-white hover:!bg-[var(--delta-blue)] dark:!bg-[var(--delta-red)] dark:!text-white dark:hover:!bg-[var(--delta-red)]"
+              className="rounded-none !bg-[var(--delta-blue)] !text-white hover:!bg-[var(--delta-blue)] dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F]"
               onClick={onReset}
             >
               Reset
@@ -1777,7 +1777,7 @@ export default function FilterBar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-[34px] w-[34px] rounded-none border-[color:transparent] !bg-[var(--delta-blue)] p-0 !text-white hover:!bg-[var(--delta-blue)] shadow-none dark:!bg-[var(--delta-red)] dark:!text-white dark:hover:!bg-[var(--delta-red)] bp-1024:h-8 bp-1024:w-8"
+            className="h-[34px] w-[34px] rounded-none border-[color:transparent] !bg-[var(--delta-blue)] p-0 !text-white hover:!bg-[var(--delta-blue)] shadow-none dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F] bp-1024:h-8 bp-1024:w-8"
             onClick={onTogglePlannerControls}
             aria-label={plannerControlsCollapsed ? "Show planner controls" : "Hide planner controls"}
             title={plannerControlsCollapsed ? "Show planner controls" : "Hide planner controls"}

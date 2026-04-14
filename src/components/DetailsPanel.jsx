@@ -382,16 +382,16 @@ function SimBriefInlinePanel({
 
       {showCompleteAction ? (
         <div className={gridClassNames.boardActionsQuad}>
-          <Button className="min-w-0 w-full dark:!bg-[var(--delta-blue)]" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
+          <Button className="min-w-0 w-full" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
             {isDispatching ? "Dispatching..." : "SimBrief Dispatch"}
           </Button>
-          <Button className="min-w-0 w-full dark:!bg-[var(--delta-blue)]" variant="board" size="sm" disabled>
+          <Button className="min-w-0 w-full" variant="board" size="sm" disabled>
             Push to ACARS
           </Button>
           <Button
             className={cn(
               "min-w-0 w-full",
-              flight.isCompleted && "!bg-[var(--delta-blue)] !text-white dark:!bg-[var(--delta-blue)] dark:!text-white"
+              flight.isCompleted && "!bg-[var(--delta-blue)] !text-white dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F]"
             )}
             variant={flight.isCompleted ? "ghost" : "success"}
             size="sm"
@@ -410,10 +410,10 @@ function SimBriefInlinePanel({
         </div>
       ) : (
         <div className="grid min-w-0 gap-2 min-[1401px]:grid-cols-3">
-          <Button className="min-w-0 w-full dark:!bg-[var(--delta-blue)]" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
+          <Button className="min-w-0 w-full" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
             {isDispatching ? "Dispatching..." : "SimBrief Dispatch"}
           </Button>
-          <Button className="min-w-0 w-full dark:!bg-[var(--delta-blue)]" variant="board" size="sm" disabled>
+          <Button className="min-w-0 w-full" variant="board" size="sm" disabled>
             Push to ACARS
           </Button>
           <Button

@@ -43,15 +43,13 @@ export const getPlannerTabStateClassName = (active) =>
     ? "border-b-[color:var(--delta-red)] text-[var(--text-heading)] opacity-100"
     : "text-[color:color-mix(in srgb,var(--text-heading) 72%, transparent)] opacity-90 hover:text-[var(--text-heading)] hover:opacity-100";
 
-export const toggleButtonClassName = (active, variant = "default") =>
+export const toggleButtonClassName = (active) =>
   cn(
     fieldShellClassName,
     "flex-1 justify-center text-center",
     buttonTextClassName,
     active
-      ? variant === "addon"
-        ? "!bg-[var(--delta-blue)] !text-white dark:!bg-[var(--delta-red)]"
-        : "!bg-[var(--delta-blue)] !text-white dark:!bg-[var(--delta-red)]"
+      ? "!bg-[var(--delta-blue)] !text-white dark:!bg-[#1F466E] dark:hover:!bg-[#27547F]"
       : "hover:bg-[var(--surface-soft)]"
   );
 

@@ -124,11 +124,11 @@
   --surface-option: rgba(13, 29, 48, 0.99);
   --surface-option-selected: rgba(0, 58, 112, 0.22);
   --input-bg: rgba(8, 20, 36, 0.99);
-  --button-ghost-bg: rgba(8, 20, 36, 0.78);
+  --button-ghost-bg: #1F466E;
   --button-ghost-border: rgba(186, 209, 234, 0.08);
   --button-ghost-text: #f0f5fb;
   --button-ghost-hover-border: rgba(214, 228, 244, 0.12);
-  --button-ghost-hover-bg: rgba(16, 34, 55, 1);
+  --button-ghost-hover-bg: #27547F;
   --chip-bg: rgba(0, 58, 112, 0.28);
   --chip-border: rgba(120, 166, 214, 0.28);
   --chip-text: #d4e6fb;

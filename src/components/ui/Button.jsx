@@ -3,15 +3,15 @@ import { buttonTextClassName } from "./typography";
 
 const VARIANT_CLASSES = {
   primary:
-    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 disabled:opacity-100 dark:bg-[var(--delta-red)]",
+    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 dark:bg-[#1F466E] dark:hover:bg-[#27547F] dark:hover:opacity-100 disabled:opacity-100",
   ghost:
     "border-transparent bg-[var(--button-ghost-bg)] text-[var(--button-ghost-text)] hover:bg-[var(--button-ghost-hover-bg)]",
   danger:
     "border-transparent bg-[var(--delta-red)] text-white hover:opacity-94 disabled:opacity-100",
   success:
-    "border-transparent bg-[#126835] text-white hover:opacity-94 disabled:opacity-100",
+    "border-transparent bg-[#126835] text-white hover:opacity-94 dark:bg-[#1F466E] dark:hover:bg-[#27547F] dark:hover:opacity-100 disabled:opacity-100",
   board:
-    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 disabled:opacity-100 dark:bg-[var(--delta-red)]"
+    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 dark:bg-[#1F466E] dark:hover:bg-[#27547F] dark:hover:opacity-100 disabled:opacity-100"
 };
 
 const SIZE_CLASSES = {
@@ -38,7 +38,7 @@ export default function Button({
         VARIANT_CLASSES[variant],
         active &&
           variant === "ghost" &&
-          "bg-[var(--surface-option-selected)] text-[var(--text-heading)]",
+          "bg-[var(--surface-option-selected)] text-[var(--text-heading)] dark:bg-[#1F466E] dark:text-white dark:hover:bg-[#27547F]",
         className
       )}
       type={Component === "button" ? type || "button" : undefined}

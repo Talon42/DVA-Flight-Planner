@@ -4394,7 +4394,7 @@ export default function App() {
               {isDvaCredentialsSaving ? "Saving..." : "Save"}
             </Button>
             <Button
-              variant="ghost"
+              variant="danger"
               onClick={handleClearDeltaVirtualCredentials}
               disabled={isDvaCredentialsSaving || isImporting || isSyncing}
             >
