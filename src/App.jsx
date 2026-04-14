@@ -27,6 +27,8 @@ import {
   fieldLabelClassName,
   fieldTitleClassName,
   gridClassNames,
+  getPlannerTabStateClassName,
+  plannerTabClassName,
   toggleButtonClassName
 } from "./components/ui/forms";
 import { DEFAULT_DUTY_FILTERS, DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
@@ -102,6 +104,13 @@ const ACCOMPLISHMENTS = normalizeAccomplishments(accomplishmentsData);
 const MAX_FLIGHT_BOARDS = 4;
 const DEFAULT_FLIGHT_BOARD_NAME = "Board 1";
 const BOOT_SPLASH_HIDE_DELAY_MS = 200;
+const SETTINGS_TABS = [
+  { id: "general", label: "General" },
+  { id: "delta-virtual", label: "Delta Virtual" },
+  { id: "simbrief", label: "SimBrief" },
+  { id: "advanced", label: "Advanced" },
+  { id: "about", label: "About" }
+];
 
 function formatTourLabelFromPath(path) {
   const fileName = String(path || "").split("/").pop() || "";
@@ -1487,6 +1496,7 @@ export default function App() {
   const [isSimBriefSaving, setIsSimBriefSaving] = useState(false);
   const [isDeletingUserData, setIsDeletingUserData] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("general");
   const [isReplaceScheduleConfirmOpen, setIsReplaceScheduleConfirmOpen] = useState(false);
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
   const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
@@ -4277,6 +4287,243 @@ export default function App() {
     }
   }
 
+  let settingsTabContent;
+  switch (settingsTab) {
+    case "delta-virtual":
+      settingsTabContent = (
+        <Panel className={insetPanelClassName}>
+          <SectionHeader eyebrow="Delta Virtual" title="Login Credentials" />
+
+          <div className={cn("grid gap-3", supportCopyTextClassName)}>
+            <p className="m-0">
+              Save the first and last name fields in app settings. When remember mode is Full, the password is stored in Windows Credential Manager after a successful login.
+            </p>
+            <p className="m-0">
+              Status:{" "}
+              <strong className="text-[var(--text-heading)]">
+                {dvaRememberMode === "full"
+                  ? dvaHasPassword
+                    ? "Password stored"
+                    : "Password not stored"
+                  : dvaRememberMode === "nameOnly"
+                    ? "Names saved"
+                    : "Not saved"}
+              </strong>
+            </p>
+          </div>
+
+          <div className={gridClassNames.twoColumn}>
+            <label className={fieldLabelClassName}>
+              <span className={fieldTitleClassName}>First Name</span>
+              <input
+                type="text"
+                className={fieldInputClassName}
+                value={dvaFirstNameDraft}
+                onChange={(event) => setDvaFirstNameDraft(event.target.value)}
+                placeholder="Enter first name"
+              />
+            </label>
+
+            <label className={fieldLabelClassName}>
+              <span className={fieldTitleClassName}>Last Name</span>
+              <input
+                type="text"
+                className={fieldInputClassName}
+                value={dvaLastNameDraft}
+                onChange={(event) => setDvaLastNameDraft(event.target.value)}
+                placeholder="Enter last name"
+              />
+            </label>
+          </div>
+
+          <div className={fieldLabelClassName}>
+            <span className={fieldTitleClassName}>Remember Mode</span>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: "none", label: "None" },
+                { value: "nameOnly", label: "Name Only" },
+                { value: "full", label: "Full" }
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={toggleButtonClassName(dvaRememberMode === option.value)}
+                  onClick={() => setDvaRememberMode(option.value)}
+                  disabled={isDvaCredentialsSaving}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {dvaRememberMode === "full" ? (
+            <label className={fieldLabelClassName}>
+              <span className={fieldTitleClassName}>Password</span>
+              <input
+                type="password"
+                className={fieldInputClassName}
+                value={dvaPasswordDraft}
+                onChange={(event) => setDvaPasswordDraft(event.target.value)}
+                placeholder={
+                  dvaHasPassword ? "Enter a new password to replace the stored one" : "Enter password to store"
+                }
+                autoComplete="new-password"
+              />
+            </label>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => handleSaveDeltaVirtualCredentials()}
+              disabled={isDvaCredentialsSaving || isImporting || isSyncing}
+            >
+              {isDvaCredentialsSaving ? "Saving..." : "Save"}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleClearDeltaVirtualCredentials}
+              disabled={isDvaCredentialsSaving || isImporting || isSyncing}
+            >
+              Clear Saved Credentials
+            </Button>
+          </div>
+        </Panel>
+      );
+      break;
+    case "simbrief":
+      settingsTabContent = (
+        <SimBriefSettingsPanel
+          username={simBriefUsernameDraft}
+          pilotId={simBriefPilotIdDraft}
+          dispatchUnits={simBriefDispatchUnits}
+          customAirframes={simBriefCustomAirframesDraft}
+          customAirframeDraftId={simBriefCustomAirframeIdDraft}
+          customAirframeDraftName={simBriefCustomAirframeNameDraft}
+          customAirframeDraftMatchType={simBriefCustomAirframeMatchTypeDraft}
+          simBriefAircraftTypes={simBriefAircraftTypes}
+          isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
+          simBriefAircraftTypesError={simBriefAircraftTypesError}
+          isSaving={isSimBriefSaving}
+          onUsernameChange={setSimBriefUsernameDraft}
+          onPilotIdChange={setSimBriefPilotIdDraft}
+          onDispatchUnitsChange={handleSimBriefDispatchUnitsChange}
+          onCustomAirframeDraftIdChange={setSimBriefCustomAirframeIdDraft}
+          onCustomAirframeDraftNameChange={setSimBriefCustomAirframeNameDraft}
+          onCustomAirframeDraftMatchTypeChange={setSimBriefCustomAirframeMatchTypeDraft}
+          onAddCustomAirframe={handleAddCustomAirframeDraft}
+          onRemoveCustomAirframe={handleRemoveCustomAirframeDraft}
+          onSaveCredentials={handleSaveSimBriefCredentials}
+        />
+      );
+      break;
+    case "advanced":
+      settingsTabContent = (
+        <>
+          <Panel className={insetPanelClassName}>
+            <SectionHeader eyebrow="App Tools" title="Maintenance" />
+
+            <div className={mutedTextStackClassName}>
+              <p className="m-0">
+                Open the app log, inspect the current build, or check for updates from GitHub.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {isDesktopAddonScanAvailable ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => handleCheckForUpdates({ manual: true })}
+                  disabled={isCheckingForUpdates}
+                >
+                  {isCheckingForUpdates ? "Checking..." : "Check for Updates"}
+                </Button>
+              ) : null}
+              <Button onClick={handleOpenLogFile}>
+                Open Log File
+              </Button>
+              <Button onClick={handleToggleDevTools}>
+                {isDevToolsEnabled ? "Dev Tools On" : "Dev Tools Off"}
+              </Button>
+            </div>
+          </Panel>
+
+          <Panel className={insetPanelClassName}>
+            <SectionHeader eyebrow="Privacy" title="Delete User Data" />
+
+            <div className={mutedTextStackClassName}>
+              <p className="m-0">
+                Removes saved schedules, UI state, SimBrief settings, addon folder roots,
+                logs, and stored Delta Virtual login settings from this device.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="danger"
+                onClick={handleDeleteUserData}
+                disabled={isDeletingUserData || isImporting || isSyncing || isSimBriefSaving}
+              >
+                {isDeletingUserData ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </Panel>
+        </>
+      );
+      break;
+    case "about":
+      settingsTabContent = (
+        <Panel className={cn(insetPanelClassName, "gap-3")}>
+          <SectionHeader eyebrow="About" title="Developer Information" />
+
+          <div className={cn("grid gap-2 text-[var(--text-muted)]", supportCopyTextClassName)}>
+            <p className="m-0">
+              Created by <strong>Jacob Benjamin (DVA11384)</strong> on GitHub as <strong>Talon42</strong>.
+            </p>
+            <p className="m-0">
+              App Version: <strong className="text-[var(--text-heading)]">{APP_BUILD_GIT_TAG}</strong>
+            </p>
+            <p className="m-0">Copyright &copy; 2026 Talon42</p>
+            <p className="m-0">
+              For flight simulation purposes only. Not a commercial application. This app is not affiliated with Delta Air Lines or any other airline.
+            </p>
+            <p className="m-0">
+              Repository:{" "}
+              <a
+                className="text-[var(--delta-blue)] no-underline hover:underline"
+                href="https://github.com/Talon42/DVA-Flight-Planner.git"
+                target="_blank"
+                rel="noreferrer"
+              >
+                github.com/Talon42/DVA-Flight-Planner
+              </a>
+            </p>
+            <p className="m-0">
+              Email:{" "}
+              <a className="text-[var(--delta-blue)] no-underline hover:underline" href="mailto:jaben428@gmail.com">
+                jaben428@gmail.com
+              </a>
+            </p>
+          </div>
+        </Panel>
+      );
+      break;
+    case "general":
+    default:
+      settingsTabContent = (
+        <AddonAirportPanel
+          addonScan={addonScan}
+          addonScanSummary={formatAddonScanSummary(addonScan)}
+          isAddonScanBusy={isAddonScanBusy}
+          isDesktopAddonScanAvailable={isDesktopAddonScanAvailable}
+          onAddAddonRoot={handleAddAddonRoot}
+          onRemoveAddonRoot={handleRemoveAddonRoot}
+          onScanAddonAirports={handleScanAddonAirports}
+        />
+      );
+      break;
+  }
+
   return (
     <div className="flex h-screen min-h-screen flex-col gap-6 overflow-hidden p-6 bp-1024:gap-3 bp-1024:p-3.5">
       <header className="flex min-w-0 flex-wrap items-end justify-between gap-4 bp-1024:items-start bp-1024:gap-3">
@@ -4552,212 +4799,42 @@ export default function App() {
               actions={<Button variant="ghost" onClick={handleCloseSettings}>Close</Button>}
             />
 
-            <AddonAirportPanel
-              addonScan={addonScan}
-              addonScanSummary={formatAddonScanSummary(addonScan)}
-              isAddonScanBusy={isAddonScanBusy}
-              isDesktopAddonScanAvailable={isDesktopAddonScanAvailable}
-              onAddAddonRoot={handleAddAddonRoot}
-              onRemoveAddonRoot={handleRemoveAddonRoot}
-              onScanAddonAirports={handleScanAddonAirports}
-            />
-
-            <Panel className={insetPanelClassName}>
-              <SectionHeader eyebrow="Delta Virtual" title="Login Credentials" />
-
-              <div className={cn("grid gap-3", supportCopyTextClassName)}>
-                <p className="m-0">
-                  Save the first and last name fields in app settings. When remember mode is Full, the password is stored in Windows Credential Manager after a successful login.
-                </p>
-                <p className="m-0">
-                  Status:{" "}
-                  <strong className="text-[var(--text-heading)]">
-                    {dvaRememberMode === "full"
-                      ? dvaHasPassword
-                        ? "Password stored"
-                        : "Password not stored"
-                      : dvaRememberMode === "nameOnly"
-                        ? "Names saved"
-                        : "Not saved"}
-                  </strong>
-                </p>
-              </div>
-
-              <div className={gridClassNames.twoColumn}>
-                <label className={fieldLabelClassName}>
-                  <span className={fieldTitleClassName}>First Name</span>
-                  <input
-                    type="text"
-                    className={fieldInputClassName}
-                    value={dvaFirstNameDraft}
-                    onChange={(event) => setDvaFirstNameDraft(event.target.value)}
-                    placeholder="Enter first name"
-                  />
-                </label>
-
-                <label className={fieldLabelClassName}>
-                  <span className={fieldTitleClassName}>Last Name</span>
-                  <input
-                    type="text"
-                    className={fieldInputClassName}
-                    value={dvaLastNameDraft}
-                    onChange={(event) => setDvaLastNameDraft(event.target.value)}
-                    placeholder="Enter last name"
-                  />
-                </label>
-              </div>
-
-              <div className={fieldLabelClassName}>
-                <span className={fieldTitleClassName}>Remember Mode</span>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: "none", label: "None" },
-                    { value: "nameOnly", label: "Name Only" },
-                    { value: "full", label: "Full" }
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={toggleButtonClassName(dvaRememberMode === option.value)}
-                      onClick={() => setDvaRememberMode(option.value)}
-                      disabled={isDvaCredentialsSaving}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {dvaRememberMode === "full" ? (
-                <label className={fieldLabelClassName}>
-                  <span className={fieldTitleClassName}>Password</span>
-                  <input
-                    type="password"
-                    className={fieldInputClassName}
-                    value={dvaPasswordDraft}
-                    onChange={(event) => setDvaPasswordDraft(event.target.value)}
-                    placeholder={
-                      dvaHasPassword ? "Enter a new password to replace the stored one" : "Enter password to store"
-                    }
-                    autoComplete="new-password"
-                  />
-                </label>
-              ) : null}
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={() => handleSaveDeltaVirtualCredentials()}
-                  disabled={isDvaCredentialsSaving || isImporting || isSyncing}
+            <div
+              className="planner-tabs mt-2 flex w-full min-w-0 flex-nowrap items-end gap-4 overflow-x-auto border-b border-[color:var(--line)] pb-1"
+              role="tablist"
+              aria-orientation="horizontal"
+              aria-label="Settings sections"
+            >
+              {SETTINGS_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  id={`settings-tab-${tab.id}`}
+                  aria-controls={`settings-panel-${tab.id}`}
+                  aria-selected={settingsTab === tab.id}
+                  tabIndex={settingsTab === tab.id ? 0 : -1}
+                  className={cn(
+                    plannerTabClassName,
+                    "shrink-0 whitespace-nowrap",
+                    getPlannerTabStateClassName(settingsTab === tab.id)
+                  )}
+                  onClick={() => setSettingsTab(tab.id)}
                 >
-                  {isDvaCredentialsSaving ? "Saving..." : "Save"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={handleClearDeltaVirtualCredentials}
-                  disabled={isDvaCredentialsSaving || isImporting || isSyncing}
-                >
-                  Clear Saved Credentials
-                </Button>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="min-h-[30rem] pt-1">
+              <div
+                id={`settings-panel-${settingsTab}`}
+                role="tabpanel"
+                aria-labelledby={`settings-tab-${settingsTab}`}
+              >
+                {settingsTabContent}
               </div>
-            </Panel>
-
-            <SimBriefSettingsPanel
-              username={simBriefUsernameDraft}
-              pilotId={simBriefPilotIdDraft}
-              dispatchUnits={simBriefDispatchUnits}
-              customAirframes={simBriefCustomAirframesDraft}
-              customAirframeDraftId={simBriefCustomAirframeIdDraft}
-              customAirframeDraftName={simBriefCustomAirframeNameDraft}
-              customAirframeDraftMatchType={simBriefCustomAirframeMatchTypeDraft}
-              simBriefAircraftTypes={simBriefAircraftTypes}
-              isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
-              simBriefAircraftTypesError={simBriefAircraftTypesError}
-              isSaving={isSimBriefSaving}
-              onUsernameChange={setSimBriefUsernameDraft}
-              onPilotIdChange={setSimBriefPilotIdDraft}
-              onDispatchUnitsChange={handleSimBriefDispatchUnitsChange}
-              onCustomAirframeDraftIdChange={setSimBriefCustomAirframeIdDraft}
-              onCustomAirframeDraftNameChange={setSimBriefCustomAirframeNameDraft}
-              onCustomAirframeDraftMatchTypeChange={setSimBriefCustomAirframeMatchTypeDraft}
-              onAddCustomAirframe={handleAddCustomAirframeDraft}
-              onRemoveCustomAirframe={handleRemoveCustomAirframeDraft}
-              onSaveCredentials={handleSaveSimBriefCredentials}
-            />
-
-            <Panel className={insetPanelClassName}>
-              <SectionHeader eyebrow="Privacy" title="Delete User Data" />
-
-              <div className={mutedTextStackClassName}>
-                <p className="m-0">
-                  Removes saved schedules, UI state, SimBrief settings, addon folder roots,
-                  logs, and stored Delta Virtual login settings from this device.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="danger"
-                  onClick={handleDeleteUserData}
-                  disabled={isDeletingUserData || isImporting || isSyncing || isSimBriefSaving}
-                >
-                  {isDeletingUserData ? "Deleting..." : "Delete"}
-                </Button>
-              </div>
-            </Panel>
-
-            <Panel className={insetPanelClassName}>
-              <SectionHeader eyebrow="About" title="Developer Information" />
-
-              <div className={cn("grid gap-3 text-[var(--text-muted)]", supportCopyTextClassName)}>
-                <p className="m-0">
-                  Created by <strong>Jacob Benjamin (DVA11384)</strong> on GitHub as <strong>Talon42</strong>.
-                </p>
-                <p className="m-0">
-                  App Version: <strong>{APP_BUILD_GIT_TAG}</strong>
-                </p>
-                <p className="m-0">Copyright &copy; 2026 Talon42</p>
-                <p className="m-0">
-                  For flight simulation purposes only. Not a commercial application. In no
-                  way is this application affiliated with Delta Air Lines, its affiliates,
-                  or any other airline. All logos, images, and trademarks remain the
-                  property of their respective owners.
-                </p>
-                <p className="m-0">
-                  Repository:{" "}
-                  <a
-                    className="text-[var(--delta-blue)] no-underline hover:underline"
-                    href="https://github.com/Talon42/DVA-Flight-Planner.git"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    github.com/Talon42/DVA-Flight-Planner
-                  </a>
-                </p>
-                <p className="m-0">
-                  Email:{" "}
-                  <a className="text-[var(--delta-blue)] no-underline hover:underline" href="mailto:jaben428@gmail.com">
-                    jaben428@gmail.com
-                  </a>
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {isDesktopAddonScanAvailable ? (
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleCheckForUpdates({ manual: true })}
-                      disabled={isCheckingForUpdates}
-                    >
-                      {isCheckingForUpdates ? "Checking..." : "Check for Updates"}
-                    </Button>
-                  ) : null}
-                  <Button onClick={handleOpenLogFile}>
-                    Open Log File
-                  </Button>
-                  <Button onClick={handleToggleDevTools}>
-                    {isDevToolsEnabled ? "Dev Tools On" : "Dev Tools Off"}
-                  </Button>
-                </div>
-              </div>
-            </Panel>
+            </div>
           </Panel>
         </ModalBackdrop>
       ) : null}
