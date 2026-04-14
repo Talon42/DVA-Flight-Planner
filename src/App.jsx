@@ -1502,6 +1502,7 @@ export default function App() {
   const [isManualUploadOpen, setIsManualUploadOpen] = useState(false);
   const [isReplaceScheduleConfirmOpen, setIsReplaceScheduleConfirmOpen] = useState(false);
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
+  const [isDvaSyncWarningOpen, setIsDvaSyncWarningOpen] = useState(false);
   const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
   const [isNoUpdatePromptOpen, setIsNoUpdatePromptOpen] = useState(false);
   const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
@@ -1755,6 +1756,23 @@ export default function App() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isUpdatePromptOpen, isNoUpdatePromptOpen]);
+
+  useEffect(() => {
+    if (!isDvaSyncWarningOpen) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsDvaSyncWarningOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isDvaSyncWarningOpen]);
 
   useEffect(() => {
     if (!isManualUploadOpen && !isReplaceScheduleConfirmOpen && !isDeleteUserDataConfirmOpen) {
@@ -2833,6 +2851,21 @@ export default function App() {
 
   async function handleDeltaVirtualSync() {
     await logAppEvent("deltava-sync-requested");
+
+    const hasSavedDeltaVirtualCredentials =
+      Boolean(String(dvaFirstName || "").trim()) &&
+      Boolean(String(dvaLastName || "").trim()) &&
+      Boolean(dvaHasPassword);
+
+    if (!hasSavedDeltaVirtualCredentials) {
+      setIsDvaSyncWarningOpen(true);
+      setStatusMessage(
+        "Delta Virtual login settings are not saved. Save your First Name, Last Name, and Password before syncing."
+      );
+      await logAppEvent("deltava-sync-blocked-missing-credentials");
+      return;
+    }
+
     const confirmed = await confirmScheduleReplacement();
     if (!confirmed) {
       await logAppEvent("deltava-sync-cancelled-overwrite");
@@ -4257,6 +4290,16 @@ export default function App() {
     }).catch(() => {});
   }
 
+  function handleOpenDeltaVirtualSettings() {
+    setIsDvaSyncWarningOpen(false);
+    setIsDevWindowMenuOpen(false);
+    setSettingsTab("delta-virtual");
+    setIsSettingsOpen(true);
+    logAppEvent("settings-opened", {
+      section: "delta-virtual"
+    }).catch(() => {});
+  }
+
   function handleCloseUpdatePrompt() {
     setIsUpdatePromptOpen(false);
     setIsNoUpdatePromptOpen(false);
@@ -5079,6 +5122,36 @@ export default function App() {
             </Panel>
           </div>
         </div>
+      ) : null}
+
+      {isDvaSyncWarningOpen ? (
+        <ModalBackdrop onClick={() => setIsDvaSyncWarningOpen(false)}>
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Delta Virtual Sync Warning"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader eyebrow="Delta Virtual Sync" title="Credentials are not saved." />
+
+            <p className={mutedTextClassName}>
+              Delta Virtual login settings are not saved in the app, so sync cannot be performed.
+              Save your First Name, Last Name, and Password in Delta Virtual settings first.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setIsDvaSyncWarningOpen(false)}>
+                Close
+              </Button>
+              <Button variant="danger" onClick={handleOpenDeltaVirtualSettings}>
+                Fix Now
+              </Button>
+            </div>
+          </Panel>
+        </ModalBackdrop>
       ) : null}
     </div>
   );
