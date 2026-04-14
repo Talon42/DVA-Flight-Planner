@@ -19,6 +19,7 @@ import {
   fieldLabelClassName,
   fieldSelectClassName,
   fieldTitleClassName,
+  darkFieldOpenClassName,
   getPlannerTabStateClassName,
   gridClassNames,
   plannerTabClassName,
@@ -478,7 +479,10 @@ export function SearchableMultiSelect({
 
       {searchable ? (
         <input
-          className={cn(fieldInputClassName, "multi-select__search")}
+          className={cn(
+            fieldInputClassName,
+            "multi-select__search dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]"
+          )}
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -575,7 +579,8 @@ export function SearchableMultiSelect({
         <button
           className={cn(
             fieldBodyClassName,
-            "multi-select__trigger flex w-full items-center justify-between gap-3 px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-left"
+            "multi-select__trigger flex w-full items-center justify-between gap-3 px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-left dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]",
+            isOpen && darkFieldOpenClassName
           )}
           type="button"
           onClick={() => setIsOpen((current) => !current)}

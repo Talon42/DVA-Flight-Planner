@@ -29,6 +29,7 @@ export const fieldInputClassName = cn(
 
 export const fieldSelectClassName = cn(
   fieldInputClassName,
+  "dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]",
   "appearance-none pr-10"
 );
 
@@ -52,6 +53,8 @@ export const toggleButtonClassName = (active) =>
       ? "!bg-[var(--delta-blue)] !text-white dark:!bg-[#1F466E] dark:hover:!bg-[#27547F]"
       : "hover:bg-[var(--surface-soft)]"
   );
+
+export const darkFieldOpenClassName = "dark:!bg-[#10243B]";
 
 export const gridClassNames = {
   routing:

@@ -123,7 +123,7 @@
     rgba(10, 24, 43, 0.9);
   --surface-option: rgba(13, 29, 48, 0.99);
   --surface-option-selected: rgba(0, 58, 112, 0.22);
-  --input-bg: rgba(8, 20, 36, 0.99);
+  --input-bg: #081424;
   --button-ghost-bg: #1F466E;
   --button-ghost-border: rgba(186, 209, 234, 0.08);
   --button-ghost-text: #f0f5fb;

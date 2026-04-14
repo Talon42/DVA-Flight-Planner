@@ -10,6 +10,7 @@ import {
   fieldBodyClassName,
   fieldInputClassName,
   fieldTitleClassName,
+  darkFieldOpenClassName,
   gridClassNames
 } from "./ui/forms";
 import { modalPanelClassName, mutedTextClassName } from "./ui/patterns";
@@ -205,7 +206,8 @@ function FlightCardAircraftSelector({
         <button
           className={cn(
             fieldBodyClassName,
-            "flex w-full items-center justify-between gap-3 px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-left"
+            "flex w-full items-center justify-between gap-3 px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-left dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]",
+            isOpen && darkFieldOpenClassName
           )}
           type="button"
           onClick={() => setIsOpen((current) => !current)}
@@ -263,7 +265,10 @@ function FlightCardAircraftSelector({
                 </div>
 
                 <input
-                  className={fieldInputClassName}
+                  className={cn(
+                    fieldInputClassName,
+                    "dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]"
+                  )}
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
