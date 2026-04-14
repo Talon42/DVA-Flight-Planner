@@ -11,6 +11,7 @@ import Panel from "./components/ui/Panel";
 import {
   insetPanelClassName,
   modalPanelClassName,
+  modalBackdropClassName,
   mutedTextClassName,
   mutedTextStackClassName
 } from "./components/ui/patterns";
@@ -470,7 +471,7 @@ function FooterLinkStat({ label, value, onClick, className = "" }) {
 function ModalBackdrop({ children, onClick }) {
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center overflow-auto bg-[rgba(8,20,36,0.42)] p-4 bp-1024:p-3"
+      className={cn("fixed inset-0 z-50 grid place-items-center overflow-auto p-4 bp-1024:p-3", modalBackdropClassName)}
       role="presentation"
       onClick={onClick}
     >
@@ -4797,7 +4798,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className="flex h-[min(calc(100vh-24px),46rem)] w-[min(860px,calc(100vw-24px))] max-w-full flex-col gap-4 overflow-hidden bp-1024:h-[min(calc(100vh-24px),44rem)] bp-1024:gap-3"
+            className="flex h-[min(calc(100vh-24px),46rem)] w-[min(860px,calc(100vw-24px))] max-w-full flex-col gap-4 overflow-hidden bg-[var(--modal-shell-bg)] bp-1024:h-[min(calc(100vh-24px),44rem)] bp-1024:gap-3"
             role="dialog"
             aria-modal="true"
             aria-label="Settings"
@@ -4855,7 +4856,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className="grid w-[min(560px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+            className="grid w-[min(560px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
             aria-label="Manual Upload"
@@ -4913,7 +4914,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
             aria-label="Delta Virtual Sync"
@@ -4943,7 +4944,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
             aria-label="Delete User Info"
@@ -5033,14 +5034,14 @@ export default function App() {
 
       {isSyncing ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-[rgba(8,20,36,0.42)] px-4 bp-1024:px-3"
+          className={cn("fixed inset-0 z-50 flex items-center justify-center overflow-auto px-4 bp-1024:px-3", modalBackdropClassName)}
           role="presentation"
         >
           <div className="w-full max-w-[32rem]">
             <Panel
               as="section"
               padding="lg"
-              className="grid w-full gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+              className="grid w-full gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
               role="status"
               aria-live="polite"
               aria-label="Delta Virtual sync in progress"

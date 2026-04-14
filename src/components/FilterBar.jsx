@@ -26,6 +26,7 @@ import {
   plannerTabsListClassName,
   toggleButtonClassName
 } from "./ui/forms";
+import { modalBackdropClassName } from "./ui/patterns";
 import {
   bodySmTextClassName,
   bodyMdTextClassName,
@@ -116,7 +117,8 @@ function CenteredFilterOverlay({ children, onClick, compact = false }) {
   return (
     <div
       className={cn(
-        "absolute inset-0 z-[60] flex min-h-full w-full justify-center bg-[rgba(8,20,36,0.42)] p-4 bp-1024:p-3",
+        "absolute inset-0 z-[60] flex min-h-full w-full justify-center p-4 bp-1024:p-3",
+        modalBackdropClassName,
         compact ? "items-start overflow-y-auto" : "items-center overflow-hidden"
       )}
       role="presentation"

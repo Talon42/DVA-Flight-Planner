@@ -13,7 +13,11 @@ import {
   darkFieldOpenClassName,
   gridClassNames
 } from "./ui/forms";
-import { modalPanelClassName, mutedTextClassName } from "./ui/patterns";
+import {
+  modalBackdropClassName,
+  modalPanelClassName,
+  mutedTextClassName
+} from "./ui/patterns";
 import { Eyebrow } from "./ui/SectionHeader";
 import { cn } from "./ui/cn";
 import {
@@ -144,7 +148,10 @@ function SimBriefSummary({ flight }) {
 function ModalBackdrop({ children, onClick }) {
   return (
     <div
-      className="absolute inset-0 z-[60] flex min-h-full w-full items-center justify-center overflow-hidden bg-[rgba(8,20,36,0.42)] p-4 bp-1024:p-3"
+      className={cn(
+        "absolute inset-0 z-[60] flex min-h-full w-full items-center justify-center overflow-hidden p-4 bp-1024:p-3",
+        modalBackdropClassName
+      )}
       role="presentation"
       onClick={onClick}
     >

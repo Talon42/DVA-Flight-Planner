@@ -68,6 +68,8 @@
   --surface-option: rgba(224, 232, 241, 0.99);
   --surface-option-selected: rgba(0, 58, 112, 0.12);
   --input-bg: rgba(230, 237, 244, 0.99);
+  --modal-shell-bg: var(--surface-raised);
+  --modal-backdrop-bg: rgba(8, 20, 36, 0.42);
   --button-ghost-bg: rgba(223, 233, 244, 0.94);
   --button-ghost-border: rgba(16, 33, 54, 0.04);
   --button-ghost-text: var(--text-primary);
@@ -124,6 +126,8 @@
   --surface-option: rgba(13, 29, 48, 0.99);
   --surface-option-selected: rgba(0, 58, 112, 0.22);
   --input-bg: #081424;
+  --modal-shell-bg: #14304D;
+  --modal-backdrop-bg: rgba(3, 8, 15, 0.74);
   --button-ghost-bg: #1F466E;
   --button-ghost-border: rgba(186, 209, 234, 0.08);
   --button-ghost-text: #f0f5fb;
