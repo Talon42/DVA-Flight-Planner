@@ -251,7 +251,7 @@ function FlightCardAircraftSelector({
                   <div className="min-w-0">
                     <div className={fieldTitleClassName}>SimBrief aircraft</div>
                     <p className={cn("m-0 text-[var(--text-muted)]", supportCopyTextClassName)}>
-                      Search and apply one aircraft type to this flight card.
+                      Select an aircraft that Simbrief will use to build your flight plan. You can also choose any custom airframe you might have added.
                     </p>
                   </div>
                   <Button
