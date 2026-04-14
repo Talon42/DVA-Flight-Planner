@@ -10,7 +10,6 @@ import IconButton from "./components/ui/IconButton";
 import Panel from "./components/ui/Panel";
 import {
   insetPanelClassName,
-  modalPanelClassName,
   mutedTextClassName,
   mutedTextStackClassName
 } from "./components/ui/patterns";
@@ -4784,10 +4783,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className={cn(
-              "app-scrollbar max-h-[calc(100vh-24px)] overflow-x-hidden overflow-y-auto overscroll-contain",
-              modalPanelClassName
-            )}
+            className="flex h-[min(calc(100vh-24px),46rem)] w-[min(860px,calc(100vw-24px))] max-w-full flex-col gap-4 overflow-hidden bp-1024:h-[min(calc(100vh-24px),44rem)] bp-1024:gap-3"
             role="dialog"
             aria-modal="true"
             aria-label="Settings"
@@ -4826,11 +4822,12 @@ export default function App() {
               ))}
             </div>
 
-            <div className="min-h-[30rem] pt-1">
+            <div className="flex min-h-0 flex-1 pt-1">
               <div
                 id={`settings-panel-${settingsTab}`}
                 role="tabpanel"
                 aria-labelledby={`settings-tab-${settingsTab}`}
+                className="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
               >
                 {settingsTabContent}
               </div>
