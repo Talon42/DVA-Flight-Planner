@@ -10,6 +10,7 @@ import IconButton from "./components/ui/IconButton";
 import Panel from "./components/ui/Panel";
 import {
   insetPanelClassName,
+  modalPanelClassName,
   mutedTextClassName,
   mutedTextStackClassName
 } from "./components/ui/patterns";
@@ -1501,6 +1502,7 @@ export default function App() {
   const [isReplaceScheduleConfirmOpen, setIsReplaceScheduleConfirmOpen] = useState(false);
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
   const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
+  const [isNoUpdatePromptOpen, setIsNoUpdatePromptOpen] = useState(false);
   const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState(null);
   const [statusMessage, setStatusMessage] = useState("Ready");
@@ -1736,13 +1738,14 @@ export default function App() {
   }, [isSettingsOpen]);
 
   useEffect(() => {
-    if (!isUpdatePromptOpen) {
+    if (!isUpdatePromptOpen && !isNoUpdatePromptOpen) {
       return undefined;
     }
 
     function handleKeyDown(event) {
       if (event.key === "Escape") {
         setIsUpdatePromptOpen(false);
+        setIsNoUpdatePromptOpen(false);
       }
     }
 
@@ -1750,7 +1753,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isUpdatePromptOpen]);
+  }, [isUpdatePromptOpen, isNoUpdatePromptOpen]);
 
   useEffect(() => {
     if (!isManualUploadOpen && !isReplaceScheduleConfirmOpen && !isDeleteUserDataConfirmOpen) {
@@ -4255,6 +4258,7 @@ export default function App() {
 
   function handleCloseUpdatePrompt() {
     setIsUpdatePromptOpen(false);
+    setIsNoUpdatePromptOpen(false);
   }
 
   async function handleOpenReleasePage() {
@@ -4294,6 +4298,7 @@ export default function App() {
 
       if (result.updateAvailable) {
         setIsUpdatePromptOpen(true);
+        setIsNoUpdatePromptOpen(false);
         if (manual) {
           setStatusMessage(`Update available: ${result.latestVersion}`);
         }
@@ -4305,7 +4310,9 @@ export default function App() {
       }
 
       if (manual) {
-        setStatusMessage(`You're up to date (${result.currentVersion}).`);
+        setIsUpdatePromptOpen(false);
+        setIsNoUpdatePromptOpen(true);
+        setStatusMessage("No update required, currently on the latest version.");
       }
 
       await logAppEvent("update-check-complete", {
@@ -4966,7 +4973,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+            className={cn(modalPanelClassName, "!w-[min(520px,100%)]")}
             role="dialog"
             aria-modal="true"
             aria-label="Update Available"
@@ -4992,6 +4999,32 @@ export default function App() {
               </Button>
               <Button onClick={handleOpenReleasePage}>
                 Open Release Page
+              </Button>
+            </div>
+          </Panel>
+        </ModalBackdrop>
+      ) : null}
+
+      {isNoUpdatePromptOpen ? (
+        <ModalBackdrop onClick={handleCloseUpdatePrompt}>
+          <Panel
+            as="section"
+            padding="lg"
+            className={cn(modalPanelClassName, "!w-[min(520px,100%)]")}
+            role="dialog"
+            aria-modal="true"
+            aria-label="No Update Required"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader eyebrow="Update Check" title="No update required." />
+
+            <p className={mutedTextClassName}>
+              No update required, currently on the latest version.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={handleCloseUpdatePrompt}>
+                Close
               </Button>
             </div>
           </Panel>
