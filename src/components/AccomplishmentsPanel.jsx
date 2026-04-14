@@ -13,7 +13,7 @@ function CompletionIndicator({ completed }) {
       className={cn(
         "grid size-5 shrink-0 place-items-center rounded-full border leading-none",
         completed
-          ? "border-[color:#22b77a] bg-transparent text-[#22b77a]"
+          ? "border-[color:#22b77a] bg-[#22b77a] text-white dark:bg-transparent dark:text-[#22b77a]"
           : "border-[color:var(--line)] bg-[var(--surface-panel)] text-[var(--text-muted)]"
       )}
       aria-hidden="true"
