@@ -1500,7 +1500,6 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("general");
   const [isManualUploadOpen, setIsManualUploadOpen] = useState(false);
-  const [isReplaceScheduleConfirmOpen, setIsReplaceScheduleConfirmOpen] = useState(false);
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
   const [isDvaSyncWarningOpen, setIsDvaSyncWarningOpen] = useState(false);
   const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
@@ -1515,7 +1514,6 @@ export default function App() {
   });
   const [manualUploadScheduleFile, setManualUploadScheduleFile] = useState(null);
   const [manualUploadLogbookFile, setManualUploadLogbookFile] = useState(null);
-  const replaceScheduleConfirmResolverRef = useRef(null);
   const deleteUserDataConfirmResolverRef = useRef(null);
   const hasPerformedStartupUpdateCheckRef = useRef(false);
   const devWindowMenuRef = useRef(null);
@@ -1775,7 +1773,7 @@ export default function App() {
   }, [isDvaSyncWarningOpen]);
 
   useEffect(() => {
-    if (!isManualUploadOpen && !isReplaceScheduleConfirmOpen && !isDeleteUserDataConfirmOpen) {
+    if (!isManualUploadOpen && !isDeleteUserDataConfirmOpen) {
       return undefined;
     }
 
@@ -1783,11 +1781,7 @@ export default function App() {
       if (event.key === "Escape") {
         if (isManualUploadOpen) {
           closeManualUploadDialog();
-        }
-        if (isReplaceScheduleConfirmOpen) {
-          resolveReplaceScheduleConfirmation(false);
-        }
-        if (isDeleteUserDataConfirmOpen) {
+        } else if (isDeleteUserDataConfirmOpen) {
           resolveDeleteUserDataConfirmation(false);
         }
       }
@@ -1797,7 +1791,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isManualUploadOpen, isReplaceScheduleConfirmOpen, isDeleteUserDataConfirmOpen]);
+  }, [isManualUploadOpen, isDeleteUserDataConfirmOpen]);
 
   useEffect(() => {
     if (!isDesktopAddonScanAvailable || hasPerformedStartupUpdateCheckRef.current) {
@@ -2810,31 +2804,12 @@ export default function App() {
     }
   }
 
-  function resolveReplaceScheduleConfirmation(confirmed) {
-    setIsReplaceScheduleConfirmOpen(false);
-    if (replaceScheduleConfirmResolverRef.current) {
-      replaceScheduleConfirmResolverRef.current(confirmed);
-      replaceScheduleConfirmResolverRef.current = null;
-    }
-  }
-
   function resolveDeleteUserDataConfirmation(confirmed) {
     setIsDeleteUserDataConfirmOpen(false);
     if (deleteUserDataConfirmResolverRef.current) {
       deleteUserDataConfirmResolverRef.current(confirmed);
       deleteUserDataConfirmResolverRef.current = null;
     }
-  }
-
-  async function confirmScheduleReplacement() {
-    if (!schedule?.flights?.length) {
-      return true;
-    }
-
-    return new Promise((resolve) => {
-      replaceScheduleConfirmResolverRef.current = resolve;
-      setIsReplaceScheduleConfirmOpen(true);
-    });
   }
 
   async function confirmDeleteUserDataInApp() {
@@ -2863,12 +2838,6 @@ export default function App() {
         "Delta Virtual login settings are not saved. Save your First Name, Last Name, and Password before syncing."
       );
       await logAppEvent("deltava-sync-blocked-missing-credentials");
-      return;
-    }
-
-    const confirmed = await confirmScheduleReplacement();
-    if (!confirmed) {
-      await logAppEvent("deltava-sync-cancelled-overwrite");
       return;
     }
 
@@ -4946,36 +4915,6 @@ export default function App() {
                 disabled={isImporting || (!manualUploadScheduleFile && !manualUploadLogbookFile)}
               >
                 Import
-              </Button>
-            </div>
-          </Panel>
-        </ModalBackdrop>
-      ) : null}
-
-      {isReplaceScheduleConfirmOpen ? (
-        <ModalBackdrop onClick={() => resolveReplaceScheduleConfirmation(false)}>
-          <Panel
-            as="section"
-            padding="lg"
-            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Delta Virtual Sync"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <SectionHeader eyebrow="Delta Virtual Sync" title="Replace the current schedule?" />
-
-            <p className={mutedTextClassName}>
-              Syncing from Delta Virtual will replace the current saved schedule and flight board.
-              Continue?
-            </p>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => resolveReplaceScheduleConfirmation(false)}>
-                Cancel
-              </Button>
-              <Button variant="danger" onClick={() => resolveReplaceScheduleConfirmation(true)}>
-                Replace
               </Button>
             </div>
           </Panel>
