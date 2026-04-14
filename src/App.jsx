@@ -1463,7 +1463,6 @@ export default function App() {
   const [dvaFirstNameDraft, setDvaFirstNameDraft] = useState("");
   const [dvaLastName, setDvaLastName] = useState("");
   const [dvaLastNameDraft, setDvaLastNameDraft] = useState("");
-  const [dvaRememberMode, setDvaRememberMode] = useState("none");
   const [dvaHasPassword, setDvaHasPassword] = useState(false);
   const [dvaPasswordDraft, setDvaPasswordDraft] = useState("");
   const [isDvaCredentialsSaving, setIsDvaCredentialsSaving] = useState(false);
@@ -1971,22 +1970,15 @@ export default function App() {
         if (dvaCredentialsResult.status === "fulfilled") {
           const firstName = String(dvaCredentialsResult.value?.firstName || "").trim();
           const lastName = String(dvaCredentialsResult.value?.lastName || "").trim();
-          const rememberMode =
-            dvaCredentialsResult.value?.rememberMode === "full" ||
-            dvaCredentialsResult.value?.rememberMode === "nameOnly"
-              ? dvaCredentialsResult.value.rememberMode
-              : "none";
           const hasPassword = Boolean(dvaCredentialsResult.value?.hasPassword);
           setDvaFirstName(firstName);
           setDvaFirstNameDraft(firstName);
           setDvaLastName(lastName);
           setDvaLastNameDraft(lastName);
-          setDvaRememberMode(rememberMode);
           setDvaHasPassword(hasPassword);
           await logAppEvent("deltava-auth-loaded", {
             firstNameSaved: Boolean(firstName),
             lastNameSaved: Boolean(lastName),
-            rememberMode,
             hasPassword
           });
         } else {
@@ -3661,23 +3653,11 @@ export default function App() {
     const nextLastName = String(
       overrides.lastName !== undefined ? overrides.lastName : dvaLastNameDraft || ""
     ).trim();
-    const nextRememberMode = ["none", "nameOnly", "full"].includes(
-      overrides.rememberMode !== undefined ? overrides.rememberMode : dvaRememberMode
-    )
-      ? overrides.rememberMode !== undefined
-        ? overrides.rememberMode
-        : dvaRememberMode
-      : "none";
     const nextPasswordDraft =
       overrides.password !== undefined ? String(overrides.password || "") : dvaPasswordDraft;
-    const shouldSavePassword = nextRememberMode === "full" && nextPasswordDraft.length > 0;
+    const shouldSavePassword = nextPasswordDraft.length > 0;
 
-    if (
-      nextFirstName === dvaFirstName &&
-      nextLastName === dvaLastName &&
-      nextRememberMode === dvaRememberMode &&
-      !shouldSavePassword
-    ) {
+    if (nextFirstName === dvaFirstName && nextLastName === dvaLastName && !shouldSavePassword) {
       return;
     }
 
@@ -3687,25 +3667,18 @@ export default function App() {
       const savedCredentials = await saveDeltaVirtualCredentials({
         firstName: nextFirstName,
         lastName: nextLastName,
-        rememberMode: nextRememberMode,
         password: shouldSavePassword ? nextPasswordDraft : undefined
       });
       setDvaFirstName(savedCredentials.firstName);
       setDvaFirstNameDraft(savedCredentials.firstName);
       setDvaLastName(savedCredentials.lastName);
       setDvaLastNameDraft(savedCredentials.lastName);
-      setDvaRememberMode(savedCredentials.rememberMode);
       setDvaHasPassword(savedCredentials.hasPassword);
       setDvaPasswordDraft("");
-      setStatusMessage(
-        savedCredentials.firstName || savedCredentials.lastName || savedCredentials.rememberMode !== "none"
-          ? "Delta Virtual login settings saved."
-          : "Delta Virtual login settings cleared."
-      );
+      setStatusMessage("Delta Virtual login settings saved.");
       await logAppEvent("deltava-auth-saved", {
         firstNameSaved: Boolean(savedCredentials.firstName),
         lastNameSaved: Boolean(savedCredentials.lastName),
-        rememberMode: savedCredentials.rememberMode,
         hasPassword: savedCredentials.hasPassword
       });
     } catch (error) {
@@ -3730,7 +3703,6 @@ export default function App() {
       setDvaFirstNameDraft(clearedCredentials.firstName);
       setDvaLastName(clearedCredentials.lastName);
       setDvaLastNameDraft(clearedCredentials.lastName);
-      setDvaRememberMode(clearedCredentials.rememberMode);
       setDvaHasPassword(clearedCredentials.hasPassword);
       setDvaPasswordDraft("");
       setStatusMessage("Delta Virtual login settings cleared.");
@@ -4117,7 +4089,6 @@ export default function App() {
       setDvaFirstNameDraft("");
       setDvaLastName("");
       setDvaLastNameDraft("");
-      setDvaRememberMode("none");
       setDvaHasPassword(false);
       setSimBriefUsername("");
       setSimBriefUsernameDraft("");
@@ -4295,18 +4266,12 @@ export default function App() {
 
           <div className={cn("grid gap-3", supportCopyTextClassName)}>
             <p className="m-0">
-              Save the first and last name fields in app settings. When remember mode is Full, the password is stored in Windows Credential Manager after a successful login.
+              Please enter your Delta Virtual Airlines information including First name, Last name, and Password.
             </p>
             <p className="m-0">
               Status:{" "}
               <strong className="text-[var(--text-heading)]">
-                {dvaRememberMode === "full"
-                  ? dvaHasPassword
-                    ? "Password stored"
-                    : "Password not stored"
-                  : dvaRememberMode === "nameOnly"
-                    ? "Names saved"
-                    : "Not saved"}
+                {dvaHasPassword ? "Password stored" : "Password not stored"}
               </strong>
             </p>
           </div>
@@ -4335,42 +4300,19 @@ export default function App() {
             </label>
           </div>
 
-          <div className={fieldLabelClassName}>
-            <span className={fieldTitleClassName}>Remember Mode</span>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { value: "none", label: "None" },
-                { value: "nameOnly", label: "Name Only" },
-                { value: "full", label: "Full" }
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={toggleButtonClassName(dvaRememberMode === option.value)}
-                  onClick={() => setDvaRememberMode(option.value)}
-                  disabled={isDvaCredentialsSaving}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {dvaRememberMode === "full" ? (
-            <label className={fieldLabelClassName}>
-              <span className={fieldTitleClassName}>Password</span>
-              <input
-                type="password"
-                className={fieldInputClassName}
-                value={dvaPasswordDraft}
-                onChange={(event) => setDvaPasswordDraft(event.target.value)}
-                placeholder={
-                  dvaHasPassword ? "Enter a new password to replace the stored one" : "Enter password to store"
-                }
-                autoComplete="new-password"
-              />
-            </label>
-          ) : null}
+          <label className={fieldLabelClassName}>
+            <span className={fieldTitleClassName}>Password</span>
+            <input
+              type="password"
+              className={fieldInputClassName}
+              value={dvaPasswordDraft}
+              onChange={(event) => setDvaPasswordDraft(event.target.value)}
+              placeholder={
+                dvaHasPassword ? "Enter a new password to replace the stored one" : "Enter password to store"
+              }
+              autoComplete="new-password"
+            />
+          </label>
 
           <div className="flex flex-wrap gap-2">
             <Button

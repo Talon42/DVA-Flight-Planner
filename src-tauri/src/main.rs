@@ -2001,8 +2001,7 @@ async fn start_deltava_sync(
         }
     };
     append_sync_log(&format!(
-        "auth:loaded remember_mode={:?} has_password={} first_name_saved={} last_name_saved={}",
-        auth_context.settings.remember_mode,
+        "auth:loaded has_password={} first_name_saved={} last_name_saved={}",
         auth_context.settings.has_password,
         !auth_context.settings.first_name.is_empty(),
         !auth_context.settings.last_name.is_empty()

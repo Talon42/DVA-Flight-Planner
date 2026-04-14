@@ -1,12 +1,11 @@
 use serde_json::json;
 
-use crate::deltava_auth::{DeltaVirtualAuthContext, DeltaVirtualRememberMode};
+use crate::deltava_auth::DeltaVirtualAuthContext;
 
 pub fn build_deltava_login_automation_script(auth: &DeltaVirtualAuthContext) -> String {
     let auth_json = serde_json::to_string(&json!({
         "firstName": auth.settings.first_name,
         "lastName": auth.settings.last_name,
-        "rememberMode": auth.settings.remember_mode,
         "password": auth.password.as_deref().unwrap_or_default()
     }))
     .unwrap_or_else(|_| "{}".to_string());
@@ -19,8 +18,6 @@ pub fn build_deltava_login_automation_script(auth: &DeltaVirtualAuthContext) -> 
         .unwrap_or_else(|_| "\"https://www.deltava.org/login.do\"".to_string());
     let target_url = serde_json::to_string("https://www.deltava.org/pfpxsched.ws")
         .unwrap_or_else(|_| "\"https://www.deltava.org/pfpxsched.ws\"".to_string());
-    let full_mode = serde_json::to_string(&DeltaVirtualRememberMode::Full)
-        .unwrap_or_else(|_| "\"full\"".to_string());
 
     const TEMPLATE: &str = r#"
 (() => {
@@ -29,7 +26,6 @@ pub fn build_deltava_login_automation_script(auth: &DeltaVirtualAuthContext) -> 
   const debugPrefix = __DEBUG_PREFIX__;
   const loginUrl = __LOGIN_URL__;
   const targetUrl = __TARGET_URL__;
-  const fullRememberMode = __FULL_REMEMBER_MODE__;
   const submittedKey = 'flightPlannerDeltaLoginSubmitted';
   const pendingPasswordKey = 'flightPlannerDeltaLoginPendingPassword';
 
@@ -96,18 +92,12 @@ pub fn build_deltava_login_automation_script(auth: &DeltaVirtualAuthContext) -> 
 
   const markSubmitted = () => {
     setSessionValue(submittedKey, '1');
-    if (auth.rememberMode === fullRememberMode) {
-      const passwordField = getPasswordField();
-      const pendingPassword = passwordField?.value || auth.password || '';
-      setSessionValue(pendingPasswordKey, pendingPassword);
-    }
+    const passwordField = getPasswordField();
+    const pendingPassword = passwordField?.value || auth.password || '';
+    setSessionValue(pendingPasswordKey, pendingPassword);
   };
 
   const updatePendingPassword = () => {
-    if (auth.rememberMode !== fullRememberMode) {
-      return;
-    }
-
     const passwordField = getPasswordField();
     const passwordValue = passwordField?.value || '';
     setSessionValue(pendingPasswordKey, passwordValue);
@@ -176,7 +166,7 @@ pub fn build_deltava_login_automation_script(auth: &DeltaVirtualAuthContext) -> 
     });
 
     const pendingPassword = getSessionValue(pendingPasswordKey);
-    if (auth.rememberMode === fullRememberMode && pendingPassword) {
+    if (pendingPassword) {
       postAuthMessage({
         kind: 'storePassword',
         password: pendingPassword
@@ -256,20 +246,13 @@ pub fn build_deltava_login_automation_script(auth: &DeltaVirtualAuthContext) -> 
   const firstNameApplied = setFieldValue('input[name="firstName"]', auth.firstName);
   const lastNameApplied = setFieldValue('input[name="lastName"]', auth.lastName);
   const passwordField = getPasswordField();
-  const passwordApplied =
-    auth.rememberMode === fullRememberMode && auth.password
-      ? setFieldValue('input[name="pwd"]', auth.password)
-      : false;
-
-  if (auth.rememberMode === fullRememberMode) {
-    updatePendingPassword();
-  }
+  const passwordApplied = auth.password ? setFieldValue('input[name="pwd"]', auth.password) : false;
 
   if (firstNameApplied || lastNameApplied || passwordApplied) {
     emitDebug(`auth:filled:${firstNameApplied ? 'first' : ''}${lastNameApplied ? 'last' : ''}${passwordApplied ? ':password' : ''}`);
   }
 
-  if (auth.rememberMode === fullRememberMode && auth.password) {
+  if (auth.password) {
     window.setTimeout(() => {
       if (submitLogin()) {
         window.setTimeout(() => {
@@ -320,5 +303,4 @@ pub fn build_deltava_login_automation_script(auth: &DeltaVirtualAuthContext) -> 
         .replace("__DEBUG_PREFIX__", &debug_prefix)
         .replace("__LOGIN_URL__", &login_url)
         .replace("__TARGET_URL__", &target_url)
-        .replace("__FULL_REMEMBER_MODE__", &full_mode)
 }

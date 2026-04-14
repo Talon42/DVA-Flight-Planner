@@ -11,26 +11,11 @@ const DVA_AUTH_FILE: &str = "deltava-auth.json";
 const DVA_AUTH_SERVICE: &str = "flight-planner:deltava-login";
 const DVA_AUTH_USERNAME: &str = "password";
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum DeltaVirtualRememberMode {
-    None,
-    NameOnly,
-    Full,
-}
-
-impl Default for DeltaVirtualRememberMode {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeltaVirtualAuthSettings {
     pub first_name: String,
     pub last_name: String,
-    pub remember_mode: DeltaVirtualRememberMode,
     #[serde(default)]
     pub has_password: bool,
 }
@@ -48,12 +33,6 @@ fn normalize_text(value: &str) -> String {
 fn normalize_settings(mut settings: DeltaVirtualAuthSettings) -> DeltaVirtualAuthSettings {
     settings.first_name = normalize_text(&settings.first_name);
     settings.last_name = normalize_text(&settings.last_name);
-
-    if matches!(settings.remember_mode, DeltaVirtualRememberMode::None) {
-        settings.first_name.clear();
-        settings.last_name.clear();
-    }
-
     settings
 }
 
@@ -150,15 +129,15 @@ fn read_auth_settings_file(app: &AppHandle) -> Result<Option<DeltaVirtualAuthSet
     Ok(Some(normalize_settings(settings)))
 }
 
+fn refresh_password_state(settings: &mut DeltaVirtualAuthSettings) -> Result<Option<String>, String> {
+    let password = read_password_from_credential_manager()?;
+    settings.has_password = password.is_some();
+    Ok(password)
+}
+
 pub fn read_auth_context_internal(app: &AppHandle) -> Result<DeltaVirtualAuthContext, String> {
     let mut settings = read_auth_settings_file(app)?.unwrap_or_default();
-    let password = if matches!(settings.remember_mode, DeltaVirtualRememberMode::Full) {
-        read_password_from_credential_manager().ok().flatten()
-    } else {
-        let _ = clear_password_from_credential_manager();
-        None
-    };
-    settings.has_password = password.is_some();
+    let password = refresh_password_state(&mut settings)?;
 
     Ok(DeltaVirtualAuthContext {
         settings,
@@ -168,12 +147,7 @@ pub fn read_auth_context_internal(app: &AppHandle) -> Result<DeltaVirtualAuthCon
 
 pub fn read_auth_settings_internal(app: &AppHandle) -> Result<DeltaVirtualAuthSettings, String> {
     let mut settings = read_auth_settings_file(app)?.unwrap_or_default();
-    settings.has_password = if matches!(settings.remember_mode, DeltaVirtualRememberMode::Full) {
-        read_password_from_credential_manager().ok().flatten().is_some()
-    } else {
-        let _ = clear_password_from_credential_manager();
-        false
-    };
+    let _ = refresh_password_state(&mut settings)?;
     Ok(settings)
 }
 
@@ -181,36 +155,21 @@ pub fn save_auth_settings_internal(
     app: &AppHandle,
     first_name: String,
     last_name: String,
-    remember_mode: DeltaVirtualRememberMode,
     password: Option<String>,
 ) -> Result<DeltaVirtualAuthSettings, String> {
     let mut settings = DeltaVirtualAuthSettings {
         first_name: normalize_text(&first_name),
         last_name: normalize_text(&last_name),
-        remember_mode,
         has_password: false,
     };
 
     let password = password.filter(|value| !value.is_empty());
-
-    if matches!(settings.remember_mode, DeltaVirtualRememberMode::Full) {
-        if let Some(password) = password.as_deref() {
-            save_password_to_credential_manager(password)?;
-        }
-    } else {
-        let _ = clear_password_from_credential_manager();
+    if let Some(password) = password.as_deref() {
+        save_password_to_credential_manager(password)?;
     }
 
-    if matches!(settings.remember_mode, DeltaVirtualRememberMode::None) {
-        settings.first_name.clear();
-        settings.last_name.clear();
-    }
-
+    settings.has_password = read_password_from_credential_manager()?.is_some();
     write_auth_settings_file(app, &settings)?;
-    settings.has_password = read_password_from_credential_manager()
-        .ok()
-        .flatten()
-        .is_some();
     Ok(settings)
 }
 
@@ -235,10 +194,9 @@ pub fn save_deltava_auth_settings(
     app: AppHandle,
     first_name: String,
     last_name: String,
-    remember_mode: DeltaVirtualRememberMode,
     password: Option<String>,
 ) -> Result<DeltaVirtualAuthSettings, String> {
-    save_auth_settings_internal(&app, first_name, last_name, remember_mode, password)
+    save_auth_settings_internal(&app, first_name, last_name, password)
 }
 
 #[tauri::command]
