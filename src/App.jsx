@@ -10,7 +10,6 @@ import IconButton from "./components/ui/IconButton";
 import Panel from "./components/ui/Panel";
 import {
   insetPanelClassName,
-  modalPanelClassName,
   mutedTextClassName,
   mutedTextStackClassName
 } from "./components/ui/patterns";
@@ -22,6 +21,15 @@ import {
   sectionTitleTextClassName,
   supportCopyTextClassName
 } from "./components/ui/typography";
+import {
+  fieldInputClassName,
+  fieldLabelClassName,
+  fieldTitleClassName,
+  gridClassNames,
+  getPlannerTabStateClassName,
+  plannerTabClassName,
+  toggleButtonClassName
+} from "./components/ui/forms";
 import { DEFAULT_DUTY_FILTERS, DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
 import {
   getAircraftProfileOptions,
@@ -56,14 +64,22 @@ import {
 import {
   appendImportLog,
   deleteStoredUserData,
+  pickJsonLogbookFile,
   pickXmlScheduleFile,
   readSimBriefSettings,
   readSavedSchedule,
   readSavedUiState,
+  storeDeltaVirtualLogbookJson,
   writeSimBriefSettings,
   writeSavedSchedule,
   writeSavedUiState
 } from "./lib/storage";
+import {
+  clearDeltaVirtualCredentials,
+  getDefaultDeltaVirtualCredentials,
+  readDeltaVirtualCredentials,
+  saveDeltaVirtualCredentials
+} from "./lib/deltaVirtualCredentials";
 import { checkForAppUpdate, GITHUB_RELEASES_PAGE_URL } from "./lib/updateCheck";
 import accomplishmentsData from "./data/accomplishments/accomplishments.json";
 import {
@@ -89,6 +105,13 @@ const ACCOMPLISHMENTS = normalizeAccomplishments(accomplishmentsData);
 const MAX_FLIGHT_BOARDS = 4;
 const DEFAULT_FLIGHT_BOARD_NAME = "Board 1";
 const BOOT_SPLASH_HIDE_DELAY_MS = 200;
+const SETTINGS_TABS = [
+  { id: "general", label: "General" },
+  { id: "delta-virtual", label: "Delta Virtual" },
+  { id: "simbrief", label: "SimBrief" },
+  { id: "advanced", label: "Advanced" },
+  { id: "about", label: "About" }
+];
 
 function formatTourLabelFromPath(path) {
   const fileName = String(path || "").split("/").pop() || "";
@@ -1438,6 +1461,13 @@ export default function App() {
     initialBasicFilterSections.basicAddonFiltersOpen
   );
   const [addonScan, setAddonScan] = useState(createEmptyAddonAirportScan);
+  const [dvaFirstName, setDvaFirstName] = useState("");
+  const [dvaFirstNameDraft, setDvaFirstNameDraft] = useState("");
+  const [dvaLastName, setDvaLastName] = useState("");
+  const [dvaLastNameDraft, setDvaLastNameDraft] = useState("");
+  const [dvaHasPassword, setDvaHasPassword] = useState(false);
+  const [dvaPasswordDraft, setDvaPasswordDraft] = useState("");
+  const [isDvaCredentialsSaving, setIsDvaCredentialsSaving] = useState(false);
   const [simBriefUsername, setSimBriefUsername] = useState("");
   const [simBriefUsernameDraft, setSimBriefUsernameDraft] = useState("");
   const [simBriefPilotId, setSimBriefPilotId] = useState("");
@@ -1466,6 +1496,8 @@ export default function App() {
   const [isSimBriefSaving, setIsSimBriefSaving] = useState(false);
   const [isDeletingUserData, setIsDeletingUserData] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("general");
+  const [isManualUploadOpen, setIsManualUploadOpen] = useState(false);
   const [isReplaceScheduleConfirmOpen, setIsReplaceScheduleConfirmOpen] = useState(false);
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
   const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
@@ -1477,6 +1509,8 @@ export default function App() {
     visitedAirports: [],
     arrivalAirports: []
   });
+  const [manualUploadScheduleFile, setManualUploadScheduleFile] = useState(null);
+  const [manualUploadLogbookFile, setManualUploadLogbookFile] = useState(null);
   const replaceScheduleConfirmResolverRef = useRef(null);
   const deleteUserDataConfirmResolverRef = useRef(null);
   const hasPerformedStartupUpdateCheckRef = useRef(false);
@@ -1504,14 +1538,7 @@ export default function App() {
     layoutBucket === "compact"
       ? "DVA Flight Planner"
       : "Delta Virtual Airlines Flight Planner";
-  const importButtonLabel =
-    layoutBucket === "compact"
-      ? schedule
-        ? "Replace Schedule"
-        : "Import Schedule"
-      : schedule
-        ? "Replace Schedule"
-        : "Import Schedule XML";
+  const importButtonLabel = "Manual Upload";
   const syncButtonLabel =
     layoutBucket === "compact"
       ? "Sync DVA"
@@ -1726,12 +1753,15 @@ export default function App() {
   }, [isUpdatePromptOpen]);
 
   useEffect(() => {
-    if (!isReplaceScheduleConfirmOpen && !isDeleteUserDataConfirmOpen) {
+    if (!isManualUploadOpen && !isReplaceScheduleConfirmOpen && !isDeleteUserDataConfirmOpen) {
       return undefined;
     }
 
     function handleKeyDown(event) {
       if (event.key === "Escape") {
+        if (isManualUploadOpen) {
+          closeManualUploadDialog();
+        }
         if (isReplaceScheduleConfirmOpen) {
           resolveReplaceScheduleConfirmation(false);
         }
@@ -1745,7 +1775,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isReplaceScheduleConfirmOpen, isDeleteUserDataConfirmOpen]);
+  }, [isManualUploadOpen, isReplaceScheduleConfirmOpen, isDeleteUserDataConfirmOpen]);
 
   useEffect(() => {
     if (!isDesktopAddonScanAvailable || hasPerformedStartupUpdateCheckRef.current) {
@@ -1910,12 +1940,14 @@ export default function App() {
       const [
         scheduleResult,
         addonCacheResult,
+        dvaCredentialsResult,
         simBriefResult,
         uiStateResult,
         logbookProgressResult
       ] = await Promise.allSettled([
         readSavedSchedule(),
         readAddonAirportCache(),
+        readDeltaVirtualCredentials(),
         readSimBriefSettings(),
         readSavedUiState(),
         readDeltaVirtualLogbookProgress()
@@ -1934,6 +1966,24 @@ export default function App() {
             addonCacheResult.reason?.message || "Unable to load addon airport cache."
           );
           await logAppError("addon-cache-hydrate-failed", addonCacheResult.reason);
+        }
+
+        if (dvaCredentialsResult.status === "fulfilled") {
+          const firstName = String(dvaCredentialsResult.value?.firstName || "").trim();
+          const lastName = String(dvaCredentialsResult.value?.lastName || "").trim();
+          const hasPassword = Boolean(dvaCredentialsResult.value?.hasPassword);
+          setDvaFirstName(firstName);
+          setDvaFirstNameDraft(firstName);
+          setDvaLastName(lastName);
+          setDvaLastNameDraft(lastName);
+          setDvaHasPassword(hasPassword);
+          await logAppEvent("deltava-auth-loaded", {
+            firstNameSaved: Boolean(firstName),
+            lastNameSaved: Boolean(lastName),
+            hasPassword
+          });
+        } else {
+          await logAppError("deltava-auth-hydrate-failed", dvaCredentialsResult.reason);
         }
 
         if (simBriefResult.status === "fulfilled") {
@@ -2662,6 +2712,82 @@ export default function App() {
     }
   }
 
+  async function processImportedLogbook(pickedFile, sourceLabel) {
+    const startedAtMs = Date.now();
+    setIsImporting(true);
+    setStatusMessage(`Importing ${pickedFile.fileName}...`);
+    await logAppEvent("logbook-import-start", {
+      source: sourceLabel,
+      file: pickedFile.fileName
+    });
+
+    try {
+      await storeDeltaVirtualLogbookJson(pickedFile.fileName, pickedFile.jsonText);
+      setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
+      setStatusMessage(`Imported logbook data from ${pickedFile.fileName}.`);
+      await logAppEvent("logbook-import-success", {
+        source: sourceLabel,
+        file: pickedFile.fileName,
+        durationMs: Date.now() - startedAtMs
+      });
+    } catch (error) {
+      setStatusMessage(error.message || "Logbook import failed.");
+      await logAppError("logbook-import-failed", error, {
+        source: sourceLabel,
+        file: pickedFile.fileName,
+        durationMs: Date.now() - startedAtMs
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
+  function openManualUploadDialog() {
+    setManualUploadScheduleFile(null);
+    setManualUploadLogbookFile(null);
+    setIsManualUploadOpen(true);
+  }
+
+  function closeManualUploadDialog() {
+    setIsManualUploadOpen(false);
+    setManualUploadScheduleFile(null);
+    setManualUploadLogbookFile(null);
+  }
+
+  async function chooseManualUploadScheduleFile() {
+    const pickedFile = await pickXmlScheduleFile();
+    if (pickedFile) {
+      setManualUploadScheduleFile(pickedFile);
+    }
+  }
+
+  async function chooseManualUploadLogbookFile() {
+    const pickedFile = await pickJsonLogbookFile();
+    if (pickedFile) {
+      setManualUploadLogbookFile(pickedFile);
+    }
+  }
+
+  async function handleManualUpload() {
+    const scheduleFile = manualUploadScheduleFile;
+    const logbookFile = manualUploadLogbookFile;
+
+    if (!scheduleFile && !logbookFile) {
+      setStatusMessage("Choose a schedule XML or logbook JSON first.");
+      return;
+    }
+
+    closeManualUploadDialog();
+
+    if (scheduleFile) {
+      await processImportedSchedule(scheduleFile, "manual-upload");
+    }
+
+    if (logbookFile) {
+      await processImportedLogbook(logbookFile, "manual-upload");
+    }
+  }
+
   function resolveReplaceScheduleConfirmation(confirmed) {
     setIsReplaceScheduleConfirmOpen(false);
     if (replaceScheduleConfirmResolverRef.current) {
@@ -2697,20 +2823,8 @@ export default function App() {
   }
 
   async function handleImport() {
-    await logAppEvent("manual-import-requested");
-    const confirmed = await confirmScheduleReplacement();
-    if (!confirmed) {
-      await logAppEvent("manual-import-cancelled-overwrite");
-      return;
-    }
-
-    const pickedFile = await pickXmlScheduleFile();
-    if (!pickedFile) {
-      await logAppEvent("manual-import-cancelled-file-picker");
-      return;
-    }
-
-    await processImportedSchedule(pickedFile, "manual");
+    await logAppEvent("manual-upload-requested");
+    openManualUploadDialog();
   }
 
   async function handleDeltaVirtualSync() {
@@ -2722,12 +2836,12 @@ export default function App() {
     }
 
     setIsSyncing(true);
-    setStatusMessage("Opening Delta Virtual login...");
+    setStatusMessage("Syncing data from Delta Virtual.");
     let shouldCloseSyncWindow = false;
     let shouldRemoveDownloadedSchedule = false;
 
     try {
-      setStatusMessage("Waiting for Delta Virtual login and schedule download...");
+      setStatusMessage("Syncing data from Delta Virtual.");
       const syncedFile = await syncScheduleFromDeltaVirtual();
       shouldCloseSyncWindow = true;
       await logAppEvent("deltava-sync-download-complete", {
@@ -2739,6 +2853,12 @@ export default function App() {
       setStatusMessage("Processing Delta Virtual schedule...");
       await processImportedSchedule(syncedFile, "deltava-sync");
       setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
+      try {
+        const refreshedDeltaCredentials = await readDeltaVirtualCredentials();
+        setDvaHasPassword(Boolean(refreshedDeltaCredentials.hasPassword));
+      } catch {
+        // Best-effort refresh only.
+      }
       if (syncedFile.warnings?.length) {
         setStatusMessage(`Delta Virtual schedule synced with warning: ${syncedFile.warnings[0]}`);
       }
@@ -2747,8 +2867,19 @@ export default function App() {
       if (error?.kind === "cancelled") {
         setStatusMessage("Delta Virtual sync canceled.");
         await logAppEvent("deltava-sync-cancelled-window");
+      } else if (error?.kind === "auth_failed") {
+        setStatusMessage(error.message || "Delta Virtual login failed.");
+        await logAppEvent("deltava-sync-auth-failed", {
+          message: error.message || ""
+        });
       } else if (error?.kind === "partial_success") {
         setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
+        try {
+          const refreshedDeltaCredentials = await readDeltaVirtualCredentials();
+          setDvaHasPassword(Boolean(refreshedDeltaCredentials.hasPassword));
+        } catch {
+          // Best-effort refresh only.
+        }
         setStatusMessage(error.message || "Delta Virtual sync partially completed.");
         await logAppEvent("deltava-sync-partial", {
           logbookJson: error.syncResult?.logbookJson?.fileName || null,
@@ -3576,6 +3707,79 @@ export default function App() {
     }
   }
 
+  async function handleSaveDeltaVirtualCredentials(overrides = {}) {
+    if (isDvaCredentialsSaving) {
+      return;
+    }
+
+    const nextFirstName = String(
+      overrides.firstName !== undefined ? overrides.firstName : dvaFirstNameDraft || ""
+    ).trim();
+    const nextLastName = String(
+      overrides.lastName !== undefined ? overrides.lastName : dvaLastNameDraft || ""
+    ).trim();
+    const nextPasswordDraft =
+      overrides.password !== undefined ? String(overrides.password || "") : dvaPasswordDraft;
+    const shouldSavePassword = nextPasswordDraft.length > 0;
+
+    if (nextFirstName === dvaFirstName && nextLastName === dvaLastName && !shouldSavePassword) {
+      return;
+    }
+
+    setIsDvaCredentialsSaving(true);
+
+    try {
+      const savedCredentials = await saveDeltaVirtualCredentials({
+        firstName: nextFirstName,
+        lastName: nextLastName,
+        password: shouldSavePassword ? nextPasswordDraft : undefined
+      });
+      setDvaFirstName(savedCredentials.firstName);
+      setDvaFirstNameDraft(savedCredentials.firstName);
+      setDvaLastName(savedCredentials.lastName);
+      setDvaLastNameDraft(savedCredentials.lastName);
+      setDvaHasPassword(savedCredentials.hasPassword);
+      setDvaPasswordDraft("");
+      setStatusMessage("Delta Virtual login settings saved.");
+      await logAppEvent("deltava-auth-saved", {
+        firstNameSaved: Boolean(savedCredentials.firstName),
+        lastNameSaved: Boolean(savedCredentials.lastName),
+        hasPassword: savedCredentials.hasPassword
+      });
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to save Delta Virtual login settings.");
+      await logAppError("deltava-auth-save-failed", error);
+    } finally {
+      setIsDvaCredentialsSaving(false);
+    }
+  }
+
+  async function handleClearDeltaVirtualCredentials() {
+    if (isDvaCredentialsSaving) {
+      return;
+    }
+
+    setIsDvaCredentialsSaving(true);
+
+    try {
+      await clearDeltaVirtualCredentials();
+      const clearedCredentials = getDefaultDeltaVirtualCredentials();
+      setDvaFirstName(clearedCredentials.firstName);
+      setDvaFirstNameDraft(clearedCredentials.firstName);
+      setDvaLastName(clearedCredentials.lastName);
+      setDvaLastNameDraft(clearedCredentials.lastName);
+      setDvaHasPassword(clearedCredentials.hasPassword);
+      setDvaPasswordDraft("");
+      setStatusMessage("Delta Virtual login settings cleared.");
+      await logAppEvent("deltava-auth-cleared");
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to clear Delta Virtual login settings.");
+      await logAppError("deltava-auth-clear-failed", error);
+    } finally {
+      setIsDvaCredentialsSaving(false);
+    }
+  }
+
   async function handleAddCustomAirframeDraft() {
     const normalizedEntry = normalizeSimBriefCustomAirframe({
       internalId: simBriefCustomAirframeIdDraft,
@@ -3946,6 +4150,11 @@ export default function App() {
         getDefaultBasicFilterSectionState(viewportSize).basicAddonFiltersOpen
       );
       setAddonScan(createEmptyAddonAirportScan());
+      setDvaFirstName("");
+      setDvaFirstNameDraft("");
+      setDvaLastName("");
+      setDvaLastNameDraft("");
+      setDvaHasPassword(false);
       setSimBriefUsername("");
       setSimBriefUsernameDraft("");
       setSimBriefPilotId("");
@@ -4111,6 +4320,214 @@ export default function App() {
     } finally {
       setIsCheckingForUpdates(false);
     }
+  }
+
+  let settingsTabContent;
+  switch (settingsTab) {
+    case "delta-virtual":
+      settingsTabContent = (
+        <Panel className={insetPanelClassName}>
+          <SectionHeader eyebrow="Delta Virtual" title="Login Credentials" />
+
+          <div className={cn("grid gap-3", supportCopyTextClassName)}>
+            <p className="m-0">
+              Please enter your Delta Virtual Airlines information including First name, Last name, and Password.
+            </p>
+            <p className="m-0">
+              Status:{" "}
+              <strong className="text-[var(--text-heading)]">
+                {dvaHasPassword ? "Password stored" : "Password not stored"}
+              </strong>
+            </p>
+          </div>
+
+          <div className={gridClassNames.twoColumn}>
+            <label className={fieldLabelClassName}>
+              <span className={fieldTitleClassName}>First Name</span>
+              <input
+                type="text"
+                className={fieldInputClassName}
+                value={dvaFirstNameDraft}
+                onChange={(event) => setDvaFirstNameDraft(event.target.value)}
+                placeholder="Enter first name"
+              />
+            </label>
+
+            <label className={fieldLabelClassName}>
+              <span className={fieldTitleClassName}>Last Name</span>
+              <input
+                type="text"
+                className={fieldInputClassName}
+                value={dvaLastNameDraft}
+                onChange={(event) => setDvaLastNameDraft(event.target.value)}
+                placeholder="Enter last name"
+              />
+            </label>
+          </div>
+
+          <label className={fieldLabelClassName}>
+            <span className={fieldTitleClassName}>Password</span>
+            <input
+              type="password"
+              className={fieldInputClassName}
+              value={dvaPasswordDraft}
+              onChange={(event) => setDvaPasswordDraft(event.target.value)}
+              placeholder={
+                dvaHasPassword ? "Enter a new password to replace the stored one" : "Enter password to store"
+              }
+              autoComplete="new-password"
+            />
+          </label>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => handleSaveDeltaVirtualCredentials()}
+              disabled={isDvaCredentialsSaving || isImporting || isSyncing}
+            >
+              {isDvaCredentialsSaving ? "Saving..." : "Save"}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleClearDeltaVirtualCredentials}
+              disabled={isDvaCredentialsSaving || isImporting || isSyncing}
+            >
+              Clear Saved Credentials
+            </Button>
+          </div>
+        </Panel>
+      );
+      break;
+    case "simbrief":
+      settingsTabContent = (
+        <SimBriefSettingsPanel
+          username={simBriefUsernameDraft}
+          pilotId={simBriefPilotIdDraft}
+          dispatchUnits={simBriefDispatchUnits}
+          customAirframes={simBriefCustomAirframesDraft}
+          customAirframeDraftId={simBriefCustomAirframeIdDraft}
+          customAirframeDraftName={simBriefCustomAirframeNameDraft}
+          customAirframeDraftMatchType={simBriefCustomAirframeMatchTypeDraft}
+          simBriefAircraftTypes={simBriefAircraftTypes}
+          isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
+          simBriefAircraftTypesError={simBriefAircraftTypesError}
+          isSaving={isSimBriefSaving}
+          onUsernameChange={setSimBriefUsernameDraft}
+          onPilotIdChange={setSimBriefPilotIdDraft}
+          onDispatchUnitsChange={handleSimBriefDispatchUnitsChange}
+          onCustomAirframeDraftIdChange={setSimBriefCustomAirframeIdDraft}
+          onCustomAirframeDraftNameChange={setSimBriefCustomAirframeNameDraft}
+          onCustomAirframeDraftMatchTypeChange={setSimBriefCustomAirframeMatchTypeDraft}
+          onAddCustomAirframe={handleAddCustomAirframeDraft}
+          onRemoveCustomAirframe={handleRemoveCustomAirframeDraft}
+          onSaveCredentials={handleSaveSimBriefCredentials}
+        />
+      );
+      break;
+    case "advanced":
+      settingsTabContent = (
+        <>
+          <Panel className={insetPanelClassName}>
+            <SectionHeader eyebrow="App Tools" title="Maintenance" />
+
+            <div className={mutedTextStackClassName}>
+              <p className="m-0">
+                Open the app log, inspect the current build, or check for updates from GitHub.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {isDesktopAddonScanAvailable ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => handleCheckForUpdates({ manual: true })}
+                  disabled={isCheckingForUpdates}
+                >
+                  {isCheckingForUpdates ? "Checking..." : "Check for Updates"}
+                </Button>
+              ) : null}
+              <Button onClick={handleOpenLogFile}>
+                Open Log File
+              </Button>
+              <Button onClick={handleToggleDevTools}>
+                {isDevToolsEnabled ? "Dev Tools On" : "Dev Tools Off"}
+              </Button>
+            </div>
+          </Panel>
+
+          <Panel className={insetPanelClassName}>
+            <SectionHeader eyebrow="Privacy" title="Delete User Data" />
+
+            <div className={mutedTextStackClassName}>
+              <p className="m-0">
+                Removes saved schedules, UI state, SimBrief settings, addon folder roots,
+                logs, and stored Delta Virtual login settings from this device.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="danger"
+                onClick={handleDeleteUserData}
+                disabled={isDeletingUserData || isImporting || isSyncing || isSimBriefSaving}
+              >
+                {isDeletingUserData ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </Panel>
+        </>
+      );
+      break;
+    case "about":
+      settingsTabContent = (
+        <Panel className={cn(insetPanelClassName, "gap-3")}>
+          <SectionHeader eyebrow="About" title="Developer Information" />
+
+          <div className={cn("grid gap-2 text-[var(--text-muted)]", supportCopyTextClassName)}>
+            <p className="m-0">
+              Created by <strong>Jacob Benjamin (DVA11384)</strong> on GitHub as <strong>Talon42</strong>.
+            </p>
+            <p className="m-0">
+              App Version: <strong className="text-[var(--text-heading)]">{APP_BUILD_GIT_TAG}</strong>
+            </p>
+            <p className="m-0">Copyright &copy; 2026 Talon42</p>
+            <p className="m-0">
+              For flight simulation purposes only. Not a commercial application. This app is not affiliated with Delta Air Lines or any other airline.
+            </p>
+            <p className="m-0">
+              Repository:{" "}
+              <a
+                className="text-[var(--delta-blue)] no-underline hover:underline"
+                href="https://github.com/Talon42/DVA-Flight-Planner.git"
+                target="_blank"
+                rel="noreferrer"
+              >
+                github.com/Talon42/DVA-Flight-Planner
+              </a>
+            </p>
+            <p className="m-0">
+              Email:{" "}
+              <a className="text-[var(--delta-blue)] no-underline hover:underline" href="mailto:jaben428@gmail.com">
+                jaben428@gmail.com
+              </a>
+            </p>
+          </div>
+        </Panel>
+      );
+      break;
+    case "general":
+    default:
+      settingsTabContent = (
+        <AddonAirportPanel
+          addonScan={addonScan}
+          addonScanSummary={formatAddonScanSummary(addonScan)}
+          isAddonScanBusy={isAddonScanBusy}
+          isDesktopAddonScanAvailable={isDesktopAddonScanAvailable}
+          onAddAddonRoot={handleAddAddonRoot}
+          onRemoveAddonRoot={handleRemoveAddonRoot}
+          onScanAddonAirports={handleScanAddonAirports}
+        />
+      );
+      break;
   }
 
   return (
@@ -4373,10 +4790,7 @@ export default function App() {
           <Panel
             as="section"
             padding="lg"
-            className={cn(
-              "app-scrollbar max-h-[calc(100vh-24px)] overflow-x-hidden overflow-y-auto overscroll-contain",
-              modalPanelClassName
-            )}
+            className="flex h-[min(calc(100vh-24px),46rem)] w-[min(860px,calc(100vw-24px))] max-w-full flex-col gap-4 overflow-hidden bp-1024:h-[min(calc(100vh-24px),44rem)] bp-1024:gap-3"
             role="dialog"
             aria-modal="true"
             aria-label="Settings"
@@ -4388,113 +4802,101 @@ export default function App() {
               actions={<Button variant="ghost" onClick={handleCloseSettings}>Close</Button>}
             />
 
-            <AddonAirportPanel
-              addonScan={addonScan}
-              addonScanSummary={formatAddonScanSummary(addonScan)}
-              isAddonScanBusy={isAddonScanBusy}
-              isDesktopAddonScanAvailable={isDesktopAddonScanAvailable}
-              onAddAddonRoot={handleAddAddonRoot}
-              onRemoveAddonRoot={handleRemoveAddonRoot}
-              onScanAddonAirports={handleScanAddonAirports}
-            />
-
-            <SimBriefSettingsPanel
-              username={simBriefUsernameDraft}
-              pilotId={simBriefPilotIdDraft}
-              dispatchUnits={simBriefDispatchUnits}
-              customAirframes={simBriefCustomAirframesDraft}
-              customAirframeDraftId={simBriefCustomAirframeIdDraft}
-              customAirframeDraftName={simBriefCustomAirframeNameDraft}
-              customAirframeDraftMatchType={simBriefCustomAirframeMatchTypeDraft}
-              simBriefAircraftTypes={simBriefAircraftTypes}
-              isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
-              simBriefAircraftTypesError={simBriefAircraftTypesError}
-              isSaving={isSimBriefSaving}
-              onUsernameChange={setSimBriefUsernameDraft}
-              onPilotIdChange={setSimBriefPilotIdDraft}
-              onDispatchUnitsChange={handleSimBriefDispatchUnitsChange}
-              onCustomAirframeDraftIdChange={setSimBriefCustomAirframeIdDraft}
-              onCustomAirframeDraftNameChange={setSimBriefCustomAirframeNameDraft}
-              onCustomAirframeDraftMatchTypeChange={setSimBriefCustomAirframeMatchTypeDraft}
-              onAddCustomAirframe={handleAddCustomAirframeDraft}
-              onRemoveCustomAirframe={handleRemoveCustomAirframeDraft}
-              onSaveCredentials={handleSaveSimBriefCredentials}
-            />
-
-            <Panel className={insetPanelClassName}>
-              <SectionHeader eyebrow="Privacy" title="Delete User Data" />
-
-              <div className={mutedTextStackClassName}>
-                <p className="m-0">
-                  Removes saved schedules, UI state, SimBrief settings, addon folder roots,
-                  logs, and stored Delta Virtual webview login data from this device.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="danger"
-                  onClick={handleDeleteUserData}
-                  disabled={isDeletingUserData || isImporting || isSyncing || isSimBriefSaving}
+            <div
+              className="planner-tabs mt-2 flex w-full min-w-0 flex-nowrap items-end gap-4 overflow-x-auto border-b border-[color:var(--line)] pb-1"
+              role="tablist"
+              aria-orientation="horizontal"
+              aria-label="Settings sections"
+            >
+              {SETTINGS_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  id={`settings-tab-${tab.id}`}
+                  aria-controls={`settings-panel-${tab.id}`}
+                  aria-selected={settingsTab === tab.id}
+                  tabIndex={settingsTab === tab.id ? 0 : -1}
+                  className={cn(
+                    plannerTabClassName,
+                    "shrink-0 whitespace-nowrap",
+                    getPlannerTabStateClassName(settingsTab === tab.id)
+                  )}
+                  onClick={() => setSettingsTab(tab.id)}
                 >
-                  {isDeletingUserData ? "Deleting..." : "Delete"}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex min-h-0 flex-1 pt-1">
+              <div
+                id={`settings-panel-${settingsTab}`}
+                role="tabpanel"
+                aria-labelledby={`settings-tab-${settingsTab}`}
+                className="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
+              >
+                {settingsTabContent}
+              </div>
+            </div>
+          </Panel>
+        </ModalBackdrop>
+      ) : null}
+
+      {isManualUploadOpen ? (
+        <ModalBackdrop onClick={closeManualUploadDialog}>
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(560px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Manual Upload"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader eyebrow="Manual Upload" title="Choose files to import" />
+
+            <p className={mutedTextClassName}>
+              Choose a schedule XML, a logbook JSON, or both. Either file can be uploaded on its own.
+            </p>
+
+            <div className="grid gap-3">
+              <div className="flex items-center justify-between gap-3 rounded border border-[color:var(--line)] px-4 py-3">
+                <div className="min-w-0">
+                  <p className={fieldTitleClassName}>Schedule XML</p>
+                  <p className={cn("m-0 truncate", mutedTextClassName)}>
+                    {manualUploadScheduleFile?.fileName || "No schedule selected"}
+                  </p>
+                </div>
+                <Button variant="ghost" onClick={chooseManualUploadScheduleFile} disabled={isImporting}>
+                  Choose XML
                 </Button>
               </div>
-            </Panel>
 
-            <Panel className={insetPanelClassName}>
-              <SectionHeader eyebrow="About" title="Developer Information" />
-
-              <div className={cn("grid gap-3 text-[var(--text-muted)]", supportCopyTextClassName)}>
-                <p className="m-0">
-                  Created by <strong>Jacob Benjamin (DVA11384)</strong> on GitHub as <strong>Talon42</strong>.
-                </p>
-                <p className="m-0">
-                  App Version: <strong>{APP_BUILD_GIT_TAG}</strong>
-                </p>
-                <p className="m-0">Copyright &copy; 2026 Talon42</p>
-                <p className="m-0">
-                  For flight simulation purposes only. Not a commercial application. In no
-                  way is this application affiliated with Delta Air Lines, its affiliates,
-                  or any other airline. All logos, images, and trademarks remain the
-                  property of their respective owners.
-                </p>
-                <p className="m-0">
-                  Repository:{" "}
-                  <a
-                    className="text-[var(--delta-blue)] no-underline hover:underline"
-                    href="https://github.com/Talon42/DVA-Flight-Planner.git"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    github.com/Talon42/DVA-Flight-Planner
-                  </a>
-                </p>
-                <p className="m-0">
-                  Email:{" "}
-                  <a className="text-[var(--delta-blue)] no-underline hover:underline" href="mailto:jaben428@gmail.com">
-                    jaben428@gmail.com
-                  </a>
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {isDesktopAddonScanAvailable ? (
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleCheckForUpdates({ manual: true })}
-                      disabled={isCheckingForUpdates}
-                    >
-                      {isCheckingForUpdates ? "Checking..." : "Check for Updates"}
-                    </Button>
-                  ) : null}
-                  <Button onClick={handleOpenLogFile}>
-                    Open Log File
-                  </Button>
-                  <Button onClick={handleToggleDevTools}>
-                    {isDevToolsEnabled ? "Dev Tools On" : "Dev Tools Off"}
-                  </Button>
+              <div className="flex items-center justify-between gap-3 rounded border border-[color:var(--line)] px-4 py-3">
+                <div className="min-w-0">
+                  <p className={fieldTitleClassName}>Logbook JSON</p>
+                  <p className={cn("m-0 truncate", mutedTextClassName)}>
+                    {manualUploadLogbookFile?.fileName || "No logbook selected"}
+                  </p>
                 </div>
+                <Button variant="ghost" onClick={chooseManualUploadLogbookFile} disabled={isImporting}>
+                  Choose JSON
+                </Button>
               </div>
-            </Panel>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={closeManualUploadDialog} disabled={isImporting}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleManualUpload}
+                disabled={isImporting || (!manualUploadScheduleFile && !manualUploadLogbookFile)}
+              >
+                Import
+              </Button>
+            </div>
           </Panel>
         </ModalBackdrop>
       ) : null}
@@ -4507,13 +4909,13 @@ export default function App() {
             className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
-            aria-label="Replace Saved Schedule"
+            aria-label="Delta Virtual Sync"
             onClick={(event) => event.stopPropagation()}
           >
-            <SectionHeader eyebrow="Replace Saved Schedule" title="Import a new schedule?" />
+            <SectionHeader eyebrow="Delta Virtual Sync" title="Replace the current schedule?" />
 
             <p className={mutedTextClassName}>
-              Importing a new schedule will replace the current saved schedule and flight board.
+              Syncing from Delta Virtual will replace the current saved schedule and flight board.
               Continue?
             </p>
 
@@ -4544,7 +4946,7 @@ export default function App() {
 
             <p className={mutedTextClassName}>
               This removes saved schedules, UI state, SimBrief settings, addon folder roots, logs,
-              and stored Delta Virtual webview login data from this device.
+              and stored Delta Virtual login settings from this device.
             </p>
 
             <div className="flex justify-end gap-2">
@@ -4594,6 +4996,55 @@ export default function App() {
             </div>
           </Panel>
         </ModalBackdrop>
+      ) : null}
+
+      {isSyncing ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-auto bg-[rgba(8,20,36,0.42)] px-4 bp-1024:px-3"
+          role="presentation"
+        >
+          <div className="w-full max-w-[32rem]">
+            <Panel
+              as="section"
+              padding="lg"
+              className="grid w-full gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+              role="status"
+              aria-live="polite"
+              aria-label="Delta Virtual sync in progress"
+            >
+              <SectionHeader
+                eyebrow="Delta Virtual Sync"
+                title="Syncing data from Delta Virtual"
+                description="Refreshing your schedule and logbook data."
+                className="w-full"
+              />
+              <div className="flex w-full items-center gap-3">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5 shrink-0 animate-spin text-[var(--delta-red)]"
+                  aria-hidden="true"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeOpacity="0.18"
+                    strokeWidth="2.25"
+                  />
+                  <path
+                    d="M21 12a9 9 0 0 0-9-9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeWidth="2.25"
+                  />
+                </svg>
+              </div>
+            </Panel>
+          </div>
+        </div>
       ) : null}
     </div>
   );
