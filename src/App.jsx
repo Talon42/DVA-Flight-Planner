@@ -64,10 +64,12 @@ import {
 import {
   appendImportLog,
   deleteStoredUserData,
+  pickJsonLogbookFile,
   pickXmlScheduleFile,
   readSimBriefSettings,
   readSavedSchedule,
   readSavedUiState,
+  storeDeltaVirtualLogbookJson,
   writeSimBriefSettings,
   writeSavedSchedule,
   writeSavedUiState
@@ -1495,6 +1497,7 @@ export default function App() {
   const [isDeletingUserData, setIsDeletingUserData] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("general");
+  const [isManualUploadOpen, setIsManualUploadOpen] = useState(false);
   const [isReplaceScheduleConfirmOpen, setIsReplaceScheduleConfirmOpen] = useState(false);
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
   const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
@@ -1506,6 +1509,8 @@ export default function App() {
     visitedAirports: [],
     arrivalAirports: []
   });
+  const [manualUploadScheduleFile, setManualUploadScheduleFile] = useState(null);
+  const [manualUploadLogbookFile, setManualUploadLogbookFile] = useState(null);
   const replaceScheduleConfirmResolverRef = useRef(null);
   const deleteUserDataConfirmResolverRef = useRef(null);
   const hasPerformedStartupUpdateCheckRef = useRef(false);
@@ -1533,14 +1538,7 @@ export default function App() {
     layoutBucket === "compact"
       ? "DVA Flight Planner"
       : "Delta Virtual Airlines Flight Planner";
-  const importButtonLabel =
-    layoutBucket === "compact"
-      ? schedule
-        ? "Replace Schedule"
-        : "Import Schedule"
-      : schedule
-        ? "Replace Schedule"
-        : "Import Schedule XML";
+  const importButtonLabel = "Manual Upload";
   const syncButtonLabel =
     layoutBucket === "compact"
       ? "Sync DVA"
@@ -1755,12 +1753,15 @@ export default function App() {
   }, [isUpdatePromptOpen]);
 
   useEffect(() => {
-    if (!isReplaceScheduleConfirmOpen && !isDeleteUserDataConfirmOpen) {
+    if (!isManualUploadOpen && !isReplaceScheduleConfirmOpen && !isDeleteUserDataConfirmOpen) {
       return undefined;
     }
 
     function handleKeyDown(event) {
       if (event.key === "Escape") {
+        if (isManualUploadOpen) {
+          closeManualUploadDialog();
+        }
         if (isReplaceScheduleConfirmOpen) {
           resolveReplaceScheduleConfirmation(false);
         }
@@ -1774,7 +1775,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isReplaceScheduleConfirmOpen, isDeleteUserDataConfirmOpen]);
+  }, [isManualUploadOpen, isReplaceScheduleConfirmOpen, isDeleteUserDataConfirmOpen]);
 
   useEffect(() => {
     if (!isDesktopAddonScanAvailable || hasPerformedStartupUpdateCheckRef.current) {
@@ -2711,6 +2712,82 @@ export default function App() {
     }
   }
 
+  async function processImportedLogbook(pickedFile, sourceLabel) {
+    const startedAtMs = Date.now();
+    setIsImporting(true);
+    setStatusMessage(`Importing ${pickedFile.fileName}...`);
+    await logAppEvent("logbook-import-start", {
+      source: sourceLabel,
+      file: pickedFile.fileName
+    });
+
+    try {
+      await storeDeltaVirtualLogbookJson(pickedFile.fileName, pickedFile.jsonText);
+      setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
+      setStatusMessage(`Imported logbook data from ${pickedFile.fileName}.`);
+      await logAppEvent("logbook-import-success", {
+        source: sourceLabel,
+        file: pickedFile.fileName,
+        durationMs: Date.now() - startedAtMs
+      });
+    } catch (error) {
+      setStatusMessage(error.message || "Logbook import failed.");
+      await logAppError("logbook-import-failed", error, {
+        source: sourceLabel,
+        file: pickedFile.fileName,
+        durationMs: Date.now() - startedAtMs
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
+  function openManualUploadDialog() {
+    setManualUploadScheduleFile(null);
+    setManualUploadLogbookFile(null);
+    setIsManualUploadOpen(true);
+  }
+
+  function closeManualUploadDialog() {
+    setIsManualUploadOpen(false);
+    setManualUploadScheduleFile(null);
+    setManualUploadLogbookFile(null);
+  }
+
+  async function chooseManualUploadScheduleFile() {
+    const pickedFile = await pickXmlScheduleFile();
+    if (pickedFile) {
+      setManualUploadScheduleFile(pickedFile);
+    }
+  }
+
+  async function chooseManualUploadLogbookFile() {
+    const pickedFile = await pickJsonLogbookFile();
+    if (pickedFile) {
+      setManualUploadLogbookFile(pickedFile);
+    }
+  }
+
+  async function handleManualUpload() {
+    const scheduleFile = manualUploadScheduleFile;
+    const logbookFile = manualUploadLogbookFile;
+
+    if (!scheduleFile && !logbookFile) {
+      setStatusMessage("Choose a schedule XML or logbook JSON first.");
+      return;
+    }
+
+    closeManualUploadDialog();
+
+    if (scheduleFile) {
+      await processImportedSchedule(scheduleFile, "manual-upload");
+    }
+
+    if (logbookFile) {
+      await processImportedLogbook(logbookFile, "manual-upload");
+    }
+  }
+
   function resolveReplaceScheduleConfirmation(confirmed) {
     setIsReplaceScheduleConfirmOpen(false);
     if (replaceScheduleConfirmResolverRef.current) {
@@ -2746,20 +2823,8 @@ export default function App() {
   }
 
   async function handleImport() {
-    await logAppEvent("manual-import-requested");
-    const confirmed = await confirmScheduleReplacement();
-    if (!confirmed) {
-      await logAppEvent("manual-import-cancelled-overwrite");
-      return;
-    }
-
-    const pickedFile = await pickXmlScheduleFile();
-    if (!pickedFile) {
-      await logAppEvent("manual-import-cancelled-file-picker");
-      return;
-    }
-
-    await processImportedSchedule(pickedFile, "manual");
+    await logAppEvent("manual-upload-requested");
+    openManualUploadDialog();
   }
 
   async function handleDeltaVirtualSync() {
@@ -4778,6 +4843,64 @@ export default function App() {
         </ModalBackdrop>
       ) : null}
 
+      {isManualUploadOpen ? (
+        <ModalBackdrop onClick={closeManualUploadDialog}>
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(560px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Manual Upload"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader eyebrow="Manual Upload" title="Choose files to import" />
+
+            <p className={mutedTextClassName}>
+              Choose a schedule XML, a logbook JSON, or both. Either file can be uploaded on its own.
+            </p>
+
+            <div className="grid gap-3">
+              <div className="flex items-center justify-between gap-3 rounded border border-[color:var(--line)] px-4 py-3">
+                <div className="min-w-0">
+                  <p className={fieldTitleClassName}>Schedule XML</p>
+                  <p className={cn("m-0 truncate", mutedTextClassName)}>
+                    {manualUploadScheduleFile?.fileName || "No schedule selected"}
+                  </p>
+                </div>
+                <Button variant="ghost" onClick={chooseManualUploadScheduleFile} disabled={isImporting}>
+                  Choose XML
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded border border-[color:var(--line)] px-4 py-3">
+                <div className="min-w-0">
+                  <p className={fieldTitleClassName}>Logbook JSON</p>
+                  <p className={cn("m-0 truncate", mutedTextClassName)}>
+                    {manualUploadLogbookFile?.fileName || "No logbook selected"}
+                  </p>
+                </div>
+                <Button variant="ghost" onClick={chooseManualUploadLogbookFile} disabled={isImporting}>
+                  Choose JSON
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={closeManualUploadDialog} disabled={isImporting}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleManualUpload}
+                disabled={isImporting || (!manualUploadScheduleFile && !manualUploadLogbookFile)}
+              >
+                Import
+              </Button>
+            </div>
+          </Panel>
+        </ModalBackdrop>
+      ) : null}
+
       {isReplaceScheduleConfirmOpen ? (
         <ModalBackdrop onClick={() => resolveReplaceScheduleConfirmation(false)}>
           <Panel
@@ -4786,13 +4909,13 @@ export default function App() {
             className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--surface-raised)] shadow-none bp-1024:gap-4"
             role="dialog"
             aria-modal="true"
-            aria-label="Replace Saved Schedule"
+            aria-label="Delta Virtual Sync"
             onClick={(event) => event.stopPropagation()}
           >
-            <SectionHeader eyebrow="Replace Saved Schedule" title="Import a new schedule?" />
+            <SectionHeader eyebrow="Delta Virtual Sync" title="Replace the current schedule?" />
 
             <p className={mutedTextClassName}>
-              Importing a new schedule will replace the current saved schedule and flight board.
+              Syncing from Delta Virtual will replace the current saved schedule and flight board.
               Continue?
             </p>
 

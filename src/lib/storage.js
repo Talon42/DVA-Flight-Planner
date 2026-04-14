@@ -11,6 +11,9 @@ const PERSISTED_SCHEDULE_VERSION = 4;
 const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
 const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
 const LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
+const DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
+const DELTAVA_LOGBOOK_STORAGE_DIR = "flight-planner/deltava-sync/logbook";
+const DELTAVA_LOGBOOK_FALLBACK_FILE = "deltava-logbook.json";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -711,6 +714,7 @@ export async function deleteStoredUserData() {
     "flight-planner.simbrief-settings",
     "flight-planner.deltava-auth",
     "flight-planner.import-log",
+    DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
     "flight-planner.theme",
     "flight-planner.dev-tools-enabled",
     "flight-planner.dev-window-width"
@@ -719,7 +723,7 @@ export async function deleteStoredUserData() {
   }
 }
 
-export async function pickXmlScheduleFile() {
+async function pickTextFile({ accept, filterName, extensions }) {
   if (isTauriRuntime()) {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const { readTextFile } = await loadFsModule();
@@ -727,8 +731,8 @@ export async function pickXmlScheduleFile() {
       multiple: false,
       filters: [
         {
-          name: "PFPX Schedule XML",
-          extensions: ["xml"]
+          name: filterName,
+          extensions
         }
       ]
     });
@@ -738,14 +742,14 @@ export async function pickXmlScheduleFile() {
     }
 
     const fileName = path.split(/[\\/]/).pop();
-    const xmlText = await readTextFile(path);
-    return { fileName, xmlText };
+    const text = await readTextFile(path);
+    return { fileName, text };
   }
 
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".xml,text/xml";
+    input.accept = accept;
     input.style.display = "none";
 
     input.addEventListener("change", async (event) => {
@@ -756,15 +760,95 @@ export async function pickXmlScheduleFile() {
         return;
       }
 
-      const xmlText = await file.text();
+      const text = await file.text();
       document.body.removeChild(input);
       resolve({
         fileName: file.name,
-        xmlText
+        text
       });
     });
 
     document.body.appendChild(input);
     input.click();
   });
+}
+
+export async function pickXmlScheduleFile() {
+  const selectedFile = await pickTextFile({
+    accept: ".xml,text/xml",
+    filterName: "Schedule XML",
+    extensions: ["xml"]
+  });
+
+  if (!selectedFile) {
+    return null;
+  }
+
+  return {
+    fileName: selectedFile.fileName,
+    xmlText: selectedFile.text
+  };
+}
+
+export async function pickJsonLogbookFile() {
+  const selectedFile = await pickTextFile({
+    accept: ".json,application/json",
+    filterName: "Logbook JSON",
+    extensions: ["json"]
+  });
+
+  if (!selectedFile) {
+    return null;
+  }
+
+  return {
+    fileName: selectedFile.fileName,
+    jsonText: selectedFile.text
+  };
+}
+
+function sanitizeLogbookFilename(fileName) {
+  const rawName = String(fileName || "").split(/[\\/]/).pop()?.trim() || DELTAVA_LOGBOOK_FALLBACK_FILE;
+  const sanitized = rawName
+    .replace(/[^A-Za-z0-9._-]/g, "-")
+    .replace(/^[-._]+|[-._]+$/g, "");
+  const normalized = sanitized || DELTAVA_LOGBOOK_FALLBACK_FILE;
+
+  return normalized.toLowerCase().endsWith(".json") ? normalized : `${normalized}.json`;
+}
+
+export async function storeDeltaVirtualLogbookJson(fileName, jsonText) {
+  const trimmed = String(jsonText || "").trim();
+  if (!trimmed) {
+    throw new Error("Logbook JSON was empty.");
+  }
+
+  try {
+    JSON.parse(trimmed);
+  } catch (error) {
+    throw new Error(`Logbook JSON was invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const normalizedFileName = sanitizeLogbookFilename(fileName);
+
+  if (isTauriRuntime()) {
+    const { mkdir, writeTextFile, BaseDirectory } = await loadFsModule();
+    await mkdir(DELTAVA_LOGBOOK_STORAGE_DIR, {
+      baseDir: BaseDirectory.AppLocalData,
+      recursive: true
+    });
+
+    await writeTextFile(`${DELTAVA_LOGBOOK_STORAGE_DIR}/${normalizedFileName}`, trimmed, {
+      baseDir: BaseDirectory.AppLocalData
+    });
+    return;
+  }
+
+  window.localStorage.setItem(
+    DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
+    JSON.stringify({
+      fileName: normalizedFileName,
+      jsonText: trimmed
+    })
+  );
 }
