@@ -1454,11 +1454,10 @@ export function AddonAirportPanel({
         actions={
           <>
             <Button
-              variant="ghost"
               onClick={onAddAddonRoot}
               disabled={!isDesktopAddonScanAvailable || isAddonScanBusy}
             >
-            Add Folder
+              Add Folder
             </Button>
             <Button
               onClick={onScanAddonAirports}
