@@ -89,8 +89,8 @@ If you already have a schedule loaded, importing a new one replaces the current 
 ### How it works
 
 1. Click `Sync from Delta Virtual`.
-2. A Delta Virtual login window opens.
-3. Sign in with your own DVA credentials on the official DVA site.
+2. The app opens a hidden WebView2 session for Delta Virtual and shows an in-app syncing modal.
+3. Delta Virtual login is handled by the host app using the credentials saved in `Settings`.
 4. The app waits for the official schedule XML download and imports it automatically.
 
 When the sync succeeds, the app also saves a local copy of the Delta Virtual logbook JSON export. That logbook data powers Accomplishments airport completion tracking.
@@ -98,38 +98,11 @@ When the sync succeeds, the app also saves a local copy of the Delta Virtual log
 
 ### Security and privacy
 
-- The sync window is restricted to `https://www.deltava.org`.
-- The app fetches the same schedule XML from the official DVA schedule endpoint: `https://www.deltava.org/pfpxsched.ws`.
-- The app fetches the official DVA logbook JSON export so it can identify completed departure and arrival airports for Accomplishments.
-- The React frontend does not ask for, store, or transmit your DVA username/password itself.
-- The app only accepts the returned XML if it looks like a valid schedule and contains flight data.
-- The downloaded XML is stored locally only long enough to complete the import, then the app prunes it after a successful sync.
-- The downloaded logbook JSON is stored locally so Accomplishments can keep tracking progress between sessions.
-- Temporary WebView cache and browsing data used for sync are pruned automatically on startup and after sync cleanup.
-
-### Terms of use note
-
-This feature is designed to behave like a normal user-initiated sign-in and schedule download against the official DVA website, not as a credential harvester or a bulk scraper. That said, you should still use your own account responsibly and follow any current Delta Virtual Airlines policies.
+Delta Virtual sync stays within the official DVA website and uses the credentials you save in the app for that sign-in flow. First name and last name are stored in app settings, while the password is stored only in Windows Credential Manager on Windows. The app only keeps the sync data it needs to import the schedule and update local progress. As with any account-based tool, you should use your own Delta Virtual credentials responsibly and follow current DVA policies.
 
 ### Clearing cached or saved data
 
-The app stores its local data under the app data folder in a `flight-planner` directory. That data can include:
-
-- saved schedule
-- saved UI state
-- import log
-- SimBrief settings
-- addon airport cache
-- Delta Virtual logbook progress data
-
-To clear app data completely, close the app and delete the local `flight-planner` app-data folder.
-
-To clear Delta Virtual sync leftovers, close the app and delete the local sync/webview folders if they exist:
-
-- `deltava-sync`
-- `deltava-webview`
-
-The app already tries to prune the downloaded XML and the sync webview cache automatically.
+Use `Settings` > `Privacy` > `Delete User Data` to clear the app's saved local data and Delta Virtual credentials from this device. It also removes temporary sync and browser data where possible, giving the app a clean local reset.
 
 ## Addon Folder Support
 
