@@ -11,6 +11,11 @@ const CSV_OPTIONS = {
 let airportCatalog = null;
 let airportByIcao = null;
 
+function parseCoordinate(value) {
+  const parsed = Number.parseFloat(String(value || "").trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function ensureAirportCatalogLoaded() {
   if (airportCatalog && airportByIcao) {
     return;
@@ -36,6 +41,8 @@ function ensureAirportCatalogLoaded() {
       icao: String(row.ICAO || "").trim().toUpperCase(),
       name: String(row.Name || "").trim(),
       country: String(row.Country || "").trim(),
+      latitude: parseCoordinate(row.Latitude),
+      longitude: parseCoordinate(row.Longitude),
       regionCode: regionByCountry.get(String(row.Country || "").trim())?.code || "",
       regionName: regionByCountry.get(String(row.Country || "").trim())?.name || ""
     }))

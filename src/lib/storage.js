@@ -75,11 +75,37 @@ function deriveCallsign(flight) {
   return `${airlineCode}${flightNumber}`.trim();
 }
 
+function normalizeSimBriefRoutePoint(point) {
+  if (!point || typeof point !== "object") {
+    return null;
+  }
+
+  const latitude = Number(point.latitude);
+  const longitude = Number(point.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+
+  return {
+    ident: String(point.ident || "").trim(),
+    latitude,
+    longitude
+  };
+}
+
 function normalizeSimBriefPlan(plan) {
   if (!plan || typeof plan !== "object") {
     return null;
   }
 
+  const rawRoutePoints = Array.isArray(plan.routePoints)
+    ? plan.routePoints
+    : Array.isArray(plan.route_points)
+      ? plan.route_points
+      : [];
+  const routePoints = rawRoutePoints
+    .map(normalizeSimBriefRoutePoint)
+    .filter(Boolean);
   const normalized = {
     status: String(plan.status || "").trim(),
     generatedAtUtc: String(plan.generatedAtUtc || "").trim(),
@@ -92,10 +118,19 @@ function normalizeSimBriefPlan(plan) {
     ete: String(plan.ete || "").trim(),
     blockFuel: String(plan.blockFuel || "").trim(),
     ofpUrl: String(plan.ofpUrl || "").trim(),
-    pdfUrl: String(plan.pdfUrl || "").trim()
+    pdfUrl: String(plan.pdfUrl || "").trim(),
+    routePoints
   };
 
-  return Object.values(normalized).some(Boolean) ? normalized : null;
+  const hasMeaningfulTextValue = Object.entries(normalized).some(([key, value]) => {
+    if (key === "routePoints") {
+      return routePoints.length > 0;
+    }
+
+    return Boolean(value);
+  });
+
+  return hasMeaningfulTextValue ? normalized : null;
 }
 
 function measureTextBytes(text) {

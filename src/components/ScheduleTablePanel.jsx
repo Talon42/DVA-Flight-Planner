@@ -8,11 +8,17 @@ import {
 import { cn } from "./ui/cn";
 import { SearchableMultiSelect } from "./FilterBar";
 import AccomplishmentsPanel from "./AccomplishmentsPanel";
+import FlightMapPanel from "./map/FlightMapPanel";
 import FlightsTable from "./tables/FlightsTable";
 import ToursTable from "./tables/ToursTable";
 
 export default function ScheduleTablePanel({
   scheduleView,
+  theme,
+  activeFlightBoardEntries,
+  selectedFlightId,
+  expandedBoardFlightId,
+  pendingMapFlightPathViewMode,
   availableTours = [],
   selectedTourPath,
   accomplishmentOptions = [],
@@ -113,6 +119,22 @@ export default function ScheduleTablePanel({
             >
               Accomplishments
             </button>
+            <span
+              aria-hidden="true"
+              className="mx-0.5 h-5 w-px self-center bg-[color:var(--line)] opacity-70"
+            />
+            <button
+              type="button"
+              className={cn(
+                plannerTabClassName,
+                getPlannerTabStateClassName(scheduleView === "map")
+              )}
+              role="tab"
+              aria-selected={scheduleView === "map"}
+              onClick={() => onScheduleViewChange?.("map")}
+            >
+              Map
+            </button>
           </div>
         </div>
         {scheduleView === "tours" && hasTours ? (
@@ -167,6 +189,13 @@ export default function ScheduleTablePanel({
             viewportWidth={viewportWidth}
             onSelectRow={onSelectRow}
             onActivateRow={onActivateRow}
+          />
+        ) : scheduleView === "map" ? (
+          <FlightMapPanel
+            theme={theme}
+            activeFlightBoardEntries={activeFlightBoardEntries}
+            expandedBoardFlightId={expandedBoardFlightId}
+            initialFlightPathViewMode={pendingMapFlightPathViewMode || "all"}
           />
         ) : (
           <FlightsTable

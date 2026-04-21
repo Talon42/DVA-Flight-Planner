@@ -1438,6 +1438,7 @@ export default function App() {
   const [selectedFlightId, setSelectedFlightId] = useState(null);
   const [selectedTourRowId, setSelectedTourRowId] = useState(null);
   const [expandedBoardFlightId, setExpandedBoardFlightId] = useState(null);
+  const [pendingMapFlightPathViewMode, setPendingMapFlightPathViewMode] = useState(null);
   const [scheduleTableTimeDisplayMode, setScheduleTableTimeDisplayMode] = useState("local");
   const [scheduleView, setScheduleView] = useState("flights");
   const [plannerMode, setPlannerMode] = useState("basic");
@@ -1559,6 +1560,18 @@ export default function App() {
     );
   }, [flightBoards, activeFlightBoardId]);
   const flightBoard = activeFlightBoard?.entries || [];
+
+  useEffect(() => {
+    if (
+      !expandedBoardFlightId ||
+      flightBoard.some((entry) => entry.boardEntryId === expandedBoardFlightId)
+    ) {
+      return;
+    }
+
+    setExpandedBoardFlightId(null);
+  }, [expandedBoardFlightId, flightBoard]);
+
   const availableTours = useMemo(
     () =>
       Object.entries(TOUR_FILE_MODULES)
@@ -1663,8 +1676,8 @@ export default function App() {
 
     setSelectedTourRowId((current) =>
       selectedTour?.rows.some((row) => row.flightId === current)
-        ? current
-        : selectedTour?.rows[0]?.flightId || null
+      ? current
+      : selectedTour?.rows[0]?.flightId || null
     );
   }, [scheduleView, selectedTour]);
 
@@ -2095,6 +2108,7 @@ export default function App() {
         setSort(savedUiState.sort || DEFAULT_SORT);
         setScheduleView(
           savedUiState.scheduleView === "tours" ||
+            savedUiState.scheduleView === "map" ||
             savedUiState.scheduleView === "accomplishments"
             ? savedUiState.scheduleView
             : "flights"
@@ -3120,12 +3134,15 @@ export default function App() {
   }
 
   function handleScheduleViewChange(nextView) {
-    const nextScheduleView =
-      nextView === "tours" && availableTours.length
-        ? "tours"
-        : nextView === "accomplishments" && ACCOMPLISHMENTS.length
-          ? "accomplishments"
-          : "flights";
+    let nextScheduleView = "flights";
+
+    if (nextView === "map") {
+      nextScheduleView = "map";
+    } else if (nextView === "tours" && availableTours.length) {
+      nextScheduleView = "tours";
+    } else if (nextView === "accomplishments" && ACCOMPLISHMENTS.length) {
+      nextScheduleView = "accomplishments";
+    }
 
     setScheduleView(nextScheduleView);
 
@@ -4011,6 +4028,9 @@ export default function App() {
       isDispatching: true,
       message: "Waiting for SimBrief login and flight plan generation..."
     });
+    setPendingMapFlightPathViewMode("selected");
+    setScheduleView("map");
+    setExpandedBoardFlightId(flightId);
     setStatusMessage("Opening SimBrief dispatch...");
     await logAppEvent("simbrief-dispatch-requested", {
       flightId,
@@ -4074,6 +4094,7 @@ export default function App() {
         type: selectedDispatchOption.dispatchType
       });
     } finally {
+      setPendingMapFlightPathViewMode(null);
       await closeSimBriefDispatchWindow();
     }
   }
@@ -4608,6 +4629,11 @@ export default function App() {
             {schedule ? (
               <ScheduleTablePanel
                 scheduleView={scheduleView}
+                theme={theme}
+                activeFlightBoardEntries={flightBoard}
+                selectedFlightId={selectedFlightId}
+                expandedBoardFlightId={expandedBoardFlightId}
+                pendingMapFlightPathViewMode={pendingMapFlightPathViewMode}
                 availableTours={availableTours}
                 selectedTourPath={selectedTour?.path || ""}
                 accomplishmentOptions={ACCOMPLISHMENTS}

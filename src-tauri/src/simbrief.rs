@@ -3,7 +3,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     fs,
     io::Write,
     path::PathBuf,
@@ -64,6 +64,15 @@ pub struct SimBriefPlanSummary {
     pub block_fuel: String,
     pub ofp_url: String,
     pub pdf_url: String,
+    pub route_points: Vec<SimBriefRoutePoint>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimBriefRoutePoint {
+    pub ident: String,
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -270,6 +279,7 @@ fn build_simbrief_dispatch_url(
         ("dest", payload.destination.trim().to_uppercase()),
         ("type", payload.aircraft_type.trim().to_uppercase()),
         ("units", payload.units.trim().to_uppercase()),
+        ("navlog", "1".to_string()),
         ("deph", departure_hour),
         ("depm", departure_minute),
         ("static_id", static_id.to_string()),
@@ -373,7 +383,7 @@ fn spawn_simbrief_background_fetch(
 ) {
     tauri::async_runtime::spawn(async move {
         append_simbrief_log(&app, "background-fetch-started");
-        let result = fetch_simbrief_plan_summary(&payload, &static_id).await;
+        let result = fetch_simbrief_plan_summary(&app, &payload, &static_id).await;
         let fetch_succeeded = result.is_ok();
         append_simbrief_log(
             &app,
@@ -521,6 +531,15 @@ fn find_path_string(value: &Value, path: &[&str]) -> Option<String> {
     value_as_string(current)
 }
 
+fn find_path_value<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+
+    Some(current)
+}
+
 fn find_key_recursively(value: &Value, target_key: &str) -> Option<String> {
     match value {
         Value::Object(map) => {
@@ -583,9 +602,286 @@ fn collect_urls(value: &Value, urls: &mut Vec<String>) {
     }
 }
 
+fn parse_coordinate_text(text: &str) -> Option<f64> {
+    let trimmed = text.trim().replace(',', ".");
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let mut sign = 1.0;
+    let mut body = trimmed.as_str();
+
+    if let Some(first) = body.chars().next() {
+        match first {
+            '-' => {
+                sign = -1.0;
+                body = &body[1..];
+            }
+            '+' => {
+                body = &body[1..];
+            }
+            'S' | 'W' => {
+                sign = -1.0;
+                body = &body[1..];
+            }
+            'N' | 'E' => {
+                body = &body[1..];
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(last) = body.chars().last() {
+        match last {
+            'S' | 'W' => {
+                sign = -1.0;
+                body = &body[..body.len().saturating_sub(1)];
+            }
+            'N' | 'E' => {
+                body = &body[..body.len().saturating_sub(1)];
+            }
+            _ => {}
+        }
+    }
+
+    let parsed = body.trim().parse::<f64>().ok()?;
+    let magnitude = parsed.abs();
+    let decimal_degrees = if magnitude > 180.0 {
+        let degrees = (magnitude / 100.0).floor();
+        let minutes = magnitude - (degrees * 100.0);
+        degrees + (minutes / 60.0)
+    } else {
+        magnitude
+    };
+
+    Some(decimal_degrees * sign)
+}
+
+fn is_route_context_key(key: &str) -> bool {
+    let normalized = key.trim().to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "navlog"
+            | "nav_logs"
+            | "route"
+            | "route_ifps"
+            | "route_navigraph"
+            | "waypoint"
+            | "waypoints"
+            | "fix"
+            | "fixes"
+            | "leg"
+            | "legs"
+            | "segment"
+            | "segments"
+            | "track"
+            | "tracks"
+            | "point"
+            | "points"
+            | "fpl"
+            | "flightplan"
+            | "flight_plan"
+            | "plan"
+    ) || normalized.contains("navlog")
+        || normalized.contains("waypoint")
+        || normalized.contains("route")
+        || normalized.contains("fix")
+        || normalized.contains("track")
+}
+
+fn parse_coordinate_value(value: Option<&Value>) -> Option<f64> {
+    let value = value?;
+    if let Some(number) = value.as_f64() {
+        return Some(number);
+    }
+
+    value.as_str().and_then(parse_coordinate_text)
+}
+
+fn extract_coordinate_pair_from_value(value: &Value) -> Option<(f64, f64)> {
+    match value {
+        Value::Array(items) => {
+            if items.len() < 2 {
+                return None;
+            }
+
+            let longitude = parse_coordinate_value(items.first());
+            let latitude = parse_coordinate_value(items.get(1));
+
+            match (latitude, longitude) {
+                (Some(latitude), Some(longitude)) => Some((latitude, longitude)),
+                _ => None,
+            }
+        }
+        Value::Object(map) => {
+            let latitude = parse_coordinate_value(
+                map.get("lat")
+                    .or_else(|| map.get("latitude"))
+                    .or_else(|| map.get("pos_lat"))
+                    .or_else(|| map.get("posLatitude"))
+                    .or_else(|| map.get("latitude_deg"))
+                    .or_else(|| map.get("y")),
+            );
+            let longitude = parse_coordinate_value(
+                map.get("lon")
+                    .or_else(|| map.get("lng"))
+                    .or_else(|| map.get("pos_long"))
+                    .or_else(|| map.get("pos_lng"))
+                    .or_else(|| map.get("posLongitude"))
+                    .or_else(|| map.get("longitude_deg"))
+                    .or_else(|| map.get("long"))
+                    .or_else(|| map.get("longitude"))
+                    .or_else(|| map.get("x")),
+            );
+
+            if let (Some(latitude), Some(longitude)) = (latitude, longitude) {
+                return Some((latitude, longitude));
+            }
+
+            for nested_key in [
+                "coordinates",
+                "coordinate",
+                "coords",
+                "position",
+                "location",
+                "point",
+                "geo",
+                "latlon",
+                "lat_lng",
+                "latlng",
+                "lnglat",
+            ] {
+                if let Some(nested_value) = map.get(nested_key) {
+                    if let Some(pair) = extract_coordinate_pair_from_value(nested_value) {
+                        return Some(pair);
+                    }
+                }
+            }
+
+            None
+        }
+        _ => None,
+    }
+}
+
+fn extract_route_point_from_map(
+    map: &serde_json::Map<String, Value>,
+    route_context: bool,
+) -> Option<SimBriefRoutePoint> {
+    let ident = find_first_string(
+        &Value::Object(map.clone()),
+        &[&["ident"], &["name"], &["waypoint"], &["fix"], &["point"], &["code"]],
+        &["ident", "name", "waypoint", "fix", "point", "code"],
+    );
+
+    if !route_context {
+        return None;
+    }
+
+    let Some((latitude, longitude)) = extract_coordinate_pair_from_value(&Value::Object(map.clone())) else {
+        return None;
+    };
+
+    Some(SimBriefRoutePoint {
+        ident,
+        latitude,
+        longitude,
+    })
+}
+
+fn extract_route_point_from_array(items: &[Value], route_context: bool) -> Option<SimBriefRoutePoint> {
+    if !route_context || items.len() < 2 {
+        return None;
+    }
+
+    let longitude = parse_coordinate_value(items.first())?;
+    let latitude = parse_coordinate_value(items.get(1))?;
+
+    Some(SimBriefRoutePoint {
+        ident: String::new(),
+        latitude,
+        longitude,
+    })
+}
+
+fn push_route_point(
+    point: SimBriefRoutePoint,
+    points: &mut Vec<SimBriefRoutePoint>,
+    seen: &mut HashSet<String>,
+) {
+    let key = format!("{:.6}:{:.6}", point.latitude, point.longitude);
+    if seen.insert(key) {
+        points.push(point);
+    }
+}
+
+fn collect_route_points(
+    value: &Value,
+    route_context: bool,
+    points: &mut Vec<SimBriefRoutePoint>,
+    seen: &mut HashSet<String>,
+) {
+    match value {
+        Value::Object(map) => {
+            let next_route_context = route_context
+                || map.keys().any(|key| is_route_context_key(key));
+
+            if let Some(point) = extract_route_point_from_map(map, next_route_context) {
+                push_route_point(point, points, seen);
+            }
+
+            for child in map.values() {
+                collect_route_points(child, next_route_context, points, seen);
+            }
+        }
+        Value::Array(items) => {
+            if let Some(point) = extract_route_point_from_array(items, route_context) {
+                push_route_point(point, points, seen);
+            }
+
+            for child in items {
+                collect_route_points(child, route_context, points, seen);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn extract_simbrief_route_points(json: &Value) -> Vec<SimBriefRoutePoint> {
+    let mut points = Vec::new();
+    let mut seen = HashSet::new();
+    let route_paths: &[&[&str]] = &[
+        &["navlog"],
+        &["nav_log"],
+        &["route"],
+        &["route_ifps"],
+        &["route_navigraph"],
+        &["atc", "route"],
+        &["atc", "route_ifps"],
+        &["atc", "route_navigraph"],
+        &["flightplan"],
+        &["flight_plan"],
+    ];
+
+    let mut found_route_container = false;
+    for path in route_paths {
+        if let Some(container) = find_path_value(json, path) {
+            found_route_container = true;
+            collect_route_points(container, true, &mut points, &mut seen);
+        }
+    }
+
+    if !found_route_container || points.is_empty() {
+        collect_route_points(json, false, &mut points, &mut seen);
+    }
+
+    points
+}
+
 fn normalize_simbrief_plan(json: &Value, static_id: &str) -> SimBriefPlanSummary {
     let mut urls = Vec::new();
     collect_urls(json, &mut urls);
+    let route_points = extract_simbrief_route_points(json);
     let generated_at_utc = find_first_string(
         json,
         &[
@@ -664,6 +960,7 @@ fn normalize_simbrief_plan(json: &Value, static_id: &str) -> SimBriefPlanSummary
         ),
         ofp_url,
         pdf_url,
+        route_points,
     }
 }
 
@@ -997,6 +1294,7 @@ async fn fetch_json_from_url(client: &reqwest::Client, url: &str) -> Result<Valu
 }
 
 async fn fetch_simbrief_plan_summary(
+    _app: &AppHandle,
     payload: &SimBriefDispatchPayload,
     static_id: &str,
 ) -> Result<SimBriefPlanSummary, String> {
@@ -1012,7 +1310,10 @@ async fn fetch_simbrief_plan_summary(
     for attempt in 0..SIMBRIEF_FETCH_RETRY_COUNT {
         for url in &fetch_urls {
             match fetch_json_from_url(&client, url).await {
-                Ok(json) => return Ok(normalize_simbrief_plan(&json, static_id)),
+                Ok(json) => {
+                    let plan = normalize_simbrief_plan(&json, static_id);
+                    return Ok(plan);
+                }
                 Err(error) => {
                     last_error = error;
                 }
@@ -1205,6 +1506,7 @@ mod tests {
         assert_eq!(pairs.get("dest"), Some(&"KLAX".to_string()));
         assert_eq!(pairs.get("type"), Some(&"A321".to_string()));
         assert_eq!(pairs.get("units"), Some(&"LBS".to_string()));
+        assert_eq!(pairs.get("navlog"), Some(&"1".to_string()));
         assert_eq!(pairs.get("deph"), Some(&"12".to_string()));
         assert_eq!(pairs.get("depm"), Some(&"30".to_string()));
         assert_eq!(pairs.get("static_id"), Some(&"FP_TEST_1".to_string()));
@@ -1288,5 +1590,120 @@ mod tests {
             ]
         );
         assert_eq!(parsed.planformats, vec!["DAL".to_string(), "LIDO".to_string()]);
+    }
+
+    #[test]
+    fn extract_simbrief_route_points_prefers_route_containers_and_preserves_order() {
+        let value = serde_json::json!({
+            "route": "KATL FIX1 FIX2 KLAX",
+            "navlog": {
+                "waypoints": [
+                    {
+                        "ident": "FIX1",
+                        "lat": 33.6407,
+                        "lon": -84.4277
+                    },
+                    {
+                        "ident": "FIX2",
+                        "coordinates": [-95.1234, 36.5678]
+                    },
+                    [-118.4085, 33.9416],
+                    {
+                        "ident": "FIX2",
+                        "lat": 36.5678,
+                        "lon": -95.1234
+                    }
+                ]
+            }
+        });
+
+        let points = extract_simbrief_route_points(&value);
+
+        assert_eq!(
+            points,
+            vec![
+                SimBriefRoutePoint {
+                    ident: "FIX1".to_string(),
+                    latitude: 33.6407,
+                    longitude: -84.4277
+                },
+                SimBriefRoutePoint {
+                    ident: "FIX2".to_string(),
+                    latitude: 36.5678,
+                    longitude: -95.1234
+                },
+                SimBriefRoutePoint {
+                    ident: String::new(),
+                    latitude: 33.9416,
+                    longitude: -118.4085
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_simbrief_route_points_handles_route_ifps_coordinate_arrays() {
+        let value = serde_json::json!({
+            "atc": {
+                "route_ifps": [
+                    ["-122.3750", "37.6189"],
+                    ["-121.0000", "38.5000"]
+                ]
+            }
+        });
+
+        let points = extract_simbrief_route_points(&value);
+
+        assert_eq!(
+            points,
+            vec![
+                SimBriefRoutePoint {
+                    ident: String::new(),
+                    latitude: 37.6189,
+                    longitude: -122.375
+                },
+                SimBriefRoutePoint {
+                    ident: String::new(),
+                    latitude: 38.5,
+                    longitude: -121.0
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_simbrief_route_points_reads_pos_lat_and_pos_long() {
+        let value = serde_json::json!({
+            "navlog": [
+                {
+                    "ident": "SSY",
+                    "pos_lat": 40.546417,
+                    "pos_long": -3.575194
+                },
+                {
+                    "ident": "MD901",
+                    "pos_lat": 40.636417,
+                    "pos_long": -3.542639
+                }
+            ]
+        });
+
+        let points = extract_simbrief_route_points(&value);
+
+        assert_eq!(
+            points,
+            vec![
+                SimBriefRoutePoint {
+                    ident: "SSY".to_string(),
+                    latitude: 40.546417,
+                    longitude: -3.575194
+                },
+                SimBriefRoutePoint {
+                    ident: "MD901".to_string(),
+                    latitude: 40.636417,
+                    longitude: -3.542639
+                }
+            ]
+        );
     }
 }
