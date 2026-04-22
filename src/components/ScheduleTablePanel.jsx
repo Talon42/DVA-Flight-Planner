@@ -19,6 +19,8 @@ export default function ScheduleTablePanel({
   selectedFlightId,
   expandedBoardFlightId,
   pendingMapFlightPathViewMode,
+  pendingMapFitToRoute,
+  onConsumePendingMapFitToRoute,
   availableTours = [],
   selectedTourPath,
   accomplishmentOptions = [],
@@ -196,6 +198,8 @@ export default function ScheduleTablePanel({
             activeFlightBoardEntries={activeFlightBoardEntries}
             expandedBoardFlightId={expandedBoardFlightId}
             initialFlightPathViewMode={pendingMapFlightPathViewMode || "all"}
+            initialFitToRoute={pendingMapFitToRoute}
+            onConsumeInitialFitToRoute={onConsumePendingMapFitToRoute}
           />
         ) : (
           <FlightsTable

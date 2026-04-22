@@ -48,7 +48,7 @@ function toClockValue(isoValue) {
 }
 
 function deriveFlightNumber(flight) {
-  const explicitFlightNumber = String(flight?.flightNumber || "").trim();
+  const explicitFlightNumber = String(flight?.flightNumber || flight?.tourFlightNumber || "").trim();
   if (explicitFlightNumber) {
     return explicitFlightNumber;
   }
@@ -59,7 +59,7 @@ function deriveFlightNumber(flight) {
   }
 
   const stripped = flightCode.replace(/^[^\d]+/, "");
-  return stripped || flightCode;
+  return stripped.replace(/\s+LEG\s+\d+$/i, "").trim() || flightCode;
 }
 
 function deriveCallsign(flight) {

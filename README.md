@@ -15,6 +15,7 @@ Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, 
 - [Schedule Table](#schedule-table)
 - [Tours Tab](#tours-tab)
 - [Accomplishments Tab](#accomplishments-tab)
+- [Map View](#map-view)
 - [Flight Board](#flight-board)
 - [Flight Board Repair](#flight-board-repair)
 - [SimBrief Dispatch](#simbrief-dispatch)
@@ -33,6 +34,7 @@ For flight simulation purposes only. Not a commercial application. In no way is 
 - Lets you drag Flight Board cards to reorder your working sequence
 - Includes a Tours tab with DVA tour legs and local completion tracking
 - Includes an Accomplishments tab with DVA accomplishment airport checklist tracking
+- Includes a map view with route plotting, flight-path filters, weather radar, satellite overlay, and airport labels
 - Supports direct schedule and logbook sync from the Delta Virtual website
 - Supports SimBrief dispatch from Flight Board entries
 - Supports saved custom SimBrief airframes mapped to specific aircraft types
@@ -196,6 +198,8 @@ Use the `Duty Schedule` tab when you want the app to build a connected sequence 
 5. Click `Build my Schedule`.
 
 In location mode, the app resolves a qualifying airline for that location before building the duty. It then loads the selected flights directly into the Flight Board.
+
+Use `Unique Destinations` when you want the built sequence to avoid reusing the same destination airport.
 
 ## Schedule Table
 
@@ -412,6 +416,19 @@ Saved custom airframes are then available as dispatch choices on Flight Board en
 The app sends the SimBrief dispatch request correctly, but returned dispatch details may not always be surfaced back into the Flight Board the way you expect.
 
 The code is set up to store returned SimBrief plan data and OFP/PDF links on the board entry when that data is available, but if no plan details come back from the dispatch flow then the dispatch is still sent without a populated plan summary in the app.
+
+## Map View
+
+The map shows flight routes and lets you narrow the view to the selected flight or all active flights.
+
+### Map features
+
+- Route plotting for active Flight Board entries
+- Selected-flight or all-flight path view
+- Flight-path labels at the origin and destination airports
+- Weather radar overlay
+- Satellite imagery overlay
+- Standard and World map modes
 
 ## Logs
 

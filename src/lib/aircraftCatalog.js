@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import aircraftProfilesCsv from "../data/aircraft_profiles.csv?raw";
+import { getAirportByIcao } from "./airportCatalog";
 
 const CSV_OPTIONS = {
   header: true,
@@ -105,6 +106,8 @@ function ensureAircraftCatalogLoaded() {
     equipmentType: String(row["Aircraft Profile"] || "").trim().toUpperCase(),
     fullAircraftName: String(row["Full Aircraft Name"] || row["Aircraft Profile"] || "").trim(),
     manufacturer: inferManufacturer(row["Full Aircraft Name"] || row["Aircraft Profile"] || ""),
+    minimumTakeoffRunwayLength: parseNumeric(row["Minimum Takeoff Runway Length"]),
+    minimumLandingRunwayLength: parseNumeric(row["Minimum Landing Runway Length"]),
     maximumTakeoffWeight: parseNumeric(row["Maximum Takeoff Weight"]),
     maximumLandingWeight: parseNumeric(row["Maximum Landing Weight"]),
     maximumRangeNm: convertStatuteMilesToNm(parseNumeric(row["Maximum Range"]))
@@ -129,6 +132,10 @@ export function getAircraftProfileOptionMetadata(equipmentType) {
 }
 
 export function supportsFlightByOperationalLimits(flight, equipmentType) {
+  return supportsFlightByRunwayLimits(flight, equipmentType);
+}
+
+export function supportsFlightByRunwayLimits(flight, equipmentType) {
   ensureAircraftCatalogLoaded();
   const normalizedType = String(equipmentType || "").trim().toUpperCase();
   if (!normalizedType) {
@@ -140,18 +147,19 @@ export function supportsFlightByOperationalLimits(flight, equipmentType) {
     return false;
   }
 
-  const mtowOk =
-    !Number.isFinite(profile.maximumTakeoffWeight) ||
-    !Number.isFinite(flight.mtow) ||
-    profile.maximumTakeoffWeight <= flight.mtow;
-  const mlwOk =
-    !Number.isFinite(profile.maximumLandingWeight) ||
-    !Number.isFinite(flight.mlw) ||
-    profile.maximumLandingWeight <= flight.mlw;
-  const rangeOk =
-    !Number.isFinite(profile.maximumRangeNm) ||
-    !Number.isFinite(flight.distanceNm) ||
-    profile.maximumRangeNm >= flight.distanceNm;
+  const fromAirport = getAirportByIcao(flight.from);
+  const toAirport = getAirportByIcao(flight.to);
 
-  return mtowOk && mlwOk && rangeOk;
+  // Duty schedule compatibility is runway-based: the airport runway must meet the
+  // aircraft's minimum takeoff/landing runway length for the selected profile.
+  const takeoffRunwayOk =
+    !Number.isFinite(profile.minimumTakeoffRunwayLength) ||
+    !Number.isFinite(fromAirport?.runwayLength) ||
+    profile.minimumTakeoffRunwayLength <= fromAirport.runwayLength;
+  const landingRunwayOk =
+    !Number.isFinite(profile.minimumLandingRunwayLength) ||
+    !Number.isFinite(toAirport?.runwayLength) ||
+    profile.minimumLandingRunwayLength <= toAirport.runwayLength;
+
+  return takeoffRunwayOk && landingRunwayOk;
 }

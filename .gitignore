@@ -9,3 +9,4 @@ src-tauri/deltava-pfpxsched-*.xml
 AGENTS.md
 git_workflow.md
 release.ps1
+test-data/

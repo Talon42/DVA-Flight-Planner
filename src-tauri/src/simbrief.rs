@@ -1407,8 +1407,8 @@ pub async fn start_simbrief_dispatch(
         WebviewUrl::External(dispatch_url),
     )
     .title("SimBrief Dispatch")
-    .inner_size(560.0, 500.0)
-    .min_inner_size(500.0, 430.0)
+    .inner_size(600.0, 260.0)
+    .min_inner_size(600.0, 260.0)
     .resizable(true)
     .center()
     .data_directory(build_webview_data_directory(&app)?)

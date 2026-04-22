@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { formatDistanceNm } from "../lib/formatters";
 import { groupSimBriefAircraftTypesByManufacturer } from "../lib/simbrief";
 import { getAircraftProfileOptionMetadata } from "../lib/aircraftCatalog";
+import { buildAirportCatalogOptions } from "../lib/airportCatalog";
 import Button from "./ui/Button";
 import Panel from "./ui/Panel";
 import {
@@ -287,6 +288,7 @@ export function SearchableMultiSelect({
   hideChips = false,
   searchable = true,
   showClearAction = true,
+  showHeaderClearAction = false,
   showOptionMark = true,
   showSingleSelectedLabel = false,
   prioritizeSelectedOptions = true,
@@ -469,14 +471,27 @@ export function SearchableMultiSelect({
             {searchable ? placeholder || `Search ${label.toLowerCase()}` : `Select ${label.toLowerCase()}`}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="rounded-none"
-          onClick={() => setIsOpen(false)}
-        >
-          Close
-        </Button>
+        <div className="flex items-center gap-2">
+          {showHeaderClearAction ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-none"
+              onClick={() => onChange([])}
+              disabled={!selectedValues.length}
+            >
+              Clear
+            </Button>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-none"
+            onClick={() => setIsOpen(false)}
+          >
+            Close
+          </Button>
+        </div>
       </div>
 
       {searchable ? (
@@ -1005,7 +1020,7 @@ function BasicFilters({
       </div>
 
       <div className="grid gap-3 bp-1024:grid-cols-2 bp-1400:grid-cols-1">
-        <div className="contents bp-1400:grid bp-1400:grid-cols-3 bp-1400:gap-3">
+        <div className="contents bp-1400:grid bp-1400:grid-cols-2 bp-1400:gap-3">
           <SearchableMultiSelect
             label="Aircraft"
             placeholder="Search aircraft"
@@ -1107,18 +1122,18 @@ function DutyScheduleFilters({
   regionOptions,
   countryOptions,
   dutyEquipmentOptions,
+  dutyOriginAirportOptions,
   qualifyingDutyAirlines,
   filterBounds,
   onDutyFilterChange,
-  onBuildDutySchedule
+  onBuildDutySchedule,
+  dutyBuildWarning,
+  onClearDutyBuildWarning
 }) {
   const hasLocationSelection =
     dutyFilters.locationKind === "region"
       ? Boolean(dutyFilters.selectedRegion)
       : Boolean(dutyFilters.selectedCountry);
-  const canBuildByAirline = Boolean(dutyFilters.selectedAirline && dutyFilters.selectedEquipment);
-  const canBuildByLocation = Boolean(hasLocationSelection && dutyFilters.selectedEquipment && dutyFilters.resolvedAirline);
-  const canBuild = dutyFilters.buildMode === "location" ? canBuildByLocation : canBuildByAirline;
   const dutyBuildModeOptions = useMemo(
     () => [
       { value: "airline", label: "By Airline", keywords: "airline" },
@@ -1161,6 +1176,22 @@ function DutyScheduleFilters({
         }))
       ),
     [countryOptions, dutyFilters.locationKind, regionOptions]
+  );
+  const dutyOriginAirportSelectOptions = useMemo(
+    () =>
+      [{ value: "", label: "All", keywords: "all" }].concat(
+        ((dutyOriginAirportOptions || []).length
+          ? dutyOriginAirportOptions
+          : buildAirportCatalogOptions())
+          .filter((airport) => airport.usedAsOrigin)
+          .map((airport) => ({
+            value: airport.icao,
+            label: airport.name,
+            selectedLabel: airport.name,
+            keywords: `${airport.icao} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
+          }))
+      ),
+    [dutyOriginAirportOptions]
   );
   const dutyEquipmentSelectOptions = useMemo(
     () =>
@@ -1208,6 +1239,9 @@ function DutyScheduleFilters({
     ],
     []
   );
+  const [originAirportInput, setOriginAirportInput] = useState(
+    dutyFilters.selectedOriginAirport || ""
+  );
   const flightLengthSlider = useTransientRangeSlider(
     dutyFilters.flightLengthMin,
     dutyFilters.flightLengthMax,
@@ -1224,6 +1258,46 @@ function DutyScheduleFilters({
       onDutyFilterChange("distanceMax", maxValue);
     }
   );
+
+  useEffect(() => {
+    setOriginAirportInput(dutyFilters.selectedOriginAirport || "");
+  }, [dutyFilters.selectedOriginAirport]);
+
+  function handleIcaoFieldChange(value, setInputValue) {
+    const icao = String(value || "")
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "")
+      .slice(0, 4);
+
+    setInputValue(icao);
+  }
+
+  function commitIcaoFieldValue(key, value, options, setInputValue) {
+    const icao = String(value || "")
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "")
+      .slice(0, 4);
+    const exactMatch = options.find((option) => option.value === icao);
+
+    if (exactMatch) {
+      setInputValue(exactMatch.value);
+      onDutyFilterChange(key, exactMatch.value);
+      return;
+    }
+
+    setInputValue("");
+    onDutyFilterChange(key, "");
+  }
+
+  function handleIcaoFieldKeyDown(event, key, value, options, setInputValue) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    commitIcaoFieldValue(key, value, options, setInputValue);
+    event.currentTarget.blur();
+  }
 
   return (
     <div className="duty-schedule-filters grid gap-3">
@@ -1318,6 +1392,54 @@ function DutyScheduleFilters({
         )}
       </div>
 
+      <div className={gridClassNames.routeFields}>
+        <SearchableMultiSelect
+          label="Origin Airport"
+          placeholder="Search origin airports"
+          emptyLabel="No matching origin airports"
+          allLabel="All"
+          allowMultiple={false}
+          hideChips
+          showClearAction={false}
+          showHeaderClearAction
+          showSingleSelectedLabel
+          filterQuery={originAirportInput}
+          options={dutyOriginAirportSelectOptions}
+          selectedValues={dutyFilters.selectedOriginAirport ? [dutyFilters.selectedOriginAirport] : [""]}
+          onChange={(value) => {
+            setOriginAirportInput(value.length === 1 ? value[0] : "");
+            onDutyFilterChange("selectedOriginAirport", value[0] || "");
+          }}
+        />
+        <Field label="ICAO" className="filter-block filter-block--icao min-w-0">
+          <input
+            className={fieldInputClassName}
+            type="text"
+            value={originAirportInput}
+            onChange={(event) => handleIcaoFieldChange(event.target.value, setOriginAirportInput)}
+            onBlur={() =>
+              commitIcaoFieldValue(
+                "selectedOriginAirport",
+                originAirportInput,
+                dutyOriginAirportSelectOptions,
+                setOriginAirportInput
+              )
+            }
+            onKeyDown={(event) =>
+              handleIcaoFieldKeyDown(
+                event,
+                "selectedOriginAirport",
+                originAirportInput,
+                dutyOriginAirportSelectOptions,
+                setOriginAirportInput
+              )
+            }
+            placeholder="KATL"
+            maxLength={4}
+          />
+        </Field>
+      </div>
+
       {dutyFilters.buildMode === "location" && hasLocationSelection ? (
         <div className={cn("rounded-none border border-[color:transparent] bg-[var(--surface-panel)] px-4 py-3 text-[var(--text-muted)]", supportCopyTextClassName)}>
           {dutyFilters.resolvedAirline ? (
@@ -1360,7 +1482,7 @@ function DutyScheduleFilters({
           />
         </div>
 
-        <div className="contents bp-1400:order-1 bp-1400:col-span-full bp-1400:grid bp-1400:grid-cols-2 bp-1400:gap-3">
+        <div className="contents bp-1400:order-1 bp-1400:col-span-full bp-1400:grid bp-1400:grid-cols-3 bp-1400:gap-3">
           <SearchableMultiSelect
             label="Aircraft"
             placeholder="Search aircraft"
@@ -1391,6 +1513,26 @@ function DutyScheduleFilters({
             selectedValues={[String(dutyFilters.dutyLength)]}
             onChange={(value) => onDutyFilterChange("dutyLength", Number(value[0] || 2))}
           />
+
+          <Field
+            label="Sequence Rules"
+            className="filter-block min-w-0 bp-1024:col-span-2 bp-1400:col-span-1"
+          >
+            <div className="toggle-row toggle-row--single-line flex flex-nowrap gap-2">
+              <button
+                className={toggleButtonClassName(dutyFilters.uniqueDestinationsEnabled, "addon")}
+                type="button"
+                onClick={() =>
+                  onDutyFilterChange(
+                    "uniqueDestinationsEnabled",
+                    !dutyFilters.uniqueDestinationsEnabled
+                  )
+                }
+              >
+                Unique Destinations
+              </button>
+            </div>
+          </Field>
         </div>
       </div>
 
@@ -1433,13 +1575,52 @@ function DutyScheduleFilters({
             </button>
           </div>
         </Field>
+
       </div>
 
       <div className="flex justify-center">
-        <Button onClick={onBuildDutySchedule} disabled={!canBuild}>
+        <Button onClick={onBuildDutySchedule}>
           Build my Schedule
         </Button>
       </div>
+
+      {dutyBuildWarning?.length ? (
+        <div
+          className={cn(
+            "absolute inset-0 z-20 grid place-items-center px-4 py-4",
+            modalBackdropClassName
+          )}
+          onClick={onClearDutyBuildWarning}
+        >
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(560px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Duty schedule build warning"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader
+              eyebrow="Duty Schedule"
+              title="Cannot build schedule yet"
+              description="Resolve the issue below, then try again."
+            />
+
+            <ul className="m-0 grid gap-2 pl-5 text-[var(--text-muted)]">
+              {dutyBuildWarning.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={onClearDutyBuildWarning}>
+                Close
+              </Button>
+            </div>
+          </Panel>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1719,6 +1900,7 @@ export default function FilterBar({
   countryOptions,
   equipmentOptions,
   dutyEquipmentOptions,
+  dutyOriginAirportOptions,
   qualifyingDutyAirlines,
   filterBounds,
   onPlannerModeChange,
@@ -1726,7 +1908,9 @@ export default function FilterBar({
   onDutyFilterChange,
   onTogglePlannerControls,
   onBuildDutySchedule,
-  onReset
+  onReset,
+  dutyBuildWarning,
+  onClearDutyBuildWarning
 }) {
   function handlePlannerHeaderClick(event) {
     if (event.target.closest("button, a, input, select, textarea")) {
@@ -1849,6 +2033,8 @@ export default function FilterBar({
               filterBounds={filterBounds}
               onDutyFilterChange={onDutyFilterChange}
               onBuildDutySchedule={onBuildDutySchedule}
+              dutyBuildWarning={dutyBuildWarning}
+              onClearDutyBuildWarning={onClearDutyBuildWarning}
             />
           ) : (
             <BasicFilters

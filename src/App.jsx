@@ -35,10 +35,14 @@ import {
 import { DEFAULT_DUTY_FILTERS, DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
 import {
   getAircraftProfileOptions,
-  supportsFlightByOperationalLimits
+  supportsFlightByRunwayLimits
 } from "./lib/aircraftCatalog";
 import { getAirlineIcao, getAirlineNameByIata } from "./lib/airlineBranding";
-import { buildAirportOptions, getAirportByIcao } from "./lib/airportCatalog";
+import {
+  buildAirportCatalogOptions,
+  buildAirportOptions,
+  getAirportByIcao
+} from "./lib/airportCatalog";
 import dalLogo from "./data/images/DAL.png";
 import {
   createEmptyAddonAirportScan,
@@ -316,7 +320,7 @@ function getDefaultPlannerControlsCollapsed() {
 }
 
 function deriveFlightNumber(flight) {
-  const explicitFlightNumber = String(flight?.flightNumber || "").trim();
+  const explicitFlightNumber = String(flight?.flightNumber || flight?.tourFlightNumber || "").trim();
   if (explicitFlightNumber) {
     return explicitFlightNumber;
   }
@@ -327,7 +331,7 @@ function deriveFlightNumber(flight) {
   }
 
   const stripped = flightCode.replace(/^[^\d]+/, "");
-  return stripped || flightCode;
+  return stripped.replace(/\s+LEG\s+\d+$/i, "").trim() || flightCode;
 }
 
 function deriveCallsign(flight) {
@@ -341,6 +345,15 @@ function deriveCallsign(flight) {
     .toUpperCase();
   const flightNumber = deriveFlightNumber(flight).toUpperCase();
   return `${airlineCode}${flightNumber}`.trim();
+}
+
+function deriveSimBriefDepartureTimeUtc(flight) {
+  const explicitUtc = String(flight?.stdUtc || "").trim();
+  if (explicitUtc) {
+    return explicitUtc;
+  }
+
+  return DateTime.local().set({ second: 0, millisecond: 0 }).toISO();
 }
 
 function buildScheduleDateLabel(flights = []) {
@@ -1146,12 +1159,21 @@ function normalizeDutyFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDi
     ...DEFAULT_DUTY_FILTERS,
     ...(savedFilters || {})
   };
+  const normalizeBlankSelection = (value) => {
+    const trimmed = String(value || "").trim();
+    return !trimmed || trimmed.toUpperCase() === "ALL" ? "" : trimmed;
+  };
 
   nextFilters.buildMode = nextFilters.buildMode === "location" ? "location" : "airline";
-  nextFilters.selectedAirline = String(nextFilters.selectedAirline || "").trim();
+  nextFilters.selectedAirline = normalizeBlankSelection(nextFilters.selectedAirline);
   nextFilters.locationKind = nextFilters.locationKind === "region" ? "region" : "country";
-  nextFilters.selectedCountry = String(nextFilters.selectedCountry || "").trim();
-  nextFilters.selectedRegion = String(nextFilters.selectedRegion || "").trim().toUpperCase();
+  nextFilters.selectedCountry = normalizeBlankSelection(nextFilters.selectedCountry);
+  nextFilters.selectedRegion = normalizeBlankSelection(nextFilters.selectedRegion).toUpperCase();
+  nextFilters.selectedOriginAirport = String(nextFilters.selectedOriginAirport || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 4);
   nextFilters.selectedEquipment = String(nextFilters.selectedEquipment || "").trim().toUpperCase();
   nextFilters.addonMatchMode = ["either", "origin", "destination", "both"].includes(
     nextFilters.addonMatchMode
@@ -1160,6 +1182,7 @@ function normalizeDutyFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDi
     : "either";
   nextFilters.addonFilterEnabled = Boolean(nextFilters.addonFilterEnabled);
   nextFilters.addonPriorityEnabled = Boolean(nextFilters.addonPriorityEnabled);
+  nextFilters.uniqueDestinationsEnabled = Boolean(nextFilters.uniqueDestinationsEnabled);
   nextFilters.resolvedAirline = String(nextFilters.resolvedAirline || "").trim();
 
   const defaultFlightLengthMax = bounds.maxBlockMinutes;
@@ -1242,6 +1265,95 @@ function flightTouchesDutyLocation(flight, dutyFilters) {
   );
 }
 
+function buildDutyOriginAirportOptions(flights, dutyFilters) {
+  const selectedAirline = String(dutyFilters?.buildMode === "airline" ? dutyFilters?.selectedAirline : "").trim();
+  const hasLocationSelection =
+    dutyFilters?.locationKind === "region"
+      ? Boolean(dutyFilters?.selectedRegion)
+      : Boolean(dutyFilters?.selectedCountry);
+
+  if (!selectedAirline && !hasLocationSelection) {
+    return buildAirportCatalogOptions();
+  }
+
+  const filteredFlights = (flights || []).filter((flight) => {
+    if (selectedAirline && flight.airlineName !== selectedAirline) {
+      return false;
+    }
+
+    if (hasLocationSelection && !flightTouchesDutyLocation(flight, dutyFilters)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  return buildAirportOptions(filteredFlights);
+}
+
+function buildDutyFlightPool(flights, dutyFilters, addonAirports = new Set(), options = {}) {
+  const selectedOriginAirport = String(dutyFilters?.selectedOriginAirport || "").trim().toUpperCase();
+  const respectOriginAirport = options.respectOriginAirport !== false;
+  const dutyAirline = String(
+    dutyFilters?.buildMode === "airline"
+      ? dutyFilters?.selectedAirline || dutyFilters?.resolvedAirline || ""
+      : dutyFilters?.resolvedAirline || ""
+  ).trim();
+  const hasLocationSelection =
+    dutyFilters?.locationKind === "region"
+      ? Boolean(dutyFilters?.selectedRegion)
+      : Boolean(dutyFilters?.selectedCountry);
+
+  return (flights || []).filter((flight) => {
+    if (
+      respectOriginAirport &&
+      selectedOriginAirport &&
+      String(flight.from || "").trim().toUpperCase() !== selectedOriginAirport
+    ) {
+      return false;
+    }
+
+    if (dutyAirline && flight.airlineName !== dutyAirline) {
+      return false;
+    }
+
+    if (
+      dutyFilters?.buildMode === "location" &&
+      hasLocationSelection &&
+      !flightTouchesDutyLocation(flight, dutyFilters)
+    ) {
+      return false;
+    }
+
+    if (
+      dutyFilters?.selectedEquipment &&
+      !supportsFlightByRunwayLimits(flight, dutyFilters.selectedEquipment)
+    ) {
+      return false;
+    }
+
+    if (
+      flight.blockMinutes < dutyFilters.flightLengthMin ||
+      flight.blockMinutes > dutyFilters.flightLengthMax
+    ) {
+      return false;
+    }
+
+    if (
+      flight.distanceNm < dutyFilters.distanceMin ||
+      flight.distanceNm > dutyFilters.distanceMax
+    ) {
+      return false;
+    }
+
+    if (dutyFilters.addonFilterEnabled) {
+      return matchesAddonAirport(flight, addonAirports, dutyFilters.addonMatchMode);
+    }
+
+    return true;
+  });
+}
+
 function getDutyQualifyingAirlines(flights, dutyFilters) {
   if (!Array.isArray(flights) || !flights.length || dutyFilters.buildMode !== "location") {
     return [];
@@ -1285,12 +1397,156 @@ function prioritizeDutyCandidates(flights, addonAirports) {
   return prioritizeAddonFlights(flights, addonAirports, "either");
 }
 
+function compareDutyCandidates(left, right, addonAirports, dutyFilters) {
+  const leftAddonMatch = dutyFilters.addonPriorityEnabled
+    ? matchesAddonAirport(left, addonAirports, dutyFilters.addonMatchMode)
+    : false;
+  const rightAddonMatch = dutyFilters.addonPriorityEnabled
+    ? matchesAddonAirport(right, addonAirports, dutyFilters.addonMatchMode)
+    : false;
+
+  if (leftAddonMatch !== rightAddonMatch) {
+    return leftAddonMatch ? -1 : 1;
+  }
+
+  return String(left.flightId || "").localeCompare(String(right.flightId || ""));
+}
+
+function sortDutyCandidates(flights, addonAirports, dutyFilters) {
+  return [...(flights || [])].sort((left, right) =>
+    compareDutyCandidates(left, right, addonAirports, dutyFilters)
+  );
+}
+
+function findExactDutyScheduleChain(candidateFlights, dutyFilters, addonAirports, selectedOriginAirport) {
+  const requestedLength = Math.max(0, Number(dutyFilters?.dutyLength || 0));
+  if (!requestedLength) {
+    return [];
+  }
+
+  const uniqueDestinationsEnabled = Boolean(dutyFilters?.uniqueDestinationsEnabled);
+  const selectedOrigin = String(selectedOriginAirport || "").trim().toUpperCase();
+  const flightsByOrigin = new Map();
+
+  for (const flight of candidateFlights || []) {
+    const origin = String(flight.from || "").trim().toUpperCase();
+    if (!origin) {
+      continue;
+    }
+
+    const currentFlights = flightsByOrigin.get(origin) || [];
+    currentFlights.push(flight);
+    flightsByOrigin.set(origin, currentFlights);
+  }
+
+  for (const flights of flightsByOrigin.values()) {
+    flights.sort((left, right) => compareDutyCandidates(left, right, addonAirports, dutyFilters));
+  }
+
+  const startFlights = selectedOrigin
+    ? [...(flightsByOrigin.get(selectedOrigin) || [])]
+    : sortDutyCandidates(candidateFlights, addonAirports, dutyFilters);
+
+  function searchFromAirport(currentAirport, selectedFlights, usedFlightIds, visitedAirports) {
+    if (selectedFlights.length >= requestedLength) {
+      return [...selectedFlights];
+    }
+
+    const nextCandidates = flightsByOrigin.get(currentAirport) || [];
+    let eligibleFlights = nextCandidates.filter((flight) => !usedFlightIds.has(flight.flightId));
+
+    if (uniqueDestinationsEnabled) {
+      eligibleFlights = eligibleFlights.filter((flight) => {
+        const nextAirport = String(flight.to || "").trim().toUpperCase();
+        return nextAirport && !visitedAirports.has(nextAirport);
+      });
+    }
+
+    for (const nextFlight of eligibleFlights) {
+      selectedFlights.push(nextFlight);
+      usedFlightIds.add(nextFlight.flightId);
+      const nextAirport = String(nextFlight.to || "").trim().toUpperCase();
+      const nextVisitedAirports = uniqueDestinationsEnabled
+        ? new Set(visitedAirports)
+        : visitedAirports;
+      if (uniqueDestinationsEnabled) {
+        nextVisitedAirports.add(nextAirport);
+      }
+
+      const completed = searchFromAirport(nextAirport, selectedFlights, usedFlightIds, nextVisitedAirports);
+      if (completed) {
+        return completed;
+      }
+
+      selectedFlights.pop();
+      usedFlightIds.delete(nextFlight.flightId);
+    }
+
+    return null;
+  }
+
+  for (const startFlight of startFlights) {
+    const startOriginAirport = String(startFlight.from || "").trim().toUpperCase();
+    const startDestinationAirport = String(startFlight.to || "").trim().toUpperCase();
+    const usedFlightIds = new Set([startFlight.flightId]);
+    const visitedAirports = uniqueDestinationsEnabled
+      ? new Set([startOriginAirport, startDestinationAirport])
+      : null;
+    const startSelectedFlights = [startFlight];
+
+    const completed = searchFromAirport(
+      startDestinationAirport,
+      startSelectedFlights,
+      usedFlightIds,
+      visitedAirports
+    );
+    if (completed) {
+      return completed;
+    }
+  }
+
+  return null;
+}
+
 function resolveDutyAirlineForLocation(flights, dutyFilters) {
   const qualifyingAirlines = getDutyQualifyingAirlines(flights, dutyFilters);
   return {
     qualifyingAirlines,
     resolvedAirline: pickRandomValue(qualifyingAirlines)
   };
+}
+
+function getDutyBuildWarnings(dutyFilters, qualifyingDutyAirlines = [], hasSchedule = false) {
+  const warnings = [];
+
+  if (!hasSchedule) {
+    warnings.push("Import a schedule before building a duty schedule.");
+    return warnings;
+  }
+
+  const hasLocationSelection =
+    dutyFilters.locationKind === "region"
+      ? Boolean(dutyFilters.selectedRegion)
+      : Boolean(dutyFilters.selectedCountry);
+  const hasAirlineSelection = dutyFilters.buildMode === "airline" && Boolean(dutyFilters.selectedAirline);
+
+  if (
+    !String(dutyFilters.selectedOriginAirport || "").trim() &&
+    !hasAirlineSelection &&
+    !hasLocationSelection
+  ) {
+    warnings.push("Select an origin airport, airline, or location.");
+  }
+
+  if (hasLocationSelection && !qualifyingDutyAirlines.length) {
+    warnings.push("No qualifying airlines were found for the selected location.");
+  }
+
+  if (!dutyFilters.selectedEquipment) {
+    warnings.push("Select one aircraft.");
+  }
+
+  return warnings;
 }
 
 function buildGeoOptions(airportOptions) {
@@ -1439,6 +1695,7 @@ export default function App() {
   const [selectedTourRowId, setSelectedTourRowId] = useState(null);
   const [expandedBoardFlightId, setExpandedBoardFlightId] = useState(null);
   const [pendingMapFlightPathViewMode, setPendingMapFlightPathViewMode] = useState(null);
+  const [pendingMapFitToRoute, setPendingMapFitToRoute] = useState(false);
   const [scheduleTableTimeDisplayMode, setScheduleTableTimeDisplayMode] = useState("local");
   const [scheduleView, setScheduleView] = useState("flights");
   const [plannerMode, setPlannerMode] = useState("basic");
@@ -1449,6 +1706,7 @@ export default function App() {
   const [selectedTourPath, setSelectedTourPath] = useState("");
   const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
   const [tourProgress, setTourProgress] = useState({});
+  const [dutyBuildWarning, setDutyBuildWarning] = useState(null);
   const [theme, setTheme] = useState(readSavedTheme);
   const [isDevToolsEnabled, setIsDevToolsEnabled] = useState(readSavedDevToolsEnabled);
   const [devWindowWidth, setDevWindowWidth] = useState(readSavedDevWindowWidth);
@@ -2231,6 +2489,10 @@ export default function App() {
     () => normalizeDutyFilters(dutyFilters, filterBounds),
     [dutyFilters, filterBounds]
   );
+  const dutyOriginAirportOptions = useMemo(
+    () => buildDutyOriginAirportOptions(scheduleFlights, normalizedDutyFilters),
+    [normalizedDutyFilters, scheduleFlights]
+  );
   const normalizedDeferredDutyFilters = useMemo(
     () => normalizeDutyFilters(deferredDutyFilters, filterBounds),
     [deferredDutyFilters, filterBounds]
@@ -2248,6 +2510,28 @@ export default function App() {
       ),
     [scheduleFlights, normalizedDutyFilters]
   );
+
+  useEffect(() => {
+    const selectedOriginAirport = String(normalizedDutyFilters.selectedOriginAirport || "").trim();
+    if (!selectedOriginAirport) {
+      return;
+    }
+
+    const allowedOrigins = new Set(dutyOriginAirportOptions.map((option) => String(option?.icao || "").trim().toUpperCase()));
+    if (allowedOrigins.has(selectedOriginAirport)) {
+      return;
+    }
+
+    setDutyFilters((current) =>
+      String(current.selectedOriginAirport || "").trim().toUpperCase() === selectedOriginAirport
+        ? {
+            ...current,
+            selectedOriginAirport: "",
+            resolvedAirline: ""
+          }
+        : current
+    );
+  }, [dutyOriginAirportOptions, normalizedDutyFilters.selectedOriginAirport]);
 
   const basicFilteredFlights = useMemo(() => {
     if (!schedule) {
@@ -2406,7 +2690,7 @@ export default function App() {
 
         if (
           normalizedDeferredDutyFilters.selectedEquipment &&
-          !supportsFlightByOperationalLimits(
+          !supportsFlightByRunwayLimits(
             flight,
             normalizedDeferredDutyFilters.selectedEquipment
           )
@@ -2919,12 +3203,46 @@ export default function App() {
     }
   }
 
-  function replaceFlightBoard(flightIds) {
+  function replaceFlightBoard(flightIds, boardName = DEFAULT_FLIGHT_BOARD_NAME) {
     const selectedFlights = flightIds
       .map((flightId) => schedule?.flights.find((flight) => flight.flightId === flightId) || null)
       .filter(Boolean);
     const nextFlightBoard = selectedFlights.map((flight) => buildBoardEntryFromFlight(flight));
-    updateActiveFlightBoardEntries(nextFlightBoard);
+    const activeBoardId =
+      activeFlightBoardId && flightBoards.some((board) => board.id === activeFlightBoardId)
+        ? activeFlightBoardId
+        : flightBoards[0]?.id || "";
+    const activeBoard = flightBoards.find((board) => board.id === activeBoardId) || null;
+    const shouldReuseActiveBoard =
+      !activeBoard ||
+      !Array.isArray(activeBoard.entries) ||
+      activeBoard.entries.length === 0 ||
+      flightBoards.length >= MAX_FLIGHT_BOARDS;
+
+    if (shouldReuseActiveBoard) {
+      if (!activeBoard) {
+        const fallbackBoard = createFlightBoard(boardName, nextFlightBoard);
+        setFlightBoards([fallbackBoard]);
+        setActiveFlightBoardId(fallbackBoard.id);
+      } else {
+        setFlightBoards((current) =>
+          current.map((board) =>
+            board.id === activeBoardId
+              ? {
+                  ...board,
+                  name: normalizeFlightBoardName(boardName, board.name),
+                  entries: nextFlightBoard
+                }
+              : board
+          )
+        );
+        setActiveFlightBoardId(activeBoardId);
+      }
+    } else {
+      const nextBoard = createFlightBoard(boardName, nextFlightBoard);
+      setFlightBoards((current) => [...current, nextBoard]);
+      setActiveFlightBoardId(nextBoard.id);
+    }
     setExpandedBoardFlightId(null);
     setSimBriefDispatchState({
       flightId: "",
@@ -3025,10 +3343,34 @@ export default function App() {
           nextFilters.selectedAirline = String(value || "").trim();
         }
 
+        if (key === "selectedOriginAirport") {
+          nextFilters.selectedOriginAirport = String(value || "")
+            .toUpperCase()
+            .replace(/[^A-Z]/g, "")
+            .slice(0, 4);
+          nextFilters.resolvedAirline = "";
+        }
+
         if (key === "selectedEquipment") {
           nextFilters.selectedEquipment = String(value || "").trim().toUpperCase();
         }
         const normalizedNextFilters = normalizeDutyFilters(nextFilters, filterBounds);
+        const allowedOriginAirportIcaos = new Set(
+          buildDutyOriginAirportOptions(schedule?.flights || [], normalizedNextFilters).map((airport) =>
+            String(airport?.icao || "").trim().toUpperCase()
+          )
+        );
+
+        if (
+          normalizedNextFilters.selectedOriginAirport &&
+          !allowedOriginAirportIcaos.has(normalizedNextFilters.selectedOriginAirport)
+        ) {
+          return {
+            ...normalizedNextFilters,
+            selectedOriginAirport: "",
+            resolvedAirline: ""
+          };
+        }
 
         if (normalizedNextFilters.buildMode !== "location") {
           return normalizedNextFilters;
@@ -3398,12 +3740,34 @@ export default function App() {
 
   function handleDeleteFlightBoard(boardId) {
     const normalizedBoardId = String(boardId || "").trim();
-    if (!normalizedBoardId || flightBoards.length <= 1) {
+    if (!normalizedBoardId) {
       return;
     }
 
     const boardIndex = flightBoards.findIndex((board) => board.id === normalizedBoardId);
     if (boardIndex < 0) {
+      return;
+    }
+
+    if (flightBoards.length <= 1) {
+      setFlightBoards((current) =>
+        current.map((board) =>
+          board.id === normalizedBoardId
+            ? {
+                ...board,
+                name: DEFAULT_FLIGHT_BOARD_NAME,
+                entries: []
+              }
+            : board
+        )
+      );
+      setActiveFlightBoardId(normalizedBoardId);
+      setExpandedBoardFlightId(null);
+      setSimBriefDispatchState({
+        flightId: "",
+        isDispatching: false,
+        message: ""
+      });
       return;
     }
 
@@ -3424,15 +3788,41 @@ export default function App() {
   }
 
   async function handleBuildDutySchedule() {
-    if (!schedule) {
+    const activeDutyFilters = normalizeDutyFilters(dutyFilters, filterBounds);
+    const buildWarnings = getDutyBuildWarnings(
+      activeDutyFilters,
+      qualifyingDutyAirlines,
+      Boolean(schedule)
+    );
+
+    if (buildWarnings.length) {
+      setDutyBuildWarning(buildWarnings);
       return;
     }
 
-    const activeDutyFilters = normalizeDutyFilters(dutyFilters, filterBounds);
-    const resolvedDutyAirline =
-      activeDutyFilters.buildMode === "location" && !activeDutyFilters.resolvedAirline
-        ? pickRandomValue(qualifyingDutyAirlines)
-        : activeDutyFilters.resolvedAirline;
+    setDutyBuildWarning(null);
+    const selectedOriginAirport = String(activeDutyFilters.selectedOriginAirport || "").trim().toUpperCase();
+    const resolutionFilters =
+      selectedOriginAirport &&
+      (activeDutyFilters.buildMode === "location" || !activeDutyFilters.selectedAirline)
+        ? {
+            ...activeDutyFilters,
+            selectedAirline: "",
+            resolvedAirline: ""
+          }
+        : activeDutyFilters;
+    const dutyFlightPool = buildDutyFlightPool(schedule.flights, resolutionFilters, addonAirports);
+    const resolvedDutyAirline = activeDutyFilters.buildMode === "airline" && activeDutyFilters.selectedAirline
+      ? activeDutyFilters.selectedAirline
+      : selectedOriginAirport
+        ? pickRandomValue(
+            [...new Set(dutyFlightPool.map((flight) => String(flight.airlineName || "").trim()).filter(Boolean))].sort(
+              (left, right) => left.localeCompare(right)
+            )
+          )
+        : activeDutyFilters.buildMode === "location" && !activeDutyFilters.resolvedAirline
+          ? pickRandomValue(qualifyingDutyAirlines)
+          : activeDutyFilters.resolvedAirline;
     const effectiveDutyFilters =
       resolvedDutyAirline === activeDutyFilters.resolvedAirline
         ? activeDutyFilters
@@ -3441,59 +3831,23 @@ export default function App() {
             resolvedAirline: resolvedDutyAirline
           };
 
-    if (effectiveDutyFilters.buildMode === "location" && resolvedDutyAirline !== activeDutyFilters.resolvedAirline) {
+    if (
+      resolvedDutyAirline &&
+      resolvedDutyAirline !== activeDutyFilters.resolvedAirline &&
+      (selectedOriginAirport || effectiveDutyFilters.buildMode === "location")
+    ) {
       setDutyFilters((current) => ({
         ...current,
         resolvedAirline: resolvedDutyAirline
       }));
     }
 
-    const candidateFlights = schedule.flights.filter((flight) => {
-      if (effectiveDutyFilters.buildMode === "airline") {
-        if (!effectiveDutyFilters.selectedAirline || flight.airlineName !== effectiveDutyFilters.selectedAirline) {
-          return false;
-        }
-      } else {
-        if (!effectiveDutyFilters.resolvedAirline || flight.airlineName !== effectiveDutyFilters.resolvedAirline) {
-          return false;
-        }
-
-        if (!flightTouchesDutyLocation(flight, effectiveDutyFilters)) {
-          return false;
-        }
-      }
-
-      if (
-        effectiveDutyFilters.selectedEquipment &&
-        !supportsFlightByOperationalLimits(flight, effectiveDutyFilters.selectedEquipment)
-      ) {
-        return false;
-      }
-
-      if (
-        flight.blockMinutes < effectiveDutyFilters.flightLengthMin ||
-        flight.blockMinutes > effectiveDutyFilters.flightLengthMax
-      ) {
-        return false;
-      }
-
-      if (
-        flight.distanceNm < effectiveDutyFilters.distanceMin ||
-        flight.distanceNm > effectiveDutyFilters.distanceMax
-      ) {
-        return false;
-      }
-
-      if (effectiveDutyFilters.addonFilterEnabled) {
-        return matchesAddonAirport(
-          flight,
-          addonAirports,
-          effectiveDutyFilters.addonMatchMode
-        );
-      }
-
-      return true;
-    });
+    const candidateFlights = buildDutyFlightPool(
+      schedule.flights,
+      effectiveDutyFilters,
+      addonAirports,
+      { respectOriginAirport: false }
+    );
 
     if (!candidateFlights.length) {
       setStatusMessage("No flights match the current duty schedule filters.");
@@ -3504,80 +3858,66 @@ export default function App() {
       return;
     }
 
-    const selectedFlights = [];
-    const usedFlightIds = new Set();
-    let remainingFlights = candidateFlights;
+    const exactSelectedFlights = findExactDutyScheduleChain(
+      candidateFlights,
+      effectiveDutyFilters,
+      addonAirports,
+      selectedOriginAirport
+    );
 
-    while (selectedFlights.length < effectiveDutyFilters.dutyLength && remainingFlights.length) {
-      let eligibleFlights =
-        selectedFlights.length === 0
-          ? remainingFlights
-          : remainingFlights.filter(
-              (flight) => flight.from === selectedFlights[selectedFlights.length - 1].to
-            );
-
-      if (!eligibleFlights.length) {
-        break;
-      }
-
-      eligibleFlights = eligibleFlights.filter((flight) => !usedFlightIds.has(flight.flightId));
-      if (!eligibleFlights.length) {
-        break;
-      }
-
-      if (effectiveDutyFilters.addonPriorityEnabled) {
-        const prioritizedFlights = prioritizeDutyCandidates(eligibleFlights, addonAirports);
-        const addonFirstFlights = prioritizedFlights.filter((flight) =>
-          matchesAddonAirport(flight, addonAirports, effectiveDutyFilters.addonMatchMode)
-        );
-        if (addonFirstFlights.length) {
-          eligibleFlights = addonFirstFlights;
-        }
-      }
-
-      const nextFlight = eligibleFlights[Math.floor(Math.random() * eligibleFlights.length)];
-      selectedFlights.push(nextFlight);
-      usedFlightIds.add(nextFlight.flightId);
-      remainingFlights = candidateFlights.filter((flight) => !usedFlightIds.has(flight.flightId));
-    }
-
-    if (!selectedFlights.length) {
-      setStatusMessage("Unable to build a connected duty schedule from the current filters.");
+    if (!exactSelectedFlights) {
+      const warningText =
+        `Unable to build a full ${effectiveDutyFilters.dutyLength}-flight duty schedule with the current filters. ` +
+        "Lower the requested flight count or adjust the filters and try again.";
+      setDutyBuildWarning([warningText]);
+      setStatusMessage(warningText);
       await logAppEvent("duty-schedule-build-failed", {
         requestedFlights: effectiveDutyFilters.dutyLength,
-        buildMode: effectiveDutyFilters.buildMode
+        buildMode: effectiveDutyFilters.buildMode,
+        reason: "no-full-chain",
+        addonPriorityEnabled: effectiveDutyFilters.addonPriorityEnabled,
+        uniqueDestinationsEnabled: effectiveDutyFilters.uniqueDestinationsEnabled
       });
       return;
     }
 
-    replaceFlightBoard(selectedFlights.map((flight) => flight.flightId));
+    const selectedFlights = exactSelectedFlights;
+
+    const dutyBoardAirline =
+      effectiveDutyFilters.resolvedAirline || effectiveDutyFilters.selectedAirline;
+    const dutyBoardName = normalizeFlightBoardName(
+      `${String(dutyBoardAirline || "").trim() || "Duty"} Duty Schedule`,
+      DEFAULT_FLIGHT_BOARD_NAME
+    );
+
+    replaceFlightBoard(
+      selectedFlights.map((flight) => flight.flightId),
+      dutyBoardName
+    );
     setSelectedFlightId(selectedFlights[0]?.flightId || null);
+    setPendingMapFlightPathViewMode("all");
+    setPendingMapFitToRoute(true);
+    setScheduleView("map");
     setPlannerControlsCollapsed(true);
 
     const resolvedAirlineLabel =
-      effectiveDutyFilters.buildMode === "location"
-        ? effectiveDutyFilters.resolvedAirline
-        : effectiveDutyFilters.selectedAirline;
+      effectiveDutyFilters.resolvedAirline || effectiveDutyFilters.selectedAirline;
 
-    if (selectedFlights.length < effectiveDutyFilters.dutyLength) {
-      setStatusMessage(
-        `Built a partial duty schedule with ${selectedFlights.length} of ${effectiveDutyFilters.dutyLength} requested flights${resolvedAirlineLabel ? ` for ${resolvedAirlineLabel}` : ""}.`
-      );
-    } else {
-      setStatusMessage(
-        `Built a ${selectedFlights.length}-flight duty schedule${resolvedAirlineLabel ? ` for ${resolvedAirlineLabel}` : ""}.`
-      );
-    }
+    setStatusMessage(
+      `Built a ${selectedFlights.length}-flight duty schedule${resolvedAirlineLabel ? ` for ${resolvedAirlineLabel}` : ""}.`
+    );
 
     await logAppEvent("duty-schedule-built", {
       requestedFlights: effectiveDutyFilters.dutyLength,
       builtFlights: selectedFlights.length,
       buildMode: effectiveDutyFilters.buildMode,
       resolvedAirline: resolvedAirlineLabel,
+      selectedOriginAirport: effectiveDutyFilters.selectedOriginAirport,
       locationKind: effectiveDutyFilters.locationKind,
       selectedCountry: effectiveDutyFilters.selectedCountry,
       selectedRegion: effectiveDutyFilters.selectedRegion,
-      addonPriorityEnabled: effectiveDutyFilters.addonPriorityEnabled
+      addonPriorityEnabled: effectiveDutyFilters.addonPriorityEnabled,
+      uniqueDestinationsEnabled: effectiveDutyFilters.uniqueDestinationsEnabled
     });
   }
 
@@ -4009,11 +4349,17 @@ export default function App() {
     }
 
     const flightId = selectedShortlistFlight.boardEntryId;
-    const flightNumber = deriveFlightNumber(selectedShortlistFlight);
-    const callsign = deriveCallsign(selectedShortlistFlight);
+    const sourceTourFlight =
+      selectedShortlistFlight.isTourFlight && selectedShortlistFlight.tourRowId
+        ? tourFlightsById.get(selectedShortlistFlight.tourRowId) || null
+        : null;
+    const dispatchFlight = sourceTourFlight || selectedShortlistFlight;
+    const flightNumber = deriveFlightNumber(dispatchFlight);
+    const callsign = deriveCallsign(dispatchFlight);
+    const departureTimeUtc = deriveSimBriefDepartureTimeUtc(dispatchFlight);
 
-    if (!flightNumber || !callsign) {
-      const message = "This flight is missing a dispatchable flight number or callsign.";
+    if (!flightNumber || !callsign || !departureTimeUtc) {
+      const message = "This flight is missing a dispatchable flight number, callsign, or departure time.";
       setSimBriefDispatchState({
         flightId,
         isDispatching: false,
@@ -4051,7 +4397,7 @@ export default function App() {
         destination: selectedShortlistFlight.to,
         aircraftType: selectedDispatchOption.dispatchType,
         units: simBriefDispatchUnits,
-        departureTimeUtc: selectedShortlistFlight.stdUtc,
+        departureTimeUtc,
         username,
         pilotId
       });
@@ -4315,6 +4661,34 @@ export default function App() {
     } catch (error) {
       await logAppError("update-release-page-open-failed", error, {
         releaseUrl
+      });
+    }
+  }
+
+  async function handleOpenSimBriefFlight(staticId) {
+    const normalizedStaticId = String(staticId || "").trim();
+    if (!normalizedStaticId) {
+      return;
+    }
+
+    const simBriefUrl = `https://dispatch.simbrief.com/briefing/latest?static_id=${encodeURIComponent(normalizedStaticId)}`;
+
+    try {
+      if (isDesktopAddonScanAvailable) {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(simBriefUrl);
+      } else {
+        window.open(simBriefUrl, "_blank", "noopener,noreferrer");
+      }
+
+      await logAppEvent("simbrief-flight-opened", {
+        staticId: normalizedStaticId,
+        url: simBriefUrl
+      });
+    } catch (error) {
+      await logAppError("simbrief-flight-open-failed", error, {
+        staticId: normalizedStaticId,
+        url: simBriefUrl
       });
     }
   }
@@ -4634,6 +5008,8 @@ export default function App() {
                 selectedFlightId={selectedFlightId}
                 expandedBoardFlightId={expandedBoardFlightId}
                 pendingMapFlightPathViewMode={pendingMapFlightPathViewMode}
+                pendingMapFitToRoute={pendingMapFitToRoute}
+                onConsumePendingMapFitToRoute={() => setPendingMapFitToRoute(false)}
                 availableTours={availableTours}
                 selectedTourPath={selectedTour?.path || ""}
                 accomplishmentOptions={ACCOMPLISHMENTS}
@@ -4683,7 +5059,14 @@ export default function App() {
                   : "grid-rows-[minmax(0,1fr)]"
               )}
             >
-              <div className={cn(scheduleView !== "flights" && "pointer-events-none opacity-60")}>
+              <div
+                className={cn(scheduleView !== "flights" && "opacity-60")}
+                onPointerDownCapture={() => {
+                  if (scheduleView !== "flights") {
+                    setScheduleView("flights");
+                  }
+                }}
+              >
                 <FilterBar
                   key={`filters-${filterUiVersion}`}
                   plannerMode={plannerMode}
@@ -4696,6 +5079,7 @@ export default function App() {
                   countryOptions={geoOptions.countries}
                   equipmentOptions={equipmentOptions}
                   dutyEquipmentOptions={dutyEquipmentOptions}
+                  dutyOriginAirportOptions={dutyOriginAirportOptions}
                   qualifyingDutyAirlines={qualifyingDutyAirlines}
                   filterBounds={filterBounds}
                   onPlannerModeChange={handlePlannerModeChange}
@@ -4705,6 +5089,8 @@ export default function App() {
                   onTogglePlannerControls={() => setPlannerControlsCollapsed((current) => !current)}
                   onBuildDutySchedule={handleBuildDutySchedule}
                   onReset={handleResetFilters}
+                  dutyBuildWarning={dutyBuildWarning}
+                  onClearDutyBuildWarning={() => setDutyBuildWarning(null)}
                 />
               </div>
 
@@ -4714,6 +5100,7 @@ export default function App() {
                   flightBoards={flightBoards}
                   activeFlightBoardId={activeFlightBoard?.id || ""}
                   expandedBoardFlightId={expandedBoardFlightId}
+                  selectedAccomplishment={selectedAccomplishment}
                   simBriefDispatchState={simBriefDispatchState}
                   simBriefCredentialsConfigured={simBriefCredentialsConfigured}
                   isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
@@ -4730,6 +5117,7 @@ export default function App() {
                   onDeleteFlightBoard={handleDeleteFlightBoard}
                   onSimBriefTypeChange={handleSimBriefTypeChange}
                   onSimBriefDispatch={handleSimBriefDispatch}
+                  onOpenSimBriefFlight={handleOpenSimBriefFlight}
                   onCompleteTourFlight={handleCompleteTourFlight}
                   showFlightBoard
                 />
@@ -5118,6 +5506,7 @@ export default function App() {
           </Panel>
         </ModalBackdrop>
       ) : null}
+
     </div>
   );
 }

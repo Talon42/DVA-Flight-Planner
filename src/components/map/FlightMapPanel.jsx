@@ -207,12 +207,15 @@ export default function FlightMapPanel({
   theme,
   activeFlightBoardEntries = [],
   expandedBoardFlightId = null,
-  initialFlightPathViewMode = "all"
+  initialFlightPathViewMode = "all",
+  initialFitToRoute = false,
+  onConsumeInitialFitToRoute
 }) {
   const [mapMode, setMapMode] = useState("standard");
   const [flightPathViewMode, setFlightPathViewMode] = useState(
     initialFlightPathViewMode === "selected" ? "selected" : "all"
   );
+  const [shouldFitToRoute, setShouldFitToRoute] = useState(Boolean(initialFitToRoute));
   const [satelliteOverlay, setSatelliteOverlay] = useState(false);
   const [radarEnabled, setRadarEnabled] = useState(false);
   const [labelsEnabled, setLabelsEnabled] = useState(true);
@@ -226,6 +229,15 @@ export default function FlightMapPanel({
 
     setFlightPathViewMode("selected");
   }, [initialFlightPathViewMode]);
+
+  useEffect(() => {
+    if (!initialFitToRoute) {
+      return;
+    }
+
+    setShouldFitToRoute(true);
+    onConsumeInitialFitToRoute?.();
+  }, [initialFitToRoute, onConsumeInitialFitToRoute]);
 
   const mapConfig = useMemo(
     () => resolveMapModeConfig(mapMode, theme),
@@ -395,7 +407,7 @@ export default function FlightMapPanel({
         flightPathGeoJson={flightPathGeoJson}
         endpointLabels={endpointLabels}
         endpointPopupMode={flightPathViewMode === "selected" ? "persistent" : "hover"}
-        fitToRoute={flightPathViewMode === "selected"}
+        fitToRoute={flightPathViewMode === "selected" || shouldFitToRoute}
         labelsEnabled={labelsEnabled}
         satelliteOverlay={satelliteOverlay}
         radarEnabled={radarEnabled}

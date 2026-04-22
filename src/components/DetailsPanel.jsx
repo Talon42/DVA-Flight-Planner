@@ -51,25 +51,34 @@ function simplifyAirportName(value) {
     .trim();
 }
 
+function formatBadgeTitleFromPath(path) {
+  const fileName = String(path || "").split("/").pop() || "";
+  const stem = fileName.replace(/\.json$/i, "");
+  return stem
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
+
 const ROUTE_LINE_CLASS =
   "route-banner__line h-[2px] w-[clamp(2.25rem,72%,5.25rem)] bg-[var(--delta-red)]";
 
-function TourBadge() {
+function FlightBoardBadge({ label, title }) {
   return (
     <span
       className={cn(
         "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-none bg-[var(--delta-red)] px-1.5 text-white",
         labelTextClassName
       )}
-      aria-label="Tour flight"
-      title="Tour flight"
+      aria-label={title}
+      title={title}
     >
-      T
+      {label}
     </span>
   );
 }
 
-function FlightBoardAirline({ flight }) {
+function FlightBoardAirline({ flight, selectedAccomplishment }) {
   const logoSrc = getAirlineLogo({
     airlineName: flight?.airlineName,
     airlineIata: flight?.airline,
@@ -78,6 +87,34 @@ function FlightBoardAirline({ flight }) {
   const flightLabel = flight?.isTourFlight
     ? String(flight?.flightCode || flight?.tourFlightNumber || flight?.flightNumber || "").trim()
     : String(flight?.flightCode || "").trim();
+  const accomplishmentAirports = Array.isArray(selectedAccomplishment?.airports)
+    ? selectedAccomplishment.airports
+    : [];
+  const accomplishmentRequirement = String(selectedAccomplishment?.requirement || "").trim().toLowerCase();
+  const isAccomplishmentFlight =
+    Boolean(accomplishmentAirports.length) &&
+    (accomplishmentRequirement === "arrival airports"
+      ? accomplishmentAirports.includes(String(flight?.to || "").trim().toUpperCase())
+      : accomplishmentAirports.some((airport) =>
+          [flight?.from, flight?.to].some(
+            (side) => String(side || "").trim().toUpperCase() === airport
+          )
+        ));
+
+  const flightBadges = [];
+  if (flight?.isTourFlight) {
+    flightBadges.push({
+      label: "T",
+      title: `Tour: ${formatBadgeTitleFromPath(flight?.tourPath) || "Tour flight"}`
+    });
+  }
+
+  if (isAccomplishmentFlight) {
+    flightBadges.push({
+      label: "A",
+      title: `Accomplishment: ${String(selectedAccomplishment?.name || "").trim() || "Selected accomplishment"}`
+    });
+  }
 
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -93,7 +130,17 @@ function FlightBoardAirline({ flight }) {
         <span className={cn("truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName, "font-semibold")}>
           {flightLabel}
         </span>
-        {flight?.isTourFlight ? <TourBadge /> : null}
+        {flightBadges.length ? (
+          <span className="flex min-w-0 items-center gap-1">
+            {flightBadges.map((badge) => (
+              <FlightBoardBadge
+                key={`${badge.label}:${badge.title}`}
+                label={badge.label}
+                title={badge.title}
+              />
+            ))}
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -346,9 +393,12 @@ function SimBriefInlinePanel({
   onRemoveFromFlightBoard,
   onCompleteTourFlight,
   onSimBriefTypeChange,
-  onSimBriefDispatch
+  onSimBriefDispatch,
+  onOpenSimBriefFlight
 }) {
   const selectedType = String(flight.simbriefSelectedType || "").trim().toUpperCase();
+  const simBriefStaticId = String(flight?.simbriefPlan?.staticId || "").trim();
+  const hasSimBriefPlan = Boolean(simBriefStaticId);
   const availableAircraftTypes = Array.isArray(simBriefAircraftTypes) ? simBriefAircraftTypes : [];
   const aircraftTypeOptions = useMemo(
     () => {
@@ -379,7 +429,18 @@ function SimBriefInlinePanel({
     !selectedType ||
     !selectedTypeSupported ||
     !simBriefCredentialsConfigured;
+  const dispatchLabel = isDispatching
+    ? hasSimBriefPlan
+      ? "Regenerating..."
+      : "Dispatching..."
+    : hasSimBriefPlan
+      ? "Regenerate"
+      : "SimBrief Dispatch";
   const showCompleteAction = Boolean(flight?.isTourFlight);
+  const actionGridClassName =
+    (showCompleteAction || hasSimBriefPlan)
+      ? gridClassNames.boardActionsQuad
+      : "grid min-w-0 gap-2 min-[1401px]:grid-cols-3";
 
   return (
     <div
@@ -393,10 +454,20 @@ function SimBriefInlinePanel({
       />
 
       {showCompleteAction ? (
-        <div className={gridClassNames.boardActionsQuad}>
+        <div className={actionGridClassName}>
           <Button className="min-w-0 w-full" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
-            {isDispatching ? "Dispatching..." : "SimBrief Dispatch"}
+            {dispatchLabel}
           </Button>
+          {hasSimBriefPlan && (
+            <Button
+              className="min-w-0 w-full"
+              variant="board"
+              size="sm"
+              onClick={() => onOpenSimBriefFlight(simBriefStaticId)}
+            >
+              Open in Simbrief
+            </Button>
+          )}
           <Button className="min-w-0 w-full" variant="board" size="sm" disabled>
             Push to ACARS
           </Button>
@@ -418,10 +489,20 @@ function SimBriefInlinePanel({
           </Button>
         </div>
       ) : (
-        <div className="grid min-w-0 gap-2 min-[1401px]:grid-cols-3">
+        <div className={actionGridClassName}>
           <Button className="min-w-0 w-full" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
-            {isDispatching ? "Dispatching..." : "SimBrief Dispatch"}
+            {dispatchLabel}
           </Button>
+          {hasSimBriefPlan && (
+            <Button
+              className="min-w-0 w-full"
+              variant="board"
+              size="sm"
+              onClick={() => onOpenSimBriefFlight(simBriefStaticId)}
+            >
+              Open in Simbrief
+            </Button>
+          )}
           <Button className="min-w-0 w-full" variant="board" size="sm" disabled>
             Push to ACARS
           </Button>
@@ -462,7 +543,7 @@ function RepairInlinePanel({ flight, onRemoveFromFlightBoard, onRepairFlightBoar
   );
 }
 
-function FlightBoardCardSummary({ flight }) {
+function FlightBoardCardSummary({ flight, selectedAccomplishment = null }) {
   const isCompletedTourFlight = Boolean(flight?.isTourFlight && flight?.isCompleted);
   const boardDistanceLabel = flight?.isTourFlight
     ? Number.isFinite(flight?.distanceMi)
@@ -484,7 +565,7 @@ function FlightBoardCardSummary({ flight }) {
       )}
     >
       <div className={cn("route-banner__meta flex flex-wrap items-center justify-between gap-2 bp-1024:gap-1.5", bodySmTextClassName)}>
-        <FlightBoardAirline flight={flight} />
+        <FlightBoardAirline flight={flight} selectedAccomplishment={selectedAccomplishment} />
         <small className="text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]">
           {boardMetaTimeLabel}
         </small>
@@ -574,6 +655,7 @@ export default function DetailsPanel({
   flightBoards = [],
   activeFlightBoardId = "",
   expandedBoardFlightId,
+  selectedAccomplishment = null,
   simBriefDispatchState,
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
@@ -590,6 +672,7 @@ export default function DetailsPanel({
   onDeleteFlightBoard,
   onSimBriefTypeChange,
   onSimBriefDispatch,
+  onOpenSimBriefFlight = () => {},
   onCompleteTourFlight,
   showFlightBoard = true
 }) {
@@ -844,7 +927,6 @@ export default function DetailsPanel({
     ? shortlist.filter((flight) => flight.boardEntryId !== draggedBoardEntryId)
     : shortlist;
   const canCreateBoard = flightBoards.length < 4;
-  const canDeleteBoard = flightBoards.length > 1;
   const renameOverlayHost = panelRef.current;
   const placeholderIndex = buildPlaceholderIndex(shortlist, dropTarget, draggedBoardEntryId);
   const draggedFlight = shortlist.find((flight) => flight.boardEntryId === draggedBoardEntryId) || null;
@@ -912,7 +994,6 @@ export default function DetailsPanel({
                       className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-none text-[var(--text-muted)] transition-colors hover:text-[var(--delta-red)] disabled:cursor-not-allowed disabled:opacity-45"
                       aria-label={`Delete ${board.name}`}
                       onClick={() => onDeleteFlightBoard?.(board.id)}
-                      disabled={!canDeleteBoard}
                     >
                       <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
                         <path
@@ -1002,7 +1083,10 @@ export default function DetailsPanel({
                     }}
                     aria-expanded={expandedBoardFlightId === flight.boardEntryId}
                   >
-                    <FlightBoardCardSummary flight={flight} />
+                    <FlightBoardCardSummary
+                      flight={flight}
+                      selectedAccomplishment={selectedAccomplishment}
+                    />
                   </div>
                   {expandedBoardFlightId === flight.boardEntryId ? (
                     flight.isStale ? (
@@ -1024,6 +1108,7 @@ export default function DetailsPanel({
                         onCompleteTourFlight={onCompleteTourFlight}
                         onSimBriefTypeChange={onSimBriefTypeChange}
                         onSimBriefDispatch={onSimBriefDispatch}
+                        onOpenSimBriefFlight={onOpenSimBriefFlight}
                       />
                     )
                   ) : null}
@@ -1103,7 +1188,10 @@ export default function DetailsPanel({
                 <span className="block h-0.5 w-4 rounded-none bg-current/80" />
               </span>
             </div>
-            <FlightBoardCardSummary flight={draggedFlight} />
+            <FlightBoardCardSummary
+              flight={draggedFlight}
+              selectedAccomplishment={selectedAccomplishment}
+            />
           </div>
         </div>
       ) : null}

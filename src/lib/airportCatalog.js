@@ -16,6 +16,11 @@ function parseCoordinate(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseNumeric(value) {
+  const normalized = String(value || "").replace(/[^0-9-]/g, "");
+  return normalized ? Number(normalized) : null;
+}
+
 function ensureAirportCatalogLoaded() {
   if (airportCatalog && airportByIcao) {
     return;
@@ -43,6 +48,7 @@ function ensureAirportCatalogLoaded() {
       country: String(row.Country || "").trim(),
       latitude: parseCoordinate(row.Latitude),
       longitude: parseCoordinate(row.Longitude),
+      runwayLength: parseNumeric(row.rwy_length),
       regionCode: regionByCountry.get(String(row.Country || "").trim())?.code || "",
       regionName: regionByCountry.get(String(row.Country || "").trim())?.name || ""
     }))
@@ -54,6 +60,30 @@ function ensureAirportCatalogLoaded() {
 export function getAirportByIcao(icao) {
   ensureAirportCatalogLoaded();
   return airportByIcao.get(String(icao || "").trim().toUpperCase()) || null;
+}
+
+export function buildAirportCatalogOptions() {
+  ensureAirportCatalogLoaded();
+
+  return [...airportCatalog]
+    .map((airport) => ({
+      icao: airport.icao,
+      name: airport.name,
+      country: airport.country,
+      runwayLength: airport.runwayLength,
+      regionCode: airport.regionCode,
+      regionName: airport.regionName,
+      usedAsOrigin: true,
+      usedAsDestination: false
+    }))
+    .toSorted((left, right) => {
+      const nameCompare = left.name.localeCompare(right.name);
+      if (nameCompare !== 0) {
+        return nameCompare;
+      }
+
+      return left.icao.localeCompare(right.icao);
+    });
 }
 
 export function buildAirportOptions(flights) {
@@ -75,6 +105,7 @@ export function buildAirportOptions(flights) {
         icao: normalizedIcao,
         name: airport?.name || normalizedIcao,
         country: airport?.country || "",
+        runwayLength: airport?.runwayLength ?? null,
         regionCode: airport?.regionCode || "",
         regionName: airport?.regionName || "",
         usedAsOrigin: false,

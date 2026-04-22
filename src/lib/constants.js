@@ -36,6 +36,7 @@ export const DEFAULT_DUTY_FILTERS = {
   locationKind: "country",
   selectedCountry: "",
   selectedRegion: "",
+  selectedOriginAirport: "",
   flightLengthMin: null,
   flightLengthMax: null,
   distanceMin: null,
@@ -44,6 +45,7 @@ export const DEFAULT_DUTY_FILTERS = {
   addonMatchMode: "either",
   addonFilterEnabled: false,
   addonPriorityEnabled: false,
+  uniqueDestinationsEnabled: false,
   dutyLength: 2,
   resolvedAirline: ""
 };
