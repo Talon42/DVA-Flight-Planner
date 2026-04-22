@@ -481,7 +481,7 @@ function FooterStat({ label, value, className = "" }) {
   return (
     <p
       className={cn(
-        "m-0 inline-flex items-baseline gap-1.5 text-[var(--text-muted)] bp-1024:text-[0.76rem]",
+        "m-0 inline-flex items-baseline gap-1.5 whitespace-nowrap text-[var(--text-muted)] bp-1024:text-[0.76rem]",
         bodySmTextClassName,
         className
       )}
@@ -498,7 +498,7 @@ function FooterDateStat({ label, value, isCurrent, className = "" }) {
   return (
     <p
       className={cn(
-        "m-0 inline-flex items-baseline gap-1.5 text-[var(--text-muted)] bp-1024:text-[0.76rem]",
+        "m-0 inline-flex items-baseline gap-1.5 whitespace-nowrap text-[var(--text-muted)] bp-1024:text-[0.76rem]",
         bodySmTextClassName,
         className
       )}
@@ -517,7 +517,7 @@ function FooterLinkStat({ label, value, onClick, className = "" }) {
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-baseline gap-1.5 border-0 bg-transparent p-0 text-left text-[var(--delta-red)] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--delta-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-panel)] bp-1024:text-[0.76rem]",
+        "inline-flex items-baseline gap-1.5 whitespace-nowrap border-0 bg-transparent p-0 text-left text-[var(--delta-red)] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--delta-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-panel)] bp-1024:text-[0.76rem]",
         bodySmTextClassName,
         className
       )}
@@ -5183,8 +5183,8 @@ export default function App() {
           </div>
 
           {schedule?.importSummary || isDevToolsEnabled ? (
-            <footer className="grid gap-x-4 gap-y-1.5 border-t border-[color:var(--line)] pt-1.5 bp-1024:grid-cols-[1fr_auto_1fr] bp-1024:items-center bp-1024:gap-x-3">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 bp-1024:justify-self-start bp-1024:gap-x-3">
+            <footer className="flex min-w-0 flex-nowrap items-center justify-between gap-3 whitespace-nowrap border-t border-[color:var(--line)] pt-1.5">
+              <div className="flex min-w-0 flex-nowrap items-center gap-x-3 overflow-hidden whitespace-nowrap">
                 {schedule?.importSummary ? (
                   <>
                     {footerMetadataItems.map((item) => (
@@ -5203,7 +5203,7 @@ export default function App() {
                 ) : null}
               </div>
               {isDevToolsEnabled ? (
-                <div className="flex items-center gap-3 justify-self-center">
+                <div className="flex min-w-0 flex-1 items-center justify-center overflow-hidden whitespace-nowrap">
                   <div className="relative" ref={devWindowMenuRef}>
                     <button
                       type="button"
@@ -5212,7 +5212,7 @@ export default function App() {
                       aria-haspopup="menu"
                       disabled={!isDesktopAddonScanAvailable}
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-none border-0 bg-transparent p-0 text-[var(--text-muted)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] bp-1024:text-[0.76rem]",
+                        "inline-flex min-w-0 max-w-full items-center gap-1 overflow-hidden rounded-none border-0 bg-transparent p-0 text-[var(--text-muted)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] bp-1024:text-[0.76rem]",
                         bodySmTextClassName
                       )}
                       title={
@@ -5221,12 +5221,12 @@ export default function App() {
                           : "Window size presets are only available in the desktop app"
                       }
                     >
-                      <span>Window Size:</span>
-                      <strong className="font-semibold text-[var(--text-heading)]">
+                      <span className="shrink-0">Window Size:</span>
+                      <strong className="min-w-0 truncate font-semibold text-[var(--text-heading)]">
                         {selectedDevWindowPreset?.label || "Choose"}
                       </strong>
-                      <span>| Current Size:</span>
-                      <strong className="font-semibold text-[var(--text-heading)]">
+                      <span className="shrink-0">| Current Size:</span>
+                      <strong className="min-w-0 truncate font-semibold text-[var(--text-heading)]">
                         {currentWindowSizeLabel}
                       </strong>
                     </button>
@@ -5256,7 +5256,7 @@ export default function App() {
               ) : null}
               <div
                 className={cn(
-                  "flex flex-wrap items-center gap-x-3 gap-y-1 text-[var(--text-muted)] bp-1024:col-start-3 bp-1024:justify-self-end bp-1024:text-[0.76rem]",
+                  "flex shrink-0 items-center gap-x-2 whitespace-nowrap text-[var(--text-muted)] bp-1024:text-[0.76rem]",
                   bodySmTextClassName
                 )}
                 aria-label="Copyright © 2026 Talon42"
