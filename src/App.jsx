@@ -856,6 +856,11 @@ function buildBoardEntryFromFlight(flight, overrides = {}) {
     boardEntryId: overrides.boardEntryId || buildBoardEntryId(flight?.flightId),
     linkedFlightId: String(flight?.flightId || "").trim() || null,
     isStale: Boolean(overrides.isStale),
+    isCompleted: Boolean(overrides.isCompleted ?? flight?.isCompleted),
+    completedAt: overrides.completedAt ?? flight?.completedAt ?? null,
+    completionOrder: Number.isFinite(overrides.completionOrder ?? flight?.completionOrder)
+      ? overrides.completionOrder ?? flight?.completionOrder
+      : null,
     flightId: String(flight?.flightId || "").trim(),
     flightCode: String(flight?.flightCode || "").trim(),
     flightNumber: deriveFlightNumber(flight),
@@ -1076,7 +1081,10 @@ function reconcileBoardWithSchedule(currentBoard, nextFlights) {
         boardEntryId: normalizedEntry.boardEntryId,
         simbriefSelectedType: normalizedEntry.simbriefSelectedType,
         simbriefPlan: normalizedEntry.simbriefPlan,
-        isStale: false
+        isStale: false,
+        isCompleted: normalizedEntry.isCompleted,
+        completedAt: normalizedEntry.completedAt,
+        completionOrder: normalizedEntry.completionOrder
       });
     })
     .filter(Boolean);
@@ -3610,15 +3618,47 @@ export default function App() {
 
   function handleCompleteTourFlight(boardEntryId) {
     const entry = flightBoard.find((item) => item.boardEntryId === boardEntryId);
-    if (!entry?.isTourFlight || !entry.tourPath || !entry.tourRowId) {
+    if (!entry) {
+      return;
+    }
+
+    const isCurrentlyCompleted = Boolean(entry.isCompleted);
+    let nextCompletionOrder = null;
+
+    updateActiveFlightBoardEntries((current) => {
+      if (!current.length) {
+        return current;
+      }
+
+      if (!isCurrentlyCompleted) {
+        nextCompletionOrder =
+          current.reduce((maxOrder, currentEntry) => {
+            const order = Number(currentEntry?.completionOrder);
+            return currentEntry?.isCompleted && Number.isFinite(order)
+              ? Math.max(maxOrder, order)
+              : maxOrder;
+          }, 0) + 1;
+      }
+
+      return current.map((currentEntry) =>
+        currentEntry.boardEntryId === boardEntryId
+          ? {
+              ...currentEntry,
+              isCompleted: !isCurrentlyCompleted,
+              completedAt: !isCurrentlyCompleted ? new Date().toISOString() : null,
+              completionOrder: !isCurrentlyCompleted ? nextCompletionOrder : null
+            }
+          : currentEntry
+      );
+    });
+
+    if (!entry.isTourFlight || !entry.tourPath || !entry.tourRowId) {
       return;
     }
 
     setTourProgress((current) => {
       const currentTourProgress = current?.[entry.tourPath]?.rows || {};
       const currentRowProgress = currentTourProgress[entry.tourRowId] || {};
-      const isCurrentlyCompleted = Boolean(currentRowProgress.completed);
-
       if (isCurrentlyCompleted) {
         return {
           ...current,
@@ -3635,7 +3675,7 @@ export default function App() {
         };
       }
 
-      const nextCompletionOrder =
+      const nextTourCompletionOrder =
         Object.values(currentTourProgress).reduce((maxOrder, progressEntry) => {
           const order = Number(progressEntry?.completionOrder);
           return Number.isFinite(order) ? Math.max(maxOrder, order) : maxOrder;
@@ -3649,7 +3689,7 @@ export default function App() {
             [entry.tourRowId]: {
               completed: true,
               completedAt: new Date().toISOString(),
-              completionOrder: nextCompletionOrder
+              completionOrder: nextTourCompletionOrder
             }
           }
         }

@@ -436,11 +436,7 @@ function SimBriefInlinePanel({
     : hasSimBriefPlan
       ? "Regenerate"
       : "SimBrief Dispatch";
-  const showCompleteAction = Boolean(flight?.isTourFlight);
-  const actionGridClassName =
-    (showCompleteAction || hasSimBriefPlan)
-      ? gridClassNames.boardActionsQuad
-      : "grid min-w-0 gap-2 min-[1401px]:grid-cols-3";
+  const actionGridClassName = gridClassNames.boardActionsQuad;
 
   return (
     <div
@@ -453,69 +449,40 @@ function SimBriefInlinePanel({
         onChange={(value) => onSimBriefTypeChange(flight.boardEntryId, value || "")}
       />
 
-      {showCompleteAction ? (
-        <div className={actionGridClassName}>
-          <Button className="min-w-0 w-full" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
-            {dispatchLabel}
-          </Button>
-          {hasSimBriefPlan && (
-            <Button
-              className="min-w-0 w-full"
-              variant="board"
-              size="sm"
-              onClick={() => onOpenSimBriefFlight(simBriefStaticId)}
-            >
-              Open in Simbrief
-            </Button>
-          )}
-          <Button className="min-w-0 w-full" variant="board" size="sm" disabled>
-            Push to ACARS
-          </Button>
-          <Button
-            className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
-            variant={flight.isCompleted ? "ghost" : "success"}
-            size="sm"
-            onClick={() => onCompleteTourFlight(flight.boardEntryId)}
-          >
-            {flight.isCompleted ? "Click to Revert Status" : "Complete Flight"}
-          </Button>
+      <div className={actionGridClassName}>
+        <Button className="min-w-0 w-full" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
+          {dispatchLabel}
+        </Button>
+        {hasSimBriefPlan && (
           <Button
             className="min-w-0 w-full"
-            variant="danger"
+            variant="board"
             size="sm"
-            onClick={() => onRemoveFromFlightBoard(flight.boardEntryId)}
+            onClick={() => onOpenSimBriefFlight(simBriefStaticId)}
           >
-            Remove from Flight Board
+            Open in Simbrief
           </Button>
-        </div>
-      ) : (
-        <div className={actionGridClassName}>
-          <Button className="min-w-0 w-full" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
-            {dispatchLabel}
-          </Button>
-          {hasSimBriefPlan && (
-            <Button
-              className="min-w-0 w-full"
-              variant="board"
-              size="sm"
-              onClick={() => onOpenSimBriefFlight(simBriefStaticId)}
-            >
-              Open in Simbrief
-            </Button>
-          )}
-          <Button className="min-w-0 w-full" variant="board" size="sm" disabled>
-            Push to ACARS
-          </Button>
-          <Button
-            className="min-w-0 w-full"
-            variant="danger"
-            size="sm"
-            onClick={() => onRemoveFromFlightBoard(flight.boardEntryId)}
-          >
-            Remove from Flight Board
-          </Button>
-        </div>
-      )}
+        )}
+        <Button className="min-w-0 w-full" variant="board" size="sm" disabled>
+          Push to ACARS
+        </Button>
+        <Button
+          className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
+          variant={flight.isCompleted ? "ghost" : "success"}
+          size="sm"
+          onClick={() => onCompleteTourFlight(flight.boardEntryId)}
+        >
+          {flight.isCompleted ? "Click to Revert Status" : "Complete Flight"}
+        </Button>
+        <Button
+          className="min-w-0 w-full"
+          variant="danger"
+          size="sm"
+          onClick={() => onRemoveFromFlightBoard(flight.boardEntryId)}
+        >
+          Remove from Flight Board
+        </Button>
+      </div>
     </div>
   );
 }
@@ -544,7 +511,7 @@ function RepairInlinePanel({ flight, onRemoveFromFlightBoard, onRepairFlightBoar
 }
 
 function FlightBoardCardSummary({ flight, selectedAccomplishment = null }) {
-  const isCompletedTourFlight = Boolean(flight?.isTourFlight && flight?.isCompleted);
+  const isCompletedFlight = Boolean(flight?.isCompleted);
   const boardDistanceLabel = flight?.isTourFlight
     ? Number.isFinite(flight?.distanceMi)
       ? `${formatNumber(flight.distanceMi)} mi`
@@ -561,7 +528,7 @@ function FlightBoardCardSummary({ flight, selectedAccomplishment = null }) {
     <div
       className={cn(
         "route-banner route-banner--board grid min-w-0 gap-2 rounded-none bg-[var(--route-banner)] px-3 py-2.5 text-[var(--text-primary)] bp-1024:gap-1.5 bp-1024:px-2.5 bp-1024:py-2 dark:text-white",
-        isCompletedTourFlight && "opacity-45"
+        isCompletedFlight && "opacity-45"
       )}
     >
       <div className={cn("route-banner__meta flex flex-wrap items-center justify-between gap-2 bp-1024:gap-1.5", bodySmTextClassName)}>
@@ -575,7 +542,7 @@ function FlightBoardCardSummary({ flight, selectedAccomplishment = null }) {
           <span className={cn("text-left text-[1.1rem] font-semibold tracking-[-0.03em]")}>
             {flight.from}
           </span>
-          {isCompletedTourFlight ? (
+          {isCompletedFlight ? (
             <span className="flex min-w-0 items-center justify-center">
               <span className={cn("rounded-none bg-[var(--status-resolved-bg)] px-3 py-1 text-[var(--status-resolved-text)]", labelTextClassName)}>
                 Completed
