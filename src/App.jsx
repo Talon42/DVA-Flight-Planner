@@ -356,14 +356,37 @@ function deriveSimBriefDepartureTimeUtc(flight) {
   return DateTime.local().set({ second: 0, millisecond: 0 }).toISO();
 }
 
-function buildScheduleDateLabel(flights = []) {
+function getDayOrdinal(day) {
+  const normalizedDay = Math.trunc(Number(day));
+  if (!Number.isFinite(normalizedDay) || normalizedDay <= 0) {
+    return "";
+  }
+
+  const mod100 = normalizedDay % 100;
+  if (mod100 >= 11 && mod100 <= 13) {
+    return "th";
+  }
+
+  switch (normalizedDay % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
+function buildScheduleDateInfo(flights = []) {
   const dates = flights
     .map((flight) => DateTime.fromISO(String(flight?.stdLocal || "")))
     .filter((value) => value.isValid)
     .map((value) => value.startOf("day"));
 
   if (!dates.length) {
-    return "N/A";
+    return { date: null, label: "N/A" };
   }
 
   let earliest = dates[0];
@@ -381,10 +404,15 @@ function buildScheduleDateLabel(flights = []) {
 
   const midpointOffsetDays = Math.floor(latest.diff(earliest, "days").days / 2);
   const effectiveScheduleDate = earliest.plus({ days: midpointOffsetDays });
+  const isCurrent = effectiveScheduleDate.hasSame(DateTime.local().startOf("day"), "day");
+  const monthLabel = effectiveScheduleDate.toFormat("MMMM");
+  const dayLabel = `${effectiveScheduleDate.day}${getDayOrdinal(effectiveScheduleDate.day)}`;
+  const label =
+    earliest.year !== latest.year
+      ? `${monthLabel} ${dayLabel}, ${effectiveScheduleDate.toFormat("yyyy")}`
+      : `${monthLabel} ${dayLabel}`;
 
-  return earliest.year !== latest.year
-    ? effectiveScheduleDate.toFormat("MMMM d, yyyy")
-    : effectiveScheduleDate.toFormat("MMMM d");
+  return { date: effectiveScheduleDate, isCurrent, label };
 }
 
 function buildFooterDateLabel(dateIso) {
@@ -460,6 +488,25 @@ function FooterStat({ label, value, className = "" }) {
     >
       <span>{label}:</span>
       <strong className="font-semibold text-[var(--text-heading)]">{value}</strong>
+    </p>
+  );
+}
+
+function FooterDateStat({ label, value, isCurrent, className = "" }) {
+  const displayValue = isCurrent ? value : `${value} (Out of Date!)`;
+
+  return (
+    <p
+      className={cn(
+        "m-0 inline-flex items-baseline gap-1.5 text-[var(--text-muted)] bp-1024:text-[0.76rem]",
+        bodySmTextClassName,
+        className
+      )}
+    >
+      <span>{label}:</span>
+      <strong className={cn("font-semibold", isCurrent ? "text-[var(--text-heading)]" : "text-[var(--delta-red)]")}>
+        {displayValue}
+      </strong>
     </p>
   );
 }
@@ -1780,14 +1827,24 @@ export default function App() {
   const deferredDutyFilters = useDeferredValue(dutyFilters);
   const isDesktopAddonScanAvailable = isTauriRuntime();
   const isDesktopSimBriefAvailable = isDesktopAddonScanAvailable;
-  const scheduleDateLabel = buildScheduleDateLabel(schedule?.flights || []);
+  const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
+  const scheduleDateLabel = scheduleDateInfo.label;
   const logbookDateLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
   const footerMetadataItems = schedule?.importSummary
     ? [
-        { label: "Source", value: getScheduleSourceLabel(schedule.importSummary) },
-        { label: "Schedule Date", value: scheduleDateLabel },
-        { label: "Imported Flights", value: formatNumber(schedule.importSummary.importedRows ?? 0) },
-        { label: "Logbook", value: logbookDateLabel }
+        { kind: "stat", label: "Source", value: getScheduleSourceLabel(schedule.importSummary) },
+        {
+          kind: "date",
+          label: "Schedule Date",
+          value: scheduleDateLabel,
+          isCurrent: scheduleDateInfo.isCurrent
+        },
+        {
+          kind: "stat",
+          label: "Imported Flights",
+          value: formatNumber(schedule.importSummary.importedRows ?? 0)
+        },
+        { kind: "stat", label: "Logbook (Last Flight Report)", value: logbookDateLabel }
       ]
     : [];
   const layoutBucket = getLayoutBucket(viewportSize);
@@ -5131,7 +5188,16 @@ export default function App() {
                 {schedule?.importSummary ? (
                   <>
                     {footerMetadataItems.map((item) => (
-                      <FooterStat key={item.label} label={item.label} value={item.value} />
+                      item.kind === "date" ? (
+                        <FooterDateStat
+                          key={item.label}
+                          label={item.label}
+                          value={item.value}
+                          isCurrent={item.isCurrent}
+                        />
+                      ) : (
+                        <FooterStat key={item.label} label={item.label} value={item.value} />
+                      )
                     ))}
                   </>
                 ) : null}
