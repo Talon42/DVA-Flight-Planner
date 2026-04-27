@@ -18,8 +18,8 @@ export const DEFAULT_FILTERS = {
   route: "",
   aircraftFamily: "ALL",
   equipment: [],
-  localDepartureWindow: "",
-  localArrivalWindow: "",
+  localDepartureWindow: [],
+  localArrivalWindow: [],
   flightLengthMin: null,
   flightLengthMax: null,
   distanceMin: null,
@@ -46,6 +46,9 @@ export const DEFAULT_DUTY_FILTERS = {
   addonFilterEnabled: false,
   addonPriorityEnabled: false,
   uniqueDestinationsEnabled: false,
+  timeOrderEnabled: false,
+  minTurnMinutes: 60,
+  dutyTargetMode: "strict",
   dutyLength: 2,
   resolvedAirline: ""
 };

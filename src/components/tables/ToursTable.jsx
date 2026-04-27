@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import DataTable from "../table/DataTable";
+import DataTable from "../data-table/DataTable";
 import { getTourTableColumns } from "./tourTableDefinition.jsx";
 
 function renderCompletedRowOverlay(row) {

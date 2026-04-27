@@ -53,21 +53,21 @@
   --text-primary: #102136;
   --text-heading: var(--delta-blue-deep);
   --text-muted: #64758a;
-  --line: rgba(10, 25, 46, 0.04);
-  --line-strong: rgba(16, 33, 54, 0.08);
-  --surface: rgba(240, 245, 250, 0.98);
-  --surface-border: rgba(196, 211, 228, 0.22);
-  --surface-raised: rgba(229, 237, 245, 0.99);
-  --surface-soft: rgba(236, 242, 248, 0.98);
-  --surface-panel: rgba(221, 231, 241, 0.99);
+  --line: rgba(16, 33, 54, 0.08);
+  --line-strong: rgba(16, 33, 54, 0.14);
+  --surface: rgba(246, 250, 253, 0.98);
+  --surface-border: rgba(150, 171, 195, 0.42);
+  --surface-raised: rgba(238, 245, 251, 0.99);
+  --surface-soft: rgba(232, 240, 248, 0.98);
+  --surface-panel: rgba(226, 236, 246, 0.99);
   --surface-table-row: rgba(248, 251, 254, 0.94);
   --surface-table-row-alt: rgba(238, 244, 249, 0.98);
   --surface-table-row-selected:
     linear-gradient(90deg, rgba(0, 58, 112, 0.18), rgba(11, 31, 54, 0.08)),
     rgba(255, 255, 255, 0.84);
-  --surface-option: rgba(224, 232, 241, 0.99);
-  --surface-option-selected: rgba(0, 58, 112, 0.12);
-  --input-bg: rgba(230, 237, 244, 0.99);
+  --surface-option: rgba(226, 235, 245, 0.99);
+  --surface-option-selected: rgba(0, 58, 112, 0.14);
+  --input-bg: rgba(230, 238, 247, 0.99);
   --modal-shell-bg: var(--surface-raised);
   --modal-backdrop-bg: rgba(8, 20, 36, 0.42);
   --button-ghost-bg: rgba(223, 233, 244, 0.94);
@@ -114,7 +114,7 @@
   --line: rgba(182, 204, 229, 0.08);
   --line-strong: rgba(221, 233, 245, 0.12);
   --surface: rgba(10, 24, 43, 0.96);
-  --surface-border: rgba(186, 209, 234, 0.08);
+  --surface-border: rgba(186, 209, 234, 0.10);
   --surface-raised: rgba(12, 28, 47, 0.98);
   --surface-soft: rgba(13, 29, 49, 0.98);
   --surface-panel: rgba(15, 33, 54, 0.99);
@@ -126,7 +126,7 @@
   --surface-option: rgba(13, 29, 48, 0.99);
   --surface-option-selected: rgba(0, 58, 112, 0.22);
   --input-bg: #081424;
-  --modal-shell-bg: #14304D;
+  --modal-shell-bg: #10243B;
   --modal-backdrop-bg: rgba(3, 8, 15, 0.74);
   --button-ghost-bg: #1F466E;
   --button-ghost-border: rgba(186, 209, 234, 0.08);
@@ -257,6 +257,51 @@
 
 .range-input:last-of-type::-webkit-slider-thumb {
   background: var(--range-thumb-max);
+}
+
+@media (max-width: 1399px) and (max-height: 850px) {
+  .duty-schedule-filters--compactable {
+    gap: 0.5rem;
+  }
+
+  .duty-schedule-filters--compactable .duty-filter-card__header {
+    display: none;
+  }
+
+  .duty-schedule-filters--compactable .duty-filter-card__content {
+    gap: 0.625rem;
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
+
+  .duty-status-card {
+    gap: 0.625rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .duty-status-card__toggle,
+  .duty-status-card__compact-strip {
+    display: flex;
+  }
+
+  .duty-status-card:not(.duty-status-card--compact-collapsed) .duty-status-card__compact-strip {
+    display: none;
+  }
+
+  .duty-status-card--compact-collapsed .duty-status-card__header {
+    display: none;
+  }
+
+  .duty-status-card--compact-collapsed .duty-status-card__body {
+    display: none;
+  }
+}
+
+@media (max-height: 899px) {
+  .duty-status-card {
+    display: none;
+  }
 }
 
 .range-input::-moz-range-thumb {

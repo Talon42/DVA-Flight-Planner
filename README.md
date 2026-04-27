@@ -11,7 +11,7 @@ Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, 
 - [Syncing from Delta Virtual](#syncing-from-delta-virtual)
 - [Addon Folder Support](#addon-folder-support)
 - [Standard Filters](#standard-filters)
-- [Duty Schedule Feature](#duty-schedule-feature)
+- [Duty Schedule](#duty-schedule)
 - [Schedule Table](#schedule-table)
 - [Tours Tab](#tours-tab)
 - [Accomplishments Tab](#accomplishments-tab)
@@ -166,9 +166,17 @@ Use the `Basic Filters` tab for normal schedule filtering.
 - Addon Only
 - Addon Priority
 
-## Duty Schedule Feature
+## Duty Schedule
 
 Use the `Duty Schedule` tab when you want the app to build a connected sequence of flights for you.
+
+On desktop, the duty panel is organized into three cards:
+
+- Build Setup
+- Rules
+- Constraints
+
+The build header actions are `Generate Schedule`, `Reroll`, and `Reset`.
 
 <table>
   <tr>
@@ -187,7 +195,7 @@ Use the `Duty Schedule` tab when you want the app to build a connected sequence 
 2. Select an airline.
 3. Select one aircraft type.
 4. Set flight length, distance, and duty length.
-5. Click `Build my Schedule`.
+5. Click `Generate Schedule`.
 
 ### Location mode
 
@@ -195,7 +203,7 @@ Use the `Duty Schedule` tab when you want the app to build a connected sequence 
 2. Select `Country` or `Region`.
 3. Select the target country or region.
 4. Select one aircraft type.
-5. Click `Build my Schedule`.
+5. Click `Generate Schedule`.
 
 In location mode, the app resolves a qualifying airline for that location before building the duty. It then loads the selected flights directly into the Flight Board.
 

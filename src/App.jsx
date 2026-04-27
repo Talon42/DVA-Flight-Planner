@@ -1,10 +1,19 @@
-import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Component,
+  startTransition,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { DateTime } from "luxon";
 import FilterBar from "./components/FilterBar";
 import { AddonAirportPanel } from "./components/FilterBar";
 import { SimBriefSettingsPanel } from "./components/FilterBar";
 import DetailsPanel from "./components/DetailsPanel";
-import ScheduleTablePanel from "./components/ScheduleTablePanel";
+import ScheduleWorkspacePanel from "./components/ScheduleWorkspacePanel";
+import AppFooter from "./components/layout/AppFooter";
 import Button from "./components/ui/Button";
 import IconButton from "./components/ui/IconButton";
 import Panel from "./components/ui/Panel";
@@ -20,7 +29,6 @@ import { cn } from "./components/ui/cn";
 import {
   bodySmTextClassName,
   heroTitleTextClassName,
-  sectionTitleTextClassName,
   supportCopyTextClassName
 } from "./components/ui/typography";
 import {
@@ -35,14 +43,29 @@ import {
 import { DEFAULT_DUTY_FILTERS, DEFAULT_FILTERS, DEFAULT_SORT } from "./lib/constants";
 import {
   getAircraftProfileOptions,
-  supportsFlightByRunwayLimits
+  supportsFlightByDutyEquipmentLimits
 } from "./lib/aircraftCatalog";
 import { getAirlineIcao, getAirlineNameByIata } from "./lib/airlineBranding";
 import {
-  buildAirportCatalogOptions,
   buildAirportOptions,
   getAirportByIcao
 } from "./lib/airportCatalog";
+import {
+  buildDutyOriginAirportOptions,
+  buildGeoOptions
+} from "./logic/dutySchedule/dutyLocation";
+import {
+  buildDefaultDutyFilters,
+  buildRangeDefaults,
+  normalizeDutyFilters,
+  applyDutyFilterChange
+} from "./logic/dutySchedule/dutyFilters";
+import {
+  getDutyQualifyingAirlines
+} from "./logic/dutySchedule/dutyAirlines";
+import {
+  prepareDutyScheduleBuild
+} from "./logic/dutySchedule/generateDutySchedule";
 import dalLogo from "./data/images/DAL.png";
 import {
   createEmptyAddonAirportScan,
@@ -118,7 +141,6 @@ const SETTINGS_TABS = [
   { id: "advanced", label: "Advanced" },
   { id: "about", label: "About" }
 ];
-
 function formatTourLabelFromPath(path) {
   const fileName = String(path || "").split("/").pop() || "";
   const stem = fileName.replace(/\.json$/i, "");
@@ -251,6 +273,15 @@ function normalizeTourRows(path, rows, progressById = {}) {
 
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+function isWindowsRuntime() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const platform = navigator.userAgentData?.platform || navigator.platform || "";
+  return /Windows/i.test(platform) || /Windows/i.test(navigator.userAgent || "");
 }
 
 function readSavedTheme() {
@@ -477,57 +508,6 @@ function SettingsIcon() {
   );
 }
 
-function FooterStat({ label, value, className = "" }) {
-  return (
-    <p
-      className={cn(
-        "m-0 inline-flex items-baseline gap-1.5 whitespace-nowrap text-[var(--text-muted)] bp-1024:text-[0.76rem]",
-        bodySmTextClassName,
-        className
-      )}
-    >
-      <span>{label}:</span>
-      <strong className="font-semibold text-[var(--text-heading)]">{value}</strong>
-    </p>
-  );
-}
-
-function FooterDateStat({ label, value, isCurrent, className = "" }) {
-  const displayValue = isCurrent ? value : `${value} (Out of Date!)`;
-
-  return (
-    <p
-      className={cn(
-        "m-0 inline-flex items-baseline gap-1.5 whitespace-nowrap text-[var(--text-muted)] bp-1024:text-[0.76rem]",
-        bodySmTextClassName,
-        className
-      )}
-    >
-      <span>{label}:</span>
-      <strong className={cn("font-semibold", isCurrent ? "text-[var(--text-heading)]" : "text-[var(--delta-red)]")}>
-        {displayValue}
-      </strong>
-    </p>
-  );
-}
-
-function FooterLinkStat({ label, value, onClick, className = "" }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-baseline gap-1.5 whitespace-nowrap border-0 bg-transparent p-0 text-left text-[var(--delta-red)] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--delta-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-panel)] bp-1024:text-[0.76rem]",
-        bodySmTextClassName,
-        className
-      )}
-    >
-      <span>{label}</span>
-      {value ? <strong className="font-semibold text-current">{value}</strong> : null}
-    </button>
-  );
-}
-
 function ModalBackdrop({ children, onClick }) {
   return (
     <div
@@ -538,6 +518,50 @@ function ModalBackdrop({ children, onClick }) {
       {children}
     </div>
   );
+}
+
+class SettingsModalBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error) {
+    logAppError("settings-modal-render-failed", error).catch(() => {});
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <Panel
+          as="section"
+          padding="lg"
+          className="grid w-[min(760px,calc(100vw-24px))] gap-4 bg-[var(--modal-shell-bg)]"
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Settings failed to render"
+        >
+          <SectionHeader eyebrow="Settings" title="Unable to render settings" />
+
+          <div className={mutedTextStackClassName}>
+            <p className="m-0">{this.state.error?.message || "Unexpected error opening settings."}</p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button variant="ghost" onClick={this.props.onClose}>
+              Close
+            </Button>
+          </div>
+        </Panel>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 function sortFlights(flights, sort) {
@@ -602,7 +626,13 @@ function parseClockMinutes(clockValue) {
 }
 
 function matchesLocalTimeWindow(clockValue, filterValue, filterKind) {
-  if (!filterValue) {
+  const filterValues = Array.isArray(filterValue)
+    ? filterValue
+    : filterValue
+      ? [filterValue]
+      : [];
+
+  if (!filterValues.length) {
     return true;
   }
 
@@ -611,20 +641,22 @@ function matchesLocalTimeWindow(clockValue, filterValue, filterKind) {
     return false;
   }
 
-  switch (filterValue) {
-    case "red-eye":
-      return filterKind === "departure"
-        ? totalMinutes >= 23 * 60 || totalMinutes < 2 * 60
-        : totalMinutes >= 2 * 60 && totalMinutes < 6 * 60;
-    case "morning":
-      return totalMinutes >= 6 * 60 && totalMinutes < 12 * 60;
-    case "afternoon":
-      return totalMinutes >= 12 * 60 && totalMinutes < 18 * 60;
-    case "evening":
-      return totalMinutes >= 18 * 60 && totalMinutes < 23 * 60;
-    default:
-      return true;
-  }
+  return filterValues.some((value) => {
+    switch (value) {
+      case "red-eye":
+        return filterKind === "departure"
+          ? totalMinutes >= 23 * 60 || totalMinutes < 2 * 60
+          : totalMinutes >= 2 * 60 && totalMinutes < 6 * 60;
+      case "morning":
+        return totalMinutes >= 6 * 60 && totalMinutes < 12 * 60;
+      case "afternoon":
+        return totalMinutes >= 12 * 60 && totalMinutes < 18 * 60;
+      case "evening":
+        return totalMinutes >= 18 * 60 && totalMinutes < 23 * 60;
+      default:
+        return false;
+    }
+  });
 }
 
 function matchesSearch(flight, query) {
@@ -1200,444 +1232,6 @@ function clampRange(value, min, max, fallback) {
   return Math.min(Math.max(value, min), max);
 }
 
-function buildRangeDefaults(bounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }) {
-  return {
-    flightLengthMin: 0,
-    flightLengthMax: bounds.maxBlockMinutes,
-    distanceMin: 0,
-    distanceMax: bounds.maxDistanceNm
-  };
-}
-
-function normalizeDutyFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }) {
-  const nextFilters = {
-    ...DEFAULT_DUTY_FILTERS,
-    ...(savedFilters || {})
-  };
-  const normalizeBlankSelection = (value) => {
-    const trimmed = String(value || "").trim();
-    return !trimmed || trimmed.toUpperCase() === "ALL" ? "" : trimmed;
-  };
-
-  nextFilters.buildMode = nextFilters.buildMode === "location" ? "location" : "airline";
-  nextFilters.selectedAirline = normalizeBlankSelection(nextFilters.selectedAirline);
-  nextFilters.locationKind = nextFilters.locationKind === "region" ? "region" : "country";
-  nextFilters.selectedCountry = normalizeBlankSelection(nextFilters.selectedCountry);
-  nextFilters.selectedRegion = normalizeBlankSelection(nextFilters.selectedRegion).toUpperCase();
-  nextFilters.selectedOriginAirport = String(nextFilters.selectedOriginAirport || "")
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z]/g, "")
-    .slice(0, 4);
-  nextFilters.selectedEquipment = String(nextFilters.selectedEquipment || "").trim().toUpperCase();
-  nextFilters.addonMatchMode = ["either", "origin", "destination", "both"].includes(
-    nextFilters.addonMatchMode
-  )
-    ? nextFilters.addonMatchMode
-    : "either";
-  nextFilters.addonFilterEnabled = Boolean(nextFilters.addonFilterEnabled);
-  nextFilters.addonPriorityEnabled = Boolean(nextFilters.addonPriorityEnabled);
-  nextFilters.uniqueDestinationsEnabled = Boolean(nextFilters.uniqueDestinationsEnabled);
-  nextFilters.resolvedAirline = String(nextFilters.resolvedAirline || "").trim();
-
-  const defaultFlightLengthMax = bounds.maxBlockMinutes;
-  const defaultDistanceMax = bounds.maxDistanceNm;
-  const toOptionalNumber = (value) => {
-    if (value === null || value === undefined || value === "") {
-      return Number.NaN;
-    }
-    return Number(value);
-  };
-
-  nextFilters.flightLengthMin = clampRange(
-    toOptionalNumber(nextFilters.flightLengthMin),
-    0,
-    defaultFlightLengthMax,
-    0
-  );
-  nextFilters.flightLengthMax = clampRange(
-    toOptionalNumber(nextFilters.flightLengthMax),
-    nextFilters.flightLengthMin,
-    defaultFlightLengthMax,
-    defaultFlightLengthMax
-  );
-  nextFilters.distanceMin = clampRange(
-    toOptionalNumber(nextFilters.distanceMin),
-    0,
-    defaultDistanceMax,
-    0
-  );
-  nextFilters.distanceMax = clampRange(
-    toOptionalNumber(nextFilters.distanceMax),
-    nextFilters.distanceMin,
-    defaultDistanceMax,
-    defaultDistanceMax
-  );
-
-  const requestedDutyLength = Number(nextFilters.dutyLength);
-  nextFilters.dutyLength = Number.isFinite(requestedDutyLength)
-    ? Math.min(Math.max(Math.round(requestedDutyLength), 2), 10)
-    : 2;
-
-  return nextFilters;
-}
-
-function buildDefaultDutyFilters(bounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }) {
-  return normalizeDutyFilters(
-    {
-      ...DEFAULT_DUTY_FILTERS,
-      ...buildRangeDefaults(bounds)
-    },
-    bounds
-  );
-}
-
-function flightTouchesDutyLocation(flight, dutyFilters) {
-  if (!flight || !dutyFilters) {
-    return false;
-  }
-
-  if (dutyFilters.locationKind === "region") {
-    const target = String(dutyFilters.selectedRegion || "").trim().toUpperCase();
-    if (!target) {
-      return false;
-    }
-
-    return (
-      String(getAirportByIcao(flight.from)?.regionCode || "").trim().toUpperCase() === target ||
-      String(getAirportByIcao(flight.to)?.regionCode || "").trim().toUpperCase() === target
-    );
-  }
-
-  const target = String(dutyFilters.selectedCountry || "").trim();
-  if (!target) {
-    return false;
-  }
-
-  return (
-    String(getAirportByIcao(flight.from)?.country || "").trim() === target ||
-    String(getAirportByIcao(flight.to)?.country || "").trim() === target
-  );
-}
-
-function buildDutyOriginAirportOptions(flights, dutyFilters) {
-  const selectedAirline = String(dutyFilters?.buildMode === "airline" ? dutyFilters?.selectedAirline : "").trim();
-  const hasLocationSelection =
-    dutyFilters?.locationKind === "region"
-      ? Boolean(dutyFilters?.selectedRegion)
-      : Boolean(dutyFilters?.selectedCountry);
-
-  if (!selectedAirline && !hasLocationSelection) {
-    return buildAirportCatalogOptions();
-  }
-
-  const filteredFlights = (flights || []).filter((flight) => {
-    if (selectedAirline && flight.airlineName !== selectedAirline) {
-      return false;
-    }
-
-    if (hasLocationSelection && !flightTouchesDutyLocation(flight, dutyFilters)) {
-      return false;
-    }
-
-    return true;
-  });
-
-  return buildAirportOptions(filteredFlights);
-}
-
-function buildDutyFlightPool(flights, dutyFilters, addonAirports = new Set(), options = {}) {
-  const selectedOriginAirport = String(dutyFilters?.selectedOriginAirport || "").trim().toUpperCase();
-  const respectOriginAirport = options.respectOriginAirport !== false;
-  const dutyAirline = String(
-    dutyFilters?.buildMode === "airline"
-      ? dutyFilters?.selectedAirline || dutyFilters?.resolvedAirline || ""
-      : dutyFilters?.resolvedAirline || ""
-  ).trim();
-  const hasLocationSelection =
-    dutyFilters?.locationKind === "region"
-      ? Boolean(dutyFilters?.selectedRegion)
-      : Boolean(dutyFilters?.selectedCountry);
-
-  return (flights || []).filter((flight) => {
-    if (
-      respectOriginAirport &&
-      selectedOriginAirport &&
-      String(flight.from || "").trim().toUpperCase() !== selectedOriginAirport
-    ) {
-      return false;
-    }
-
-    if (dutyAirline && flight.airlineName !== dutyAirline) {
-      return false;
-    }
-
-    if (
-      dutyFilters?.buildMode === "location" &&
-      hasLocationSelection &&
-      !flightTouchesDutyLocation(flight, dutyFilters)
-    ) {
-      return false;
-    }
-
-    if (
-      dutyFilters?.selectedEquipment &&
-      !supportsFlightByRunwayLimits(flight, dutyFilters.selectedEquipment)
-    ) {
-      return false;
-    }
-
-    if (
-      flight.blockMinutes < dutyFilters.flightLengthMin ||
-      flight.blockMinutes > dutyFilters.flightLengthMax
-    ) {
-      return false;
-    }
-
-    if (
-      flight.distanceNm < dutyFilters.distanceMin ||
-      flight.distanceNm > dutyFilters.distanceMax
-    ) {
-      return false;
-    }
-
-    if (dutyFilters.addonFilterEnabled) {
-      return matchesAddonAirport(flight, addonAirports, dutyFilters.addonMatchMode);
-    }
-
-    return true;
-  });
-}
-
-function getDutyQualifyingAirlines(flights, dutyFilters) {
-  if (!Array.isArray(flights) || !flights.length || dutyFilters.buildMode !== "location") {
-    return [];
-  }
-
-  const counts = new Map();
-
-  for (const flight of flights) {
-    if (!flightTouchesDutyLocation(flight, dutyFilters)) {
-      continue;
-    }
-
-    const airlineName = String(flight.airlineName || "").trim();
-    if (!airlineName) {
-      continue;
-    }
-
-    counts.set(airlineName, (counts.get(airlineName) || 0) + 1);
-  }
-
-  return [...counts.entries()]
-    .filter(([, count]) => count >= 10)
-    .map(([airlineName]) => airlineName)
-    .sort((left, right) => left.localeCompare(right));
-}
-
-function pickRandomValue(values) {
-  if (!Array.isArray(values) || !values.length) {
-    return "";
-  }
-
-  const index = Math.floor(Math.random() * values.length);
-  return values[index];
-}
-
-function prioritizeDutyCandidates(flights, addonAirports) {
-  if (!Array.isArray(flights) || flights.length <= 1) {
-    return flights;
-  }
-
-  return prioritizeAddonFlights(flights, addonAirports, "either");
-}
-
-function compareDutyCandidates(left, right, addonAirports, dutyFilters) {
-  const leftAddonMatch = dutyFilters.addonPriorityEnabled
-    ? matchesAddonAirport(left, addonAirports, dutyFilters.addonMatchMode)
-    : false;
-  const rightAddonMatch = dutyFilters.addonPriorityEnabled
-    ? matchesAddonAirport(right, addonAirports, dutyFilters.addonMatchMode)
-    : false;
-
-  if (leftAddonMatch !== rightAddonMatch) {
-    return leftAddonMatch ? -1 : 1;
-  }
-
-  return String(left.flightId || "").localeCompare(String(right.flightId || ""));
-}
-
-function sortDutyCandidates(flights, addonAirports, dutyFilters) {
-  return [...(flights || [])].sort((left, right) =>
-    compareDutyCandidates(left, right, addonAirports, dutyFilters)
-  );
-}
-
-function findExactDutyScheduleChain(candidateFlights, dutyFilters, addonAirports, selectedOriginAirport) {
-  const requestedLength = Math.max(0, Number(dutyFilters?.dutyLength || 0));
-  if (!requestedLength) {
-    return [];
-  }
-
-  const uniqueDestinationsEnabled = Boolean(dutyFilters?.uniqueDestinationsEnabled);
-  const selectedOrigin = String(selectedOriginAirport || "").trim().toUpperCase();
-  const flightsByOrigin = new Map();
-
-  for (const flight of candidateFlights || []) {
-    const origin = String(flight.from || "").trim().toUpperCase();
-    if (!origin) {
-      continue;
-    }
-
-    const currentFlights = flightsByOrigin.get(origin) || [];
-    currentFlights.push(flight);
-    flightsByOrigin.set(origin, currentFlights);
-  }
-
-  for (const flights of flightsByOrigin.values()) {
-    flights.sort((left, right) => compareDutyCandidates(left, right, addonAirports, dutyFilters));
-  }
-
-  const startFlights = selectedOrigin
-    ? [...(flightsByOrigin.get(selectedOrigin) || [])]
-    : sortDutyCandidates(candidateFlights, addonAirports, dutyFilters);
-
-  function searchFromAirport(currentAirport, selectedFlights, usedFlightIds, visitedAirports) {
-    if (selectedFlights.length >= requestedLength) {
-      return [...selectedFlights];
-    }
-
-    const nextCandidates = flightsByOrigin.get(currentAirport) || [];
-    let eligibleFlights = nextCandidates.filter((flight) => !usedFlightIds.has(flight.flightId));
-
-    if (uniqueDestinationsEnabled) {
-      eligibleFlights = eligibleFlights.filter((flight) => {
-        const nextAirport = String(flight.to || "").trim().toUpperCase();
-        return nextAirport && !visitedAirports.has(nextAirport);
-      });
-    }
-
-    for (const nextFlight of eligibleFlights) {
-      selectedFlights.push(nextFlight);
-      usedFlightIds.add(nextFlight.flightId);
-      const nextAirport = String(nextFlight.to || "").trim().toUpperCase();
-      const nextVisitedAirports = uniqueDestinationsEnabled
-        ? new Set(visitedAirports)
-        : visitedAirports;
-      if (uniqueDestinationsEnabled) {
-        nextVisitedAirports.add(nextAirport);
-      }
-
-      const completed = searchFromAirport(nextAirport, selectedFlights, usedFlightIds, nextVisitedAirports);
-      if (completed) {
-        return completed;
-      }
-
-      selectedFlights.pop();
-      usedFlightIds.delete(nextFlight.flightId);
-    }
-
-    return null;
-  }
-
-  for (const startFlight of startFlights) {
-    const startOriginAirport = String(startFlight.from || "").trim().toUpperCase();
-    const startDestinationAirport = String(startFlight.to || "").trim().toUpperCase();
-    const usedFlightIds = new Set([startFlight.flightId]);
-    const visitedAirports = uniqueDestinationsEnabled
-      ? new Set([startOriginAirport, startDestinationAirport])
-      : null;
-    const startSelectedFlights = [startFlight];
-
-    const completed = searchFromAirport(
-      startDestinationAirport,
-      startSelectedFlights,
-      usedFlightIds,
-      visitedAirports
-    );
-    if (completed) {
-      return completed;
-    }
-  }
-
-  return null;
-}
-
-function resolveDutyAirlineForLocation(flights, dutyFilters) {
-  const qualifyingAirlines = getDutyQualifyingAirlines(flights, dutyFilters);
-  return {
-    qualifyingAirlines,
-    resolvedAirline: pickRandomValue(qualifyingAirlines)
-  };
-}
-
-function getDutyBuildWarnings(dutyFilters, qualifyingDutyAirlines = [], hasSchedule = false) {
-  const warnings = [];
-
-  if (!hasSchedule) {
-    warnings.push("Import a schedule before building a duty schedule.");
-    return warnings;
-  }
-
-  const hasLocationSelection =
-    dutyFilters.locationKind === "region"
-      ? Boolean(dutyFilters.selectedRegion)
-      : Boolean(dutyFilters.selectedCountry);
-  const hasAirlineSelection = dutyFilters.buildMode === "airline" && Boolean(dutyFilters.selectedAirline);
-
-  if (
-    !String(dutyFilters.selectedOriginAirport || "").trim() &&
-    !hasAirlineSelection &&
-    !hasLocationSelection
-  ) {
-    warnings.push("Select an origin airport, airline, or location.");
-  }
-
-  if (hasLocationSelection && !qualifyingDutyAirlines.length) {
-    warnings.push("No qualifying airlines were found for the selected location.");
-  }
-
-  if (!dutyFilters.selectedEquipment) {
-    warnings.push("Select one aircraft.");
-  }
-
-  return warnings;
-}
-
-function buildGeoOptions(airportOptions) {
-  const regionMap = new Map();
-  const countrySet = new Set();
-
-  for (const airport of airportOptions || []) {
-    const icao = String(airport?.icao || "").trim().toUpperCase();
-    if (!icao) {
-      continue;
-    }
-
-    const regionCode = String(airport?.regionCode || "").trim().toUpperCase();
-    const regionName = String(airport?.regionName || "").trim();
-    const country = String(airport?.country || "").trim();
-
-    if (regionCode && regionName && !regionMap.has(regionCode)) {
-      regionMap.set(regionCode, {
-        code: regionCode,
-        name: regionName
-      });
-    }
-
-    if (country) {
-      countrySet.add(country);
-    }
-  }
-
-  return {
-    regions: [...regionMap.values()].toSorted((left, right) =>
-      left.name.localeCompare(right.name)
-    ),
-    countries: [...countrySet].toSorted((left, right) => left.localeCompare(right))
-  };
-}
-
 function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }) {
   const nextFilters = {
     ...DEFAULT_FILTERS,
@@ -1665,7 +1259,7 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
   nextFilters.destinationAirport = String(nextFilters.destinationAirport || "").trim();
   nextFilters.originOrDestinationAirport = String(nextFilters.originOrDestinationAirport || "").trim();
   nextFilters.addonFilterEnabled = Boolean(nextFilters.addonFilterEnabled);
-  nextFilters.addonPriorityEnabled = Boolean(nextFilters.addonPriorityEnabled);
+  nextFilters.addonPriorityEnabled = false;
   nextFilters.addonMatchMode = ["either", "origin", "destination", "both"].includes(
     nextFilters.addonMatchMode
   )
@@ -1692,16 +1286,24 @@ function normalizeFilters(savedFilters, bounds = { maxBlockMinutes: 0, maxDistan
     nextFilters.equipment = nextFilters.equipment ? [nextFilters.equipment] : [];
   }
 
-  nextFilters.localDepartureWindow = ["", "red-eye", "morning", "afternoon", "evening"].includes(
-    nextFilters.localDepartureWindow
-  )
-    ? nextFilters.localDepartureWindow
-    : "";
-  nextFilters.localArrivalWindow = ["", "red-eye", "morning", "afternoon", "evening"].includes(
-    nextFilters.localArrivalWindow
-  )
-    ? nextFilters.localArrivalWindow
-    : "";
+  nextFilters.localDepartureWindow = Array.isArray(nextFilters.localDepartureWindow)
+    ? [...new Set(
+        nextFilters.localDepartureWindow.filter((value) =>
+          ["red-eye", "morning", "afternoon", "evening"].includes(value)
+        )
+      )]
+    : ["red-eye", "morning", "afternoon", "evening"].includes(nextFilters.localDepartureWindow)
+      ? [nextFilters.localDepartureWindow]
+      : [];
+  nextFilters.localArrivalWindow = Array.isArray(nextFilters.localArrivalWindow)
+    ? [...new Set(
+        nextFilters.localArrivalWindow.filter((value) =>
+          ["red-eye", "morning", "afternoon", "evening"].includes(value)
+        )
+      )]
+    : ["red-eye", "morning", "afternoon", "evening"].includes(nextFilters.localArrivalWindow)
+      ? [nextFilters.localArrivalWindow]
+      : [];
 
   const defaultFlightLengthMax = bounds.maxBlockMinutes;
   const defaultDistanceMax = bounds.maxDistanceNm;
@@ -1746,6 +1348,7 @@ export default function App() {
   const [schedule, setSchedule] = useState(null);
   const [flightBoards, setFlightBoards] = useState([createFlightBoard()]);
   const [activeFlightBoardId, setActiveFlightBoardId] = useState("");
+  const [lastDutyGeneratedBoardId, setLastDutyGeneratedBoardId] = useState("");
   const [selectedFlightId, setSelectedFlightId] = useState(null);
   const [selectedTourRowId, setSelectedTourRowId] = useState(null);
   const [expandedBoardFlightId, setExpandedBoardFlightId] = useState(null);
@@ -1815,6 +1418,7 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState("general");
   const [isManualUploadOpen, setIsManualUploadOpen] = useState(false);
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
+  const [isDutyBoardOverwriteConfirmOpen, setIsDutyBoardOverwriteConfirmOpen] = useState(false);
   const [isDvaSyncWarningOpen, setIsDvaSyncWarningOpen] = useState(false);
   const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
   const [isNoUpdatePromptOpen, setIsNoUpdatePromptOpen] = useState(false);
@@ -1829,6 +1433,7 @@ export default function App() {
   const [manualUploadScheduleFile, setManualUploadScheduleFile] = useState(null);
   const [manualUploadLogbookFile, setManualUploadLogbookFile] = useState(null);
   const deleteUserDataConfirmResolverRef = useRef(null);
+  const dutyBoardOverwriteConfirmResolverRef = useRef(null);
   const hasPerformedStartupUpdateCheckRef = useRef(false);
   const devWindowMenuRef = useRef(null);
   const deferredFilters = useDeferredValue(filters);
@@ -1883,6 +1488,8 @@ export default function App() {
     );
   }, [flightBoards, activeFlightBoardId]);
   const flightBoard = activeFlightBoard?.entries || [];
+  const canRerollDutySchedule =
+    Boolean(activeFlightBoardId) && activeFlightBoardId === lastDutyGeneratedBoardId;
 
   useEffect(() => {
     if (
@@ -2203,6 +1810,34 @@ export default function App() {
       setIsDevWindowMenuOpen(false);
     }
   }, [isDevToolsEnabled]);
+
+  useEffect(() => {
+    if (!isDesktopAddonScanAvailable || !isWindowsRuntime()) {
+      return;
+    }
+
+    let cancelled = false;
+
+    // Keep the desktop window pinned above others while dev tools are enabled on Windows.
+    const syncAlwaysOnTop = async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        if (cancelled) {
+          return;
+        }
+
+        await getCurrentWindow().setAlwaysOnTop(isDevToolsEnabled);
+      } catch (error) {
+        await logAppError("window-always-on-top-sync-failed", error);
+      }
+    };
+
+    syncAlwaysOnTop();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDevToolsEnabled, isDesktopAddonScanAvailable]);
 
   useEffect(() => {
     function handleResize() {
@@ -2558,10 +2193,6 @@ export default function App() {
     () => buildDutyOriginAirportOptions(scheduleFlights, normalizedDutyFilters),
     [normalizedDutyFilters, scheduleFlights]
   );
-  const normalizedDeferredDutyFilters = useMemo(
-    () => normalizeDutyFilters(deferredDutyFilters, filterBounds),
-    [deferredDutyFilters, filterBounds]
-  );
   const addonAirports = useMemo(() => new Set(addonScan.airports), [addonScan.airports]);
   const simBriefDispatchOptions = buildSimBriefDispatchOptions(
     simBriefAircraftTypes,
@@ -2575,7 +2206,6 @@ export default function App() {
       ),
     [scheduleFlights, normalizedDutyFilters]
   );
-
   useEffect(() => {
     const selectedOriginAirport = String(normalizedDutyFilters.selectedOriginAirport || "").trim();
     if (!selectedOriginAirport) {
@@ -2722,96 +2352,20 @@ export default function App() {
       });
   }, [addonAirports, normalizedDeferredFilters, schedule, scheduleFlights]);
 
-  const dutyFilteredFlights = useMemo(() => {
-    if (!schedule) {
-      return [];
-    }
-
-    return scheduleFlights.filter((flight) => {
-        if (normalizedDeferredDutyFilters.buildMode === "airline") {
-          if (!normalizedDeferredDutyFilters.selectedAirline) {
-            return false;
-          }
-
-          if (
-            normalizedDeferredDutyFilters.selectedAirline &&
-            flight.airlineName !== normalizedDeferredDutyFilters.selectedAirline
-          ) {
-            return false;
-          }
-        } else {
-          if (!normalizedDeferredDutyFilters.resolvedAirline) {
-            return false;
-          }
-
-          if (flight.airlineName !== normalizedDeferredDutyFilters.resolvedAirline) {
-            return false;
-          }
-
-          if (!flightTouchesDutyLocation(flight, normalizedDeferredDutyFilters)) {
-            return false;
-          }
-        }
-
-        if (
-          normalizedDeferredDutyFilters.selectedEquipment &&
-          !supportsFlightByRunwayLimits(
-            flight,
-            normalizedDeferredDutyFilters.selectedEquipment
-          )
-        ) {
-          return false;
-        }
-
-        if (
-          flight.blockMinutes < normalizedDeferredDutyFilters.flightLengthMin ||
-          flight.blockMinutes > normalizedDeferredDutyFilters.flightLengthMax
-        ) {
-          return false;
-        }
-
-        if (
-          flight.distanceNm < normalizedDeferredDutyFilters.distanceMin ||
-          flight.distanceNm > normalizedDeferredDutyFilters.distanceMax
-        ) {
-          return false;
-        }
-
-        if (normalizedDeferredDutyFilters.addonFilterEnabled) {
-          return matchesAddonAirport(
-            flight,
-            addonAirports,
-            normalizedDeferredDutyFilters.addonMatchMode
-          );
-        }
-
-        return true;
-      });
-  }, [addonAirports, normalizedDeferredDutyFilters, schedule, scheduleFlights]);
-
-  const activeFlights = plannerMode === "duty" ? dutyFilteredFlights : basicFilteredFlights;
   const activeTourRows = selectedTour?.rows || [];
 
   const sortedFlights = useMemo(() => {
-    const sorted = sortFlights(activeFlights, sort);
-    if (plannerMode === "duty") {
-      return normalizedDeferredDutyFilters.addonPriorityEnabled
-        ? prioritizeDutyCandidates(sorted, addonAirports)
-        : sorted;
-    }
-
+    const sorted = sortFlights(basicFilteredFlights, sort);
     if (!normalizedDeferredFilters.addonPriorityEnabled) {
       return sorted;
     }
 
     return prioritizeAddonFlights(sorted, addonAirports, normalizedDeferredFilters.addonMatchMode);
   }, [
-    activeFlights,
+    basicFilteredFlights,
     addonAirports,
-    normalizedDeferredDutyFilters.addonPriorityEnabled,
     normalizedDeferredFilters.addonMatchMode,
     normalizedDeferredFilters.addonPriorityEnabled,
-    plannerMode,
     sort
   ]);
   const sortedTourRows = useMemo(
@@ -3182,6 +2736,22 @@ export default function App() {
     });
   }
 
+  // Duty Schedule overwrite uses the shared modal so Generate can ask before replacing a full set of boards.
+  function resolveDutyBoardOverwriteConfirmation(confirmed) {
+    setIsDutyBoardOverwriteConfirmOpen(false);
+    if (dutyBoardOverwriteConfirmResolverRef.current) {
+      dutyBoardOverwriteConfirmResolverRef.current(confirmed);
+      dutyBoardOverwriteConfirmResolverRef.current = null;
+    }
+  }
+
+  async function confirmDutyBoardOverwriteInApp() {
+    return new Promise((resolve) => {
+      dutyBoardOverwriteConfirmResolverRef.current = resolve;
+      setIsDutyBoardOverwriteConfirmOpen(true);
+    });
+  }
+
   async function handleImport() {
     await logAppEvent("manual-upload-requested");
     openManualUploadDialog();
@@ -3268,52 +2838,57 @@ export default function App() {
     }
   }
 
-  function replaceFlightBoard(flightIds, boardName = DEFAULT_FLIGHT_BOARD_NAME) {
+  // Duty Schedule builds either append a fresh board or replace a specific board in place.
+  function replaceFlightBoard(flightIds, boardName = DEFAULT_FLIGHT_BOARD_NAME, options = {}) {
     const selectedFlights = flightIds
       .map((flightId) => schedule?.flights.find((flight) => flight.flightId === flightId) || null)
       .filter(Boolean);
     const nextFlightBoard = selectedFlights.map((flight) => buildBoardEntryFromFlight(flight));
-    const activeBoardId =
-      activeFlightBoardId && flightBoards.some((board) => board.id === activeFlightBoardId)
-        ? activeFlightBoardId
-        : flightBoards[0]?.id || "";
-    const activeBoard = flightBoards.find((board) => board.id === activeBoardId) || null;
-    const shouldReuseActiveBoard =
-      !activeBoard ||
-      !Array.isArray(activeBoard.entries) ||
-      activeBoard.entries.length === 0 ||
-      flightBoards.length >= MAX_FLIGHT_BOARDS;
+    const targetBoardId = String(options.targetBoardId || "").trim();
+    const targetBoardExists = targetBoardId
+      ? flightBoards.some((board) => board.id === targetBoardId)
+      : false;
 
-    if (shouldReuseActiveBoard) {
-      if (!activeBoard) {
-        const fallbackBoard = createFlightBoard(boardName, nextFlightBoard);
-        setFlightBoards([fallbackBoard]);
-        setActiveFlightBoardId(fallbackBoard.id);
-      } else {
-        setFlightBoards((current) =>
-          current.map((board) =>
-            board.id === activeBoardId
-              ? {
-                  ...board,
-                  name: normalizeFlightBoardName(boardName, board.name),
-                  entries: nextFlightBoard
-                }
-              : board
-          )
-        );
-        setActiveFlightBoardId(activeBoardId);
+    if (targetBoardId) {
+      if (!targetBoardExists) {
+        return "";
       }
-    } else {
-      const nextBoard = createFlightBoard(boardName, nextFlightBoard);
-      setFlightBoards((current) => [...current, nextBoard]);
-      setActiveFlightBoardId(nextBoard.id);
+
+      setFlightBoards((current) =>
+        current.map((board) =>
+          board.id === targetBoardId
+            ? {
+                ...board,
+                name: normalizeFlightBoardName(boardName, board.name),
+                entries: nextFlightBoard
+              }
+            : board
+        )
+      );
+      setActiveFlightBoardId(targetBoardId);
+      setExpandedBoardFlightId(null);
+      setSimBriefDispatchState({
+        flightId: "",
+        isDispatching: false,
+        message: ""
+      });
+      return targetBoardId;
     }
+
+    if (flightBoards.length >= MAX_FLIGHT_BOARDS) {
+      return "";
+    }
+
+    const nextBoard = createFlightBoard(boardName, nextFlightBoard);
+    setFlightBoards((current) => [...current, nextBoard]);
+    setActiveFlightBoardId(nextBoard.id);
     setExpandedBoardFlightId(null);
     setSimBriefDispatchState({
       flightId: "",
       isDispatching: false,
       message: ""
     });
+    return nextBoard.id;
   }
 
   function handleFilterChange(key, value) {
@@ -3371,6 +2946,24 @@ export default function App() {
           };
         }
 
+        if (key === "addonFilterEnabled") {
+          const nextEnabled = Boolean(value);
+          return {
+            ...current,
+            addonFilterEnabled: nextEnabled,
+            addonPriorityEnabled: nextEnabled ? false : current.addonPriorityEnabled
+          };
+        }
+
+        if (key === "addonPriorityEnabled") {
+          const nextEnabled = Boolean(value);
+          return {
+            ...current,
+            addonFilterEnabled: nextEnabled ? false : current.addonFilterEnabled,
+            addonPriorityEnabled: nextEnabled
+          };
+        }
+
         return {
           ...current,
           [key]: value
@@ -3384,94 +2977,12 @@ export default function App() {
     startTransition(() => {
       setPlannerMode("duty");
       setFilters(normalizeFilters(DEFAULT_FILTERS, filterBounds));
-      setDutyFilters((current) => {
-        const nextFilters = {
-          ...current,
-          [key]: value
-        };
-
-        if (key === "buildMode") {
-          nextFilters.resolvedAirline = "";
-        }
-
-        if (key === "locationKind") {
-          nextFilters.selectedCountry = "";
-          nextFilters.selectedRegion = "";
-          nextFilters.resolvedAirline = "";
-        }
-
-        if (key === "selectedCountry" || key === "selectedRegion") {
-          nextFilters.resolvedAirline = "";
-        }
-
-        if (key === "selectedAirline") {
-          nextFilters.selectedAirline = String(value || "").trim();
-        }
-
-        if (key === "selectedOriginAirport") {
-          nextFilters.selectedOriginAirport = String(value || "")
-            .toUpperCase()
-            .replace(/[^A-Z]/g, "")
-            .slice(0, 4);
-          nextFilters.resolvedAirline = "";
-        }
-
-        if (key === "selectedEquipment") {
-          nextFilters.selectedEquipment = String(value || "").trim().toUpperCase();
-        }
-        const normalizedNextFilters = normalizeDutyFilters(nextFilters, filterBounds);
-        const allowedOriginAirportIcaos = new Set(
-          buildDutyOriginAirportOptions(schedule?.flights || [], normalizedNextFilters).map((airport) =>
-            String(airport?.icao || "").trim().toUpperCase()
-          )
-        );
-
-        if (
-          normalizedNextFilters.selectedOriginAirport &&
-          !allowedOriginAirportIcaos.has(normalizedNextFilters.selectedOriginAirport)
-        ) {
-          return {
-            ...normalizedNextFilters,
-            selectedOriginAirport: "",
-            resolvedAirline: ""
-          };
-        }
-
-        if (normalizedNextFilters.buildMode !== "location") {
-          return normalizedNextFilters;
-        }
-
-        const hasLocationTarget =
-          normalizedNextFilters.locationKind === "region"
-            ? Boolean(normalizedNextFilters.selectedRegion)
-            : Boolean(normalizedNextFilters.selectedCountry);
-
-        if (!hasLocationTarget) {
-          return {
-            ...normalizedNextFilters,
-            resolvedAirline: ""
-          };
-        }
-
-        if (
-          key === "buildMode" ||
-          key === "locationKind" ||
-          key === "selectedCountry" ||
-          key === "selectedRegion"
-        ) {
-          const { resolvedAirline } = resolveDutyAirlineForLocation(
-            schedule?.flights || [],
-            normalizedNextFilters
-          );
-
-          return {
-            ...normalizedNextFilters,
-            resolvedAirline
-          };
-        }
-
-        return normalizedNextFilters;
-      });
+      setDutyFilters((current) =>
+        applyDutyFilterChange(current, key, value, {
+          scheduleFlights: schedule?.flights || [],
+          filterBounds
+        })
+      );
     });
   }
 
@@ -3516,8 +3027,14 @@ export default function App() {
     });
   }
 
-  function handlePlannerModeChange(nextMode) {
-    setPlannerMode(nextMode === "duty" ? "duty" : "basic");
+  function handlePrimaryViewChange(nextView) {
+    if (nextView === "duty") {
+      setPlannerMode("duty");
+      return;
+    }
+
+    setPlannerMode("basic");
+    handleScheduleViewChange(nextView);
   }
 
   function handleSort(sortKey) {
@@ -3884,129 +3401,105 @@ export default function App() {
     });
   }
 
-  async function handleBuildDutySchedule() {
-    const activeDutyFilters = normalizeDutyFilters(dutyFilters, filterBounds);
-    const buildWarnings = getDutyBuildWarnings(
-      activeDutyFilters,
+  async function runDutyScheduleBuild({ targetBoardId = "" } = {}) {
+    const buildPlan = prepareDutyScheduleBuild({
+      scheduleFlights: schedule?.flights || [],
+      dutyFilters,
+      addonAirports,
       qualifyingDutyAirlines,
-      Boolean(schedule)
-    );
+      hasSchedule: Boolean(schedule),
+      supportsFlightByRunwayLimits: supportsFlightByDutyEquipmentLimits,
+      rng: Math.random,
+      filterBounds
+    });
 
-    if (buildWarnings.length) {
-      setDutyBuildWarning(buildWarnings);
+    if (buildPlan.buildWarnings.length) {
+      setDutyBuildWarning(buildPlan.buildWarnings);
       return;
     }
 
     setDutyBuildWarning(null);
-    const selectedOriginAirport = String(activeDutyFilters.selectedOriginAirport || "").trim().toUpperCase();
-    const resolutionFilters =
-      selectedOriginAirport &&
-      (activeDutyFilters.buildMode === "location" || !activeDutyFilters.selectedAirline)
-        ? {
-            ...activeDutyFilters,
-            selectedAirline: "",
-            resolvedAirline: ""
-          }
-        : activeDutyFilters;
-    const dutyFlightPool = buildDutyFlightPool(schedule.flights, resolutionFilters, addonAirports);
-    const resolvedDutyAirline = activeDutyFilters.buildMode === "airline" && activeDutyFilters.selectedAirline
-      ? activeDutyFilters.selectedAirline
-      : selectedOriginAirport
-        ? pickRandomValue(
-            [...new Set(dutyFlightPool.map((flight) => String(flight.airlineName || "").trim()).filter(Boolean))].sort(
-              (left, right) => left.localeCompare(right)
-            )
-          )
-        : activeDutyFilters.buildMode === "location" && !activeDutyFilters.resolvedAirline
-          ? pickRandomValue(qualifyingDutyAirlines)
-          : activeDutyFilters.resolvedAirline;
-    const effectiveDutyFilters =
-      resolvedDutyAirline === activeDutyFilters.resolvedAirline
-        ? activeDutyFilters
-        : {
-            ...activeDutyFilters,
-            resolvedAirline: resolvedDutyAirline
-          };
+    const { effectiveDutyFilters, buildResult, shouldPersistResolvedAirline } = buildPlan;
 
-    if (
-      resolvedDutyAirline &&
-      resolvedDutyAirline !== activeDutyFilters.resolvedAirline &&
-      (selectedOriginAirport || effectiveDutyFilters.buildMode === "location")
-    ) {
+    if (shouldPersistResolvedAirline) {
       setDutyFilters((current) => ({
         ...current,
-        resolvedAirline: resolvedDutyAirline
+        resolvedAirline: effectiveDutyFilters.resolvedAirline
       }));
     }
 
-    const candidateFlights = buildDutyFlightPool(
-      schedule.flights,
-      effectiveDutyFilters,
-      addonAirports,
-      { respectOriginAirport: false }
-    );
-
-    if (!candidateFlights.length) {
-      setStatusMessage("No flights match the current duty schedule filters.");
-      await logAppEvent("duty-schedule-build-empty", {
-        buildMode: effectiveDutyFilters.buildMode,
-        resolvedAirline: effectiveDutyFilters.resolvedAirline || effectiveDutyFilters.selectedAirline
-      });
-      return;
-    }
-
-    const exactSelectedFlights = findExactDutyScheduleChain(
-      candidateFlights,
-      effectiveDutyFilters,
-      addonAirports,
-      selectedOriginAirport
-    );
-
-    if (!exactSelectedFlights) {
-      const warningText =
-        `Unable to build a full ${effectiveDutyFilters.dutyLength}-flight duty schedule with the current filters. ` +
-        "Lower the requested flight count or adjust the filters and try again.";
-      setDutyBuildWarning([warningText]);
-      setStatusMessage(warningText);
+    if (buildResult.status === "failure") {
+      setDutyBuildWarning([buildResult.message]);
+      setStatusMessage(buildResult.message);
       await logAppEvent("duty-schedule-build-failed", {
-        requestedFlights: effectiveDutyFilters.dutyLength,
+        requestedFlights: buildResult.requestedCount,
+        builtFlights: buildResult.generatedCount,
         buildMode: effectiveDutyFilters.buildMode,
-        reason: "no-full-chain",
+        resultStatus: buildResult.status,
+        reasonCodes: buildResult.reasonCodes,
+        selectedAirline: String(effectiveDutyFilters.selectedAirline || "").trim(),
+        resolvedAirline: String(effectiveDutyFilters.resolvedAirline || "").trim(),
+        selectedOriginAirport: String(effectiveDutyFilters.selectedOriginAirport || "").trim().toUpperCase(),
+        selectedEquipment: String(effectiveDutyFilters.selectedEquipment || "").trim().toUpperCase(),
+        locationKind: effectiveDutyFilters.locationKind,
+        selectedCountry: String(effectiveDutyFilters.selectedCountry || "").trim(),
+        selectedRegion: String(effectiveDutyFilters.selectedRegion || "").trim().toUpperCase(),
+        flightLengthMin: effectiveDutyFilters.flightLengthMin,
+        flightLengthMax: effectiveDutyFilters.flightLengthMax,
+        distanceMin: effectiveDutyFilters.distanceMin,
+        distanceMax: effectiveDutyFilters.distanceMax,
+        addonFilterEnabled: effectiveDutyFilters.addonFilterEnabled,
+        addonMatchMode: effectiveDutyFilters.addonMatchMode,
+        scheduleFlightsLength: schedule?.flights?.length || 0,
+        candidateFlightsLength: buildPlan.candidateFlights.length,
+        locationAirlineSelection: buildPlan.locationAirlineSelection,
+        dutyFlightPoolDiagnostics: buildPlan.dutyFlightPoolDiagnostics,
         addonPriorityEnabled: effectiveDutyFilters.addonPriorityEnabled,
-        uniqueDestinationsEnabled: effectiveDutyFilters.uniqueDestinationsEnabled
+        uniqueDestinationsEnabled: effectiveDutyFilters.uniqueDestinationsEnabled,
+        timeOrderEnabled: effectiveDutyFilters.timeOrderEnabled,
+        dutyTargetMode: effectiveDutyFilters.dutyTargetMode
       });
       return;
     }
 
-    const selectedFlights = exactSelectedFlights;
+    const selectedFlights = buildResult.flights;
 
     const dutyBoardAirline =
       effectiveDutyFilters.resolvedAirline || effectiveDutyFilters.selectedAirline;
     const dutyBoardName = normalizeFlightBoardName(
-      `${String(dutyBoardAirline || "").trim() || "Duty"} Duty Schedule`,
+      String(dutyBoardAirline || "").trim() || "Duty",
       DEFAULT_FLIGHT_BOARD_NAME
     );
 
-    replaceFlightBoard(
+    const updatedBoardId = replaceFlightBoard(
       selectedFlights.map((flight) => flight.flightId),
-      dutyBoardName
+      dutyBoardName,
+      targetBoardId ? { targetBoardId } : {}
     );
+    if (!updatedBoardId) {
+      setDutyBuildWarning(["Unable to update the flight board."]);
+      setStatusMessage("Unable to update the flight board.");
+      return;
+    }
+
+    setLastDutyGeneratedBoardId(updatedBoardId);
     setSelectedFlightId(selectedFlights[0]?.flightId || null);
     setPendingMapFlightPathViewMode("all");
     setPendingMapFitToRoute(true);
+    setPlannerMode("basic");
     setScheduleView("map");
     setPlannerControlsCollapsed(true);
 
     const resolvedAirlineLabel =
       effectiveDutyFilters.resolvedAirline || effectiveDutyFilters.selectedAirline;
 
-    setStatusMessage(
-      `Built a ${selectedFlights.length}-flight duty schedule${resolvedAirlineLabel ? ` for ${resolvedAirlineLabel}` : ""}.`
-    );
+    setStatusMessage(buildResult.message);
 
     await logAppEvent("duty-schedule-built", {
-      requestedFlights: effectiveDutyFilters.dutyLength,
+      requestedFlights: buildResult.requestedCount,
       builtFlights: selectedFlights.length,
+      resultStatus: buildResult.status,
+      reasonCodes: buildResult.reasonCodes,
       buildMode: effectiveDutyFilters.buildMode,
       resolvedAirline: resolvedAirlineLabel,
       selectedOriginAirport: effectiveDutyFilters.selectedOriginAirport,
@@ -4014,8 +3507,41 @@ export default function App() {
       selectedCountry: effectiveDutyFilters.selectedCountry,
       selectedRegion: effectiveDutyFilters.selectedRegion,
       addonPriorityEnabled: effectiveDutyFilters.addonPriorityEnabled,
-      uniqueDestinationsEnabled: effectiveDutyFilters.uniqueDestinationsEnabled
+      uniqueDestinationsEnabled: effectiveDutyFilters.uniqueDestinationsEnabled,
+      timeOrderEnabled: effectiveDutyFilters.timeOrderEnabled,
+      minTurnMinutes: effectiveDutyFilters.minTurnMinutes,
+      dutyTargetMode: effectiveDutyFilters.dutyTargetMode,
+      locationAirlineSelection: buildPlan.locationAirlineSelection
     });
+
+    return updatedBoardId;
+  }
+
+  async function handleBuildDutySchedule() {
+    if (flightBoards.length >= MAX_FLIGHT_BOARDS) {
+      const overwriteBoardId = activeFlightBoard?.id || flightBoards[0]?.id || "";
+      if (!overwriteBoardId) {
+        return;
+      }
+
+      const confirmed = await confirmDutyBoardOverwriteInApp();
+      if (!confirmed) {
+        return;
+      }
+
+      await runDutyScheduleBuild({ targetBoardId: overwriteBoardId });
+      return;
+    }
+
+    await runDutyScheduleBuild();
+  }
+
+  async function handleRerollDutySchedule() {
+    if (activeFlightBoardId !== lastDutyGeneratedBoardId) {
+      return;
+    }
+
+    await runDutyScheduleBuild({ targetBoardId: activeFlightBoardId });
   }
 
   async function handleOpenLogFile() {
@@ -4600,6 +4126,7 @@ export default function App() {
       const defaultBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
       setFlightBoards([defaultBoard]);
       setActiveFlightBoardId(defaultBoard.id);
+      setLastDutyGeneratedBoardId("");
       setSelectedFlightId(null);
       setExpandedBoardFlightId(null);
       setScheduleTableTimeDisplayMode("local");
@@ -4957,9 +4484,7 @@ export default function App() {
                   {isCheckingForUpdates ? "Checking..." : "Check for Updates"}
                 </Button>
               ) : null}
-              <Button onClick={handleOpenLogFile}>
-                Open Log File
-              </Button>
+              <Button onClick={handleOpenLogFile}>Open Log File</Button>
               <Button onClick={handleToggleDevTools}>
                 {isDevToolsEnabled ? "Dev Tools On" : "Dev Tools Off"}
               </Button>
@@ -5042,6 +4567,104 @@ export default function App() {
       break;
   }
 
+  let rightColumnContent = null;
+  if (plannerMode === "duty" || scheduleView !== "flights") {
+    rightColumnContent = (
+      <DetailsPanel
+        shortlist={shortlist}
+        flightBoards={flightBoards}
+        activeFlightBoardId={activeFlightBoard?.id || ""}
+        expandedBoardFlightId={expandedBoardFlightId}
+        selectedAccomplishment={selectedAccomplishment}
+        simBriefDispatchState={simBriefDispatchState}
+        simBriefCredentialsConfigured={simBriefCredentialsConfigured}
+        isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
+        simBriefAircraftTypes={simBriefDispatchOptions}
+        isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
+        simBriefAircraftTypesError={simBriefAircraftTypesError}
+        onToggleBoardFlight={handleToggleBoardFlight}
+        onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
+        onRepairFlightBoardEntry={handleRepairFlightBoardEntry}
+        onReorderFlightBoard={handleReorderFlightBoard}
+        onSelectFlightBoard={handleSelectFlightBoard}
+        onCreateFlightBoard={handleCreateFlightBoard}
+        onRenameFlightBoard={handleRenameFlightBoard}
+        onDeleteFlightBoard={handleDeleteFlightBoard}
+        onSimBriefTypeChange={handleSimBriefTypeChange}
+        onSimBriefDispatch={handleSimBriefDispatch}
+        onOpenSimBriefFlight={handleOpenSimBriefFlight}
+        onCompleteTourFlight={handleCompleteTourFlight}
+        showFlightBoard
+      />
+    );
+  } else {
+    rightColumnContent = (
+      <div
+        className={cn(
+          "grid min-w-0 min-h-0 gap-3 bp-1024:gap-2.5",
+          isPlannerControlsInlineCollapsed
+            ? "[grid-template-rows:auto_minmax(0,1fr)]"
+            : "grid-rows-[minmax(0,1fr)]"
+        )}
+      >
+        <div
+          className={cn(scheduleView !== "flights" && "opacity-60")}
+          onPointerDownCapture={() => {
+            if (scheduleView !== "flights") {
+              setScheduleView("flights");
+            }
+          }}
+        >
+          <FilterBar
+            key={`filters-${filterUiVersion}`}
+            popupMode={false}
+            filters={normalizeFilters(filters, filterBounds)}
+            airlines={airlines}
+            airportOptions={airportOptions}
+            regionOptions={geoOptions.regions}
+            countryOptions={geoOptions.countries}
+            equipmentOptions={equipmentOptions}
+            viewportHeight={viewportSize.height}
+            filterBounds={filterBounds}
+            onFilterChange={handleFilterChange}
+            plannerControlsCollapsed={isPlannerControlsInlineCollapsed}
+            onTogglePlannerControls={() => setPlannerControlsCollapsed((current) => !current)}
+            onReset={handleResetFilters}
+          />
+        </div>
+
+        {isPlannerControlsInlineCollapsed ? (
+          <DetailsPanel
+            shortlist={shortlist}
+            flightBoards={flightBoards}
+            activeFlightBoardId={activeFlightBoard?.id || ""}
+            expandedBoardFlightId={expandedBoardFlightId}
+            selectedAccomplishment={selectedAccomplishment}
+            simBriefDispatchState={simBriefDispatchState}
+            simBriefCredentialsConfigured={simBriefCredentialsConfigured}
+            isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
+            simBriefAircraftTypes={simBriefDispatchOptions}
+            isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
+            simBriefAircraftTypesError={simBriefAircraftTypesError}
+            onToggleBoardFlight={handleToggleBoardFlight}
+            onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
+            onRepairFlightBoardEntry={handleRepairFlightBoardEntry}
+            onReorderFlightBoard={handleReorderFlightBoard}
+            onSelectFlightBoard={handleSelectFlightBoard}
+            onCreateFlightBoard={handleCreateFlightBoard}
+            onRenameFlightBoard={handleRenameFlightBoard}
+            onDeleteFlightBoard={handleDeleteFlightBoard}
+            onSimBriefTypeChange={handleSimBriefTypeChange}
+            onSimBriefDispatch={handleSimBriefDispatch}
+            onOpenSimBriefFlight={handleOpenSimBriefFlight}
+            onCompleteTourFlight={handleCompleteTourFlight}
+            showFlightBoard
+          />
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen min-h-screen flex-col gap-6 overflow-hidden p-6 bp-1024:gap-3 bp-1024:p-3.5">
       <header className="flex min-w-0 flex-wrap items-end justify-between gap-4 bp-1024:items-start bp-1024:gap-3">
@@ -5094,292 +4717,139 @@ export default function App() {
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-hidden">
-        <div className="grid h-full min-h-0 gap-4 [grid-template-rows:minmax(0,1fr)_auto] bp-1024:gap-3">
-          <div className="grid min-h-0 gap-4 [grid-template-columns:minmax(0,1.42fr)_minmax(224px,0.9fr)] bp-1024:gap-3 bp-1024:[grid-template-columns:minmax(0,1.48fr)_minmax(248px,0.9fr)] bp-1400:[grid-template-columns:minmax(0,1.55fr)_minmax(260px,0.92fr)]">
-            {schedule ? (
-              <ScheduleTablePanel
-                scheduleView={scheduleView}
-                theme={theme}
-                activeFlightBoardEntries={flightBoard}
-                selectedFlightId={selectedFlightId}
-                expandedBoardFlightId={expandedBoardFlightId}
-                pendingMapFlightPathViewMode={pendingMapFlightPathViewMode}
-                pendingMapFitToRoute={pendingMapFitToRoute}
-                onConsumePendingMapFitToRoute={() => setPendingMapFitToRoute(false)}
-                availableTours={availableTours}
-                selectedTourPath={selectedTour?.path || ""}
-                accomplishmentOptions={ACCOMPLISHMENTS}
-                selectedAccomplishmentName={selectedAccomplishment?.name || ""}
-                selectedAccomplishment={selectedAccomplishment}
-                accomplishmentRows={accomplishmentRows}
-                viewportWidth={viewportSize.width}
-                flightRows={sortedFlights}
-                selectedFlightRowId={selectedFlightId}
-                flightSort={sort}
-                timeDisplayMode={scheduleTableTimeDisplayMode}
-                addonAirports={addonAirports}
-                tourRows={sortedTourRows}
-                selectedTourRowId={selectedTourRowId}
-                onScheduleViewChange={handleScheduleViewChange}
-                onSelectTourPath={setSelectedTourPath}
-                onSelectAccomplishmentName={setSelectedAccomplishmentName}
-                onShowAccomplishmentFlights={handleShowAccomplishmentFlights}
-                onSortFlights={handleSort}
-                onToggleTimeDisplayMode={() =>
-                  setScheduleTableTimeDisplayMode((current) =>
-                    current === "local" ? "utc" : "local"
-                  )
-                }
-                onSelectRow={handleSelectFlight}
-                onActivateRow={handleAddToFlightBoard}
-              />
-            ) : (
-              <Panel className="grid content-start gap-3 rounded-none bp-1024:p-4">
-                <Eyebrow>No Active Schedule</Eyebrow>
-                <h2 className={cn("m-0 bp-1024:text-[1.04rem]", sectionTitleTextClassName)}>
-                  Import a PFPX XML file to start planning.
-                </h2>
-                <p className={cn("m-0 max-w-[56ch] text-[var(--text-muted)] bp-1024:text-[0.88rem]", supportCopyTextClassName)}>
-                  The app validates airport coverage, converts local schedule times to
-                  UTC, calculates route distance, and filters routes by compatible
-                  aircraft families and equipment based on weight, capacity, and range.
-                </p>
-              </Panel>
-            )}
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="grid min-h-0 flex-1 gap-4 [grid-template-columns:minmax(0,1.42fr)_minmax(224px,0.9fr)] bp-1024:gap-3 bp-1024:[grid-template-columns:minmax(0,1.48fr)_minmax(248px,0.9fr)] bp-1400:[grid-template-columns:minmax(0,1.55fr)_minmax(260px,0.92fr)]">
+          <ScheduleWorkspacePanel
+            scheduleExists={Boolean(schedule)}
+            scheduleView={scheduleView}
+            theme={theme}
+            activeFlightBoardEntries={flightBoard}
+            selectedFlightId={selectedFlightId}
+            expandedBoardFlightId={expandedBoardFlightId}
+            pendingMapFlightPathViewMode={pendingMapFlightPathViewMode}
+            pendingMapFitToRoute={pendingMapFitToRoute}
+            onConsumePendingMapFitToRoute={() => setPendingMapFitToRoute(false)}
+            availableTours={availableTours}
+            selectedTourPath={selectedTour?.path || ""}
+            accomplishmentOptions={ACCOMPLISHMENTS}
+            selectedAccomplishmentName={selectedAccomplishment?.name || ""}
+            onPrimaryViewChange={handlePrimaryViewChange}
+            onSelectTourPath={setSelectedTourPath}
+            onSelectAccomplishmentName={setSelectedAccomplishmentName}
+            accomplishmentRows={accomplishmentRows}
+            selectedAccomplishment={selectedAccomplishment}
+            viewportWidth={viewportSize.width}
+            flightRows={sortedFlights}
+            selectedFlightRowId={selectedFlightId}
+            flightSort={sort}
+            timeDisplayMode={scheduleTableTimeDisplayMode}
+            addonAirports={addonAirports}
+            tourRows={sortedTourRows}
+            selectedTourRowId={selectedTourRowId}
+            onShowAccomplishmentFlights={handleShowAccomplishmentFlights}
+            onSortFlights={handleSort}
+            onToggleTimeDisplayMode={() =>
+              setScheduleTableTimeDisplayMode((current) =>
+                current === "local" ? "utc" : "local"
+              )
+            }
+            onSelectRow={handleSelectFlight}
+            onActivateRow={handleAddToFlightBoard}
+            plannerMode={plannerMode}
+            dutyFilters={dutyFilters}
+            airlines={airlines}
+            regionOptions={geoOptions.regions}
+            countryOptions={geoOptions.countries}
+            dutyEquipmentOptions={dutyEquipmentOptions}
+            dutyOriginAirportOptions={dutyOriginAirportOptions}
+            filterBounds={filterBounds}
+            onDutyFilterChange={handleDutyFilterChange}
+            onBuildDutySchedule={handleBuildDutySchedule}
+            onRerollDutySchedule={handleRerollDutySchedule}
+            canRerollDutySchedule={canRerollDutySchedule}
+            onReset={handleResetFilters}
+            dutyBuildWarning={dutyBuildWarning}
+            onClearDutyBuildWarning={() => setDutyBuildWarning(null)}
+          />
 
-            <div
-              className={cn(
-                "grid min-w-0 min-h-0 gap-3 bp-1024:gap-2.5",
-                isPlannerControlsInlineCollapsed
-                  ? "[grid-template-rows:auto_minmax(0,1fr)]"
-                  : "grid-rows-[minmax(0,1fr)]"
-              )}
-            >
-              <div
-                className={cn(scheduleView !== "flights" && "opacity-60")}
-                onPointerDownCapture={() => {
-                  if (scheduleView !== "flights") {
-                    setScheduleView("flights");
-                  }
-                }}
-              >
-                <FilterBar
-                  key={`filters-${filterUiVersion}`}
-                  plannerMode={plannerMode}
-                  popupMode={false}
-                  filters={normalizeFilters(filters, filterBounds)}
-                  dutyFilters={normalizeDutyFilters(dutyFilters, filterBounds)}
-                  airlines={airlines}
-                  airportOptions={airportOptions}
-                  regionOptions={geoOptions.regions}
-                  countryOptions={geoOptions.countries}
-                  equipmentOptions={equipmentOptions}
-                  dutyEquipmentOptions={dutyEquipmentOptions}
-                  dutyOriginAirportOptions={dutyOriginAirportOptions}
-                  qualifyingDutyAirlines={qualifyingDutyAirlines}
-                  filterBounds={filterBounds}
-                  onPlannerModeChange={handlePlannerModeChange}
-                  onFilterChange={handleFilterChange}
-                  onDutyFilterChange={handleDutyFilterChange}
-                  plannerControlsCollapsed={isPlannerControlsInlineCollapsed}
-                  onTogglePlannerControls={() => setPlannerControlsCollapsed((current) => !current)}
-                  onBuildDutySchedule={handleBuildDutySchedule}
-                  onReset={handleResetFilters}
-                  dutyBuildWarning={dutyBuildWarning}
-                  onClearDutyBuildWarning={() => setDutyBuildWarning(null)}
-                />
-              </div>
-
-              {isPlannerControlsInlineCollapsed ? (
-                <DetailsPanel
-                  shortlist={shortlist}
-                  flightBoards={flightBoards}
-                  activeFlightBoardId={activeFlightBoard?.id || ""}
-                  expandedBoardFlightId={expandedBoardFlightId}
-                  selectedAccomplishment={selectedAccomplishment}
-                  simBriefDispatchState={simBriefDispatchState}
-                  simBriefCredentialsConfigured={simBriefCredentialsConfigured}
-                  isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
-                  simBriefAircraftTypes={simBriefDispatchOptions}
-                  isSimBriefAircraftTypesLoading={isSimBriefAircraftTypesLoading}
-                  simBriefAircraftTypesError={simBriefAircraftTypesError}
-                  onToggleBoardFlight={handleToggleBoardFlight}
-                  onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
-                  onRepairFlightBoardEntry={handleRepairFlightBoardEntry}
-                  onReorderFlightBoard={handleReorderFlightBoard}
-                  onSelectFlightBoard={handleSelectFlightBoard}
-                  onCreateFlightBoard={handleCreateFlightBoard}
-                  onRenameFlightBoard={handleRenameFlightBoard}
-                  onDeleteFlightBoard={handleDeleteFlightBoard}
-                  onSimBriefTypeChange={handleSimBriefTypeChange}
-                  onSimBriefDispatch={handleSimBriefDispatch}
-                  onOpenSimBriefFlight={handleOpenSimBriefFlight}
-                  onCompleteTourFlight={handleCompleteTourFlight}
-                  showFlightBoard
-                />
-              ) : null}
-            </div>
-          </div>
-
-          {schedule?.importSummary || isDevToolsEnabled ? (
-            <footer className="flex min-w-0 flex-nowrap items-center justify-between gap-3 whitespace-nowrap border-t border-[color:var(--line)] pt-1.5">
-              <div className="flex min-w-0 flex-nowrap items-center gap-x-3 overflow-hidden whitespace-nowrap">
-                {schedule?.importSummary ? (
-                  <>
-                    {footerMetadataItems.map((item) => (
-                      item.kind === "date" ? (
-                        <FooterDateStat
-                          key={item.label}
-                          label={item.label}
-                          value={item.value}
-                          isCurrent={item.isCurrent}
-                        />
-                      ) : (
-                        <FooterStat key={item.label} label={item.label} value={item.value} />
-                      )
-                    ))}
-                  </>
-                ) : null}
-              </div>
-              {isDevToolsEnabled ? (
-                <div className="flex min-w-0 flex-1 items-center justify-center overflow-hidden whitespace-nowrap">
-                  <div className="relative" ref={devWindowMenuRef}>
-                    <button
-                      type="button"
-                      onClick={() => setIsDevWindowMenuOpen((current) => !current)}
-                      aria-expanded={isDevWindowMenuOpen}
-                      aria-haspopup="menu"
-                      disabled={!isDesktopAddonScanAvailable}
-                      className={cn(
-                        "inline-flex min-w-0 max-w-full items-center gap-1 overflow-hidden rounded-none border-0 bg-transparent p-0 text-[var(--text-muted)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] bp-1024:text-[0.76rem]",
-                        bodySmTextClassName
-                      )}
-                      title={
-                        isDesktopAddonScanAvailable
-                          ? "Choose a responsive test window width"
-                          : "Window size presets are only available in the desktop app"
-                      }
-                    >
-                      <span className="shrink-0">Window Size:</span>
-                      <strong className="min-w-0 truncate font-semibold text-[var(--text-heading)]">
-                        {selectedDevWindowPreset?.label || "Choose"}
-                      </strong>
-                      <span className="shrink-0">| Current Size:</span>
-                      <strong className="min-w-0 truncate font-semibold text-[var(--text-heading)]">
-                        {currentWindowSizeLabel}
-                      </strong>
-                    </button>
-                    {isDevWindowMenuOpen ? (
-                      <div
-                        className="absolute left-1/2 bottom-[calc(100%+0.5rem)] z-30 flex min-w-[180px] -translate-x-1/2 flex-col gap-1 rounded-none border border-[color:transparent] bg-[var(--surface-raised)] p-2 shadow-none"
-                        role="menu"
-                        aria-label="Window size presets"
-                      >
-                        {DEV_WINDOW_WIDTH_PRESETS.map((option) => (
-                          <Button
-                            key={option.width}
-                            variant="ghost"
-                            active={devWindowWidth === option.width}
-                            className="justify-start rounded-none px-3 py-2 text-[0.8rem]"
-                            role="menuitemradio"
-                            aria-checked={devWindowWidth === option.width}
-                            onClick={() => handleSelectDevWindowWidth(option.width)}
-                          >
-                            {option.label}
-                          </Button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-              <div
-                className={cn(
-                  "flex shrink-0 items-center gap-x-2 whitespace-nowrap text-[var(--text-muted)] bp-1024:text-[0.76rem]",
-                  bodySmTextClassName
-                )}
-                aria-label="Copyright © 2026 Talon42"
-              >
-                <span>Copyright &copy; 2026</span>
-                <a
-                  className="text-[var(--delta-blue)] no-underline hover:underline dark:text-[rgb(255,255,255)]"
-                  href="https://github.com/Talon42/DVA-Flight-Planner"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Talon42
-                </a>
-                <span>Version:</span>
-                <strong className="text-[var(--text-heading)]">{APP_BUILD_GIT_TAG}</strong>
-                {isDesktopAddonScanAvailable && availableUpdate?.updateAvailable ? (
-                  <FooterLinkStat
-                    label="Update Available"
-                    value=""
-                    onClick={handleOpenReleasePage}
-                  />
-                ) : null}
-              </div>
-            </footer>
-          ) : null}
+          {rightColumnContent}
         </div>
+        <AppFooter
+          showFooter={Boolean(schedule?.importSummary || isDevToolsEnabled)}
+          footerMetadataItems={footerMetadataItems}
+          isDevToolsEnabled={isDevToolsEnabled}
+          isDesktopAddonScanAvailable={isDesktopAddonScanAvailable}
+          hasUpdateAvailable={Boolean(isDesktopAddonScanAvailable && availableUpdate?.updateAvailable)}
+          appBuildGitTag={APP_BUILD_GIT_TAG}
+          selectedDevWindowPreset={selectedDevWindowPreset}
+          currentWindowSizeLabel={currentWindowSizeLabel}
+          devWindowMenuRef={devWindowMenuRef}
+          isDevWindowMenuOpen={isDevWindowMenuOpen}
+          onToggleDevWindowMenu={() => setIsDevWindowMenuOpen((current) => !current)}
+          devWindowWidth={devWindowWidth}
+          devWindowWidthPresets={DEV_WINDOW_WIDTH_PRESETS}
+          onSelectDevWindowWidth={handleSelectDevWindowWidth}
+          onOpenReleasePage={handleOpenReleasePage}
+        />
       </main>
 
       {isSettingsOpen ? (
         <ModalBackdrop onClick={handleCloseSettings}>
-          <Panel
-            as="section"
-            padding="lg"
-            className="flex h-[min(calc(100vh-24px),46rem)] w-[min(860px,calc(100vw-24px))] max-w-full flex-col gap-4 overflow-hidden bg-[var(--modal-shell-bg)] bp-1024:h-[min(calc(100vh-24px),44rem)] bp-1024:gap-3"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Settings"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <SectionHeader
-              eyebrow="Settings"
-              title="Application Settings"
-              actions={<Button variant="ghost" onClick={handleCloseSettings}>Close</Button>}
-            />
-
-            <div
-              className="planner-tabs mt-2 flex w-full min-w-0 flex-nowrap items-end gap-4 overflow-x-auto border-b border-[color:var(--line)] pb-1"
-              role="tablist"
-              aria-orientation="horizontal"
-              aria-label="Settings sections"
+          <SettingsModalBoundary onClose={handleCloseSettings}>
+            <Panel
+              as="section"
+              padding="lg"
+              className="flex h-[min(calc(100vh-24px),46rem)] w-[min(860px,calc(100vw-24px))] max-w-full flex-col gap-4 overflow-hidden bg-[var(--modal-shell-bg)] bp-1024:h-[min(calc(100vh-24px),44rem)] bp-1024:gap-3"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Settings"
+              onClick={(event) => event.stopPropagation()}
             >
-              {SETTINGS_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  id={`settings-tab-${tab.id}`}
-                  aria-controls={`settings-panel-${tab.id}`}
-                  aria-selected={settingsTab === tab.id}
-                  tabIndex={settingsTab === tab.id ? 0 : -1}
-                  className={cn(
-                    plannerTabClassName,
-                    "shrink-0 whitespace-nowrap",
-                    getPlannerTabStateClassName(settingsTab === tab.id)
-                  )}
-                  onClick={() => setSettingsTab(tab.id)}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+              <SectionHeader
+                eyebrow="Settings"
+                title="Application Settings"
+                actions={<Button variant="ghost" onClick={handleCloseSettings}>Close</Button>}
+              />
 
-            <div className="flex min-h-0 flex-1 pt-1">
               <div
-                id={`settings-panel-${settingsTab}`}
-                role="tabpanel"
-                aria-labelledby={`settings-tab-${settingsTab}`}
-                className="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
+                className="planner-tabs mt-2 flex w-full min-w-0 flex-nowrap items-end gap-4 overflow-x-auto border-b border-[color:var(--line)] pb-1"
+                role="tablist"
+                aria-orientation="horizontal"
+                aria-label="Settings sections"
               >
-                {settingsTabContent}
+                {SETTINGS_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    id={`settings-tab-${tab.id}`}
+                    aria-controls={`settings-panel-${tab.id}`}
+                    aria-selected={settingsTab === tab.id}
+                    tabIndex={settingsTab === tab.id ? 0 : -1}
+                    className={cn(
+                      plannerTabClassName,
+                      "shrink-0 whitespace-nowrap",
+                      getPlannerTabStateClassName(settingsTab === tab.id)
+                    )}
+                    onClick={() => setSettingsTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-            </div>
-          </Panel>
+
+              <div className="flex min-h-0 flex-1 pt-1">
+                <div
+                  id={`settings-panel-${settingsTab}`}
+                  role="tabpanel"
+                  aria-labelledby={`settings-tab-${settingsTab}`}
+                  className="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
+                >
+                  {settingsTabContent}
+                </div>
+              </div>
+            </Panel>
+          </SettingsModalBoundary>
         </ModalBackdrop>
       ) : null}
 
@@ -5465,6 +4935,39 @@ export default function App() {
               </Button>
               <Button variant="danger" onClick={() => resolveDeleteUserDataConfirmation(true)}>
                 Delete
+              </Button>
+            </div>
+          </Panel>
+        </ModalBackdrop>
+      ) : null}
+
+      {isDutyBoardOverwriteConfirmOpen ? (
+        <ModalBackdrop onClick={() => resolveDutyBoardOverwriteConfirmation(false)}>
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(560px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Overwrite flight board"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader
+              eyebrow="Duty Schedule"
+              title="Overwrite the current flight board?"
+            />
+
+            <p className={mutedTextClassName}>
+              Generate Schedule will replace the active flight board with a newly generated duty
+              schedule. Choose Yes to continue or No to cancel.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => resolveDutyBoardOverwriteConfirmation(false)}>
+                No
+              </Button>
+              <Button variant="danger" onClick={() => resolveDutyBoardOverwriteConfirmation(true)}>
+                Yes
               </Button>
             </div>
           </Panel>

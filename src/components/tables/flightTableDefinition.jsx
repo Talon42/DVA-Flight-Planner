@@ -49,10 +49,20 @@ function AddonAirportIndicator({ airportCode, addonAirports, missingInDatabase =
     >
       <span>{normalizedAirportCode}</span>
       <span
-        className="inline-flex h-4 min-w-4 items-center justify-center rounded-none bg-[var(--status-resolved-bg)] px-1 text-[0.62rem] font-bold text-[var(--status-resolved-text)]"
+        className="inline-flex items-center justify-center text-[#3EB85A] dark:text-[#74D68C]"
         aria-label={`${normalizedAirportCode} addon airport`}
+        title="Addon Airport"
       >
-        OK
+        <svg viewBox="0 0 16 16" className="h-3 w-3" focusable="false" aria-hidden="true">
+          <path
+            d="m3.5 8.5 3 3 6-7"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2.2"
+          />
+        </svg>
       </span>
     </span>
   );

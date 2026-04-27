@@ -209,7 +209,10 @@ export default function DataTable({
   );
 
   return (
-    <div ref={tableRef} className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
+    <div
+      ref={tableRef}
+      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)]"
+    >
       <div className="w-full min-w-0 flex-none overflow-hidden">
         <TableHeader
           columns={resolvedColumns}

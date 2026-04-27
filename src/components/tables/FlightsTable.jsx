@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import DataTable from "../table/DataTable";
+import DataTable from "../data-table/DataTable";
 import { getFlightTableColumns } from "./flightTableDefinition.jsx";
 
 export default function FlightsTable({

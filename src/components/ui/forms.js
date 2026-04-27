@@ -7,13 +7,25 @@ import {
 import { cn } from "./cn";
 
 export const fieldLabelClassName =
-  cn("flex min-w-0 flex-col gap-1.5 text-[var(--text-muted)]", labelTextClassName);
+  "flex min-w-0 flex-col gap-1 text-[var(--text-muted)]";
 
 export const fieldTitleClassName =
   cn("text-[var(--text-muted)]", labelTextClassName);
 
+export const fieldHelperTextClassName =
+  "m-0 mt-0.5 text-[0.72rem] font-normal leading-[1.35] tracking-[0.01em] normal-case text-[var(--text-muted)]";
+
+export const choiceButtonLabelClassName =
+  "text-[0.75rem] font-normal leading-[1.2] tracking-[0] normal-case";
+
 export const fieldShellClassName = cn(
   "min-h-[var(--planner-control-box-min-height)] rounded-[var(--planner-control-box-radius)] border border-[color:transparent] bg-[var(--input-bg)] px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-[var(--text-primary)] transition-[background,color,outline-color] duration-150 ease-out",
+  "hover:bg-[var(--surface-soft)]",
+  "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[rgba(227,27,35,0.22)]"
+);
+
+const fieldShellCompactClassName = cn(
+  "min-h-[var(--planner-control-box-min-height)] rounded-[var(--planner-control-box-radius)] border border-[color:transparent] bg-[var(--input-bg)] px-[var(--planner-control-box-padding-x)] py-2 text-[var(--text-primary)] transition-[background,color,outline-color] duration-150 ease-out",
   "hover:bg-[var(--surface-soft)]",
   "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[rgba(227,27,35,0.22)]"
 );
@@ -33,22 +45,44 @@ export const fieldSelectClassName = cn(
   "appearance-none pr-10"
 );
 
+export const dropdownPanelClassName =
+  "grid gap-4 overflow-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] bg-[var(--modal-shell-bg)] p-4 shadow-none dark:border-[color:var(--surface-border)]";
+
+export const dropdownOptionRowClassName = cn(
+  "flex min-w-0 items-center justify-between gap-3 rounded-none border border-transparent px-3 py-2 text-left text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-option)] focus-visible:bg-[var(--surface-option)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+  bodySmTextClassName
+);
+
+export const dropdownGroupLabelClassName = cn(
+  "px-2 pb-1 pt-2 text-[var(--text-muted)]",
+  labelTextClassName
+);
+
+export const dropdownEmptyStateClassName = cn(
+  "rounded-none bg-[var(--surface-option)] px-3 py-4 text-center text-[var(--text-muted)]",
+  bodySmTextClassName
+);
+
 export const plannerTabsListClassName =
-  "planner-tabs flex w-fit max-w-full flex-nowrap items-end gap-6 border-b border-[color:var(--line)]";
+  "planner-tabs flex w-fit max-w-full flex-nowrap items-end gap-6";
 
 export const plannerTabClassName =
-  "planner-tab -mb-px min-h-9 border-b-2 border-transparent px-0 pb-2 pt-1 text-[0.94rem] font-semibold leading-[1.2] tracking-[0.01em] transition-[color,opacity,border-color] duration-150";
+  "planner-tab -mb-px min-h-9 border-b-[3px] border-transparent px-0 pb-2 pt-1 text-[0.94rem] font-semibold leading-[1.2] tracking-[0.01em] transition-[color,opacity,border-color] duration-150";
 
 export const getPlannerTabStateClassName = (active) =>
   active
     ? "border-b-[color:var(--delta-red)] text-[var(--text-heading)] opacity-100"
     : "text-[color:color-mix(in srgb,var(--text-heading) 72%, transparent)] opacity-90 hover:text-[var(--text-heading)] hover:opacity-100";
 
-export const toggleButtonClassName = (active) =>
+export const toggleButtonClassName = (active, variant = "default", density = "default") =>
   cn(
-    fieldShellClassName,
+    density === "compact" ? fieldShellCompactClassName : fieldShellClassName,
     "flex-1 justify-center text-center",
-    buttonTextClassName,
+    variant === "choice"
+      ? choiceButtonLabelClassName
+      : variant === "addon"
+        ? bodySmTextClassName
+        : buttonTextClassName,
     active
       ? "!bg-[var(--delta-blue)] !text-white dark:!bg-[#1F466E] dark:hover:!bg-[#27547F]"
       : "hover:bg-[var(--surface-soft)]"

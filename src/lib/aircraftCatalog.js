@@ -135,6 +135,28 @@ export function supportsFlightByOperationalLimits(flight, equipmentType) {
   return supportsFlightByRunwayLimits(flight, equipmentType);
 }
 
+export function supportsFlightByDutyEquipmentLimits(flight, equipmentType) {
+  ensureAircraftCatalogLoaded();
+  const normalizedType = String(equipmentType || "").trim().toUpperCase();
+  if (!normalizedType) {
+    return true;
+  }
+
+  const profile = aircraftProfileMap.get(normalizedType);
+  if (!profile || !flight) {
+    return false;
+  }
+
+  const runwayCompatible = supportsFlightByRunwayLimits(flight, normalizedType);
+  const routeDistanceOk =
+    Number.isFinite(profile.maximumRangeNm) &&
+    Number.isFinite(flight.distanceNm) &&
+    profile.maximumRangeNm >= flight.distanceNm;
+
+  // Duty schedules must respect both airport runway limits and route range.
+  return runwayCompatible && routeDistanceOk;
+}
+
 export function supportsFlightByRunwayLimits(flight, equipmentType) {
   ensureAircraftCatalogLoaded();
   const normalizedType = String(equipmentType || "").trim().toUpperCase();

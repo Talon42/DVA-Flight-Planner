@@ -6,11 +6,10 @@ import { groupSimBriefAircraftTypesByManufacturer } from "../lib/simbrief";
 import planeLight from "../data/images/plane_light.png";
 import Button from "./ui/Button";
 import Panel from "./ui/Panel";
+import { SearchableMultiSelect } from "./ui/SearchableSelect";
 import {
-  fieldBodyClassName,
   fieldInputClassName,
   fieldTitleClassName,
-  darkFieldOpenClassName,
   gridClassNames
 } from "./ui/forms";
 import {
@@ -213,172 +212,22 @@ function FlightCardAircraftSelector({
   isLoading,
   onChange
 }) {
-  const rootRef = useRef(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    function handleKeyDown(event) {
-      if (event.key === "Escape" && isOpen) {
-        setIsOpen(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
-
-  const selectedOption = useMemo(
-    () => options.find((option) => option.value === selectedValue) || null,
-    [options, selectedValue]
-  );
-
-  const filteredOptions = useMemo(() => {
-    const normalizedQuery = query.trim().toUpperCase();
-    if (!normalizedQuery) {
-      return options;
-    }
-
-    return options.filter((option) => {
-      const haystack = `${option.label || ""} ${option.value || ""} ${option.keywords || ""}`.toUpperCase();
-      return haystack.includes(normalizedQuery);
-    });
-  }, [options, query]);
-
-  const selectionLabel = selectedOption?.selectedLabel || selectedOption?.label || "Select aircraft";
-  const overlayHost =
-    typeof document !== "undefined"
-      ? rootRef.current?.closest('[data-flight-board="true"]') || null
-      : null;
-
   return (
-    <div className="grid gap-3" ref={rootRef}>
-      <div className="grid grid-cols-[minmax(110px,max-content)_minmax(0,1fr)] items-center gap-3">
-        <span className={fieldTitleClassName}>SIMBRIEF AIRCRAFT</span>
-        <button
-          className={cn(
-            fieldBodyClassName,
-            "flex w-full items-center justify-between gap-3 px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-left dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]",
-            isOpen && darkFieldOpenClassName
-          )}
-          type="button"
-          onClick={() => setIsOpen((current) => !current)}
-        >
-          <span className="block min-w-0 truncate">{selectionLabel}</span>
-          <span
-            className={cn(
-              "shrink-0 text-[var(--text-muted)] transition-transform duration-150",
-              isOpen && "rotate-180"
-            )}
-            aria-hidden="true"
-          >
-            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
-              <path
-                d="M4 6.5 8 10.5 12 6.5"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.75"
-              />
-            </svg>
-          </span>
-        </button>
-      </div>
-
-      {isOpen && overlayHost
-        ? createPortal(
-            <ModalBackdrop onClick={() => setIsOpen(false)}>
-              <Panel
-                className={cn(
-                  modalPanelClassName,
-                  "relative z-[61] w-[min(640px,calc(100%-2rem))] p-5 bp-1024:w-[min(560px,calc(100%-1.5rem))] bp-1024:p-4"
-                )}
-                role="dialog"
-                aria-modal="true"
-                aria-label="Select SimBrief aircraft"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className={fieldTitleClassName}>SimBrief aircraft</div>
-                    <p className={cn("m-0 text-[var(--text-muted)]", supportCopyTextClassName)}>
-                      Select an aircraft that Simbrief will use to build your flight plan. You can also choose any custom airframe you might have added.
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-none"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Close
-                  </Button>
-                </div>
-
-                <input
-                  className={cn(
-                    fieldInputClassName,
-                    "dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]"
-                  )}
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={isLoading ? "Loading aircraft..." : "Search aircraft"}
-                  autoFocus
-                />
-
-                <div className="app-scrollbar grid max-h-[min(58vh,460px)] gap-1 overflow-y-auto pr-1">
-                  {filteredOptions.map((option, index) => {
-                    const previousOption = index > 0 ? filteredOptions[index - 1] : null;
-                    const showGroupLabel =
-                      option.groupLabel && option.groupLabel !== previousOption?.groupLabel;
-                    const isSelected = option.value === selectedValue;
-
-                    return (
-                      <Fragment key={option.value}>
-                        {showGroupLabel ? (
-                          <div className={cn("px-2 pb-1 pt-2 text-[var(--text-muted)]", labelTextClassName)}>
-                            {option.groupLabel}
-                          </div>
-                        ) : null}
-                        <button
-                          className={cn(
-                            "flex items-center justify-between gap-3 rounded-none border border-transparent px-3 py-2 text-left text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-option)]",
-                            bodySmTextClassName,
-                            isSelected &&
-                              "bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
-                          )}
-                          type="button"
-                          onClick={() => {
-                            onChange(option.value);
-                            setIsOpen(false);
-                            setQuery("");
-                          }}
-                        >
-                          <span className="min-w-0 truncate">{option.label}</span>
-                          <span className={cn("shrink-0 text-[var(--text-muted)]", labelTextClassName)}>
-                            {isSelected ? "Selected" : "Add"}
-                          </span>
-                        </button>
-                      </Fragment>
-                    );
-                  })}
-
-                  {!filteredOptions.length ? (
-                    <div className={cn("rounded-none bg-[var(--surface-option)] px-3 py-4 text-center text-[var(--text-muted)]", bodySmTextClassName)}>
-                      No matching aircraft
-                    </div>
-                  ) : null}
-                </div>
-              </Panel>
-            </ModalBackdrop>,
-            overlayHost
-          )
-        : null}
-    </div>
+    <SearchableMultiSelect
+      label="SimBrief Aircraft"
+      labelPlacement="inline"
+      placeholder={isLoading ? "Loading aircraft..." : "Search aircraft"}
+      emptyLabel="No matching aircraft"
+      allLabel="Select aircraft"
+      allowMultiple={false}
+      hideChips
+      showClearAction={false}
+      showOptionMark={false}
+      showSingleSelectedLabel
+      options={options}
+      selectedValues={selectedValue ? [selectedValue] : [""]}
+      onChange={(values) => onChange(values[0] || "")}
+    />
   );
 }
 
@@ -506,6 +355,281 @@ function RepairInlinePanel({ flight, onRemoveFromFlightBoard, onRepairFlightBoar
           Remove from Flight Board
         </Button>
       </div>
+    </div>
+  );
+}
+
+// Keeps the flight board selector centered around the active board while preserving the existing callbacks.
+function FlightBoardSelectorStrip({
+  flightBoards,
+  activeFlightBoardId,
+  onSelectFlightBoard,
+  onCreateFlightBoard,
+  onRenameFlightBoard,
+  onDeleteFlightBoard
+}) {
+  const activeBoardIndex = Math.max(
+    flightBoards.findIndex((board) => board.id === activeFlightBoardId),
+    0
+  );
+  const activeBoard = flightBoards[activeBoardIndex] || null;
+  const boardCountLabel = flightBoards.length
+    ? `${activeBoardIndex + 1} of ${flightBoards.length}`
+    : "0 of 0";
+  const hasMultipleBoards = flightBoards.length > 1;
+  const canCreateBoard = flightBoards.length < 4;
+
+  function selectAdjacentBoard(delta) {
+    if (!flightBoards.length) {
+      return;
+    }
+
+    const nextIndex = (activeBoardIndex + delta + flightBoards.length) % flightBoards.length;
+    onSelectFlightBoard?.(flightBoards[nextIndex].id);
+  }
+
+  function openActiveRenameModal() {
+    if (activeBoard) {
+      onRenameFlightBoard?.(activeBoard);
+    }
+  }
+
+  function deleteActiveBoard() {
+    if (activeBoard) {
+      onDeleteFlightBoard?.(activeBoard.id);
+    }
+  }
+
+  return (
+    <div className="grid gap-2 border-b border-[color:var(--line)] pb-1">
+      <div className="hidden bp-1400:flex items-center gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {flightBoards.slice(0, 4).map((board, index) => {
+            const isActive = board.id === activeFlightBoardId;
+
+            if (isActive) {
+              return (
+                <button
+                  key={board.id}
+                  type="button"
+                  className={cn(
+                    "inline-flex h-10 min-w-0 max-w-[18rem] items-center justify-center rounded-none border-b-2 border-[color:var(--delta-red)] px-6 text-[var(--text-heading)] transition-colors",
+                    bodySmTextClassName,
+                    "font-medium"
+                  )}
+                  onClick={() => onSelectFlightBoard?.(board.id)}
+                  aria-label={`Select ${board.name}`}
+                  aria-current="page"
+                  title={board.name}
+                >
+                  <span className="min-w-0 truncate">{board.name}</span>
+                </button>
+              );
+            }
+
+            return (
+              <button
+                key={board.id}
+                type="button"
+                className={cn(
+                  "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-none border border-[color:var(--line)] text-[var(--text-muted)] transition-colors hover:border-[color:var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)]",
+                  labelTextClassName,
+                  "font-semibold"
+                )}
+                onClick={() => onSelectFlightBoard?.(board.id)}
+                aria-label={`Select ${board.name}`}
+                aria-current={undefined}
+                title={board.name}
+              >
+                {index + 1}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className="h-6 w-px bg-[color:var(--line)]" />
+          <FlightBoardSelectorActions
+            activeBoard={activeBoard}
+            canCreateBoard={canCreateBoard}
+            onCreateFlightBoard={onCreateFlightBoard}
+            onRenameFlightBoard={openActiveRenameModal}
+            onDeleteFlightBoard={deleteActiveBoard}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-2 bp-1400:hidden">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+          <FlightBoardChevronButton
+            direction="previous"
+            ariaLabel="Previous flight board"
+            disabled={!hasMultipleBoards}
+            onClick={() => selectAdjacentBoard(-1)}
+          />
+
+          <div className="grid min-w-0 justify-items-center">
+            {activeBoard ? (
+              <FlightBoardTabButton
+                board={activeBoard}
+                onSelectFlightBoard={onSelectFlightBoard}
+                variant="active"
+                align="center"
+                countLabel={boardCountLabel}
+              />
+            ) : null}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <FlightBoardChevronButton
+              direction="next"
+              ariaLabel="Next flight board"
+              disabled={!hasMultipleBoards}
+              onClick={() => selectAdjacentBoard(1)}
+            />
+            <span aria-hidden="true" className="h-6 w-px bg-[color:var(--line)]" />
+            <FlightBoardSelectorActions
+              activeBoard={activeBoard}
+              canCreateBoard={canCreateBoard}
+              onCreateFlightBoard={onCreateFlightBoard}
+              onRenameFlightBoard={openActiveRenameModal}
+              onDeleteFlightBoard={deleteActiveBoard}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FlightBoardChevronButton({ direction, ariaLabel, disabled = false, onClick }) {
+  const isPrevious = direction === "previous";
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-none border border-[color:var(--line)] text-[var(--text-muted)] transition-colors hover:border-[color:var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] disabled:cursor-not-allowed disabled:opacity-45"
+      )}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden="true">
+        <path
+          d={isPrevious ? "M9.5 4.5 6 8l3.5 3.5" : "M6.5 4.5 10 8l-3.5 3.5"}
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.75"
+        />
+      </svg>
+    </button>
+  );
+}
+
+function FlightBoardTabButton({
+  board,
+  variant = "preview",
+  align = "center",
+  countLabel = "",
+  onSelectFlightBoard
+}) {
+  const isActive = variant === "active";
+  const alignClassName =
+    align === "right"
+      ? "justify-end text-right"
+      : align === "left"
+        ? "justify-start text-left"
+        : "justify-center text-center";
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "grid min-w-0 rounded-none transition-colors",
+        alignClassName,
+        isActive
+          ? "max-w-[min(18rem,100%)] text-[var(--text-heading)]"
+          : "max-w-[min(14rem,100%)] text-[var(--text-muted)] hover:text-[var(--text-heading)]"
+      )}
+      onClick={() => onSelectFlightBoard?.(board.id)}
+      aria-label={`Select ${board.name}`}
+      aria-current={isActive ? "page" : undefined}
+      title={board.name}
+    >
+      <span
+        className={cn(
+          "min-w-0 truncate",
+          bodySmTextClassName,
+          "font-medium",
+          isActive
+            ? cn(
+                "border-b-2 border-[color:var(--delta-red)] pb-0.5"
+              )
+            : cn("bp-1400:text-[0.86rem]")
+        )}
+      >
+        {board.name}
+      </span>
+      {isActive ? (
+        <span className="mt-1 text-[0.7rem] font-normal leading-none text-[var(--text-muted)]">
+          {countLabel}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function FlightBoardSelectorActions({
+  activeBoard,
+  canCreateBoard,
+  onCreateFlightBoard,
+  onRenameFlightBoard,
+  onDeleteFlightBoard
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-none text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] disabled:cursor-not-allowed disabled:opacity-45"
+        aria-label={activeBoard ? `Rename ${activeBoard.name}` : "Rename flight board"}
+        onClick={onRenameFlightBoard}
+        disabled={!activeBoard}
+      >
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
+          <path
+            d="M3 11.75V13h1.25l6.5-6.5-1.25-1.25-6.5 6.5ZM12.2 4.05a.75.75 0 0 0 0-1.06l-.19-.19a.75.75 0 0 0-1.06 0l-.53.53 1.25 1.25.53-.53Z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-none text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--delta-red)] disabled:cursor-not-allowed disabled:opacity-45"
+        aria-label={activeBoard ? `Delete ${activeBoard.name}` : "Delete flight board"}
+        onClick={onDeleteFlightBoard}
+        disabled={!activeBoard}
+      >
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
+          <path
+            d="M4.5 4.5h7v8.25a.75.75 0 0 1-.75.75h-5.5a.75.75 0 0 1-.75-.75V4.5Zm2-2h3l.5.75H12v1H4v-1h2l.5-.75Z"
+            fill="currentColor"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-none border border-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] disabled:cursor-not-allowed disabled:opacity-45"
+        aria-label="Add flight board"
+        onClick={onCreateFlightBoard}
+        disabled={!canCreateBoard}
+      >
+        <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden="true">
+          <path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -893,7 +1017,6 @@ export default function DetailsPanel({
   const visibleShortlist = draggedBoardEntryId
     ? shortlist.filter((flight) => flight.boardEntryId !== draggedBoardEntryId)
     : shortlist;
-  const canCreateBoard = flightBoards.length < 4;
   const renameOverlayHost = panelRef.current;
   const placeholderIndex = buildPlaceholderIndex(shortlist, dropTarget, draggedBoardEntryId);
   const draggedFlight = shortlist.find((flight) => flight.boardEntryId === draggedBoardEntryId) || null;
@@ -908,82 +1031,15 @@ export default function DetailsPanel({
       >
         <div className="details-card__header mb-3">
           <Eyebrow>Flight Board</Eyebrow>
-          <div className="app-scrollbar mt-2 min-w-0 overflow-x-auto overflow-y-hidden pb-1">
-            <div className="inline-flex min-w-full items-center gap-1.5 whitespace-nowrap border-b border-[color:var(--line)] pb-1">
-              {flightBoards.map((board) => {
-                const isActive = board.id === activeFlightBoardId;
-                return (
-                  <div
-                    key={board.id}
-                    className={cn(
-                      "grid min-w-[12rem] max-w-[16rem] flex-none grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1 border-b-2 pb-1",
-                      isActive
-                        ? "border-[var(--delta-red)]"
-                        : "border-transparent"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      className={cn(
-                        "min-w-0 w-full rounded-none px-2 py-0.5 whitespace-nowrap transition-colors",
-                        bodySmTextClassName,
-                        "font-medium",
-                        isActive
-                          ? "text-[var(--text-heading)] dark:text-white"
-                          : "text-[var(--text-primary)] hover:text-[var(--text-heading)] dark:text-[var(--text-primary)] dark:hover:text-white"
-                      )}
-                      onClick={() => onSelectFlightBoard?.(board.id)}
-                    >
-                      <span
-                        className={cn(
-                          "block min-w-0 truncate"
-                        )}
-                        title={board.name}
-                      >
-                        {board.name}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-none text-[var(--text-muted)] transition-colors hover:text-[var(--text-heading)]"
-                      aria-label={`Rename ${board.name}`}
-                      onClick={() => openRenameModal(board)}
-                    >
-                      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
-                        <path
-                          d="M3 11.75V13h1.25l6.5-6.5-1.25-1.25-6.5 6.5ZM12.2 4.05a.75.75 0 0 0 0-1.06l-.19-.19a.75.75 0 0 0-1.06 0l-.53.53 1.25 1.25.53-.53Z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-none text-[var(--text-muted)] transition-colors hover:text-[var(--delta-red)] disabled:cursor-not-allowed disabled:opacity-45"
-                      aria-label={`Delete ${board.name}`}
-                      onClick={() => onDeleteFlightBoard?.(board.id)}
-                    >
-                      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true">
-                        <path
-                          d="M4.5 4.5h7v8.25a.75.75 0 0 1-.75.75h-5.5a.75.75 0 0 1-.75-.75V4.5Zm2-2h3l.5.75H12v1H4v-1h2l.5-.75Z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                );
-              })}
-              <button
-                type="button"
-                className="inline-flex h-7 w-7 flex-none shrink-0 items-center justify-center rounded-none border border-transparent text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] disabled:cursor-not-allowed disabled:opacity-45"
-                aria-label="Add flight board"
-                onClick={() => onCreateFlightBoard?.()}
-                disabled={!canCreateBoard}
-              >
-                <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden="true">
-                  <path d="M8 3.25v9.5M3.25 8h9.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
+          <div className="mt-2">
+            <FlightBoardSelectorStrip
+              flightBoards={flightBoards}
+              activeFlightBoardId={activeFlightBoardId}
+              onSelectFlightBoard={onSelectFlightBoard}
+              onCreateFlightBoard={onCreateFlightBoard}
+              onRenameFlightBoard={openRenameModal}
+              onDeleteFlightBoard={onDeleteFlightBoard}
+            />
           </div>
         </div>
 

@@ -1,3 +1,4 @@
+import planeLight from "../data/images/plane_light.png";
 import Button from "./ui/Button";
 import { cn } from "./ui/cn";
 import {
@@ -6,6 +7,11 @@ import {
   sectionTitleTextClassName
 } from "./ui/typography";
 import { getAccomplishmentCompletedCount } from "../lib/accomplishments";
+
+function getAccomplishmentColumnCount(viewportWidth = 0) {
+  void viewportWidth;
+  return 4;
+}
 
 function CompletionIndicator({ completed }) {
   return (
@@ -54,11 +60,12 @@ function StatusIcon() {
   );
 }
 
-function AccomplishmentChecklistRow({ row, requirement, onShowFlights }) {
+function AccomplishmentChecklistRow({ row, requirement, onShowFlights, isAltRow }) {
   return (
     <div
       className={cn(
-        "relative grid min-h-[3.15rem] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] bg-[var(--surface-table-row)] px-3.5 py-2.5 even:bg-[var(--surface-table-row-alt)]",
+        "relative grid min-h-[3.15rem] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] px-3.5 py-2.5",
+        isAltRow ? "bg-[var(--surface-table-row-alt)]" : "bg-[var(--surface-table-row)]",
         row.isCompleted && "text-[var(--text-muted)]"
       )}
     >
@@ -78,18 +85,32 @@ function AccomplishmentChecklistRow({ row, requirement, onShowFlights }) {
         <Button
           size="sm"
           variant="ghost"
-          className="relative z-[2] min-h-8 justify-self-end whitespace-nowrap px-2 py-1.5"
+          className="relative z-[2] min-h-8 w-10 justify-self-end px-0 py-1.5 bp-1400:w-auto bp-1400:whitespace-nowrap bp-1400:px-2"
+          aria-label={`Find a flight for ${row.airport}`}
           onClick={() => onShowFlights?.(row.airport, requirement)}
         >
-          Find a Flight
+          <img
+            src={planeLight}
+            alt=""
+            title="Find a Flight"
+            className="h-5.5 w-5.5 object-contain brightness-0 opacity-80 bp-1400:hidden dark:brightness-100 dark:opacity-100"
+            aria-hidden="true"
+          />
+          <span className="hidden bp-1400:inline">Find a Flight</span>
         </Button>
       )}
     </div>
   );
 }
 
-function CompletedAccomplishmentSummary({ accomplishment, rows, completedCount, totalCount }) {
-  const columns = 4;
+function CompletedAccomplishmentSummary({
+  accomplishment,
+  rows,
+  completedCount,
+  totalCount,
+  viewportWidth
+}) {
+  const columns = getAccomplishmentColumnCount(viewportWidth);
   const visibleRows = Math.ceil(rows.length / columns);
   const orderedRows = Array.from({ length: visibleRows * columns }, (_, index) => {
     const column = Math.floor(index / visibleRows);
@@ -124,8 +145,8 @@ function CompletedAccomplishmentSummary({ accomplishment, rows, completedCount, 
       </div>
 
       <div className="app-scrollbar min-h-0 overflow-x-hidden overflow-y-auto px-3 py-4 bp-1024:px-2">
-        <div className="min-w-0 overflow-hidden">
-          <div className="grid grid-cols-4 bp-1024:grid-cols-3">
+        <div className="min-w-0 overflow-hidden border-2 border-[color:var(--panel-border)]">
+          <div className="grid grid-cols-4">
             {orderedRows.map((row, index) =>
               row ? (
             <div
@@ -162,6 +183,7 @@ function CompletedAccomplishmentSummary({ accomplishment, rows, completedCount, 
 export default function AccomplishmentsPanel({
   accomplishment,
   rows,
+  viewportWidth,
   onShowFlights
 }) {
   if (!accomplishment) {
@@ -175,6 +197,8 @@ export default function AccomplishmentsPanel({
   const completedCount = getAccomplishmentCompletedCount(rows);
   const totalCount = rows.length;
   const isAccomplishmentCompleted = totalCount > 0 && completedCount === totalCount;
+  // Keep the zebra striping aligned by visual row when the grid changes columns at breakpoints.
+  const rowGroupColumns = getAccomplishmentColumnCount(viewportWidth);
 
   if (isAccomplishmentCompleted) {
     return (
@@ -184,6 +208,7 @@ export default function AccomplishmentsPanel({
           rows={rows}
           completedCount={completedCount}
           totalCount={totalCount}
+          viewportWidth={viewportWidth}
         />
       </div>
     );
@@ -214,15 +239,20 @@ export default function AccomplishmentsPanel({
         </div>
 
         <div className="app-scrollbar min-h-0 overflow-x-hidden overflow-y-auto">
-          <div className="grid min-w-0 grid-cols-1 overflow-hidden bp-1024:grid-cols-2 bp-1400:grid-cols-3 bp-1920:grid-cols-4">
-            {rows.map((row) => (
-              <AccomplishmentChecklistRow
-                key={row.id}
-                row={row}
-                requirement={accomplishment.requirement}
-                onShowFlights={onShowFlights}
-              />
-            ))}
+          <div className="grid min-w-0 grid-cols-4 overflow-hidden border-2 border-[color:var(--panel-border)]">
+            {rows.map((row, index) => {
+              const isAltRow = Math.floor(index / rowGroupColumns) % 2 === 1;
+
+              return (
+                <AccomplishmentChecklistRow
+                  key={row.id}
+                  row={row}
+                  requirement={accomplishment.requirement}
+                  onShowFlights={onShowFlights}
+                  isAltRow={isAltRow}
+                />
+              );
+            })}
           </div>
         </div>
       </div>
