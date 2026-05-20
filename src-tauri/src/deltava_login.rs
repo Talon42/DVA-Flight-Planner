@@ -2,7 +2,11 @@ use serde_json::json;
 
 use crate::deltava_auth::DeltaVirtualAuthContext;
 
-pub fn build_deltava_login_automation_script(auth: &DeltaVirtualAuthContext) -> String {
+pub fn build_deltava_login_automation_script(
+    auth: &DeltaVirtualAuthContext,
+    login_url: &str,
+    target_url: &str,
+) -> String {
     let auth_json = serde_json::to_string(&json!({
         "firstName": auth.settings.first_name,
         "lastName": auth.settings.last_name,
@@ -14,9 +18,9 @@ pub fn build_deltava_login_automation_script(auth: &DeltaVirtualAuthContext) -> 
         .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_DVA_AUTH__\"".to_string());
     let debug_prefix = serde_json::to_string(crate::DELTAVA_DEBUG_MESSAGE_PREFIX)
         .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_SYNC_DEBUG__\"".to_string());
-    let login_url = serde_json::to_string(crate::DELTAVA_LOGIN_URL)
+    let login_url = serde_json::to_string(login_url)
         .unwrap_or_else(|_| "\"https://www.deltava.org/login.do\"".to_string());
-    let target_url = serde_json::to_string("https://www.deltava.org/pfpxsched.ws")
+    let target_url = serde_json::to_string(target_url)
         .unwrap_or_else(|_| "\"https://www.deltava.org/pfpxsched.ws\"".to_string());
 
     const TEMPLATE: &str = r#"

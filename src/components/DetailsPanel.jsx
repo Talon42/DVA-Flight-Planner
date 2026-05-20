@@ -25,6 +25,10 @@ import {
   labelTextClassName,
   supportCopyTextClassName
 } from "./ui/typography";
+import {
+  buildDeltaVirtualDraftReportPayload,
+  validateDeltaVirtualDraftReportPayload
+} from "../lib/deltaVirtualDraftReport";
 
 function DetailRow({ label, value }) {
   return (
@@ -234,6 +238,12 @@ function FlightCardAircraftSelector({
 function SimBriefInlinePanel({
   flight,
   simBriefDispatchState,
+  deltaDraftSubmitState = {
+    boardEntryId: "",
+    isSubmitting: false,
+    error: "",
+    result: null
+  },
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
   simBriefAircraftTypes,
@@ -243,11 +253,18 @@ function SimBriefInlinePanel({
   onCompleteTourFlight,
   onSimBriefTypeChange,
   onSimBriefDispatch,
-  onOpenSimBriefFlight
+  onOpenSimBriefFlight,
+  onPushToAcars
 }) {
   const selectedType = String(flight.simbriefSelectedType || "").trim().toUpperCase();
   const simBriefStaticId = String(flight?.simbriefPlan?.staticId || "").trim();
   const hasSimBriefPlan = Boolean(simBriefStaticId);
+  const hasDraftReportId = Number.isInteger(Number(flight?.draftReportId)) && Number(flight.draftReportId) > 0;
+  const draftPayload = buildDeltaVirtualDraftReportPayload(flight);
+  const draftValidation = validateDeltaVirtualDraftReportPayload(draftPayload);
+  const isDraftSubmitting =
+    deltaDraftSubmitState.boardEntryId === flight.boardEntryId &&
+    deltaDraftSubmitState.isSubmitting;
   const availableAircraftTypes = Array.isArray(simBriefAircraftTypes) ? simBriefAircraftTypes : [];
   const aircraftTypeOptions = useMemo(
     () => {
@@ -285,6 +302,14 @@ function SimBriefInlinePanel({
     : hasSimBriefPlan
       ? "Regenerate"
       : "SimBrief Dispatch";
+  const draftDisabled = isDraftSubmitting || !draftValidation.valid;
+  const draftLabel = isDraftSubmitting
+    ? hasDraftReportId
+      ? "Updating Draft Flight Report..."
+      : "Generating Draft Flight Report..."
+    : hasDraftReportId
+      ? "Update Draft Flight Report"
+      : "Create Draft Flight Report";
   const actionGridClassName = gridClassNames.boardActionsQuad;
 
   return (
@@ -312,8 +337,14 @@ function SimBriefInlinePanel({
             Open in Simbrief
           </Button>
         )}
-        <Button className="min-w-0 w-full" variant="board" size="sm" disabled>
-          Push to ACARS
+        <Button
+          className="min-w-0 w-full"
+          variant="board"
+          size="sm"
+          onClick={() => onPushToAcars(flight.boardEntryId)}
+          disabled={draftDisabled}
+        >
+          {draftLabel}
         </Button>
         <Button
           className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
@@ -748,6 +779,12 @@ export default function DetailsPanel({
   expandedBoardFlightId,
   selectedAccomplishment = null,
   simBriefDispatchState,
+  deltaDraftSubmitState = {
+    boardEntryId: "",
+    isSubmitting: false,
+    error: "",
+    result: null
+  },
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
   simBriefAircraftTypes,
@@ -764,6 +801,7 @@ export default function DetailsPanel({
   onSimBriefTypeChange,
   onSimBriefDispatch,
   onOpenSimBriefFlight = () => {},
+  onPushToAcars = () => {},
   onCompleteTourFlight,
   showFlightBoard = true
 }) {
@@ -1122,6 +1160,7 @@ export default function DetailsPanel({
                       <SimBriefInlinePanel
                         flight={flight}
                         simBriefDispatchState={simBriefDispatchState}
+                        deltaDraftSubmitState={deltaDraftSubmitState}
                         simBriefCredentialsConfigured={simBriefCredentialsConfigured}
                         isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
                         simBriefAircraftTypes={simBriefAircraftTypes}
@@ -1132,6 +1171,7 @@ export default function DetailsPanel({
                         onSimBriefTypeChange={onSimBriefTypeChange}
                         onSimBriefDispatch={onSimBriefDispatch}
                         onOpenSimBriefFlight={onOpenSimBriefFlight}
+                        onPushToAcars={onPushToAcars}
                       />
                     )
                   ) : null}

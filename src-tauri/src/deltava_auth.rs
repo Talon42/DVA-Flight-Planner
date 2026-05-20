@@ -107,7 +107,10 @@ pub fn clear_password_from_credential_manager() -> Result<(), String> {
     Ok(())
 }
 
-fn write_auth_settings_file(app: &AppHandle, settings: &DeltaVirtualAuthSettings) -> Result<(), String> {
+fn write_auth_settings_file(
+    app: &AppHandle,
+    settings: &DeltaVirtualAuthSettings,
+) -> Result<(), String> {
     let path = ensure_auth_storage_dir(app)?;
     let serialized = serde_json::to_string(settings)
         .map_err(|error| format!("Unable to serialize Delta Virtual auth settings: {error}"))?;
@@ -129,7 +132,9 @@ fn read_auth_settings_file(app: &AppHandle) -> Result<Option<DeltaVirtualAuthSet
     Ok(Some(normalize_settings(settings)))
 }
 
-fn refresh_password_state(settings: &mut DeltaVirtualAuthSettings) -> Result<Option<String>, String> {
+fn refresh_password_state(
+    settings: &mut DeltaVirtualAuthSettings,
+) -> Result<Option<String>, String> {
     let password = read_password_from_credential_manager()?;
     settings.has_password = password.is_some();
     Ok(password)
@@ -139,10 +144,7 @@ pub fn read_auth_context_internal(app: &AppHandle) -> Result<DeltaVirtualAuthCon
     let mut settings = read_auth_settings_file(app)?.unwrap_or_default();
     let password = refresh_password_state(&mut settings)?;
 
-    Ok(DeltaVirtualAuthContext {
-        settings,
-        password,
-    })
+    Ok(DeltaVirtualAuthContext { settings, password })
 }
 
 pub fn read_auth_settings_internal(app: &AppHandle) -> Result<DeltaVirtualAuthSettings, String> {

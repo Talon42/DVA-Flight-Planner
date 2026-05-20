@@ -18,6 +18,7 @@ Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, 
 - [Map View](#map-view)
 - [Flight Board](#flight-board)
 - [Flight Board Repair](#flight-board-repair)
+- [Draft Flight Report](#draft-flight-report)
 - [SimBrief Dispatch](#simbrief-dispatch)
 
 ## Disclaimer
@@ -36,6 +37,7 @@ For flight simulation purposes only. Not a commercial application. In no way is 
 - Includes an Accomplishments tab with DVA accomplishment airport checklist tracking
 - Includes a map view with route plotting, flight-path filters, weather radar, satellite overlay, and airport labels
 - Supports direct schedule and logbook sync from the Delta Virtual website
+- Supports draft flight report submission from Flight Board entries
 - Supports SimBrief dispatch from Flight Board entries
 - Supports saved custom SimBrief airframes mapped to specific aircraft types
 
@@ -366,6 +368,16 @@ If a repair is found, the board entry is relinked to the current schedule.
 
 If no repair match is found, the entry stays stale until you remove it.
 
+## Draft Flight Report
+
+The Flight Board includes a draft flight report action for Delta Virtual.
+
+### What changed recently
+
+- The draft report now submits against the production `deltava.org` domain.
+- The payload includes the stored SimBrief `simBriefID` again when a valid OFP XML or legacy ID is available.
+- The draft flow still uses SimBrief route and plan data already loaded on the flight board entry.
+
 ## SimBrief Dispatch
 
 SimBrief dispatch is available from Flight Board entries in the desktop app.
@@ -417,7 +429,6 @@ Saved custom airframes are then available as dispatch choices on Flight Board en
 - Pilots still sign in with their own SimBrief/Navigraph account. The app does not bypass SimBrief authentication.
 - `Navigraph Alias` is preferred for OFP fetches. `Pilot ID` is supported as a fallback.
 - At least one of those identifiers must be saved in `Settings` before dispatching.
-- `Push to ACARS` is present in the UI but currently disabled.
 
 ### Current limitation
 

@@ -1,4 +1,5 @@
 use chrono::{SecondsFormat, Utc};
+use md5;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -11,11 +12,11 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tokio::sync::oneshot;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
 };
-use tokio::sync::oneshot;
 
 const SIMBRIEF_DISPATCH_LABEL: &str = "simbrief-dispatch";
 const SIMBRIEF_DISPATCH_TIMEOUT_SECONDS: u64 = 300;
@@ -55,6 +56,7 @@ pub struct SimBriefPlanSummary {
     pub status: String,
     pub generated_at_utc: String,
     pub static_id: String,
+    pub ofp_xml_id: String,
     pub aircraft_type: String,
     pub callsign: String,
     pub route: String,
@@ -62,6 +64,7 @@ pub struct SimBriefPlanSummary {
     pub alternate: String,
     pub ete: String,
     pub block_fuel: String,
+    pub pax: Option<i64>,
     pub ofp_url: String,
     pub pdf_url: String,
     pub route_points: Vec<SimBriefRoutePoint>,
@@ -144,7 +147,11 @@ impl SimBriefDispatchManager {
         self.active
             .lock()
             .ok()
-            .and_then(|active| active.as_ref().map(|session| (session.label == label, session.close_on_completion)))
+            .and_then(|active| {
+                active
+                    .as_ref()
+                    .map(|session| (session.label == label, session.close_on_completion))
+            })
             .map(|(matches_label, close_on_completion)| matches_label && !close_on_completion)
             .unwrap_or(false)
     }
@@ -211,7 +218,8 @@ fn simbrief_api_key() -> Result<String, String> {
 }
 
 fn sanitize_static_id(value: &str) -> String {
-    value.chars()
+    value
+        .chars()
         .map(|character| match character {
             'A'..='Z' | 'a'..='z' | '0'..='9' | '_' => character,
             _ => '_',
@@ -238,7 +246,9 @@ fn extract_departure_parts(iso_value: &str) -> Result<(String, String), String> 
         || !hour.chars().all(|character| character.is_ascii_digit())
         || !minute.chars().all(|character| character.is_ascii_digit())
     {
-        return Err("validation_failed: Departure time must contain a valid UTC hour and minute.".into());
+        return Err(
+            "validation_failed: Departure time must contain a valid UTC hour and minute.".into(),
+        );
     }
 
     Ok((hour, minute))
@@ -316,7 +326,9 @@ fn build_fetch_urls(
                 ("json", "v2"),
             ],
         )
-        .map_err(|error| format!("fetch_failed: Unable to build SimBrief username fetch URL: {error}"))?;
+        .map_err(|error| {
+            format!("fetch_failed: Unable to build SimBrief username fetch URL: {error}")
+        })?;
         urls.push(url.to_string());
     }
 
@@ -329,7 +341,9 @@ fn build_fetch_urls(
                 ("json", "v2"),
             ],
         )
-        .map_err(|error| format!("fetch_failed: Unable to build SimBrief pilot ID fetch URL: {error}"))?;
+        .map_err(|error| {
+            format!("fetch_failed: Unable to build SimBrief pilot ID fetch URL: {error}")
+        })?;
         urls.push(url.to_string());
     }
 
@@ -341,6 +355,79 @@ fn build_fetch_urls(
     }
 
     Ok(urls)
+}
+
+fn is_valid_simbrief_ofp_xml_id(value: &str) -> bool {
+    let trimmed = value.trim();
+    let (timestamp, suffix) = match trimmed.split_once('_') {
+        Some(parts) => parts,
+        None => return false,
+    };
+
+    timestamp.len() == 10
+        && suffix.len() == 10
+        && timestamp.chars().all(|character| character.is_ascii_digit())
+        && suffix.chars().all(|character| character.is_ascii_alphanumeric())
+}
+
+fn is_valid_simbrief_xml_filename_stem(value: &str) -> bool {
+    let normalized = value.trim().to_ascii_uppercase();
+    if normalized.is_empty() {
+        return false;
+    }
+
+    if is_valid_simbrief_ofp_xml_id(&normalized) {
+        return true;
+    }
+
+    let Some((prefix, timestamp)) = normalized.rsplit_once('_') else {
+        return false;
+    };
+
+    if timestamp.is_empty() || !timestamp.chars().all(|character| character.is_ascii_digit()) {
+        return false;
+    }
+
+    let Some((name, marker)) = prefix.rsplit_once('_') else {
+        return false;
+    };
+
+    !name.is_empty()
+        && marker == "XML"
+        && name.chars().all(|character| character.is_ascii_alphanumeric())
+}
+
+fn extract_simbrief_xml_filename_stem(xml_file_value: &str) -> Option<String> {
+    // SimBrief returns a full XML URL; we keep only the filename stem for DVA linking.
+    let parsed_url = Url::parse(xml_file_value.trim()).ok()?;
+    if parsed_url.scheme() != "https" {
+        return None;
+    }
+
+    let domain = parsed_url.domain()?;
+    let is_simbrief_domain = domain.eq_ignore_ascii_case("simbrief.com")
+        || domain.eq_ignore_ascii_case("www.simbrief.com")
+        || domain.ends_with(".simbrief.com");
+    if !is_simbrief_domain {
+        return None;
+    }
+
+    if !parsed_url.path().starts_with("/ofp/flightplans/xml/") {
+        return None;
+    }
+
+    let file_name = parsed_url
+        .path_segments()
+        .and_then(|segments| segments.last())
+        .unwrap_or_default();
+    let stem = file_name.strip_suffix(".xml")?;
+    let normalized_stem = stem.trim().to_ascii_uppercase();
+
+    if is_valid_simbrief_xml_filename_stem(&normalized_stem) {
+        Some(normalized_stem)
+    } else {
+        None
+    }
 }
 
 fn is_simbrief_domain(url: &tauri::webview::Url) -> bool {
@@ -382,37 +469,31 @@ fn spawn_simbrief_background_fetch(
     static_id: String,
 ) {
     tauri::async_runtime::spawn(async move {
-        append_simbrief_log(&app, "background-fetch-started");
+        append_simbrief_log(&app, "fetch-started");
         let result = fetch_simbrief_plan_summary(&app, &payload, &static_id).await;
         let fetch_succeeded = result.is_ok();
-        append_simbrief_log(
-            &app,
-            &format!("background-fetch-finished ok={fetch_succeeded}"),
-        );
+        append_simbrief_log(&app, &format!("fetch-finished ok={fetch_succeeded}"));
+        let dispatch_error = result.as_ref().err().cloned();
 
         if fetch_succeeded {
             app.state::<SimBriefDispatchManager>()
                 .mark_close_on_completion(SIMBRIEF_DISPATCH_LABEL);
-            append_simbrief_log(&app, "close-on-completion marked");
         }
 
         app.state::<SimBriefDispatchManager>()
             .finish(SIMBRIEF_DISPATCH_LABEL, result);
 
         if !fetch_succeeded {
+            if let Some(error) = dispatch_error {
+                append_simbrief_log(
+                    &app,
+                    &format!("dispatch-failed flightId={} error={error}", payload.flight_id),
+                );
+            }
             return;
         }
 
-        append_simbrief_log(&app, "delayed-close-scheduled");
-        tokio::time::sleep(Duration::from_millis(
-            SIMBRIEF_CALLBACK_PAGE_CLOSE_DELAY_MS,
-        ))
-        .await;
-        let window_exists = app.get_webview_window(SIMBRIEF_DISPATCH_LABEL).is_some();
-        append_simbrief_log(
-            &app,
-            &format!("delayed-close-fired window_exists={window_exists}"),
-        );
+        tokio::time::sleep(Duration::from_millis(SIMBRIEF_CALLBACK_PAGE_CLOSE_DELAY_MS)).await;
         close_simbrief_dispatch_window_internal(&app);
     });
 }
@@ -430,15 +511,12 @@ fn resolve_simbrief_log_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn simbrief_log_timestamp() -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    format!("{}.{:03}", now.as_secs(), now.subsec_millis())
+    Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
 fn append_simbrief_log(app: &AppHandle, message: &str) {
     let line = format!(
-        "[{}] [App] simbrief-dispatch {}\n",
+        "[{}] [SimBrief] {}\n",
         simbrief_log_timestamp(),
         message
     );
@@ -498,10 +576,13 @@ fn build_webview_data_directory(app: &AppHandle) -> Result<std::path::PathBuf, S
     let data_dir = app
         .path()
         .app_local_data_dir()
-        .map_err(|error| format!("dispatch_failed: Unable to resolve SimBrief webview data path: {error}"))?
+        .map_err(|error| {
+            format!("dispatch_failed: Unable to resolve SimBrief webview data path: {error}")
+        })?
         .join("simbrief-webview");
-    fs::create_dir_all(&data_dir)
-        .map_err(|error| format!("dispatch_failed: Unable to create SimBrief webview data path: {error}"))?;
+    fs::create_dir_all(&data_dir).map_err(|error| {
+        format!("dispatch_failed: Unable to create SimBrief webview data path: {error}")
+    })?;
     Ok(data_dir)
 }
 
@@ -578,6 +659,46 @@ fn find_first_string(value: &Value, paths: &[&[&str]], keys: &[&str]) -> String 
     }
 
     String::new()
+}
+
+fn value_as_integer(value: &Value) -> Option<i64> {
+    match value {
+        Value::Number(number) => number
+            .as_i64()
+            .or_else(|| {
+                number
+                    .as_u64()
+                    .and_then(|number| (number <= i64::MAX as u64).then_some(number as i64))
+            }),
+        Value::String(text) => text.trim().parse::<i64>().ok(),
+        _ => None,
+    }
+}
+
+fn find_path_integer(value: &Value, path: &[&str]) -> Option<i64> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+
+    value_as_integer(current)
+}
+
+fn extract_passenger_count(value: &Value) -> Option<i64> {
+    let prioritized_paths: &[&[&str]] = &[
+        &["weights", "pax_count_actual"],
+        &["weights", "pax_count"],
+        &["general", "passengers"],
+        &["pax"],
+    ];
+
+    for path in prioritized_paths {
+        if let Some(found) = find_path_integer(value, path) {
+            return Some(found);
+        }
+    }
+
+    None
 }
 
 fn collect_urls(value: &Value, urls: &mut Vec<String>) {
@@ -770,7 +891,14 @@ fn extract_route_point_from_map(
 ) -> Option<SimBriefRoutePoint> {
     let ident = find_first_string(
         &Value::Object(map.clone()),
-        &[&["ident"], &["name"], &["waypoint"], &["fix"], &["point"], &["code"]],
+        &[
+            &["ident"],
+            &["name"],
+            &["waypoint"],
+            &["fix"],
+            &["point"],
+            &["code"],
+        ],
         &["ident", "name", "waypoint", "fix", "point", "code"],
     );
 
@@ -778,7 +906,9 @@ fn extract_route_point_from_map(
         return None;
     }
 
-    let Some((latitude, longitude)) = extract_coordinate_pair_from_value(&Value::Object(map.clone())) else {
+    let Some((latitude, longitude)) =
+        extract_coordinate_pair_from_value(&Value::Object(map.clone()))
+    else {
         return None;
     };
 
@@ -789,7 +919,10 @@ fn extract_route_point_from_map(
     })
 }
 
-fn extract_route_point_from_array(items: &[Value], route_context: bool) -> Option<SimBriefRoutePoint> {
+fn extract_route_point_from_array(
+    items: &[Value],
+    route_context: bool,
+) -> Option<SimBriefRoutePoint> {
     if !route_context || items.len() < 2 {
         return None;
     }
@@ -823,8 +956,8 @@ fn collect_route_points(
 ) {
     match value {
         Value::Object(map) => {
-            let next_route_context = route_context
-                || map.keys().any(|key| is_route_context_key(key));
+            let next_route_context =
+                route_context || map.keys().any(|key| is_route_context_key(key));
 
             if let Some(point) = extract_route_point_from_map(map, next_route_context) {
                 push_route_point(point, points, seen);
@@ -911,6 +1044,7 @@ fn normalize_simbrief_plan(json: &Value, static_id: &str) -> SimBriefPlanSummary
             generated_at_utc
         },
         static_id: static_id.to_string(),
+        ofp_xml_id: String::new(),
         aircraft_type: find_first_string(
             json,
             &[
@@ -923,7 +1057,11 @@ fn normalize_simbrief_plan(json: &Value, static_id: &str) -> SimBriefPlanSummary
         callsign: find_first_string(json, &[&["params", "callsign"]], &["callsign"]),
         route: find_first_string(
             json,
-            &[&["general", "route"], &["atc", "route"], &["params", "route"]],
+            &[
+                &["general", "route"],
+                &["atc", "route"],
+                &["params", "route"],
+            ],
             &["route"],
         ),
         cruise_altitude: find_first_string(
@@ -958,6 +1096,7 @@ fn normalize_simbrief_plan(json: &Value, static_id: &str) -> SimBriefPlanSummary
             ],
             &["plan_ramp", "block", "block_fuel"],
         ),
+        pax: extract_passenger_count(json),
         ofp_url,
         pdf_url,
         route_points,
@@ -977,8 +1116,12 @@ fn normalize_aircraft_code(value: &str) -> Option<String> {
     let normalized = value.trim().to_uppercase();
     if normalized.len() < 3
         || normalized.len() > 5
-        || !normalized.chars().all(|character| character.is_ascii_alphanumeric())
-        || !normalized.chars().any(|character| character.is_ascii_alphabetic())
+        || !normalized
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric())
+        || !normalized
+            .chars()
+            .any(|character| character.is_ascii_alphabetic())
     {
         None
     } else {
@@ -1048,8 +1191,7 @@ fn collect_aircraft_codes(value: &Value, codes: &mut BTreeSet<String>) {
             for (key, child) in map {
                 if !matches!(
                     key.as_str(),
-                    "id"
-                        | "icao"
+                    "id" | "icao"
                         | "type"
                         | "code"
                         | "value"
@@ -1069,8 +1211,10 @@ fn collect_aircraft_codes(value: &Value, codes: &mut BTreeSet<String>) {
                     }
                 }
 
-                if matches!(key.as_str(), "icao" | "type" | "code" | "value" | "id" | "basetype")
-                {
+                if matches!(
+                    key.as_str(),
+                    "icao" | "type" | "code" | "value" | "id" | "basetype"
+                ) {
                     if let Some(code) = child.as_str().and_then(normalize_aircraft_code) {
                         codes.insert(code);
                     }
@@ -1167,7 +1311,10 @@ fn collect_planformats(value: &Value, formats: &mut BTreeSet<String>) {
                     }
                 }
 
-                if matches!(key.as_str(), "id" | "value" | "code" | "layout" | "name_short") {
+                if matches!(
+                    key.as_str(),
+                    "id" | "value" | "code" | "layout" | "name_short"
+                ) {
                     if let Some(format) = child.as_str().and_then(normalize_planformat) {
                         formats.insert(format);
                     }
@@ -1211,12 +1358,15 @@ fn parse_simbrief_inputs_list(value: &Value) -> SimBriefInputsList {
     }
 }
 
-async fn fetch_simbrief_aircraft_types_internal() -> Result<Vec<SimBriefAircraftTypeOption>, String> {
+async fn fetch_simbrief_aircraft_types_internal() -> Result<Vec<SimBriefAircraftTypeOption>, String>
+{
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(20))
         .user_agent("flight-planner-app/0.1.0")
         .build()
-        .map_err(|error| format!("fetch_failed: Unable to initialize SimBrief HTTP client: {error}"))?;
+        .map_err(|error| {
+            format!("fetch_failed: Unable to initialize SimBrief HTTP client: {error}")
+        })?;
 
     let response = client
         .get(SIMBRIEF_INPUTS_LIST_URL)
@@ -1224,10 +1374,9 @@ async fn fetch_simbrief_aircraft_types_internal() -> Result<Vec<SimBriefAircraft
         .await
         .map_err(|error| format!("fetch_failed: SimBrief inputs list request failed: {error}"))?;
     let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|error| format!("fetch_failed: Unable to read SimBrief inputs list response: {error}"))?;
+    let body = response.text().await.map_err(|error| {
+        format!("fetch_failed: Unable to read SimBrief inputs list response: {error}")
+    })?;
 
     if !status.is_success() {
         return Err(format!(
@@ -1257,7 +1406,9 @@ async fn fetch_simbrief_aircraft_types_internal() -> Result<Vec<SimBriefAircraft
 async fn load_simbrief_aircraft_types(
     _app: &AppHandle,
 ) -> Result<SimBriefAircraftTypesResponse, String> {
-    fetch_simbrief_aircraft_types_internal().await.map(|types| SimBriefAircraftTypesResponse {
+    fetch_simbrief_aircraft_types_internal()
+        .await
+        .map(|types| SimBriefAircraftTypesResponse {
             types,
             source: "live".into(),
             warning: String::new(),
@@ -1265,6 +1416,17 @@ async fn load_simbrief_aircraft_types(
 }
 
 async fn fetch_json_from_url(client: &reqwest::Client, url: &str) -> Result<Value, String> {
+    let body = fetch_text_from_url(client, url).await?;
+
+    serde_json::from_str::<Value>(&body).map_err(|error| {
+        format!(
+            "fetch_failed: SimBrief returned a non-JSON OFP payload: {} ({error})",
+            truncate_for_error(&body)
+        )
+    })
+}
+
+async fn fetch_text_from_url(client: &reqwest::Client, url: &str) -> Result<String, String> {
     let response = client
         .get(url)
         .send()
@@ -1272,10 +1434,9 @@ async fn fetch_json_from_url(client: &reqwest::Client, url: &str) -> Result<Valu
         .map_err(|error| format!("fetch_failed: SimBrief fetch request failed: {error}"))?;
 
     let status = response.status();
-    let body = response
-        .text()
-        .await
-        .map_err(|error| format!("fetch_failed: Unable to read SimBrief fetch response: {error}"))?;
+    let body = response.text().await.map_err(|error| {
+        format!("fetch_failed: Unable to read SimBrief fetch response: {error}")
+    })?;
 
     if !status.is_success() {
         return Err(format!(
@@ -1285,12 +1446,33 @@ async fn fetch_json_from_url(client: &reqwest::Client, url: &str) -> Result<Valu
         ));
     }
 
-    serde_json::from_str::<Value>(&body).map_err(|error| {
-        format!(
-            "fetch_failed: SimBrief returned a non-JSON OFP payload: {} ({error})",
-            truncate_for_error(&body)
-        )
-    })
+    Ok(body)
+}
+
+fn extract_xml_file_value(body: &str) -> Option<String> {
+    let open_tag = "<xml_file>";
+    let close_tag = "</xml_file>";
+    let start = body.find(open_tag)? + open_tag.len();
+    let end = body[start..].find(close_tag)? + start;
+    Some(body[start..end].trim().to_string())
+}
+
+async fn fetch_simbrief_xml_file_stem(client: &reqwest::Client, username: &str, static_id: &str) -> Option<String> {
+    // Fetches the SimBrief XML response and extracts only the XML filename stem.
+    let normalized_username = username.trim();
+    if normalized_username.is_empty() {
+        return None;
+    }
+
+    let url = Url::parse_with_params(
+        SIMBRIEF_FETCH_URL,
+        &[("username", normalized_username), ("static_id", static_id)],
+    )
+    .ok()?;
+
+    let body = fetch_text_from_url(client, &url.to_string()).await.ok()?;
+    let xml_file = extract_xml_file_value(&body)?;
+    extract_simbrief_xml_filename_stem(&xml_file)
 }
 
 async fn fetch_simbrief_plan_summary(
@@ -1303,7 +1485,9 @@ async fn fetch_simbrief_plan_summary(
         .timeout(Duration::from_secs(20))
         .user_agent("flight-planner-app/0.1.0")
         .build()
-        .map_err(|error| format!("fetch_failed: Unable to initialize SimBrief HTTP client: {error}"))?;
+        .map_err(|error| {
+            format!("fetch_failed: Unable to initialize SimBrief HTTP client: {error}")
+        })?;
 
     let mut last_error = String::from("fetch_failed: Unable to retrieve SimBrief OFP data.");
 
@@ -1311,7 +1495,18 @@ async fn fetch_simbrief_plan_summary(
         for url in &fetch_urls {
             match fetch_json_from_url(&client, url).await {
                 Ok(json) => {
-                    let plan = normalize_simbrief_plan(&json, static_id);
+                    let mut plan = normalize_simbrief_plan(&json, static_id);
+                    let ofp_xml_id = fetch_simbrief_xml_file_stem(
+                        &client,
+                        &payload.username,
+                        static_id,
+                    )
+                    .await;
+
+                    if let Some(ofp_xml_id) = ofp_xml_id {
+                        plan.ofp_xml_id = ofp_xml_id;
+                    }
+
                     return Ok(plan);
                 }
                 Err(error) => {
@@ -1346,7 +1541,6 @@ pub async fn start_simbrief_dispatch(
     manager: State<'_, SimBriefDispatchManager>,
     payload: SimBriefDispatchPayload,
 ) -> Result<SimBriefPlanSummary, String> {
-    append_simbrief_log(&app, "dispatch-start requested");
     let normalized_payload = SimBriefDispatchPayload {
         flight_id: payload.flight_id.trim().to_string(),
         airline: payload.airline.trim().to_uppercase(),
@@ -1364,6 +1558,17 @@ pub async fn start_simbrief_dispatch(
         username: payload.username.trim().to_string(),
         pilot_id: payload.pilot_id.trim().to_string(),
     };
+
+    append_simbrief_log(
+        &app,
+        &format!(
+            "dispatch-requested flightId={} origin={} destination={} aircraftType={}",
+            normalized_payload.flight_id,
+            normalized_payload.origin,
+            normalized_payload.destination,
+            normalized_payload.aircraft_type
+        ),
+    );
 
     if normalized_payload.airline.is_empty()
         || normalized_payload.flight_number.is_empty()
@@ -1394,7 +1599,6 @@ pub async fn start_simbrief_dispatch(
     let (sender, receiver) = oneshot::channel();
     manager.begin(SIMBRIEF_DISPATCH_LABEL.to_string(), sender)?;
 
-    let app_for_navigation = app.clone();
     let app_for_close = app.clone();
     let app_for_timeout = app.clone();
     let dispatch_url = dispatch_url
@@ -1415,22 +1619,21 @@ pub async fn start_simbrief_dispatch(
     .on_page_load(move |_webview_window, _payload| {})
     .on_navigation(move |url| {
         if is_simbrief_callback_url(url) {
-            append_simbrief_log(&app_for_navigation, "callback-detected");
             return true;
         }
 
         is_allowed_simbrief_url(url)
     })
     .build()
-    .map_err(|error| format!("dispatch_failed: Unable to open SimBrief dispatch window: {error}"))?;
-    append_simbrief_log(&app, "popup-created");
+    .map_err(|error| {
+        format!("dispatch_failed: Unable to open SimBrief dispatch window: {error}")
+    })?;
 
     spawn_simbrief_background_fetch(
         app.clone(),
         normalized_payload.clone(),
         static_id.clone(),
     );
-    append_simbrief_log(&app, "background-fetch-spawned");
 
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed)
@@ -1438,7 +1641,6 @@ pub async fn start_simbrief_dispatch(
                 .state::<SimBriefDispatchManager>()
                 .should_treat_close_as_cancel(SIMBRIEF_DISPATCH_LABEL)
         {
-            append_simbrief_log(&app_for_close, "popup-closed-before-completion");
             app_for_close.state::<SimBriefDispatchManager>().finish(
                 SIMBRIEF_DISPATCH_LABEL,
                 Err("cancelled: SimBrief dispatch window was closed before the flight plan returned.".into()),
@@ -1446,18 +1648,27 @@ pub async fn start_simbrief_dispatch(
         }
     });
 
-    match tokio::time::timeout(Duration::from_secs(SIMBRIEF_DISPATCH_TIMEOUT_SECONDS), receiver)
-        .await
+    match tokio::time::timeout(
+        Duration::from_secs(SIMBRIEF_DISPATCH_TIMEOUT_SECONDS),
+        receiver,
+    )
+    .await
     {
         Ok(Ok(result)) => result,
         Ok(Err(_)) => Err("dispatch_failed: SimBrief dispatch stopped unexpectedly.".into()),
         Err(_) => {
             app_for_timeout.state::<SimBriefDispatchManager>().finish(
                 SIMBRIEF_DISPATCH_LABEL,
-                Err("auth_failed: Timed out waiting for SimBrief login or flight plan generation.".into()),
+                Err(
+                    "auth_failed: Timed out waiting for SimBrief login or flight plan generation."
+                        .into(),
+                ),
             );
             close_simbrief_dispatch_window_internal(&app_for_timeout);
-            Err("auth_failed: Timed out waiting for SimBrief login or flight plan generation.".into())
+            Err(
+                "auth_failed: Timed out waiting for SimBrief login or flight plan generation."
+                    .into(),
+            )
         }
     }
 }
@@ -1486,8 +1697,14 @@ mod tests {
     fn build_simbrief_dispatch_url_includes_required_fields_and_apicode() {
         let payload = sample_payload();
         let outputpage = build_outputpage("FP_TEST_1").expect("outputpage");
-        let url = build_simbrief_dispatch_url(&payload, "secret", 1_716_778_800, &outputpage, "FP_TEST_1")
-            .expect("dispatch url");
+        let url = build_simbrief_dispatch_url(
+            &payload,
+            "secret",
+            1_716_778_800,
+            &outputpage,
+            "FP_TEST_1",
+        )
+        .expect("dispatch url");
 
         let parsed = Url::parse(&url).expect("url parse");
         let pairs: std::collections::HashMap<_, _> = parsed.query_pairs().into_owned().collect();
@@ -1495,7 +1712,11 @@ mod tests {
             "{:x}",
             md5::compute(format!(
                 "secret{}{}{}{}{}",
-                payload.origin, payload.destination, payload.aircraft_type, 1_716_778_800, outputpage
+                payload.origin,
+                payload.destination,
+                payload.aircraft_type,
+                1_716_778_800,
+                outputpage
             ))
         );
 
@@ -1533,8 +1754,9 @@ mod tests {
 
     #[test]
     fn resolve_simbrief_api_key_prefers_bundled_key() {
-        let api_key = resolve_simbrief_api_key(Some("bundled-key"), Some("env-key"), Some("tauri-key"))
-            .expect("bundled key should resolve");
+        let api_key =
+            resolve_simbrief_api_key(Some("bundled-key"), Some("env-key"), Some("tauri-key"))
+                .expect("bundled key should resolve");
 
         assert_eq!(api_key, "bundled-key");
     }
@@ -1556,6 +1778,58 @@ mod tests {
             resolve_simbrief_api_key(None, Some("   "), None).expect_err("missing key should fail");
 
         assert!(error.contains("simbrief/api_key.txt"));
+    }
+
+    #[test]
+    fn normalize_simbrief_plan_reads_passenger_count_from_generated_response() {
+        let value = serde_json::json!({
+            "weights": {
+                "pax_count_actual": "148"
+            }
+        });
+
+        let plan = normalize_simbrief_plan(&value, "FP_TEST_1");
+
+        assert_eq!(plan.pax, Some(148));
+    }
+
+    #[test]
+    fn normalize_simbrief_plan_falls_back_to_general_passengers_and_preserves_zero() {
+        let value = serde_json::json!({
+            "general": {
+                "passengers": 0
+            }
+        });
+
+        let plan = normalize_simbrief_plan(&value, "FP_TEST_2");
+
+        assert_eq!(plan.pax, Some(0));
+    }
+
+    #[test]
+    fn normalize_simbrief_plan_falls_back_to_direct_pax_field() {
+        let value = serde_json::json!({
+            "pax": "42"
+        });
+
+        let plan = normalize_simbrief_plan(&value, "FP_TEST_3");
+
+        assert_eq!(plan.pax, Some(42));
+    }
+
+    #[test]
+    fn extract_simbrief_xml_filename_stem_reads_xml_file_url() {
+        let xml_file = "https://www.simbrief.com/ofp/flightplans/xml/KABEKCVG_XML_1778384844.xml";
+        let stem = extract_simbrief_xml_filename_stem(xml_file).expect("xml stem");
+
+        assert_eq!(stem, "KABEKCVG_XML_1778384844");
+    }
+
+    #[test]
+    fn extract_simbrief_xml_filename_stem_rejects_wrong_path() {
+        let xml_file = "https://www.simbrief.com/briefing/latest?static_id=FP_TEST_1";
+
+        assert!(extract_simbrief_xml_filename_stem(xml_file).is_none());
     }
 
     #[test]
@@ -1589,7 +1863,10 @@ mod tests {
                 }
             ]
         );
-        assert_eq!(parsed.planformats, vec!["DAL".to_string(), "LIDO".to_string()]);
+        assert_eq!(
+            parsed.planformats,
+            vec!["DAL".to_string(), "LIDO".to_string()]
+        );
     }
 
     #[test]

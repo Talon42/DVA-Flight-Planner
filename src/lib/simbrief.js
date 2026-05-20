@@ -123,6 +123,19 @@ export function deriveSimBriefFallbackTypes(equipmentTypes = []) {
   )].sort();
 }
 
+export function resolveSimBriefFallbackEquipmentTypeCandidates(selectedType) {
+  const normalizedSelectedType = normalizeFallbackKey(selectedType);
+  if (!normalizedSelectedType) {
+    return [];
+  }
+
+  return [...new Set(
+    Object.entries(SIMBRIEF_FALLBACK_TYPE_MAP)
+      .filter(([, simBriefType]) => normalizeFallbackKey(simBriefType) === normalizedSelectedType)
+      .map(([equipmentType]) => equipmentType)
+  )];
+}
+
 export function normalizeSimBriefCustomAirframe(entry) {
   if (!entry || typeof entry !== "object") {
     return null;

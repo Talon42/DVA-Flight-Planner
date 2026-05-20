@@ -82,7 +82,13 @@ import {
 } from "./lib/deltaVirtualSync";
 import { formatNumber } from "./lib/formatters";
 import { runScheduleImport } from "./lib/importClient";
-import { logAppError, logAppEvent, openAppLogFile } from "./lib/appLog";
+import {
+  logAppError,
+  logAppEvent,
+  logSystemError,
+  logSystemEvent,
+  openAppLogFile
+} from "./lib/appLog";
 import {
   buildSimBriefDispatchOptions,
   closeSimBriefDispatchWindow,
@@ -90,6 +96,11 @@ import {
   normalizeSimBriefCustomAirframe,
   startSimBriefDispatch
 } from "./lib/simbrief";
+import {
+  buildDeltaVirtualDraftReportPayload,
+  resolveDraftSimBriefId,
+  submitDeltaVirtualDraftReport
+} from "./lib/deltaVirtualDraftReport";
 import {
   appendImportLog,
   deleteStoredUserData,
@@ -748,81 +759,16 @@ function buildAddonAirportPreview(airports, limit = 12) {
   return airports.slice(0, limit);
 }
 
-function buildAddonScanLogData(addonScan) {
+function buildAddonScanSummary(addonScan) {
   return {
     rootCount: addonScan?.roots?.length || 0,
-    roots: addonScan?.roots || [],
     airportsCached: addonScan?.airports?.length || 0,
-    airportPreview: buildAddonAirportPreview(addonScan?.airports || []),
-    contentHistoryFilesScanned: addonScan?.contentHistoryFilesScanned || 0,
-    airportEntriesFound: addonScan?.airportEntriesFound || 0,
-    lastScannedAt: addonScan?.lastScannedAt || null,
+    filesScanned: addonScan?.contentHistoryFilesScanned || 0,
+    entriesFound: addonScan?.airportEntriesFound || 0,
     status: addonScan?.status || "idle",
-    lastError: addonScan?.lastError || null,
-    warnings: addonScan?.warnings || [],
-    scanDetails: addonScan?.scanDetails || []
+    warningCount: Array.isArray(addonScan?.warnings) ? addonScan.warnings.length : 0,
+    airportPreview: buildAddonAirportPreview(addonScan?.airports || [])
   };
-}
-
-function formatLogTimestamp() {
-  return new Date().toISOString();
-}
-
-function buildAddonNotCachedItems(addonScan) {
-  const items = [];
-
-  for (const detail of addonScan?.scanDetails || []) {
-    if (Array.isArray(detail?.duplicateAirports) && detail.duplicateAirports.length) {
-      for (const airport of detail.duplicateAirports) {
-        items.push({
-          name: airport,
-          reason: "duplicate",
-          path: detail.path
-        });
-      }
-    }
-
-    if (detail?.status === "malformed-json") {
-      items.push({
-        name: detail.path,
-        reason: "malformed-json",
-        path: detail.path
-      });
-    }
-
-    if (detail?.status === "unreadable-file") {
-      items.push({
-        name: detail.path,
-        reason: "unreadable-file",
-        path: detail.path
-      });
-    }
-
-    if (detail?.status === "no-airport-content") {
-      items.push({
-        name: detail.path,
-        reason: "no-airport-content",
-        path: detail.path
-      });
-    }
-  }
-
-  return items;
-}
-
-function buildAddonScanLogReport(addonScan) {
-  const notCachedItems = buildAddonNotCachedItems(addonScan);
-  const lines = [
-    `[${formatLogTimestamp()}] [App] addon-scan-summary scanned=${addonScan?.contentHistoryFilesScanned || 0} cached=${addonScan?.airports?.length || 0} notCached=${notCachedItems.length}`
-  ];
-
-  for (const item of notCachedItems) {
-    lines.push(
-      `[${formatLogTimestamp()}] [App] addon-scan-not-cached name="${item.name}" reason="${item.reason}" path="${item.path}"`
-    );
-  }
-
-  return lines.join("\n");
 }
 
 function buildSavedSchedule(schedule, uiState) {
@@ -863,6 +809,11 @@ function normalizeFlightBoardName(value, fallback = DEFAULT_FLIGHT_BOARD_NAME) {
 
 function buildBoardEntryId(seed = "") {
   return `board:${seed || "flight"}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizePositiveDraftReportId(value) {
+  const parsed = Number.parseInt(String(value || "").trim(), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function createFlightBoard(name = DEFAULT_FLIGHT_BOARD_NAME, entries = []) {
@@ -927,6 +878,9 @@ function buildBoardEntryFromFlight(flight, overrides = {}) {
     )
       .trim()
       .toUpperCase(),
+    draftReportId: normalizePositiveDraftReportId(
+      overrides.draftReportId ?? flight?.draftReportId ?? flight?.dvaDraftReportId
+    ),
     simbriefPlan:
       overrides.simbriefPlan !== undefined ? overrides.simbriefPlan : flight?.simbriefPlan ?? null
   };
@@ -1008,6 +962,9 @@ function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     )
       .trim()
       .toUpperCase(),
+    draftReportId: normalizePositiveDraftReportId(
+      overrides.draftReportId ?? flight?.draftReportId ?? flight?.dvaDraftReportId
+    ),
     simbriefPlan:
       overrides.simbriefPlan !== undefined ? overrides.simbriefPlan : flight?.simbriefPlan ?? null
   };
@@ -1065,6 +1022,7 @@ function normalizeBoardEntry(entry) {
     distanceMi: Number.isFinite(entry.distanceMi) ? entry.distanceMi : null,
     compatibleEquipment: Array.isArray(entry.compatibleEquipment) ? [...entry.compatibleEquipment] : [],
     simbriefSelectedType: String(entry.simbriefSelectedType || "").trim().toUpperCase(),
+    draftReportId: normalizePositiveDraftReportId(entry.draftReportId ?? entry.dvaDraftReportId),
     simbriefPlan: entry.simbriefPlan || null
   };
 
@@ -1113,6 +1071,7 @@ function reconcileBoardWithSchedule(currentBoard, nextFlights) {
         boardEntryId: normalizedEntry.boardEntryId,
         simbriefSelectedType: normalizedEntry.simbriefSelectedType,
         simbriefPlan: normalizedEntry.simbriefPlan,
+        draftReportId: normalizedEntry.draftReportId,
         isStale: false,
         isCompleted: normalizedEntry.isCompleted,
         completedAt: normalizedEntry.completedAt,
@@ -1181,6 +1140,7 @@ function repairBoardEntryAgainstSchedule(entry, flights = []) {
     boardEntryId: normalizedEntry.boardEntryId,
     simbriefSelectedType: normalizedEntry.simbriefSelectedType,
     simbriefPlan: null,
+    draftReportId: normalizedEntry.draftReportId,
     isStale: false
   });
 }
@@ -1403,6 +1363,12 @@ export default function App() {
     flightId: "",
     isDispatching: false,
     message: ""
+  });
+  const [deltaDraftSubmitState, setDeltaDraftSubmitState] = useState({
+    boardEntryId: "",
+    isSubmitting: false,
+    error: "",
+    result: null
   });
   const [simBriefAircraftTypes, setSimBriefAircraftTypes] = useState([]);
   const [isSimBriefAircraftTypesLoading, setIsSimBriefAircraftTypesLoading] = useState(false);
@@ -1879,7 +1845,7 @@ export default function App() {
             : [];
           setSimBriefAircraftTypes(normalizedTypes);
           setSimBriefAircraftTypesError(String(result?.warning || "").trim());
-          logAppEvent("simbrief-aircraft-types-loaded", {
+          logSystemEvent("SimBrief", "aircraft-types-loaded", {
             source: "live",
             returnedTypes: normalizedTypes.length
           }).catch(() => {});
@@ -1893,7 +1859,7 @@ export default function App() {
           setSimBriefAircraftTypesError(
             error instanceof Error ? error.message : "Unable to load SimBrief aircraft types."
           );
-          logAppError("simbrief-aircraft-types-load-failed", error).catch(() => {});
+          logSystemError("SimBrief", "aircraft-types-load-failed", error).catch(() => {});
         })
         .finally(() => {
           if (!cancelled) {
@@ -1921,7 +1887,7 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    logAppEvent("app-start").catch(() => {});
+    logAppEvent("start").catch(() => {});
 
     async function hydrate() {
       const [
@@ -1947,12 +1913,12 @@ export default function App() {
 
         if (addonCacheResult.status === "fulfilled") {
           setAddonScan(addonCacheResult.value);
-          await logAppEvent("addon-cache-loaded", buildAddonScanLogData(addonCacheResult.value));
+          await logSystemEvent("AddonScan", "cache-loaded", buildAddonScanSummary(addonCacheResult.value));
         } else {
           setStatusMessage(
             addonCacheResult.reason?.message || "Unable to load addon airport cache."
           );
-          await logAppError("addon-cache-hydrate-failed", addonCacheResult.reason);
+          await logSystemError("AddonScan", "cache-load-failed", addonCacheResult.reason);
         }
 
         if (dvaCredentialsResult.status === "fulfilled") {
@@ -1991,14 +1957,14 @@ export default function App() {
           setSavedSimBriefDispatchUnits(dispatchUnits);
           setSimBriefCustomAirframes(customAirframes);
           setSimBriefCustomAirframesDraft(customAirframes);
-          await logAppEvent("simbrief-settings-loaded", {
+          await logSystemEvent("SimBrief", "settings-loaded", {
             hasUsername: Boolean(username),
             hasPilotId: Boolean(pilotId),
             dispatchUnits,
             customAirframeCount: customAirframes.length
           });
         } else {
-          await logAppError("simbrief-settings-hydrate-failed", simBriefResult.reason);
+          await logSystemError("SimBrief", "settings-hydrate-failed", simBriefResult.reason);
         }
 
         if (logbookProgressResult.status === "fulfilled") {
@@ -2092,7 +2058,7 @@ export default function App() {
         if (addonCacheResult.status === "fulfilled") {
           setStatusMessage("");
         }
-        await logAppEvent("hydrate-loaded", {
+        await logAppEvent("hydrate-succeeded", {
           flights: savedSchedule.flights.length,
           source: savedSchedule.importSummary?.sourceFileName || "unknown"
         });
@@ -2411,6 +2377,7 @@ export default function App() {
           boardEntryId: entry.boardEntryId,
           simbriefSelectedType: entry.simbriefSelectedType,
           simbriefPlan: entry.simbriefPlan,
+          draftReportId: entry.draftReportId,
           isCompleted: sourceFlight.isCompleted,
           completionOrder: sourceFlight.completionOrder
         });
@@ -2758,7 +2725,7 @@ export default function App() {
   }
 
   async function handleDeltaVirtualSync() {
-    await logAppEvent("deltava-sync-requested");
+    await logSystemEvent("DVA Sync", "started");
 
     const hasSavedDeltaVirtualCredentials =
       Boolean(String(dvaFirstName || "").trim()) &&
@@ -2770,7 +2737,12 @@ export default function App() {
       setStatusMessage(
         "Delta Virtual login settings are not saved. Save your First Name, Last Name, and Password before syncing."
       );
-      await logAppEvent("deltava-sync-blocked-missing-credentials");
+      await logSystemError(
+        "DVA Sync",
+        "failed",
+        new Error("Delta Virtual login settings are not saved."),
+        { reason: "missing-credentials" }
+      );
       return;
     }
 
@@ -2783,11 +2755,11 @@ export default function App() {
       setStatusMessage("Syncing data from Delta Virtual.");
       const syncedFile = await syncScheduleFromDeltaVirtual();
       shouldCloseSyncWindow = true;
-      await logAppEvent("deltava-sync-download-complete", {
+      await logSystemEvent("DVA Sync", "succeeded", {
         file: syncedFile.fileName,
         bytes: syncedFile.xmlText?.length || 0,
         logbookJson: syncedFile.logbookJson?.fileName || null,
-        warnings: syncedFile.warnings || []
+        warningCount: Array.isArray(syncedFile.warnings) ? syncedFile.warnings.length : 0
       });
       setStatusMessage("Processing Delta Virtual schedule...");
       await processImportedSchedule(syncedFile, "deltava-sync");
@@ -2805,11 +2777,13 @@ export default function App() {
     } catch (error) {
       if (error?.kind === "cancelled") {
         setStatusMessage("Delta Virtual sync canceled.");
-        await logAppEvent("deltava-sync-cancelled-window");
+        await logSystemEvent("DVA Sync", "failed", {
+          reason: "cancelled"
+        });
       } else if (error?.kind === "auth_failed") {
         setStatusMessage(error.message || "Delta Virtual login failed.");
-        await logAppEvent("deltava-sync-auth-failed", {
-          message: error.message || ""
+        await logSystemError("DVA Sync", "failed", error, {
+          reason: "auth_failed"
         });
       } else if (error?.kind === "partial_success") {
         setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
@@ -2820,18 +2794,18 @@ export default function App() {
           // Best-effort refresh only.
         }
         setStatusMessage(error.message || "Delta Virtual sync partially completed.");
-        await logAppEvent("deltava-sync-partial", {
+        await logSystemEvent("DVA Sync", "succeeded", {
+          partial: true,
           logbookJson: error.syncResult?.logbookJson?.fileName || null,
-          warnings: error.syncResult?.warnings || []
+          warningCount: Array.isArray(error.syncResult?.warnings) ? error.syncResult.warnings.length : 0
         });
       } else {
         setStatusMessage(error.message || "Delta Virtual sync failed.");
-        await logAppError("deltava-sync-failed", error);
+        await logSystemError("DVA Sync", "failed", error);
       }
     } finally {
       if (shouldCloseSyncWindow) {
         await closeDeltaVirtualSyncWindow();
-        await logAppEvent("deltava-sync-window-closed");
       }
       await pruneDeltaVirtualStorage(shouldRemoveDownloadedSchedule);
       setIsSyncing(false);
@@ -3564,21 +3538,19 @@ export default function App() {
     try {
       const path = await pickAddonAirportFolder();
       if (!path) {
-        await logAppEvent("addon-root-add-cancelled");
+        await logSystemEvent("AddonScan", "root-add-cancelled");
         return;
       }
 
       const nextRoots = [...new Set([...addonScan.roots, path])];
       await persistAddonRoots(nextRoots);
       setStatusMessage(`Saved ${formatNumber(nextRoots.length)} addon folder roots.`);
-      await logAppEvent("addon-root-added", {
-        rootAdded: path,
-        rootCount: nextRoots.length,
-        roots: nextRoots
+      await logSystemEvent("AddonScan", "root-added", {
+        rootCount: nextRoots.length
       });
     } catch (error) {
       setStatusMessage(error.message || "Unable to add addon folder.");
-      await logAppError("addon-root-add-failed", error);
+      await logSystemError("AddonScan", "root-add-failed", error);
     }
   }
 
@@ -3591,30 +3563,27 @@ export default function App() {
           ? `Removed addon folder. ${formatNumber(nextRoots.length)} roots remain.`
           : "Removed addon folder. No roots saved."
       );
-      await logAppEvent("addon-root-removed", {
-        rootRemoved: rootToRemove,
-        rootCount: nextRoots.length,
-        roots: nextRoots
+      await logSystemEvent("AddonScan", "root-removed", {
+        rootCount: nextRoots.length
       });
     } catch (error) {
       setStatusMessage(error.message || "Unable to update addon folder list.");
-      await logAppError("addon-root-remove-failed", error);
+      await logSystemError("AddonScan", "root-remove-failed", error);
     }
   }
 
   async function handleScanAddonAirports() {
     if (!addonScan.roots.length) {
-      await logAppEvent("addon-scan-skipped-no-roots");
+      await logSystemEvent("AddonScan", "scan-skipped-no-roots");
       return;
     }
 
     setIsAddonScanBusy(true);
     setStatusMessage("Scanning addon folders for ContentHistory.json...");
-    await logAppEvent("addon-scan-start", {
-      roots: addonScan.roots,
+    await logSystemEvent("AddonScan", "scan-start", {
       rootCount: addonScan.roots.length,
-      previousAirportsCached: addonScan.airports.length,
-      previousContentHistoryFilesScanned: addonScan.contentHistoryFilesScanned
+      airportsCached: addonScan.airports.length,
+      filesScanned: addonScan.contentHistoryFilesScanned
     });
 
     try {
@@ -3623,12 +3592,16 @@ export default function App() {
       setStatusMessage(
         `Scanned ${formatNumber(nextScan.contentHistoryFilesScanned)} ContentHistory files and cached ${formatNumber(nextScan.airports.length)} addon airports.`
       );
-      await appendImportLog(buildAddonScanLogReport(nextScan));
+      await logSystemEvent("AddonScan", "scan-succeeded", buildAddonScanSummary(nextScan));
+      if (isDevToolsEnabled && Array.isArray(nextScan.scanDetails) && nextScan.scanDetails.length) {
+        await logSystemEvent("AddonScan", "scan-details", {
+          scanDetails: nextScan.scanDetails
+        });
+      }
     } catch (error) {
       setStatusMessage(error.message || "Addon airport scan failed.");
-      await logAppError("addon-scan-failed", error, {
-        rootCount: addonScan.roots.length,
-        roots: addonScan.roots
+      await logSystemError("AddonScan", "scan-failed", error, {
+        rootCount: addonScan.roots.length
       });
     } finally {
       setIsAddonScanBusy(false);
@@ -3679,7 +3652,7 @@ export default function App() {
           ? "SimBrief settings saved."
           : "SimBrief settings cleared."
       );
-      await logAppEvent("simbrief-settings-saved", {
+      await logSystemEvent("SimBrief", "settings-saved", {
         hasUsername: Boolean(nextUsername),
         hasPilotId: Boolean(nextPilotId),
         dispatchUnits: simBriefDispatchUnits,
@@ -3687,7 +3660,7 @@ export default function App() {
       });
     } catch (error) {
       setStatusMessage(error.message || "Unable to save SimBrief settings.");
-      await logAppError("simbrief-settings-save-failed", error);
+      await logSystemError("SimBrief", "settings-save-failed", error);
     } finally {
       setIsSimBriefSaving(false);
     }
@@ -3815,14 +3788,14 @@ export default function App() {
       setSimBriefCustomAirframeNameDraft("");
       setSimBriefCustomAirframeMatchTypeDraft("");
       setStatusMessage("Custom SimBrief airframe saved.");
-      await logAppEvent("simbrief-custom-airframe-added", {
+      await logSystemEvent("SimBrief", "custom-airframe-added", {
         internalId: normalizedEntry.internalId,
         matchType: normalizedEntry.matchType,
         customAirframeCount: nextCustomAirframes.length
       });
     } catch (error) {
       setStatusMessage(error.message || "Unable to save the custom SimBrief airframe.");
-      await logAppError("simbrief-custom-airframe-add-failed", error, {
+      await logSystemError("SimBrief", "custom-airframe-add-failed", error, {
         internalId: normalizedEntry.internalId,
         matchType: normalizedEntry.matchType
       });
@@ -3855,13 +3828,13 @@ export default function App() {
       setSimBriefCustomAirframes(nextCustomAirframes);
       setSimBriefCustomAirframesDraft(nextCustomAirframes);
       setStatusMessage("Custom SimBrief airframe removed.");
-      await logAppEvent("simbrief-custom-airframe-removed", {
+      await logSystemEvent("SimBrief", "custom-airframe-removed", {
         internalId,
         customAirframeCount: nextCustomAirframes.length
       });
     } catch (error) {
       setStatusMessage(error.message || "Unable to remove the custom SimBrief airframe.");
-      await logAppError("simbrief-custom-airframe-remove-failed", error, {
+      await logSystemError("SimBrief", "custom-airframe-remove-failed", error, {
         internalId
       });
     } finally {
@@ -4001,11 +3974,11 @@ export default function App() {
     setScheduleView("map");
     setExpandedBoardFlightId(flightId);
     setStatusMessage("Opening SimBrief dispatch...");
-    await logAppEvent("simbrief-dispatch-requested", {
+    await logSystemEvent("SimBrief", "dispatch-requested", {
       flightId,
       origin: selectedShortlistFlight.from,
       destination: selectedShortlistFlight.to,
-      type: selectedDispatchOption.dispatchType,
+      aircraftType: selectedDispatchOption.dispatchType,
       hasUsername: Boolean(username),
       hasPilotId: Boolean(pilotId)
     });
@@ -4042,11 +4015,26 @@ export default function App() {
       setStatusMessage(
         `SimBrief plan ready for ${selectedShortlistFlight.flightCode} ${selectedShortlistFlight.from}-${selectedShortlistFlight.to}.`
       );
-      await logAppEvent("simbrief-dispatch-succeeded", {
+      const pax = simBriefPlan?.pax;
+      const hasPax = Number.isInteger(pax) && pax >= 0;
+      const simBriefResolution = resolveDraftSimBriefId(simBriefPlan || null);
+      await logSystemEvent("SimBrief", "dispatch-succeeded", {
         flightId,
-        staticId: simBriefPlan?.staticId || "",
+        aircraftType: selectedDispatchOption.dispatchType || simBriefPlan?.aircraftType || "",
+        cruiseAltitude: simBriefPlan?.cruiseAltitude || "",
+        alternate: simBriefPlan?.alternate || "",
+        ete: simBriefPlan?.ete || "",
+        blockFuel: simBriefPlan?.blockFuel || "",
         hasPdfUrl: Boolean(simBriefPlan?.pdfUrl),
-        hasOfpUrl: Boolean(simBriefPlan?.ofpUrl)
+        hasOfpUrl: Boolean(simBriefPlan?.ofpUrl),
+        hasOfpXmlId: Boolean(simBriefResolution.simBriefID),
+        simBriefIDState: simBriefResolution.simBriefIDState,
+        simBriefIDSource: simBriefResolution.simBriefIDSource,
+        routePresent: Boolean(simBriefPlan?.route),
+        routeLength: simBriefPlan?.route?.length || 0,
+        routePoints: Array.isArray(simBriefPlan?.routePoints) ? simBriefPlan.routePoints.length : 0,
+        hasPax,
+        pax: hasPax ? pax : undefined
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "SimBrief dispatch failed.";
@@ -4056,11 +4044,11 @@ export default function App() {
         message
       });
       setStatusMessage(message);
-      await logAppError("simbrief-dispatch-failed", error, {
+      await logSystemError("SimBrief", "dispatch-failed", error, {
         flightId,
         origin: selectedShortlistFlight.from,
         destination: selectedShortlistFlight.to,
-        type: selectedDispatchOption.dispatchType
+        aircraftType: selectedDispatchOption.dispatchType
       });
     } finally {
       setPendingMapFlightPathViewMode(null);
@@ -4098,13 +4086,13 @@ export default function App() {
       setSimBriefCustomAirframes(nextCustomAirframes);
       setSimBriefCustomAirframesDraft(nextCustomAirframes);
       setStatusMessage(`SimBrief dispatch units set to ${normalizedUnits}.`);
-      await logAppEvent("simbrief-dispatch-units-saved", {
+      await logSystemEvent("SimBrief", "dispatch-units-saved", {
         dispatchUnits: normalizedUnits
       });
     } catch (error) {
       setSimBriefDispatchUnits(savedSimBriefDispatchUnits);
       setStatusMessage(error.message || "Unable to save SimBrief dispatch units.");
-      await logAppError("simbrief-dispatch-units-save-failed", error, {
+      await logSystemError("SimBrief", "dispatch-units-save-failed", error, {
         dispatchUnits: normalizedUnits
       });
     } finally {
@@ -4305,15 +4293,152 @@ export default function App() {
         window.open(simBriefUrl, "_blank", "noopener,noreferrer");
       }
 
-      await logAppEvent("simbrief-flight-opened", {
+      await logSystemEvent("SimBrief", "flight-opened", {
         staticId: normalizedStaticId,
         url: simBriefUrl
       });
     } catch (error) {
-      await logAppError("simbrief-flight-open-failed", error, {
+      await logSystemError("SimBrief", "flight-open-failed", error, {
         staticId: normalizedStaticId,
         url: simBriefUrl
       });
+    }
+  }
+
+  async function handlePushToAcars(boardEntryId) {
+    const normalizedBoardEntryId = String(boardEntryId || "").trim();
+    if (!normalizedBoardEntryId || deltaDraftSubmitState.isSubmitting) {
+      return;
+    }
+
+    const getDraftFailureMessage = (error) => {
+      const message = error instanceof Error ? error.message : String(error || "");
+      return message.startsWith("session_required:")
+        ? message.replace(/^session_required:\s*/, "")
+        : "Unable to send draft flight report to ACARS.";
+    };
+
+    const flight = flightBoard.find((entry) => entry.boardEntryId === normalizedBoardEntryId) || null;
+    if (!flight) {
+      const message = "Unable to send draft flight report to ACARS.";
+      setDeltaDraftSubmitState({
+        boardEntryId: normalizedBoardEntryId,
+        isSubmitting: false,
+        error: "Draft flight board entry was not found.",
+        result: null
+      });
+      setStatusMessage(message);
+      await logSystemError("DVA Draft", "submit-failed", new Error("Draft flight board entry was not found."), {
+        boardEntryId: normalizedBoardEntryId
+      });
+      return;
+    }
+
+    const draftPayload = buildDeltaVirtualDraftReportPayload(flight);
+    const simBriefResolution = resolveDraftSimBriefId(flight?.simbriefPlan || null);
+    const hasDraftReportId = normalizePositiveDraftReportId(draftPayload.id) !== null;
+    const draftLogData = {
+      boardEntryId: normalizedBoardEntryId,
+      flight: flight.flightCode,
+      airportD: flight.from,
+      airportA: flight.to,
+      eqType: draftPayload.eqType,
+      hasDraftReportId,
+      hasOfpXmlId: Boolean(simBriefResolution.simBriefID),
+      simBriefIDState: simBriefResolution.simBriefIDState,
+      simBriefIDSource: simBriefResolution.simBriefIDSource
+    };
+
+    setDeltaDraftSubmitState({
+      boardEntryId: normalizedBoardEntryId,
+      isSubmitting: true,
+      error: "",
+      result: null
+    });
+    setStatusMessage(
+      hasDraftReportId ? "Updating Draft Flight Report..." : "Generating Draft Flight Report..."
+    );
+    await logSystemEvent("DVA Draft", "submit-requested", {
+      ...draftLogData
+    });
+
+    try {
+      const result = await submitDeltaVirtualDraftReport(flight, { debugEnabled: isDevToolsEnabled });
+      const resultErrorMessage = result.ok ? "" : getDraftFailureMessage(result.error);
+      setDeltaDraftSubmitState({
+        boardEntryId: normalizedBoardEntryId,
+        isSubmitting: false,
+        error: resultErrorMessage,
+        result
+      });
+
+      if (result.ok) {
+        const returnedId = normalizePositiveDraftReportId(result.id);
+        const returnedIdPresent = returnedId !== null;
+        if (returnedIdPresent) {
+          updateActiveFlightBoardEntries((currentEntries) =>
+            currentEntries.map((entry) =>
+              entry.boardEntryId === normalizedBoardEntryId
+                ? {
+                    ...entry,
+                    draftReportId: returnedId
+                  }
+                : entry
+            )
+          );
+        }
+
+        const successMessage = hasDraftReportId
+          ? "Draft Flight Report Updated."
+          : "Draft Flight Report Created.";
+        setStatusMessage(successMessage);
+        await logSystemEvent("DVA Draft", hasDraftReportId ? "draft-id-reused" : "draft-id-stored", {
+          ...draftLogData,
+          returnedIdPresent,
+          status: result.status,
+          contentType: result.contentType || ""
+        });
+        await logSystemEvent("DVA Draft", "submit-succeeded", {
+          ...draftLogData,
+          status: result.status,
+          contentType: result.contentType || "",
+          returnedIdPresent
+        });
+        return;
+      }
+
+      const failureMessage = getDraftFailureMessage(result.error);
+      setStatusMessage(failureMessage);
+      await logSystemError("DVA Draft", "submit-failed", new Error(result.error || failureMessage), {
+        ...draftLogData,
+        status: result.status,
+        contentType: result.contentType || "",
+        returnedIdPresent: Boolean(result.id),
+        message: result.error || failureMessage
+      });
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      const statusMessage = getDraftFailureMessage(normalizedError);
+      setDeltaDraftSubmitState({
+        boardEntryId: normalizedBoardEntryId,
+        isSubmitting: false,
+        error: statusMessage,
+        result: null
+      });
+      setStatusMessage(statusMessage);
+      await logSystemError("DVA Draft", "submit-failed", normalizedError, {
+        ...draftLogData,
+        status: 0,
+        contentType: "",
+        returnedIdPresent: false,
+        message: statusMessage
+      });
+    } finally {
+      setDeltaDraftSubmitState((current) =>
+        current.boardEntryId === normalizedBoardEntryId
+          ? { ...current, isSubmitting: false }
+          : current
+      );
     }
   }
 
@@ -4334,9 +4459,10 @@ export default function App() {
         if (manual) {
           setStatusMessage(`Update available: ${result.latestVersion}`);
         }
-        await logAppEvent("update-available", {
+        await logSystemEvent("Update", "check-complete", {
           currentVersion: result.currentVersion,
-          latestVersion: result.latestVersion
+          latestVersion: result.latestVersion,
+          updateAvailable: true
         });
         return;
       }
@@ -4347,13 +4473,13 @@ export default function App() {
         setStatusMessage("No update required, currently on the latest version.");
       }
 
-      await logAppEvent("update-check-complete", {
+      await logSystemEvent("Update", "check-complete", {
         currentVersion: result.currentVersion,
         latestVersion: result.latestVersion,
         updateAvailable: false
       });
     } catch (error) {
-      await logAppError("update-check-failed", error, {
+      await logSystemError("Update", "check-failed", error, {
         manual
       });
     } finally {
@@ -4577,6 +4703,7 @@ export default function App() {
         expandedBoardFlightId={expandedBoardFlightId}
         selectedAccomplishment={selectedAccomplishment}
         simBriefDispatchState={simBriefDispatchState}
+        deltaDraftSubmitState={deltaDraftSubmitState}
         simBriefCredentialsConfigured={simBriefCredentialsConfigured}
         isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
         simBriefAircraftTypes={simBriefDispatchOptions}
@@ -4593,6 +4720,7 @@ export default function App() {
         onSimBriefTypeChange={handleSimBriefTypeChange}
         onSimBriefDispatch={handleSimBriefDispatch}
         onOpenSimBriefFlight={handleOpenSimBriefFlight}
+        onPushToAcars={handlePushToAcars}
         onCompleteTourFlight={handleCompleteTourFlight}
         showFlightBoard
       />
@@ -4641,6 +4769,7 @@ export default function App() {
             expandedBoardFlightId={expandedBoardFlightId}
             selectedAccomplishment={selectedAccomplishment}
             simBriefDispatchState={simBriefDispatchState}
+            deltaDraftSubmitState={deltaDraftSubmitState}
             simBriefCredentialsConfigured={simBriefCredentialsConfigured}
             isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
             simBriefAircraftTypes={simBriefDispatchOptions}
@@ -4657,6 +4786,7 @@ export default function App() {
             onSimBriefTypeChange={handleSimBriefTypeChange}
             onSimBriefDispatch={handleSimBriefDispatch}
             onOpenSimBriefFlight={handleOpenSimBriefFlight}
+            onPushToAcars={handlePushToAcars}
             onCompleteTourFlight={handleCompleteTourFlight}
             showFlightBoard
           />

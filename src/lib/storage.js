@@ -93,6 +93,32 @@ function normalizeSimBriefRoutePoint(point) {
   };
 }
 
+function normalizeSimBriefPax(pax) {
+  if (pax === null || pax === undefined || pax === "") {
+    return null;
+  }
+
+  if (typeof pax === "number") {
+    return Number.isInteger(pax) ? pax : null;
+  }
+
+  const numeric = Number(String(pax).trim());
+  return Number.isInteger(numeric) ? numeric : null;
+}
+
+function isValidSimBriefXmlId(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (!normalized) {
+    return false;
+  }
+
+  if (/^\d{10}_[A-Z0-9]{10}$/.test(normalized)) {
+    return true;
+  }
+
+  return /^[A-Z0-9]+_XML_\d+$/.test(normalized);
+}
+
 function normalizeSimBriefPlan(plan) {
   if (!plan || typeof plan !== "object") {
     return null;
@@ -106,10 +132,12 @@ function normalizeSimBriefPlan(plan) {
   const routePoints = rawRoutePoints
     .map(normalizeSimBriefRoutePoint)
     .filter(Boolean);
+  const normalizedOfpXmlId = String(plan.ofpXmlId || plan.dvaSimBriefId || "").trim().toUpperCase();
   const normalized = {
     status: String(plan.status || "").trim(),
     generatedAtUtc: String(plan.generatedAtUtc || "").trim(),
     staticId: String(plan.staticId || "").trim(),
+    ofpXmlId: isValidSimBriefXmlId(normalizedOfpXmlId) ? normalizedOfpXmlId : "",
     aircraftType: String(plan.aircraftType || "").trim(),
     callsign: String(plan.callsign || "").trim(),
     route: String(plan.route || "").trim(),
@@ -117,6 +145,7 @@ function normalizeSimBriefPlan(plan) {
     alternate: String(plan.alternate || "").trim(),
     ete: String(plan.ete || "").trim(),
     blockFuel: String(plan.blockFuel || "").trim(),
+    pax: normalizeSimBriefPax(plan.pax),
     ofpUrl: String(plan.ofpUrl || "").trim(),
     pdfUrl: String(plan.pdfUrl || "").trim(),
     routePoints
@@ -125,6 +154,10 @@ function normalizeSimBriefPlan(plan) {
   const hasMeaningfulTextValue = Object.entries(normalized).some(([key, value]) => {
     if (key === "routePoints") {
       return routePoints.length > 0;
+    }
+
+    if (key === "pax") {
+      return value !== null && value !== undefined && value !== "";
     }
 
     return Boolean(value);
@@ -137,21 +170,26 @@ function measureTextBytes(text) {
   return textEncoder.encode(text || "").length;
 }
 
+function normalizeLogEntryText(text) {
+  return String(text || "").replace(/[\r\n]+$/g, "");
+}
+
 function buildNextLogText(existingText, incomingText) {
   const existing = existingText || "";
-  const incoming = incomingText || "";
+  const incoming = normalizeLogEntryText(incomingText);
 
   if (!incoming) {
     return existing;
   }
 
-  const combined = existing ? `${existing.trimEnd()}\n\n${incoming}` : incoming;
+  const separator = existing && !existing.endsWith("\n") ? "\n" : "";
+  const combined = `${existing}${separator}${incoming}\n`;
 
   if (measureTextBytes(combined) < LOG_SIZE_LIMIT_BYTES) {
     return combined;
   }
 
-  return incoming;
+  return `${incoming}\n`;
 }
 
 function uint8ArrayToBase64(bytes) {
