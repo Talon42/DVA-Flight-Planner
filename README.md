@@ -120,6 +120,10 @@ After scanning, addon airports affect the schedule in two ways:
 
 Use the `Basic Filters` tab for normal schedule filtering.
 
+<p align="center">
+  <img src="docs/images/basic_filters.png" width="1200" alt="basic filters" />
+</p>
+
 ### Route and geography
 
 - Airline
@@ -397,6 +401,10 @@ Saved custom airframes are then available as dispatch choices on Flight Board en
 ## Map View
 
 The map shows flight routes and lets you narrow the view to the selected flight or all active flights.
+
+<p align="center">
+  <img src="docs/images/map_view.png" width="1200" alt="map view" />
+</p>
 
 ### Map features
 
