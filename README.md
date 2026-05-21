@@ -121,7 +121,7 @@ After scanning, addon airports affect the schedule in two ways:
 Use the `Basic Filters` tab for normal schedule filtering.
 
 <p align="center">
-  <img src="docs/images/basic_filters.png" width="1200" alt="basic filters" />
+  <img src="docs/images/basic_filters.png" width="600" alt="basic filters" />
 </p>
 
 ### Route and geography
@@ -298,7 +298,7 @@ Accomplishment progress is based on the locally saved Delta Virtual logbook JSON
 The Flight Board is your working shortlist.
 
 <p align="center">
-  <img src="docs/images/flight_board.png" width="1200" alt="flight board" />
+  <img src="docs/images/flight_board.png" width="600" alt="flight board" />
 </p>
 
 ### Adding flights
