@@ -1,23 +1,16 @@
-import Papa from "papaparse";
-import airportsCsv from "../data/airports.csv?raw";
-import regionsCountriesCsv from "../data/icao_regions_countries.csv?raw";
-
-const CSV_OPTIONS = {
-  header: true,
-  skipEmptyLines: true,
-  transformHeader: (header) => header.trim()
-};
+import airportsData from "../data/airports.json";
+import regionsCountriesData from "../data/icao_regions_countries.json";
 
 let airportCatalog = null;
 let airportByIcao = null;
 
 function parseCoordinate(value) {
-  const parsed = Number.parseFloat(String(value || "").trim());
+  const parsed = Number.parseFloat(String(value ?? "").trim());
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function parseNumeric(value) {
-  const normalized = String(value || "").replace(/[^0-9-]/g, "");
+  const normalized = String(value ?? "").replace(/[^0-9-]/g, "");
   return normalized ? Number(normalized) : null;
 }
 
@@ -26,8 +19,8 @@ function ensureAirportCatalogLoaded() {
     return;
   }
 
-  const airportRows = Papa.parse(airportsCsv, CSV_OPTIONS).data;
-  const regionCountryRows = Papa.parse(regionsCountriesCsv, CSV_OPTIONS).data;
+  const airportRows = airportsData.airports || [];
+  const regionCountryRows = Array.isArray(regionsCountriesData) ? regionsCountriesData : [];
 
   const regionByCountry = new Map(
     regionCountryRows
@@ -43,25 +36,29 @@ function ensureAirportCatalogLoaded() {
 
   airportCatalog = airportRows
     .map((row) => ({
-      icao: String(row.ICAO || "").trim().toUpperCase(),
-      name: String(row.Name || "").trim(),
-      country: String(row.Country || "").trim(),
-      latitude: parseCoordinate(row.Latitude),
-      longitude: parseCoordinate(row.Longitude),
-      runwayLength: parseNumeric(row.rwy_length),
-      regionCode: regionByCountry.get(String(row.Country || "").trim())?.code || "",
-      regionName: regionByCountry.get(String(row.Country || "").trim())?.name || ""
+      icao: String(row.icao || "").trim().toUpperCase(),
+      name: String(row.name || "").trim(),
+      country: String(row.countryName || "").trim(),
+      state: String(row.stateTerritory || "").trim(),
+      timezone: String(row.timezone || "").trim(),
+      latitude: parseCoordinate(row.lat),
+      longitude: parseCoordinate(row.lng),
+      runwayLength: parseNumeric(row.runwayLength),
+      regionCode: regionByCountry.get(String(row.countryName || "").trim())?.code || "",
+      regionName: regionByCountry.get(String(row.countryName || "").trim())?.name || ""
     }))
     .filter((airport) => airport.icao && airport.name);
 
   airportByIcao = new Map(airportCatalog.map((airport) => [airport.icao, airport]));
 }
 
+// Returns the normalized airport record for an ICAO code.
 export function getAirportByIcao(icao) {
   ensureAirportCatalogLoaded();
   return airportByIcao.get(String(icao || "").trim().toUpperCase()) || null;
 }
 
+// Builds the full airport catalog used by airport pickers and filters.
 export function buildAirportCatalogOptions() {
   ensureAirportCatalogLoaded();
 
@@ -70,6 +67,10 @@ export function buildAirportCatalogOptions() {
       icao: airport.icao,
       name: airport.name,
       country: airport.country,
+      state: airport.state,
+      timezone: airport.timezone,
+      latitude: airport.latitude,
+      longitude: airport.longitude,
       runwayLength: airport.runwayLength,
       regionCode: airport.regionCode,
       regionName: airport.regionName,
@@ -105,6 +106,10 @@ export function buildAirportOptions(flights) {
         icao: normalizedIcao,
         name: airport?.name || normalizedIcao,
         country: airport?.country || "",
+        state: airport?.state || "",
+        timezone: airport?.timezone || "",
+        latitude: airport?.latitude ?? null,
+        longitude: airport?.longitude ?? null,
         runwayLength: airport?.runwayLength ?? null,
         regionCode: airport?.regionCode || "",
         regionName: airport?.regionName || "",

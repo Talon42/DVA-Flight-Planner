@@ -1,0 +1,977 @@
+[
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Afghanistan"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Australia"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Bangladesh"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Bhutan"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Brunei Darussalam"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Cambodia"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "China"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Cook Islands"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Democratic People's Republic of Korea"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Fiji"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Hong Kong, China"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "India"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Indonesia"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Japan"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Kiribati"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Lao People's Democratic Republic"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Macao, China"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Malaysia"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Maldives"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Marshall Islands"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Micronesia (Federated States of)"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Mongolia"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Myanmar"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Nauru"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Nepal"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "New Zealand"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Pakistan"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Palau"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Papua New Guinea"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Philippines"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Republic of Korea"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Samoa"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Singapore"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Solomon Islands"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Sri Lanka"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Thailand"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Timor Leste"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Tonga"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Tuvalu"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Vanuatu"
+  },
+  {
+    "region_code": "APAC",
+    "region_name": "Asia and Pacific",
+    "country": "Viet Nam"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Angola"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Botswana"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Burundi"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Comoros"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Djibouti"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Eritrea"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Eswatini"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Ethiopia"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Kenya"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Lesotho"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Madagascar"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Malawi"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Mauritius"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Mozambique"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Namibia"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Rwanda"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Seychelles"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Somalia"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "South Africa"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "South Sudan"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Uganda"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "United Republic of Tanzania"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Zambia"
+  },
+  {
+    "region_code": "ESAF",
+    "region_name": "Eastern and Southern African",
+    "country": "Zimbabwe"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Albania"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Algeria"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Andorra"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Armenia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Austria"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Azerbaijan"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Belarus"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Belgium"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Bosnia and Herzegovina"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Bulgaria"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Croatia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Cyprus"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Czechia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Denmark"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Estonia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Finland"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "France"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Georgia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Germany"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Greece"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Hungary"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Iceland"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Ireland"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Israel"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Italy"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Kazakhstan"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Kyrgyzstan"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Latvia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Lithuania"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Luxembourg"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Malta"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Monaco"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Montenegro"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Morocco"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Netherlands"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "North Macedonia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Norway"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Poland"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Portugal"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Republic of Moldova"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Romania"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Russian Federation"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "San Marino"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Serbia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Slovakia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Slovenia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Spain"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Sweden"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Switzerland"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Tajikistan"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Tunisia"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Turkmenistan"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Türkiye"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Ukraine"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "United Kingdom"
+  },
+  {
+    "region_code": "EUR/NAT",
+    "region_name": "European and North Atlantic",
+    "country": "Uzbekistan"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Bahrain"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Egypt"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Iran"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Iraq"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Jordan"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Kuwait"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Lebanon"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Libya"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Oman"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Qatar"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Saudi Arabia"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Sudan"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Syrian Arab Republic"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "United Arab Emirates"
+  },
+  {
+    "region_code": "MID",
+    "region_name": "Middle East",
+    "country": "Yemen"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Antigua and Barbuda"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Bahamas"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Barbados"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Belize"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Canada"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Costa Rica"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Cuba"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Dominica"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Dominican Republic"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "El Salvador"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Grenada"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Guatemala"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Haiti"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Honduras"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Jamaica"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Mexico"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Nicaragua"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Saint Kitts and Nevis"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Saint Lucia"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Saint Vincent and the Grenadines"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "Trinidad and Tobago"
+  },
+  {
+    "region_code": "NACC",
+    "region_name": "North American, Central American and Caribbean",
+    "country": "United States"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Argentina"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Bolivia (Plurinational State of)"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Brazil"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Chile"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Colombia"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Ecuador"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Guyana"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Panama"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Paraguay"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Peru"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Suriname"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Uruguay"
+  },
+  {
+    "region_code": "SAM",
+    "region_name": "South American",
+    "country": "Venezuela (Bolivarian Republic of)"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Benin"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Burkina Faso"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Cabo Verde"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Cameroon"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Central African Republic"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Chad"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Congo"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Côte d’Ivoire"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Democratic Republic of the Congo"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Equatorial Guinea"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Gabon"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Gambia"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Ghana"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Guinea"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Guinea-Bissau"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Liberia"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Mali"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Mauritania"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Niger"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Nigeria"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Sao Tome and Principe"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Senegal"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Sierra Leone"
+  },
+  {
+    "region_code": "WACAF",
+    "region_name": "Western and Central African",
+    "country": "Togo"
+  }
+]

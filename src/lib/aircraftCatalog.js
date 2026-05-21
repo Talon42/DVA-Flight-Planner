@@ -1,12 +1,5 @@
-import Papa from "papaparse";
-import aircraftProfilesCsv from "../data/aircraft_profiles.csv?raw";
+import aircraftProfilesData from "../data/aircraft_profiles.json";
 import { getAirportByIcao } from "./airportCatalog";
-
-const CSV_OPTIONS = {
-  header: true,
-  skipEmptyLines: true,
-  transformHeader: (header) => header.trim()
-};
 
 function parseNumeric(value) {
   const normalized = String(value || "").replace(/[^0-9-]/g, "");
@@ -100,7 +93,7 @@ function ensureAircraftCatalogLoaded() {
     return;
   }
 
-  const aircraftProfileRows = Papa.parse(aircraftProfilesCsv, CSV_OPTIONS).data;
+  const aircraftProfileRows = Array.isArray(aircraftProfilesData) ? aircraftProfilesData : [];
 
   aircraftCatalog = aircraftProfileRows.map((row) => ({
     equipmentType: String(row["Aircraft Profile"] || "").trim().toUpperCase(),

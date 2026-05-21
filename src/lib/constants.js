@@ -1,8 +1,8 @@
-export const STORAGE_DIR = "flight-planner";
-export const SAVED_SCHEDULE_FILE = `${STORAGE_DIR}/saved-schedule.json`;
-export const UI_STATE_FILE = `${STORAGE_DIR}/ui-state.json`;
-export const IMPORT_LOG_FILE = `${STORAGE_DIR}/log.txt`;
-export const SIMBRIEF_SETTINGS_FILE = `${STORAGE_DIR}/simbrief-settings.json`;
+export const SAVED_SCHEDULE_FILE = "saved-schedule.json";
+export const UI_STATE_FILE = "ui-state.json";
+export const IMPORT_LOG_FILE = "log.txt";
+export const SIMBRIEF_SETTINGS_FILE = "simbrief-settings.json";
+export const GETTING_STARTED_STATE_FILE = "getting-started.json";
 export const ADDON_MATCH_MODES = ["either", "origin", "destination", "both"];
 
 export const DEFAULT_FILTERS = {

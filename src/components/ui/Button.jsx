@@ -3,15 +3,15 @@ import { buttonTextClassName } from "./typography";
 
 const VARIANT_CLASSES = {
   primary:
-    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 dark:bg-[#1F466E] dark:hover:bg-[#27547F] dark:hover:opacity-100 disabled:opacity-100",
+    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 disabled:hover:!bg-[var(--delta-blue)] dark:bg-[#1F466E] dark:hover:bg-[#27547F] dark:hover:opacity-100 dark:disabled:hover:!bg-[#1F466E]",
   ghost:
-    "border-transparent bg-[var(--button-ghost-bg)] text-[var(--button-ghost-text)] hover:bg-[var(--button-ghost-hover-bg)]",
+    "border-transparent bg-[var(--button-ghost-bg)] text-[var(--button-ghost-text)] hover:bg-[var(--button-ghost-hover-bg)] disabled:hover:!bg-[var(--button-ghost-bg)]",
   danger:
-    "border-transparent bg-[var(--delta-red)] text-white hover:opacity-94 disabled:opacity-100",
+    "border-transparent bg-[var(--delta-red)] text-white hover:opacity-94 disabled:hover:!bg-[var(--delta-red)]",
   success:
-    "border-transparent bg-[#126835] text-white hover:opacity-94 dark:bg-[#1F466E] dark:hover:bg-[#27547F] dark:hover:opacity-100 disabled:opacity-100",
+    "border-transparent bg-[#126835] text-white hover:opacity-94 disabled:hover:!bg-[#126835] dark:bg-[#1F466E] dark:hover:bg-[#27547F] dark:hover:opacity-100 dark:disabled:hover:!bg-[#1F466E]",
   board:
-    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 dark:bg-[#1F466E] dark:hover:bg-[#27547F] dark:hover:opacity-100 disabled:opacity-100"
+    "border-transparent bg-[var(--delta-blue)] text-white hover:opacity-94 disabled:hover:!bg-[var(--delta-blue)] dark:bg-[#1F466E] dark:hover:bg-[#27547F] dark:hover:opacity-100 dark:disabled:hover:!bg-[#1F466E]"
 };
 
 const SIZE_CLASSES = {
@@ -32,7 +32,7 @@ export default function Button({
   return (
     <Component
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-none border border-transparent transition-[background,color,opacity] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex items-center justify-center gap-2 rounded-none border border-transparent transition-[background,color,opacity] duration-150 ease-out disabled:pointer-events-none disabled:cursor-default disabled:opacity-45",
         buttonTextClassName,
         SIZE_CLASSES[size],
         VARIANT_CLASSES[variant],

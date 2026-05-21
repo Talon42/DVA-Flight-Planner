@@ -1,0 +1,297 @@
+[
+  {
+    "IATA": "AM",
+    "Airline": "AeroMexico",
+    "ICAO": "AMX"
+  },
+  {
+    "IATA": "AMH",
+    "Airline": "AeroMexico Historical",
+    "ICAO": "AMX"
+  },
+  {
+    "IATA": "SUD",
+    "Airline": "Aeroflot Historical",
+    "ICAO": "AFL"
+  },
+  {
+    "IATA": "SU",
+    "Airline": "Aeroflot Russian Airlines",
+    "ICAO": "AFL"
+  },
+  {
+    "IATA": "AR",
+    "Airline": "Aerolineas Argentina",
+    "ICAO": "ARG"
+  },
+  {
+    "IATA": "UX",
+    "Airline": "Air Europa",
+    "ICAO": "AEA"
+  },
+  {
+    "IATA": "AF",
+    "Airline": "Air France",
+    "ICAO": "AFR"
+  },
+  {
+    "IATA": "AFH",
+    "Airline": "Air France Historic",
+    "ICAO": "AFR"
+  },
+  {
+    "IATA": "RW",
+    "Airline": "Air West",
+    "ICAO": "AWT"
+  },
+  {
+    "IATA": "AS",
+    "Airline": "Alaska Airlines",
+    "ICAO": "ASA"
+  },
+  {
+    "IATA": "AZD",
+    "Airline": "Alitalia Historic",
+    "ICAO": "AZA"
+  },
+  {
+    "IATA": "CI",
+    "Airline": "China Airlines",
+    "ICAO": "CAL"
+  },
+  {
+    "IATA": "CID",
+    "Airline": "China Airlines Historic",
+    "ICAO": "CAL"
+  },
+  {
+    "IATA": "MU",
+    "Airline": "China Eastern",
+    "ICAO": "CES"
+  },
+  {
+    "IATA": "MUD",
+    "Airline": "China Eastern Historical",
+    "ICAO": "CES"
+  },
+  {
+    "IATA": "CZ",
+    "Airline": "China Southern",
+    "ICAO": "CSN"
+  },
+  {
+    "IATA": "CZH",
+    "Airline": "China Southern Historical",
+    "ICAO": "CSN"
+  },
+  {
+    "IATA": "OK",
+    "Airline": "Czech Air Lines",
+    "ICAO": "CSA"
+  },
+  {
+    "IATA": "DL",
+    "Airline": "Delta Air Lines",
+    "ICAO": "DAL"
+  },
+  {
+    "IATA": "DLC",
+    "Airline": "Delta Connection",
+    "ICAO": "DAL"
+  },
+  {
+    "IATA": "DVH",
+    "Airline": "Delta Historic",
+    "ICAO": "DAL"
+  },
+  {
+    "IATA": "GA",
+    "Airline": "Garuda Indonesia",
+    "ICAO": "GIA"
+  },
+  {
+    "IATA": "GLO",
+    "Airline": "Gol Transportes Aereos",
+    "ICAO": "GLO"
+  },
+  {
+    "IATA": "HA",
+    "Airline": "Hawaiian Airlines",
+    "ICAO": "HAL"
+  },
+  {
+    "IATA": "AZ",
+    "Airline": "ITA Airways",
+    "ICAO": "ITY"
+  },
+  {
+    "IATA": "JAD",
+    "Airline": "Jet Airways Historical",
+    "ICAO": "JAI"
+  },
+  {
+    "IATA": "KLH",
+    "Airline": "KLM Historic",
+    "ICAO": "KLM"
+  },
+  {
+    "IATA": "KL",
+    "Airline": "KLM Royal Dutch Airlines",
+    "ICAO": "KLM"
+  },
+  {
+    "IATA": "KQ",
+    "Airline": "Kenya Airways",
+    "ICAO": "KQA"
+  },
+  {
+    "IATA": "KQH",
+    "Airline": "Kenya Airways Historic",
+    "ICAO": "KQA"
+  },
+  {
+    "IATA": "KE",
+    "Airline": "Korean Air Lines",
+    "ICAO": "KAL"
+  },
+  {
+    "IATA": "KEH",
+    "Airline": "Korean Air Lines Historic",
+    "ICAO": "KAL"
+  },
+  {
+    "IATA": "ME",
+    "Airline": "Middle East Airlines",
+    "ICAO": "MEA"
+  },
+  {
+    "IATA": "NA",
+    "Airline": "National Airlines",
+    "ICAO": "NAL"
+  },
+  {
+    "IATA": "NPA",
+    "Airline": "National Parks Airways",
+    "ICAO": ""
+  },
+  {
+    "IATA": "NCA",
+    "Airline": "North Central Airlines",
+    "ICAO": "NC"
+  },
+  {
+    "IATA": "NEH",
+    "Airline": "Northeast Airlines",
+    "ICAO": "NEE"
+  },
+  {
+    "IATA": "NW",
+    "Airline": "Northwest Airlines",
+    "ICAO": "NWA"
+  },
+  {
+    "IATA": "PAH",
+    "Airline": "Pan American Airways",
+    "ICAO": "PAA"
+  },
+  {
+    "IATA": "SV",
+    "Airline": "Saudi Arabian Airlines",
+    "ICAO": "SVA"
+  },
+  {
+    "IATA": "SVD",
+    "Airline": "Saudia Historical",
+    "ICAO": "SVA"
+  },
+  {
+    "IATA": "SK",
+    "Airline": "Scandinavian Airlines",
+    "ICAO": "SAS"
+  },
+  {
+    "IATA": "SBS",
+    "Airline": "Seaborne Airlines",
+    "ICAO": "SBS"
+  },
+  {
+    "IATA": "FM",
+    "Airline": "Shanghai Airlines",
+    "ICAO": "CSH"
+  },
+  {
+    "IATA": "SWR",
+    "Airline": "Swissair",
+    "ICAO": "SWR"
+  },
+  {
+    "IATA": "ROH",
+    "Airline": "Tarom Historical",
+    "ICAO": "ROT"
+  },
+  {
+    "IATA": "HV",
+    "Airline": "Transavia",
+    "ICAO": "TRA"
+  },
+  {
+    "IATA": "HVD",
+    "Airline": "Transavia Historical",
+    "ICAO": "TRA"
+  },
+  {
+    "IATA": "RO",
+    "Airline": "Transporturile Aeriene Române",
+    "ICAO": "ROT"
+  },
+  {
+    "IATA": "VND",
+    "Airline": "Vietnam Air Historical",
+    "ICAO": "HVN"
+  },
+  {
+    "IATA": "VN",
+    "Airline": "Vietnam Airlines",
+    "ICAO": "HVN"
+  },
+  {
+    "IATA": "VS",
+    "Airline": "Virgin Atlantic",
+    "ICAO": "VIR"
+  },
+  {
+    "IATA": "VSD",
+    "Airline": "Virgin Atlantic Historic",
+    "ICAO": "VIR"
+  },
+  {
+    "IATA": "VA",
+    "Airline": "Virgin Australia",
+    "ICAO": "VOZ"
+  },
+  {
+    "IATA": "WS",
+    "Airline": "WestJet Airlines",
+    "ICAO": "WJA"
+  },
+  {
+    "IATA": "WSH",
+    "Airline": "WestJet Airlines Historical",
+    "ICAO": "WJA"
+  },
+  {
+    "IATA": "WR",
+    "Airline": "WestJet Encore",
+    "ICAO": "WEN"
+  },
+  {
+    "IATA": "WAH",
+    "Airline": "Western Airlines",
+    "ICAO": "WAL"
+  },
+  {
+    "IATA": "MF",
+    "Airline": "Xiamen Airlines",
+    "ICAO": "CXA"
+  }
+]

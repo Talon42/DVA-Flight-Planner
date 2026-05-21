@@ -10,10 +10,11 @@ import {
 import { DateTime } from "luxon";
 import FilterBar from "./components/FilterBar";
 import { AddonAirportPanel } from "./components/FilterBar";
-import { SimBriefSettingsPanel } from "./components/FilterBar";
 import DetailsPanel from "./components/DetailsPanel";
 import ScheduleWorkspacePanel from "./components/ScheduleWorkspacePanel";
 import AppFooter from "./components/layout/AppFooter";
+import GettingStartedModal from "./components/GettingStartedModal";
+import ReadmeModal from "./components/ReadmeModal";
 import Button from "./components/ui/Button";
 import IconButton from "./components/ui/IconButton";
 import Panel from "./components/ui/Panel";
@@ -34,7 +35,6 @@ import {
 import {
   fieldInputClassName,
   fieldLabelClassName,
-  fieldTitleClassName,
   gridClassNames,
   getPlannerTabStateClassName,
   plannerTabClassName,
@@ -94,6 +94,7 @@ import {
   closeSimBriefDispatchWindow,
   fetchSimBriefAircraftTypes,
   normalizeSimBriefCustomAirframe,
+  refreshSimBriefDispatch,
   startSimBriefDispatch
 } from "./lib/simbrief";
 import {
@@ -104,12 +105,11 @@ import {
 import {
   appendImportLog,
   deleteStoredUserData,
-  pickJsonLogbookFile,
-  pickXmlScheduleFile,
+  readGettingStartedState,
   readSimBriefSettings,
   readSavedSchedule,
   readSavedUiState,
-  storeDeltaVirtualLogbookJson,
+  writeGettingStartedState,
   writeSimBriefSettings,
   writeSavedSchedule,
   writeSavedUiState
@@ -120,6 +120,8 @@ import {
   readDeltaVirtualCredentials,
   saveDeltaVirtualCredentials
 } from "./lib/deltaVirtualCredentials";
+import { DeltaVirtualCredentialsForm } from "./components/settings/DeltaVirtualCredentialsForm";
+import { SimBriefSettingsForm } from "./components/settings/SimBriefSettingsForm";
 import { checkForAppUpdate, GITHUB_RELEASES_PAGE_URL } from "./lib/updateCheck";
 import accomplishmentsData from "./data/accomplishments/accomplishments.json";
 import {
@@ -132,6 +134,8 @@ const THEME_STORAGE_KEY = "flight-planner.theme";
 const DEV_TOOLS_STORAGE_KEY = "flight-planner.dev-tools-enabled";
 const DEV_WINDOW_WIDTH_STORAGE_KEY = "flight-planner.dev-window-width";
 const APP_BUILD_GIT_TAG = String(import.meta.env.VITE_BUILD_GIT_TAG || "").trim() || "local-dev";
+const DVA_PASSWORD_MASK = "********";
+const DVA_PASSWORD_PROMPT = "Enter Password";
 const DEV_WINDOW_WIDTH_PRESETS = [
   { width: 1920, height: 900, label: "1920x900" },
   { width: 1400, height: 900, label: "1400x900" },
@@ -145,6 +149,11 @@ const ACCOMPLISHMENTS = normalizeAccomplishments(accomplishmentsData);
 const MAX_FLIGHT_BOARDS = 4;
 const DEFAULT_FLIGHT_BOARD_NAME = "Board 1";
 const BOOT_SPLASH_HIDE_DELAY_MS = 200;
+const DEFAULT_GETTING_STARTED_STATE = {
+  gettingStartedDismissed: false,
+  gettingStartedFinalized: false,
+  addonSetupSkipped: false
+};
 const SETTINGS_TABS = [
   { id: "general", label: "General" },
   { id: "delta-virtual", label: "Delta Virtual" },
@@ -465,12 +474,9 @@ function buildFooterDateLabel(dateIso) {
 function getScheduleSourceLabel(importSummary) {
   const source = String(importSummary?.source || "").trim().toLowerCase();
   if (source === "deltava-sync") {
-    return "Sync";
+    return "Delta Virtual";
   }
-  if (source === "manual") {
-    return "Manual";
-  }
-  return "Manual";
+  return "Delta Virtual";
 }
 
 function ThemeToggleIcon({ theme }) {
@@ -515,6 +521,23 @@ function SettingsIcon() {
         strokeWidth="1.3"
       />
       <circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg viewBox="0 0 16 16" focusable="false" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path
+        d="M6.1 5.9a2.1 2.1 0 0 1 4.1.7c0 1.1-1 1.5-1.5 1.9-.4.3-.6.6-.6 1.3v.3"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.3"
+      />
+      <circle cx="8" cy="11.9" r=".65" fill="currentColor" />
     </svg>
   );
 }
@@ -736,7 +759,7 @@ function formatScanTimestamp(value) {
 
 function formatAddonScanSummary(addonScan) {
   if (!addonScan.roots.length) {
-    return "No addon folders saved.";
+    return "";
   }
 
   const scanStamp = formatScanTimestamp(addonScan.lastScannedAt);
@@ -881,6 +904,9 @@ function buildBoardEntryFromFlight(flight, overrides = {}) {
     draftReportId: normalizePositiveDraftReportId(
       overrides.draftReportId ?? flight?.draftReportId ?? flight?.dvaDraftReportId
     ),
+    dvaDraftReportId: normalizePositiveDraftReportId(
+      overrides.dvaDraftReportId ?? overrides.draftReportId ?? flight?.draftReportId ?? flight?.dvaDraftReportId
+    ),
     simbriefPlan:
       overrides.simbriefPlan !== undefined ? overrides.simbriefPlan : flight?.simbriefPlan ?? null
   };
@@ -965,6 +991,9 @@ function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     draftReportId: normalizePositiveDraftReportId(
       overrides.draftReportId ?? flight?.draftReportId ?? flight?.dvaDraftReportId
     ),
+    dvaDraftReportId: normalizePositiveDraftReportId(
+      overrides.dvaDraftReportId ?? overrides.draftReportId ?? flight?.draftReportId ?? flight?.dvaDraftReportId
+    ),
     simbriefPlan:
       overrides.simbriefPlan !== undefined ? overrides.simbriefPlan : flight?.simbriefPlan ?? null
   };
@@ -1023,6 +1052,7 @@ function normalizeBoardEntry(entry) {
     compatibleEquipment: Array.isArray(entry.compatibleEquipment) ? [...entry.compatibleEquipment] : [],
     simbriefSelectedType: String(entry.simbriefSelectedType || "").trim().toUpperCase(),
     draftReportId: normalizePositiveDraftReportId(entry.draftReportId ?? entry.dvaDraftReportId),
+    dvaDraftReportId: normalizePositiveDraftReportId(entry.dvaDraftReportId ?? entry.draftReportId),
     simbriefPlan: entry.simbriefPlan || null
   };
 
@@ -1340,13 +1370,29 @@ export default function App() {
     initialBasicFilterSections.basicAddonFiltersOpen
   );
   const [addonScan, setAddonScan] = useState(createEmptyAddonAirportScan);
+  const [gettingStartedState, setGettingStartedState] = useState(DEFAULT_GETTING_STARTED_STATE);
+  const [hasLoadedGettingStartedState, setHasLoadedGettingStartedState] = useState(false);
   const [dvaFirstName, setDvaFirstName] = useState("");
   const [dvaFirstNameDraft, setDvaFirstNameDraft] = useState("");
   const [dvaLastName, setDvaLastName] = useState("");
   const [dvaLastNameDraft, setDvaLastNameDraft] = useState("");
   const [dvaHasPassword, setDvaHasPassword] = useState(false);
   const [dvaPasswordDraft, setDvaPasswordDraft] = useState("");
+  const [isDvaPasswordEditing, setIsDvaPasswordEditing] = useState(false);
   const [isDvaCredentialsSaving, setIsDvaCredentialsSaving] = useState(false);
+  // Disable save until one of the credential fields actually changes.
+  const hasDvaCredentialChanges =
+    dvaFirstNameDraft.trim() !== dvaFirstName ||
+    dvaLastNameDraft.trim() !== dvaLastName ||
+    Boolean(dvaPasswordDraft);
+  const isDvaPasswordMasked = dvaHasPassword && !dvaPasswordDraft && !isDvaPasswordEditing;
+  const isDvaPasswordPromptVisible = !dvaHasPassword && !dvaPasswordDraft && !isDvaPasswordEditing;
+  const isDvaPasswordDisplayText = isDvaPasswordMasked || isDvaPasswordPromptVisible;
+  const dvaPasswordFieldValue = isDvaPasswordMasked
+    ? DVA_PASSWORD_MASK
+    : isDvaPasswordPromptVisible
+      ? DVA_PASSWORD_PROMPT
+      : dvaPasswordDraft;
   const [simBriefUsername, setSimBriefUsername] = useState("");
   const [simBriefUsernameDraft, setSimBriefUsernameDraft] = useState("");
   const [simBriefPilotId, setSimBriefPilotId] = useState("");
@@ -1370,6 +1416,10 @@ export default function App() {
     error: "",
     result: null
   });
+  const [deltaDraftReportUrlState, setDeltaDraftReportUrlState] = useState({
+    boardEntryId: "",
+    url: ""
+  });
   const [simBriefAircraftTypes, setSimBriefAircraftTypes] = useState([]);
   const [isSimBriefAircraftTypesLoading, setIsSimBriefAircraftTypesLoading] = useState(false);
   const [simBriefAircraftTypesError, setSimBriefAircraftTypesError] = useState("");
@@ -1378,11 +1428,13 @@ export default function App() {
   const [isHydrating, setIsHydrating] = useState(true);
   const [shouldAwaitRestoredScheduleStartup, setShouldAwaitRestoredScheduleStartup] = useState(false);
   const [isAddonScanBusy, setIsAddonScanBusy] = useState(false);
+  // Addon scans use a dedicated popup so both manual and automatic scans share the same overlay.
+  const [isAddonAutoScanning, setIsAddonAutoScanning] = useState(false);
   const [isSimBriefSaving, setIsSimBriefSaving] = useState(false);
   const [isDeletingUserData, setIsDeletingUserData] = useState(false);
+  const [isReadmeOpen, setIsReadmeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("general");
-  const [isManualUploadOpen, setIsManualUploadOpen] = useState(false);
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
   const [isDutyBoardOverwriteConfirmOpen, setIsDutyBoardOverwriteConfirmOpen] = useState(false);
   const [isDvaSyncWarningOpen, setIsDvaSyncWarningOpen] = useState(false);
@@ -1396,8 +1448,6 @@ export default function App() {
     visitedAirports: [],
     arrivalAirports: []
   });
-  const [manualUploadScheduleFile, setManualUploadScheduleFile] = useState(null);
-  const [manualUploadLogbookFile, setManualUploadLogbookFile] = useState(null);
   const deleteUserDataConfirmResolverRef = useRef(null);
   const dutyBoardOverwriteConfirmResolverRef = useRef(null);
   const hasPerformedStartupUpdateCheckRef = useRef(false);
@@ -1435,7 +1485,6 @@ export default function App() {
     layoutBucket === "compact"
       ? "DVA Flight Planner"
       : "Delta Virtual Airlines Flight Planner";
-  const importButtonLabel = "Manual Upload";
   const syncButtonLabel =
     layoutBucket === "compact"
       ? "Sync DVA"
@@ -1682,17 +1731,13 @@ export default function App() {
   }, [isDvaSyncWarningOpen]);
 
   useEffect(() => {
-    if (!isManualUploadOpen && !isDeleteUserDataConfirmOpen) {
+    if (!isDeleteUserDataConfirmOpen) {
       return undefined;
     }
 
     function handleKeyDown(event) {
       if (event.key === "Escape") {
-        if (isManualUploadOpen) {
-          closeManualUploadDialog();
-        } else if (isDeleteUserDataConfirmOpen) {
-          resolveDeleteUserDataConfirmation(false);
-        }
+        resolveDeleteUserDataConfirmation(false);
       }
     }
 
@@ -1700,7 +1745,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isManualUploadOpen, isDeleteUserDataConfirmOpen]);
+  }, [isDeleteUserDataConfirmOpen]);
 
   useEffect(() => {
     if (!isDesktopAddonScanAvailable || hasPerformedStartupUpdateCheckRef.current) {
@@ -1895,6 +1940,7 @@ export default function App() {
         addonCacheResult,
         dvaCredentialsResult,
         simBriefResult,
+        gettingStartedResult,
         uiStateResult,
         logbookProgressResult
       ] = await Promise.allSettled([
@@ -1902,6 +1948,7 @@ export default function App() {
         readAddonAirportCache(),
         readDeltaVirtualCredentials(),
         readSimBriefSettings(),
+        readGettingStartedState(),
         readSavedUiState(),
         readDeltaVirtualLogbookProgress()
       ]);
@@ -1930,6 +1977,7 @@ export default function App() {
           setDvaLastName(lastName);
           setDvaLastNameDraft(lastName);
           setDvaHasPassword(hasPassword);
+          setIsDvaPasswordEditing(false);
           await logAppEvent("deltava-auth-loaded", {
             firstNameSaved: Boolean(firstName),
             lastNameSaved: Boolean(lastName),
@@ -1976,6 +2024,17 @@ export default function App() {
             }
           );
         }
+
+        if (gettingStartedResult.status === "fulfilled") {
+          setGettingStartedState({
+            gettingStartedDismissed: Boolean(gettingStartedResult.value?.gettingStartedDismissed),
+            gettingStartedFinalized: Boolean(gettingStartedResult.value?.gettingStartedFinalized),
+            addonSetupSkipped: Boolean(gettingStartedResult.value?.addonSetupSkipped)
+          });
+        } else {
+          setGettingStartedState(DEFAULT_GETTING_STARTED_STATE);
+        }
+        setHasLoadedGettingStartedState(true);
 
         if (
           scheduleResult.status !== "fulfilled" ||
@@ -2030,13 +2089,8 @@ export default function App() {
           savedUiState.scheduleTableTimeDisplayMode === "utc" ? "utc" : "local"
         );
         setSort(savedUiState.sort || DEFAULT_SORT);
-        setScheduleView(
-          savedUiState.scheduleView === "tours" ||
-            savedUiState.scheduleView === "map" ||
-            savedUiState.scheduleView === "accomplishments"
-            ? savedUiState.scheduleView
-            : "flights"
-        );
+        // Always reopen on Flights after a full app restart.
+        setScheduleView("flights");
         setSelectedTourPath(String(savedUiState.selectedTourPath || "").trim());
         setSelectedAccomplishmentName(
           String(savedUiState.selectedAccomplishmentName || "").trim()
@@ -2160,6 +2214,7 @@ export default function App() {
     [normalizedDutyFilters, scheduleFlights]
   );
   const addonAirports = useMemo(() => new Set(addonScan.airports), [addonScan.airports]);
+  const addonSetupComplete = addonScan.roots.length > 0 || gettingStartedState.addonSetupSkipped;
   const simBriefDispatchOptions = buildSimBriefDispatchOptions(
     simBriefAircraftTypes,
     simBriefCustomAirframes
@@ -2387,9 +2442,19 @@ export default function App() {
   );
   const selectedShortlistFlight =
     shortlist.find((flight) => flight.boardEntryId === expandedBoardFlightId) || null;
+  const dvaCredentialsConfigured = Boolean(
+    String(dvaFirstName || "").trim() &&
+      String(dvaLastName || "").trim() &&
+      dvaHasPassword
+  );
   const simBriefCredentialsConfigured = Boolean(
     String(simBriefUsername || "").trim() || String(simBriefPilotId || "").trim()
   );
+  const shouldShowGettingStarted =
+    hasLoadedGettingStartedState &&
+    !isHydrating &&
+    !gettingStartedState.gettingStartedDismissed &&
+    !gettingStartedState.gettingStartedFinalized;
 
   function updateActiveFlightBoardEntries(nextEntriesOrUpdater) {
     let resolvedEntries = null;
@@ -2612,82 +2677,6 @@ export default function App() {
     }
   }
 
-  async function processImportedLogbook(pickedFile, sourceLabel) {
-    const startedAtMs = Date.now();
-    setIsImporting(true);
-    setStatusMessage(`Importing ${pickedFile.fileName}...`);
-    await logAppEvent("logbook-import-start", {
-      source: sourceLabel,
-      file: pickedFile.fileName
-    });
-
-    try {
-      await storeDeltaVirtualLogbookJson(pickedFile.fileName, pickedFile.jsonText);
-      setLogbookAirportProgress(await readDeltaVirtualLogbookProgress());
-      setStatusMessage(`Imported logbook data from ${pickedFile.fileName}.`);
-      await logAppEvent("logbook-import-success", {
-        source: sourceLabel,
-        file: pickedFile.fileName,
-        durationMs: Date.now() - startedAtMs
-      });
-    } catch (error) {
-      setStatusMessage(error.message || "Logbook import failed.");
-      await logAppError("logbook-import-failed", error, {
-        source: sourceLabel,
-        file: pickedFile.fileName,
-        durationMs: Date.now() - startedAtMs
-      });
-    } finally {
-      setIsImporting(false);
-    }
-  }
-
-  function openManualUploadDialog() {
-    setManualUploadScheduleFile(null);
-    setManualUploadLogbookFile(null);
-    setIsManualUploadOpen(true);
-  }
-
-  function closeManualUploadDialog() {
-    setIsManualUploadOpen(false);
-    setManualUploadScheduleFile(null);
-    setManualUploadLogbookFile(null);
-  }
-
-  async function chooseManualUploadScheduleFile() {
-    const pickedFile = await pickXmlScheduleFile();
-    if (pickedFile) {
-      setManualUploadScheduleFile(pickedFile);
-    }
-  }
-
-  async function chooseManualUploadLogbookFile() {
-    const pickedFile = await pickJsonLogbookFile();
-    if (pickedFile) {
-      setManualUploadLogbookFile(pickedFile);
-    }
-  }
-
-  async function handleManualUpload() {
-    const scheduleFile = manualUploadScheduleFile;
-    const logbookFile = manualUploadLogbookFile;
-
-    if (!scheduleFile && !logbookFile) {
-      setStatusMessage("Choose a schedule XML or logbook JSON first.");
-      return;
-    }
-
-    closeManualUploadDialog();
-
-    if (scheduleFile) {
-      await processImportedSchedule(scheduleFile, "manual-upload");
-    }
-
-    if (logbookFile) {
-      await processImportedLogbook(logbookFile, "manual-upload");
-    }
-  }
-
   function resolveDeleteUserDataConfirmation(confirmed) {
     setIsDeleteUserDataConfirmOpen(false);
     if (deleteUserDataConfirmResolverRef.current) {
@@ -2717,11 +2706,6 @@ export default function App() {
       dutyBoardOverwriteConfirmResolverRef.current = resolve;
       setIsDutyBoardOverwriteConfirmOpen(true);
     });
-  }
-
-  async function handleImport() {
-    await logAppEvent("manual-upload-requested");
-    openManualUploadDialog();
   }
 
   async function handleDeltaVirtualSync() {
@@ -3534,23 +3518,36 @@ export default function App() {
     return nextScan;
   }
 
+  async function persistGettingStartedState(nextState) {
+    const normalizedState = {
+      gettingStartedDismissed: Boolean(nextState?.gettingStartedDismissed),
+      gettingStartedFinalized: Boolean(nextState?.gettingStartedFinalized),
+      addonSetupSkipped: Boolean(nextState?.addonSetupSkipped)
+    };
+    await writeGettingStartedState(normalizedState);
+    setGettingStartedState(normalizedState);
+    return normalizedState;
+  }
+
   async function handleAddAddonRoot() {
     try {
       const path = await pickAddonAirportFolder();
       if (!path) {
         await logSystemEvent("AddonScan", "root-add-cancelled");
-        return;
+        return false;
       }
 
       const nextRoots = [...new Set([...addonScan.roots, path])];
       await persistAddonRoots(nextRoots);
-      setStatusMessage(`Saved ${formatNumber(nextRoots.length)} addon folder roots.`);
+      await handleScanAddonAirports(nextRoots);
       await logSystemEvent("AddonScan", "root-added", {
         rootCount: nextRoots.length
       });
+      return true;
     } catch (error) {
       setStatusMessage(error.message || "Unable to add addon folder.");
       await logSystemError("AddonScan", "root-add-failed", error);
+      return false;
     }
   }
 
@@ -3572,22 +3569,29 @@ export default function App() {
     }
   }
 
-  async function handleScanAddonAirports() {
-    if (!addonScan.roots.length) {
+  async function handleScanAddonAirports(roots = addonScan.roots, options = {}) {
+    if (!roots.length) {
       await logSystemEvent("AddonScan", "scan-skipped-no-roots");
       return;
+    }
+
+    setIsAddonAutoScanning(true);
+
+    if (options.resetCache) {
+      // Clear the stored results for this root set before starting a fresh scan.
+      await persistAddonRoots(roots);
     }
 
     setIsAddonScanBusy(true);
     setStatusMessage("Scanning addon folders for ContentHistory.json...");
     await logSystemEvent("AddonScan", "scan-start", {
-      rootCount: addonScan.roots.length,
-      airportsCached: addonScan.airports.length,
+      rootCount: roots.length,
+      airportsCached: options.resetCache ? 0 : addonScan.airports.length,
       filesScanned: addonScan.contentHistoryFilesScanned
     });
 
     try {
-      const nextScan = await scanAddonAirports(addonScan.roots);
+      const nextScan = await scanAddonAirports(roots);
       setAddonScan(nextScan);
       setStatusMessage(
         `Scanned ${formatNumber(nextScan.contentHistoryFilesScanned)} ContentHistory files and cached ${formatNumber(nextScan.airports.length)} addon airports.`
@@ -3601,16 +3605,31 @@ export default function App() {
     } catch (error) {
       setStatusMessage(error.message || "Addon airport scan failed.");
       await logSystemError("AddonScan", "scan-failed", error, {
-        rootCount: addonScan.roots.length
+        rootCount: roots.length
       });
     } finally {
       setIsAddonScanBusy(false);
+      setIsAddonAutoScanning(false);
+    }
+  }
+
+  async function handleSkipAddonSetup() {
+    try {
+      await persistGettingStartedState({
+        ...gettingStartedState,
+        addonSetupSkipped: true
+      });
+      return true;
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to save addon setup preference.");
+      await logAppError("addon-setup-skip-failed", error);
+      return false;
     }
   }
 
   async function handleSaveSimBriefCredentials(overrides = {}) {
     if (isSimBriefSaving) {
-      return;
+      return false;
     }
 
     const nextUsername = String(
@@ -3628,7 +3647,7 @@ export default function App() {
       nextPilotId === simBriefPilotId &&
       JSON.stringify(nextCustomAirframes) === JSON.stringify(simBriefCustomAirframes)
     ) {
-      return;
+      return false;
     }
 
     setIsSimBriefSaving(true);
@@ -3658,9 +3677,11 @@ export default function App() {
         dispatchUnits: simBriefDispatchUnits,
         customAirframeCount: nextCustomAirframes.length
       });
+      return true;
     } catch (error) {
       setStatusMessage(error.message || "Unable to save SimBrief settings.");
       await logSystemError("SimBrief", "settings-save-failed", error);
+      return false;
     } finally {
       setIsSimBriefSaving(false);
     }
@@ -3668,7 +3689,7 @@ export default function App() {
 
   async function handleSaveDeltaVirtualCredentials(overrides = {}) {
     if (isDvaCredentialsSaving) {
-      return;
+      return false;
     }
 
     const nextFirstName = String(
@@ -3682,7 +3703,7 @@ export default function App() {
     const shouldSavePassword = nextPasswordDraft.length > 0;
 
     if (nextFirstName === dvaFirstName && nextLastName === dvaLastName && !shouldSavePassword) {
-      return;
+      return false;
     }
 
     setIsDvaCredentialsSaving(true);
@@ -3699,15 +3720,18 @@ export default function App() {
       setDvaLastNameDraft(savedCredentials.lastName);
       setDvaHasPassword(savedCredentials.hasPassword);
       setDvaPasswordDraft("");
+      setIsDvaPasswordEditing(false);
       setStatusMessage("Delta Virtual login settings saved.");
       await logAppEvent("deltava-auth-saved", {
         firstNameSaved: Boolean(savedCredentials.firstName),
         lastNameSaved: Boolean(savedCredentials.lastName),
         hasPassword: savedCredentials.hasPassword
       });
+      return true;
     } catch (error) {
       setStatusMessage(error.message || "Unable to save Delta Virtual login settings.");
       await logAppError("deltava-auth-save-failed", error);
+      return false;
     } finally {
       setIsDvaCredentialsSaving(false);
     }
@@ -3729,6 +3753,7 @@ export default function App() {
       setDvaLastNameDraft(clearedCredentials.lastName);
       setDvaHasPassword(clearedCredentials.hasPassword);
       setDvaPasswordDraft("");
+      setIsDvaPasswordEditing(false);
       setStatusMessage("Delta Virtual login settings cleared.");
       await logAppEvent("deltava-auth-cleared");
     } catch (error) {
@@ -3855,7 +3880,328 @@ export default function App() {
     updateActiveFlightBoardEntries(nextFlightBoard);
   }
 
-  async function handleSimBriefDispatch() {
+  function isValidSimBriefAircraftCode(value) {
+    const normalizedValue = String(value || "").trim().toUpperCase();
+    return Boolean(normalizedValue) && !/[\/\s]/.test(normalizedValue);
+  }
+
+  function normalizeSimBriefAircraftCode(value) {
+    const normalizedValue = String(value || "").trim().toUpperCase();
+    return isValidSimBriefAircraftCode(normalizedValue) ? normalizedValue : "";
+  }
+
+  function normalizeSimBriefPlanForBoardEntry(plan, fallbackStaticId = "") {
+    if (!plan || typeof plan !== "object") {
+      return null;
+    }
+
+    const routePointsSource = Array.isArray(plan.routePoints)
+      ? plan.routePoints
+      : Array.isArray(plan.route_points)
+        ? plan.route_points
+        : [];
+    const routePoints = routePointsSource
+      .map((point) => {
+        if (!point || typeof point !== "object") {
+          return null;
+        }
+
+        const latitude = Number(point.latitude);
+        const longitude = Number(point.longitude);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          return null;
+        }
+
+        return {
+          ident: String(point.ident || "").trim(),
+          latitude,
+          longitude
+        };
+      })
+      .filter(Boolean);
+    const aircraftType = String(
+      plan.aircraftType ||
+        plan.aircraft_type ||
+        plan.aircraft?.icao ||
+        plan.aircraft?.type ||
+        plan.aircraft?.code ||
+        plan.aircraft?.name ||
+        plan.aircraft ||
+        ""
+    )
+      .trim()
+      .toUpperCase();
+    const staticId = String(plan.staticId || plan.static_id || fallbackStaticId || "").trim();
+    const ofpXmlId = String(plan.ofpXmlId || plan.ofp_xml_id || plan.dvaSimBriefId || "").trim().toUpperCase();
+    const aircraft =
+      plan.aircraft && typeof plan.aircraft === "object"
+        ? { ...plan.aircraft }
+        : aircraftType
+          ? {
+              code: aircraftType,
+              icao: aircraftType,
+              type: aircraftType,
+              name: aircraftType
+            }
+          : null;
+
+    return {
+      status: String(plan.status || "").trim(),
+      generatedAtUtc: String(plan.generatedAtUtc || plan.generated_at_utc || "").trim(),
+      generated_at_utc: String(plan.generatedAtUtc || plan.generated_at_utc || "").trim(),
+      staticId,
+      static_id: staticId,
+      ofpXmlId,
+      ofp_xml_id: ofpXmlId,
+      aircraftType,
+      aircraft_type: aircraftType,
+      aircraft,
+      callsign: String(plan.callsign || "").trim(),
+      route: String(plan.route || "").trim(),
+      cruiseAltitude: String(plan.cruiseAltitude || plan.cruise_altitude || "").trim(),
+      alternate: String(plan.alternate || "").trim(),
+      ete: String(plan.ete || "").trim(),
+      blockFuel: String(plan.blockFuel || plan.block_fuel || "").trim(),
+      pax: Number.isInteger(plan.pax) ? plan.pax : Number.isInteger(Number(plan.pax)) ? Number(plan.pax) : null,
+      ofpUrl: String(plan.ofpUrl || plan.ofp_url || "").trim(),
+      pdfUrl: String(plan.pdfUrl || plan.pdf_url || "").trim(),
+      routePoints,
+      route_points: routePoints
+    };
+  }
+
+  // Builds the board-entry shape used by both the live board state and the draft submit payload.
+  function buildBoardEntryWithSimBriefPlan(boardEntry, simBriefPlan) {
+    const normalizedBoardEntry = normalizeBoardEntry(boardEntry);
+    if (!normalizedBoardEntry) {
+      return null;
+    }
+
+    const normalizedPlan = normalizeSimBriefPlanForBoardEntry(
+      simBriefPlan,
+      normalizedBoardEntry.simbriefPlan?.staticId || normalizedBoardEntry.simbriefPlan?.static_id || ""
+    );
+    const existingSelectedType = normalizeSimBriefAircraftCode(normalizedBoardEntry.simbriefSelectedType);
+    const refreshedAircraftType = normalizeSimBriefAircraftCode(normalizedPlan?.aircraftType);
+    // Preserve the current locked selector unless SimBrief returns a valid replacement on refresh.
+    const resolvedSelectedType = refreshedAircraftType || existingSelectedType;
+    const resolvedPlan = normalizedPlan
+      ? {
+          ...normalizedPlan,
+          aircraftType: resolvedSelectedType,
+          aircraft_type: resolvedSelectedType,
+          aircraft: resolvedSelectedType
+            ? normalizedPlan.aircraft ||
+              {
+                code: resolvedSelectedType,
+                icao: resolvedSelectedType,
+                type: resolvedSelectedType,
+                name: resolvedSelectedType
+              }
+            : null
+        }
+      : null;
+
+    return {
+      ...normalizedBoardEntry,
+      simbriefPlan: resolvedPlan,
+      simbriefSelectedType: resolvedSelectedType
+    };
+  }
+
+  // Keeps the stored aircraft selection aligned with the latest imported SimBrief plan.
+  function applySimBriefPlanToBoardEntry(boardEntryId, simBriefPlan) {
+    const currentBoardEntry =
+      flightBoard.find((entry) => entry.boardEntryId === boardEntryId) ||
+      selectedShortlistFlight ||
+      null;
+    const nextBoardEntry = buildBoardEntryWithSimBriefPlan(currentBoardEntry, simBriefPlan);
+
+    if (!nextBoardEntry) {
+      return null;
+    }
+
+    updateActiveFlightBoardEntries((currentEntries) =>
+      currentEntries.map((entry) =>
+        entry.boardEntryId === boardEntryId
+          ? nextBoardEntry
+          : entry
+      )
+    );
+
+    return nextBoardEntry;
+  }
+
+  async function submitDraftReportForBoardEntry(boardEntry, { boardEntryId } = {}) {
+    const normalizedBoardEntryId = String(boardEntryId || boardEntry?.boardEntryId || "").trim();
+    if (!normalizedBoardEntryId || deltaDraftSubmitState.isSubmitting) {
+      return;
+    }
+
+    const getDraftFailureMessage = (error) => {
+      const message = error instanceof Error ? error.message : String(error || "");
+      return message.startsWith("session_required:")
+        ? message.replace(/^session_required:\s*/, "")
+        : "Unable to send draft flight report to ACARS.";
+    };
+
+    const currentFlight = buildBoardEntryWithSimBriefPlan(boardEntry, boardEntry?.simbriefPlan || null);
+    if (!currentFlight) {
+      const message = "Unable to send draft flight report to ACARS.";
+      setDeltaDraftSubmitState({
+        boardEntryId: normalizedBoardEntryId,
+        isSubmitting: false,
+        error: "Draft flight board entry was not found.",
+        result: null
+      });
+      setStatusMessage(message);
+      await logSystemError(
+        "DVA Draft",
+        "submit-failed",
+        new Error("Draft flight board entry was not found."),
+        {
+          boardEntryId: normalizedBoardEntryId
+        }
+      );
+      return;
+    }
+
+    const draftPayload = buildDeltaVirtualDraftReportPayload(currentFlight);
+    const simBriefResolution = resolveDraftSimBriefId(currentFlight?.simbriefPlan || null);
+    const hasDraftReportId = normalizePositiveDraftReportId(draftPayload.id) !== null;
+    const draftLogData = {
+      boardEntryId: normalizedBoardEntryId,
+      flight: currentFlight.flightCode,
+      airportD: currentFlight.from,
+      airportA: currentFlight.to,
+      eqType: draftPayload.eqType,
+      hasDraftReportId,
+      hasOfpXmlId: Boolean(simBriefResolution.simBriefID),
+      simBriefIDState: simBriefResolution.simBriefIDState,
+      simBriefIDSource: simBriefResolution.simBriefIDSource
+    };
+
+    setDeltaDraftSubmitState({
+      boardEntryId: normalizedBoardEntryId,
+      isSubmitting: true,
+      error: "",
+      result: null
+    });
+    setDeltaDraftReportUrlState({
+      boardEntryId: normalizedBoardEntryId,
+      url: ""
+    });
+    setStatusMessage(
+      hasDraftReportId ? "Updating Draft Flight Report..." : "Generating Draft Flight Report..."
+    );
+    await logSystemEvent("DVA Draft", "submit-requested", {
+      ...draftLogData
+    });
+
+    try {
+      const result = await submitDeltaVirtualDraftReport(currentFlight, {
+        debugEnabled: isDevToolsEnabled
+      });
+      const resultErrorMessage = result.ok ? "" : getDraftFailureMessage(result.error);
+      setDeltaDraftSubmitState({
+        boardEntryId: normalizedBoardEntryId,
+        isSubmitting: false,
+        error: resultErrorMessage,
+        result
+      });
+
+      if (result.ok) {
+        const returnedId = normalizePositiveDraftReportId(result.id);
+        const returnedIdPresent = returnedId !== null;
+        if (returnedIdPresent) {
+          const draftReportUrl = `https://www.deltava.org/pirep.do?id=0x${Number(returnedId).toString(16)}`;
+          setDeltaDraftReportUrlState({
+            boardEntryId: normalizedBoardEntryId,
+            url: draftReportUrl
+          });
+          updateActiveFlightBoardEntries((currentEntries) =>
+            currentEntries.map((entry) =>
+              entry.boardEntryId === normalizedBoardEntryId
+                ? {
+                    ...entry,
+                    draftReportId: returnedId,
+                    dvaDraftReportId: returnedId
+                  }
+                : entry
+            )
+          );
+        } else {
+          setDeltaDraftReportUrlState({
+            boardEntryId: normalizedBoardEntryId,
+            url: ""
+          });
+        }
+
+        const successMessage = hasDraftReportId
+          ? "Draft Flight Report Updated."
+          : "Draft Flight Report Created.";
+        setStatusMessage(successMessage);
+        await logSystemEvent("DVA Draft", hasDraftReportId ? "draft-id-reused" : "draft-id-stored", {
+          ...draftLogData,
+          returnedIdPresent,
+          status: result.status,
+          contentType: result.contentType || ""
+        });
+        await logSystemEvent("DVA Draft", "submit-succeeded", {
+          ...draftLogData,
+          status: result.status,
+          contentType: result.contentType || "",
+          returnedIdPresent
+        });
+        return result;
+      }
+
+      const failureMessage = getDraftFailureMessage(result.error);
+      setDeltaDraftReportUrlState({
+        boardEntryId: normalizedBoardEntryId,
+        url: ""
+      });
+      setStatusMessage(failureMessage);
+      await logSystemError("DVA Draft", "submit-failed", new Error(result.error || failureMessage), {
+        ...draftLogData,
+        status: result.status,
+        contentType: result.contentType || "",
+        returnedIdPresent: Boolean(result.id),
+        message: result.error || failureMessage
+      });
+      return result;
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      const statusMessage = getDraftFailureMessage(normalizedError);
+      setDeltaDraftSubmitState({
+        boardEntryId: normalizedBoardEntryId,
+        isSubmitting: false,
+        error: statusMessage,
+        result: null
+      });
+      setDeltaDraftReportUrlState({
+        boardEntryId: normalizedBoardEntryId,
+        url: ""
+      });
+      setStatusMessage(statusMessage);
+      await logSystemError("DVA Draft", "submit-failed", normalizedError, {
+        ...draftLogData,
+        status: 0,
+        contentType: "",
+        returnedIdPresent: false,
+        message: statusMessage
+      });
+      return null;
+    } finally {
+      setDeltaDraftSubmitState((current) =>
+        current.boardEntryId === normalizedBoardEntryId
+          ? { ...current, isSubmitting: false }
+          : current
+      );
+    }
+  }
+
+  async function handleDispatchWorkflow() {
     if (!selectedShortlistFlight) {
       return;
     }
@@ -3882,80 +4228,24 @@ export default function App() {
       return;
     }
 
-    const selectedType = String(selectedShortlistFlight.simbriefSelectedType || "").trim();
+    const flightId = selectedShortlistFlight.boardEntryId;
+    const currentBoardEntry =
+      flightBoard.find((entry) => entry.boardEntryId === flightId) || selectedShortlistFlight;
+    const existingSimBriefPlan = currentBoardEntry?.simbriefPlan || null;
+    const hasSimBriefPlan = Boolean(
+      String(existingSimBriefPlan?.staticId || existingSimBriefPlan?.static_id || "").trim()
+    );
+    const selectedType = String(currentBoardEntry?.simbriefSelectedType || "").trim();
     const availableAircraftTypes = simBriefAircraftTypes;
     const selectedDispatchOption = simBriefDispatchOptions.find(
       (option) => option.code === selectedType
     );
-    if (!selectedType) {
-      const message = "Choose a SimBrief aircraft type before dispatching.";
-      setSimBriefDispatchState({
-        flightId: selectedShortlistFlight.boardEntryId,
-        isDispatching: false,
-        message
-      });
-      setStatusMessage(message);
-      return;
-    }
-
-    if (!availableAircraftTypes.length && !simBriefCustomAirframes.length && isSimBriefAircraftTypesLoading) {
-      const message = "SimBrief aircraft types are still loading.";
-      setSimBriefDispatchState({
-        flightId: selectedShortlistFlight.boardEntryId,
-        isDispatching: false,
-        message
-      });
-      setStatusMessage(message);
-      return;
-    }
-
-    if (!availableAircraftTypes.length && !simBriefCustomAirframes.length && simBriefAircraftTypesError) {
-      const message = "Unable to load SimBrief aircraft types right now.";
-      setSimBriefDispatchState({
-        flightId: selectedShortlistFlight.boardEntryId,
-        isDispatching: false,
-        message
-      });
-      setStatusMessage(message);
-      return;
-    }
-
-    if (!selectedDispatchOption) {
-      const message = `The selected SimBrief aircraft type (${selectedType}) is not currently supported.`;
-      setSimBriefDispatchState({
-        flightId: selectedShortlistFlight.boardEntryId,
-        isDispatching: false,
-        message
-      });
-      setStatusMessage(message);
-      return;
-    }
-
     const username = String(simBriefUsername || "").trim();
     const pilotId = String(simBriefPilotId || "").trim();
     if (!username && !pilotId) {
-      const message = "Save a SimBrief Navigraph Alias or Pilot ID before dispatching.";
-      setSimBriefDispatchState({
-        flightId: selectedShortlistFlight.boardEntryId,
-        isDispatching: false,
-        message
-      });
-      setStatusMessage(message);
-      return;
-    }
-
-    const flightId = selectedShortlistFlight.boardEntryId;
-    const sourceTourFlight =
-      selectedShortlistFlight.isTourFlight && selectedShortlistFlight.tourRowId
-        ? tourFlightsById.get(selectedShortlistFlight.tourRowId) || null
-        : null;
-    const dispatchFlight = sourceTourFlight || selectedShortlistFlight;
-    const flightNumber = deriveFlightNumber(dispatchFlight);
-    const callsign = deriveCallsign(dispatchFlight);
-    const departureTimeUtc = deriveSimBriefDepartureTimeUtc(dispatchFlight);
-
-    if (!flightNumber || !callsign || !departureTimeUtc) {
-      const message = "This flight is missing a dispatchable flight number, callsign, or departure time.";
+      const message = hasSimBriefPlan
+        ? "Save a SimBrief Navigraph Alias or Pilot ID before refreshing."
+        : "Save a SimBrief Navigraph Alias or Pilot ID before dispatching.";
       setSimBriefDispatchState({
         flightId,
         isDispatching: false,
@@ -3968,59 +4258,168 @@ export default function App() {
     setSimBriefDispatchState({
       flightId,
       isDispatching: true,
-      message: "Waiting for SimBrief login and flight plan generation..."
+      message: hasSimBriefPlan
+        ? "Refreshing latest SimBrief flight plan..."
+        : "Waiting for SimBrief login and flight plan generation..."
     });
     setPendingMapFlightPathViewMode("selected");
     setScheduleView("map");
     setExpandedBoardFlightId(flightId);
-    setStatusMessage("Opening SimBrief dispatch...");
-    await logSystemEvent("SimBrief", "dispatch-requested", {
-      flightId,
-      origin: selectedShortlistFlight.from,
-      destination: selectedShortlistFlight.to,
-      aircraftType: selectedDispatchOption.dispatchType,
-      hasUsername: Boolean(username),
-      hasPilotId: Boolean(pilotId)
-    });
+    setStatusMessage(hasSimBriefPlan ? "Refreshing SimBrief dispatch..." : "Opening SimBrief dispatch...");
 
     try {
-      const simBriefPlan = await startSimBriefDispatch({
-        flightId,
-        airline: selectedShortlistFlight.airline,
-        flightNumber,
-        callsign,
-        origin: selectedShortlistFlight.from,
-        destination: selectedShortlistFlight.to,
-        aircraftType: selectedDispatchOption.dispatchType,
-        units: simBriefDispatchUnits,
-        departureTimeUtc,
-        username,
-        pilotId
-      });
+      let simBriefPlan = null;
 
-      const nextFlightBoard = flightBoard.map((entry) =>
-        entry.boardEntryId === flightId
-          ? {
-              ...entry,
-              simbriefPlan: simBriefPlan
-            }
-          : entry
-      );
-      updateActiveFlightBoardEntries(nextFlightBoard);
+      if (hasSimBriefPlan) {
+        const staticId = String(existingSimBriefPlan?.staticId || existingSimBriefPlan?.static_id || "").trim();
+        if (!staticId) {
+          const message = "Load a SimBrief plan before refreshing it.";
+          setSimBriefDispatchState({
+            flightId,
+            isDispatching: false,
+            message
+          });
+          setStatusMessage(message);
+          return;
+        }
+
+        await logSystemEvent("SimBrief", "refresh-requested", {
+          flightId,
+          staticId,
+          origin: selectedShortlistFlight.from,
+          destination: selectedShortlistFlight.to
+        });
+        simBriefPlan = await refreshSimBriefDispatch({
+          flightId,
+          staticId,
+          username,
+          pilotId
+        });
+      } else {
+        if (!selectedType) {
+          const message = "Choose a SimBrief aircraft type before dispatching.";
+          setSimBriefDispatchState({
+            flightId,
+            isDispatching: false,
+            message
+          });
+          setStatusMessage(message);
+          return;
+        }
+
+        if (!availableAircraftTypes.length && !simBriefCustomAirframes.length && isSimBriefAircraftTypesLoading) {
+          const message = "SimBrief aircraft types are still loading.";
+          setSimBriefDispatchState({
+            flightId,
+            isDispatching: false,
+            message
+          });
+          setStatusMessage(message);
+          return;
+        }
+
+        if (!availableAircraftTypes.length && !simBriefCustomAirframes.length && simBriefAircraftTypesError) {
+          const message = "Unable to load SimBrief aircraft types right now.";
+          setSimBriefDispatchState({
+            flightId,
+            isDispatching: false,
+            message
+          });
+          setStatusMessage(message);
+          return;
+        }
+
+        if (!selectedDispatchOption) {
+          const message = `The selected SimBrief aircraft type (${selectedType}) is not currently supported.`;
+          setSimBriefDispatchState({
+            flightId,
+            isDispatching: false,
+            message
+          });
+          setStatusMessage(message);
+          return;
+        }
+
+        const sourceTourFlight =
+          selectedShortlistFlight.isTourFlight && selectedShortlistFlight.tourRowId
+            ? tourFlightsById.get(selectedShortlistFlight.tourRowId) || null
+            : null;
+        const dispatchFlight = sourceTourFlight || currentBoardEntry || selectedShortlistFlight;
+        const flightNumber = deriveFlightNumber(dispatchFlight);
+        const callsign = deriveCallsign(dispatchFlight);
+        const departureTimeUtc = deriveSimBriefDepartureTimeUtc(dispatchFlight);
+
+        if (!flightNumber || !callsign || !departureTimeUtc) {
+          const message =
+            "This flight is missing a dispatchable flight number, callsign, or departure time.";
+          setSimBriefDispatchState({
+            flightId,
+            isDispatching: false,
+            message
+          });
+          setStatusMessage(message);
+          return;
+        }
+
+        await logSystemEvent("SimBrief", "dispatch-requested", {
+          flightId,
+          origin: selectedShortlistFlight.from,
+          destination: selectedShortlistFlight.to,
+          aircraftType: selectedDispatchOption?.dispatchType || selectedType || "",
+          hasUsername: Boolean(username),
+          hasPilotId: Boolean(pilotId)
+        });
+
+        simBriefPlan = await startSimBriefDispatch({
+          flightId,
+          airline: selectedShortlistFlight.airline,
+          flightNumber,
+          callsign,
+          origin: selectedShortlistFlight.from,
+          destination: selectedShortlistFlight.to,
+          aircraftType: selectedDispatchOption?.dispatchType || selectedType || "",
+          units: simBriefDispatchUnits,
+          departureTimeUtc,
+          username,
+          pilotId
+        });
+      }
+
+      const normalizedBoardEntry = applySimBriefPlanToBoardEntry(flightId, simBriefPlan);
+      if (!normalizedBoardEntry) {
+        const message = "Unable to normalize the SimBrief dispatch result.";
+        setSimBriefDispatchState({
+          flightId,
+          isDispatching: false,
+          message
+        });
+        setStatusMessage(message);
+        return;
+      }
+
       setSimBriefDispatchState({
         flightId,
         isDispatching: false,
-        message: "SimBrief flight plan loaded."
+        message: hasSimBriefPlan
+          ? "SimBrief flight plan refreshed."
+          : "SimBrief flight plan loaded."
       });
       setStatusMessage(
-        `SimBrief plan ready for ${selectedShortlistFlight.flightCode} ${selectedShortlistFlight.from}-${selectedShortlistFlight.to}.`
+        hasSimBriefPlan
+          ? `SimBrief plan refreshed for ${selectedShortlistFlight.flightCode} ${selectedShortlistFlight.from}-${selectedShortlistFlight.to}.`
+          : `SimBrief plan ready for ${selectedShortlistFlight.flightCode} ${selectedShortlistFlight.from}-${selectedShortlistFlight.to}.`
       );
       const pax = simBriefPlan?.pax;
       const hasPax = Number.isInteger(pax) && pax >= 0;
       const simBriefResolution = resolveDraftSimBriefId(simBriefPlan || null);
-      await logSystemEvent("SimBrief", "dispatch-succeeded", {
+      await logSystemEvent("SimBrief", hasSimBriefPlan ? "refresh-succeeded" : "dispatch-succeeded", {
         flightId,
-        aircraftType: selectedDispatchOption.dispatchType || simBriefPlan?.aircraftType || "",
+        aircraftType:
+          (hasSimBriefPlan
+            ? normalizedBoardEntry?.simbriefPlan?.aircraftType
+            : selectedDispatchOption?.dispatchType) ||
+          simBriefPlan?.aircraftType ||
+          "",
         cruiseAltitude: simBriefPlan?.cruiseAltitude || "",
         alternate: simBriefPlan?.alternate || "",
         ete: simBriefPlan?.ete || "",
@@ -4036,6 +4435,10 @@ export default function App() {
         hasPax,
         pax: hasPax ? pax : undefined
       });
+
+      await submitDraftReportForBoardEntry(normalizedBoardEntry, {
+        boardEntryId: flightId
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "SimBrief dispatch failed.";
       setSimBriefDispatchState({
@@ -4048,7 +4451,11 @@ export default function App() {
         flightId,
         origin: selectedShortlistFlight.from,
         destination: selectedShortlistFlight.to,
-        aircraftType: selectedDispatchOption.dispatchType
+        aircraftType:
+          selectedDispatchOption?.dispatchType ||
+          currentBoardEntry?.simbriefPlan?.aircraftType ||
+          selectedType ||
+          ""
       });
     } finally {
       setPendingMapFlightPathViewMode(null);
@@ -4110,6 +4517,7 @@ export default function App() {
 
     try {
       await deleteStoredUserData();
+      setGettingStartedState(DEFAULT_GETTING_STARTED_STATE);
       setSchedule(null);
       const defaultBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
       setFlightBoards([defaultBoard]);
@@ -4230,12 +4638,52 @@ export default function App() {
     });
   }
 
+  function handleToggleReadme() {
+    setIsReadmeOpen((current) => !current);
+  }
+
+  function handleCloseReadme() {
+    setIsReadmeOpen(false);
+  }
+
   function handleCloseSettings() {
     setIsDevWindowMenuOpen(false);
     setIsSettingsOpen(false);
     logAppEvent("settings-closed", {
       section: "addon-airports"
     }).catch(() => {});
+  }
+
+  async function handleFinalizeGettingStarted() {
+    try {
+      await persistGettingStartedState({
+        ...gettingStartedState,
+        gettingStartedFinalized: true
+      });
+      void handleDeltaVirtualSync().catch(async (error) => {
+        setStatusMessage(error.message || "Unable to sync from Delta Virtual.");
+        await logAppError("getting-started-sync-failed", error);
+      });
+      return true;
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to finalize onboarding.");
+      await logAppError("getting-started-finalize-failed", error);
+      return false;
+    }
+  }
+
+  async function handleDismissGettingStarted() {
+    try {
+      await persistGettingStartedState({
+        ...gettingStartedState,
+        gettingStartedDismissed: true
+      });
+      return true;
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to dismiss onboarding.");
+      await logAppError("getting-started-dismiss-failed", error);
+      return false;
+    }
   }
 
   function handleOpenDeltaVirtualSettings() {
@@ -4305,18 +4753,11 @@ export default function App() {
     }
   }
 
-  async function handlePushToAcars(boardEntryId) {
+  async function handleDraftOnlySubmit(boardEntryId) {
     const normalizedBoardEntryId = String(boardEntryId || "").trim();
     if (!normalizedBoardEntryId || deltaDraftSubmitState.isSubmitting) {
       return;
     }
-
-    const getDraftFailureMessage = (error) => {
-      const message = error instanceof Error ? error.message : String(error || "");
-      return message.startsWith("session_required:")
-        ? message.replace(/^session_required:\s*/, "")
-        : "Unable to send draft flight report to ACARS.";
-    };
 
     const flight = flightBoard.find((entry) => entry.boardEntryId === normalizedBoardEntryId) || null;
     if (!flight) {
@@ -4328,118 +4769,20 @@ export default function App() {
         result: null
       });
       setStatusMessage(message);
-      await logSystemError("DVA Draft", "submit-failed", new Error("Draft flight board entry was not found."), {
-        boardEntryId: normalizedBoardEntryId
-      });
+      await logSystemError(
+        "DVA Draft",
+        "submit-failed",
+        new Error("Draft flight board entry was not found."),
+        {
+          boardEntryId: normalizedBoardEntryId
+        }
+      );
       return;
     }
 
-    const draftPayload = buildDeltaVirtualDraftReportPayload(flight);
-    const simBriefResolution = resolveDraftSimBriefId(flight?.simbriefPlan || null);
-    const hasDraftReportId = normalizePositiveDraftReportId(draftPayload.id) !== null;
-    const draftLogData = {
-      boardEntryId: normalizedBoardEntryId,
-      flight: flight.flightCode,
-      airportD: flight.from,
-      airportA: flight.to,
-      eqType: draftPayload.eqType,
-      hasDraftReportId,
-      hasOfpXmlId: Boolean(simBriefResolution.simBriefID),
-      simBriefIDState: simBriefResolution.simBriefIDState,
-      simBriefIDSource: simBriefResolution.simBriefIDSource
-    };
-
-    setDeltaDraftSubmitState({
-      boardEntryId: normalizedBoardEntryId,
-      isSubmitting: true,
-      error: "",
-      result: null
+    await submitDraftReportForBoardEntry(flight, {
+      boardEntryId: normalizedBoardEntryId
     });
-    setStatusMessage(
-      hasDraftReportId ? "Updating Draft Flight Report..." : "Generating Draft Flight Report..."
-    );
-    await logSystemEvent("DVA Draft", "submit-requested", {
-      ...draftLogData
-    });
-
-    try {
-      const result = await submitDeltaVirtualDraftReport(flight, { debugEnabled: isDevToolsEnabled });
-      const resultErrorMessage = result.ok ? "" : getDraftFailureMessage(result.error);
-      setDeltaDraftSubmitState({
-        boardEntryId: normalizedBoardEntryId,
-        isSubmitting: false,
-        error: resultErrorMessage,
-        result
-      });
-
-      if (result.ok) {
-        const returnedId = normalizePositiveDraftReportId(result.id);
-        const returnedIdPresent = returnedId !== null;
-        if (returnedIdPresent) {
-          updateActiveFlightBoardEntries((currentEntries) =>
-            currentEntries.map((entry) =>
-              entry.boardEntryId === normalizedBoardEntryId
-                ? {
-                    ...entry,
-                    draftReportId: returnedId
-                  }
-                : entry
-            )
-          );
-        }
-
-        const successMessage = hasDraftReportId
-          ? "Draft Flight Report Updated."
-          : "Draft Flight Report Created.";
-        setStatusMessage(successMessage);
-        await logSystemEvent("DVA Draft", hasDraftReportId ? "draft-id-reused" : "draft-id-stored", {
-          ...draftLogData,
-          returnedIdPresent,
-          status: result.status,
-          contentType: result.contentType || ""
-        });
-        await logSystemEvent("DVA Draft", "submit-succeeded", {
-          ...draftLogData,
-          status: result.status,
-          contentType: result.contentType || "",
-          returnedIdPresent
-        });
-        return;
-      }
-
-      const failureMessage = getDraftFailureMessage(result.error);
-      setStatusMessage(failureMessage);
-      await logSystemError("DVA Draft", "submit-failed", new Error(result.error || failureMessage), {
-        ...draftLogData,
-        status: result.status,
-        contentType: result.contentType || "",
-        returnedIdPresent: Boolean(result.id),
-        message: result.error || failureMessage
-      });
-    } catch (error) {
-      const normalizedError = error instanceof Error ? error : new Error(String(error));
-      const statusMessage = getDraftFailureMessage(normalizedError);
-      setDeltaDraftSubmitState({
-        boardEntryId: normalizedBoardEntryId,
-        isSubmitting: false,
-        error: statusMessage,
-        result: null
-      });
-      setStatusMessage(statusMessage);
-      await logSystemError("DVA Draft", "submit-failed", normalizedError, {
-        ...draftLogData,
-        status: 0,
-        contentType: "",
-        returnedIdPresent: false,
-        message: statusMessage
-      });
-    } finally {
-      setDeltaDraftSubmitState((current) =>
-        current.boardEntryId === normalizedBoardEntryId
-          ? { ...current, isSubmitting: false }
-          : current
-      );
-    }
   }
 
   async function handleCheckForUpdates({ manual = false } = {}) {
@@ -4491,80 +4834,36 @@ export default function App() {
   switch (settingsTab) {
     case "delta-virtual":
       settingsTabContent = (
-        <Panel className={insetPanelClassName}>
-          <SectionHeader eyebrow="Delta Virtual" title="Login Credentials" />
-
-          <div className={cn("grid gap-3", supportCopyTextClassName)}>
-            <p className="m-0">
-              Please enter your Delta Virtual Airlines information including First name, Last name, and Password.
-            </p>
-            <p className="m-0">
-              Status:{" "}
-              <strong className="text-[var(--text-heading)]">
-                {dvaHasPassword ? "Password stored" : "Password not stored"}
-              </strong>
-            </p>
-          </div>
-
-          <div className={gridClassNames.twoColumn}>
-            <label className={fieldLabelClassName}>
-              <span className={fieldTitleClassName}>First Name</span>
-              <input
-                type="text"
-                className={fieldInputClassName}
-                value={dvaFirstNameDraft}
-                onChange={(event) => setDvaFirstNameDraft(event.target.value)}
-                placeholder="Enter first name"
-              />
-            </label>
-
-            <label className={fieldLabelClassName}>
-              <span className={fieldTitleClassName}>Last Name</span>
-              <input
-                type="text"
-                className={fieldInputClassName}
-                value={dvaLastNameDraft}
-                onChange={(event) => setDvaLastNameDraft(event.target.value)}
-                placeholder="Enter last name"
-              />
-            </label>
-          </div>
-
-          <label className={fieldLabelClassName}>
-            <span className={fieldTitleClassName}>Password</span>
-            <input
-              type="password"
-              className={fieldInputClassName}
-              value={dvaPasswordDraft}
-              onChange={(event) => setDvaPasswordDraft(event.target.value)}
-              placeholder={
-                dvaHasPassword ? "Enter a new password to replace the stored one" : "Enter password to store"
-              }
-              autoComplete="new-password"
-            />
-          </label>
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => handleSaveDeltaVirtualCredentials()}
-              disabled={isDvaCredentialsSaving || isImporting || isSyncing}
-            >
-              {isDvaCredentialsSaving ? "Saving..." : "Save"}
-            </Button>
-            <Button
-              variant="danger"
-              onClick={handleClearDeltaVirtualCredentials}
-              disabled={isDvaCredentialsSaving || isImporting || isSyncing}
-            >
-              Clear Saved Credentials
-            </Button>
-          </div>
-        </Panel>
+        <DeltaVirtualCredentialsForm
+          mode="settings"
+          firstName={dvaFirstNameDraft}
+          lastName={dvaLastNameDraft}
+          passwordFieldValue={dvaPasswordFieldValue}
+          isPasswordDisplayText={isDvaPasswordDisplayText}
+          hasSavedPassword={dvaHasPassword}
+          isSaving={isDvaCredentialsSaving}
+          isSaveDisabled={isDvaCredentialsSaving || isImporting || isSyncing || !hasDvaCredentialChanges}
+          isClearDisabled={isDvaCredentialsSaving || isImporting || isSyncing}
+          onFirstNameChange={setDvaFirstNameDraft}
+          onLastNameChange={setDvaLastNameDraft}
+          onPasswordChange={setDvaPasswordDraft}
+          onPasswordFocus={() => {
+            if (isDvaPasswordDisplayText) {
+              // Swap the display text for an editable field on first focus.
+              setIsDvaPasswordEditing(true);
+              setDvaPasswordDraft("");
+            }
+          }}
+          onPasswordBlur={() => setIsDvaPasswordEditing(false)}
+          onSaveCredentials={handleSaveDeltaVirtualCredentials}
+          onClearCredentials={handleClearDeltaVirtualCredentials}
+        />
       );
       break;
     case "simbrief":
       settingsTabContent = (
-        <SimBriefSettingsPanel
+        <SimBriefSettingsForm
+          mode="settings"
           username={simBriefUsernameDraft}
           pilotId={simBriefPilotIdDraft}
           dispatchUnits={simBriefDispatchUnits}
@@ -4687,7 +4986,7 @@ export default function App() {
           isDesktopAddonScanAvailable={isDesktopAddonScanAvailable}
           onAddAddonRoot={handleAddAddonRoot}
           onRemoveAddonRoot={handleRemoveAddonRoot}
-          onScanAddonAirports={handleScanAddonAirports}
+          onScanAddonAirports={() => handleScanAddonAirports(addonScan.roots, { resetCache: true })}
         />
       );
       break;
@@ -4704,6 +5003,7 @@ export default function App() {
         selectedAccomplishment={selectedAccomplishment}
         simBriefDispatchState={simBriefDispatchState}
         deltaDraftSubmitState={deltaDraftSubmitState}
+        deltaDraftReportUrlState={deltaDraftReportUrlState}
         simBriefCredentialsConfigured={simBriefCredentialsConfigured}
         isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
         simBriefAircraftTypes={simBriefDispatchOptions}
@@ -4718,9 +5018,9 @@ export default function App() {
         onRenameFlightBoard={handleRenameFlightBoard}
         onDeleteFlightBoard={handleDeleteFlightBoard}
         onSimBriefTypeChange={handleSimBriefTypeChange}
-        onSimBriefDispatch={handleSimBriefDispatch}
+        onDispatchWorkflow={handleDispatchWorkflow}
         onOpenSimBriefFlight={handleOpenSimBriefFlight}
-        onPushToAcars={handlePushToAcars}
+        onDraftOnlySubmit={handleDraftOnlySubmit}
         onCompleteTourFlight={handleCompleteTourFlight}
         showFlightBoard
       />
@@ -4770,6 +5070,7 @@ export default function App() {
             selectedAccomplishment={selectedAccomplishment}
             simBriefDispatchState={simBriefDispatchState}
             deltaDraftSubmitState={deltaDraftSubmitState}
+            deltaDraftReportUrlState={deltaDraftReportUrlState}
             simBriefCredentialsConfigured={simBriefCredentialsConfigured}
             isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
             simBriefAircraftTypes={simBriefDispatchOptions}
@@ -4784,9 +5085,9 @@ export default function App() {
             onRenameFlightBoard={handleRenameFlightBoard}
             onDeleteFlightBoard={handleDeleteFlightBoard}
             onSimBriefTypeChange={handleSimBriefTypeChange}
-            onSimBriefDispatch={handleSimBriefDispatch}
+            onDispatchWorkflow={handleDispatchWorkflow}
             onOpenSimBriefFlight={handleOpenSimBriefFlight}
-            onPushToAcars={handlePushToAcars}
+            onDraftOnlySubmit={handleDraftOnlySubmit}
             onCompleteTourFlight={handleCompleteTourFlight}
             showFlightBoard
           />
@@ -4814,13 +5115,6 @@ export default function App() {
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-3 self-end bp-1024:gap-2">
           <Button
-            onClick={handleImport}
-            disabled={isImporting || isSyncing || isAddonScanBusy || isHydrating}
-            className="bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
-          >
-            {isImporting ? "Importing..." : importButtonLabel}
-          </Button>
-          <Button
             onClick={handleDeltaVirtualSync}
             disabled={isImporting || isSyncing || isAddonScanBusy || isHydrating}
             className="bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
@@ -4843,6 +5137,15 @@ export default function App() {
             className="size-9 bp-1024:size-8"
           >
             <SettingsIcon />
+          </IconButton>
+          <IconButton
+            onClick={handleToggleReadme}
+            title="Open README"
+            aria-label="Open README"
+            aria-expanded={isReadmeOpen}
+            className="size-9 bp-1024:size-8"
+          >
+            <HelpIcon />
           </IconButton>
         </div>
       </header>
@@ -4983,62 +5286,71 @@ export default function App() {
         </ModalBackdrop>
       ) : null}
 
-      {isManualUploadOpen ? (
-        <ModalBackdrop onClick={closeManualUploadDialog}>
-          <Panel
-            as="section"
-            padding="lg"
-            className="grid w-[min(560px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Manual Upload"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <SectionHeader eyebrow="Manual Upload" title="Choose files to import" />
+      {isReadmeOpen ? <ReadmeModal isOpen={isReadmeOpen} onClose={handleCloseReadme} /> : null}
 
-            <p className={mutedTextClassName}>
-              Choose a schedule XML, a logbook JSON, or both. Either file can be uploaded on its own.
-            </p>
-
-            <div className="grid gap-3">
-              <div className="flex items-center justify-between gap-3 rounded border border-[color:var(--line)] px-4 py-3">
-                <div className="min-w-0">
-                  <p className={fieldTitleClassName}>Schedule XML</p>
-                  <p className={cn("m-0 truncate", mutedTextClassName)}>
-                    {manualUploadScheduleFile?.fileName || "No schedule selected"}
-                  </p>
-                </div>
-                <Button variant="ghost" onClick={chooseManualUploadScheduleFile} disabled={isImporting}>
-                  Choose XML
-                </Button>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 rounded border border-[color:var(--line)] px-4 py-3">
-                <div className="min-w-0">
-                  <p className={fieldTitleClassName}>Logbook JSON</p>
-                  <p className={cn("m-0 truncate", mutedTextClassName)}>
-                    {manualUploadLogbookFile?.fileName || "No logbook selected"}
-                  </p>
-                </div>
-                <Button variant="ghost" onClick={chooseManualUploadLogbookFile} disabled={isImporting}>
-                  Choose JSON
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={closeManualUploadDialog} disabled={isImporting}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleManualUpload}
-                disabled={isImporting || (!manualUploadScheduleFile && !manualUploadLogbookFile)}
-              >
-                Import
-              </Button>
-            </div>
-          </Panel>
-        </ModalBackdrop>
+      {shouldShowGettingStarted ? (
+        <GettingStartedModal
+          isOpen={shouldShowGettingStarted}
+          dvaComplete={dvaCredentialsConfigured}
+          simBriefComplete={simBriefCredentialsConfigured}
+          addonComplete={addonSetupComplete}
+          onFinalize={handleFinalizeGettingStarted}
+          onSkip={handleDismissGettingStarted}
+          dvaFormProps={{
+            firstName: dvaFirstNameDraft,
+            lastName: dvaLastNameDraft,
+            passwordFieldValue: dvaPasswordFieldValue,
+            isPasswordDisplayText: isDvaPasswordDisplayText,
+            hasSavedPassword: dvaHasPassword,
+            isSaving: isDvaCredentialsSaving,
+            isSaveDisabled:
+              isDvaCredentialsSaving || isImporting || isSyncing || !hasDvaCredentialChanges,
+            isClearDisabled: isDvaCredentialsSaving || isImporting || isSyncing,
+            onFirstNameChange: setDvaFirstNameDraft,
+            onLastNameChange: setDvaLastNameDraft,
+            onPasswordChange: setDvaPasswordDraft,
+            onPasswordFocus: () => {
+              if (isDvaPasswordDisplayText) {
+                setIsDvaPasswordEditing(true);
+                setDvaPasswordDraft("");
+              }
+            },
+            onPasswordBlur: () => setIsDvaPasswordEditing(false),
+            onSaveCredentials: handleSaveDeltaVirtualCredentials,
+            onClearCredentials: handleClearDeltaVirtualCredentials
+          }}
+          simBriefFormProps={{
+            username: simBriefUsernameDraft,
+            pilotId: simBriefPilotIdDraft,
+            dispatchUnits: simBriefDispatchUnits,
+            customAirframes: simBriefCustomAirframesDraft,
+            customAirframeDraftId: simBriefCustomAirframeIdDraft,
+            customAirframeDraftName: simBriefCustomAirframeNameDraft,
+            customAirframeDraftMatchType: simBriefCustomAirframeMatchTypeDraft,
+            simBriefAircraftTypes,
+            isSimBriefAircraftTypesLoading,
+            simBriefAircraftTypesError,
+            isSaving: isSimBriefSaving,
+            onUsernameChange: setSimBriefUsernameDraft,
+            onPilotIdChange: setSimBriefPilotIdDraft,
+            onDispatchUnitsChange: handleSimBriefDispatchUnitsChange,
+            onCustomAirframeDraftIdChange: setSimBriefCustomAirframeIdDraft,
+            onCustomAirframeDraftNameChange: setSimBriefCustomAirframeNameDraft,
+            onCustomAirframeDraftMatchTypeChange: setSimBriefCustomAirframeMatchTypeDraft,
+            onAddCustomAirframe: handleAddCustomAirframeDraft,
+            onRemoveCustomAirframe: handleRemoveCustomAirframeDraft,
+            onSaveCredentials: handleSaveSimBriefCredentials
+          }}
+          addonProps={{
+            addonScan,
+            addonScanSummary: formatAddonScanSummary(addonScan),
+            isAddonScanBusy,
+            isDesktopAddonScanAvailable,
+            onAddAddonRoot: handleAddAddonRoot,
+            onRemoveAddonRoot: handleRemoveAddonRoot,
+            onSkipAddonSetup: handleSkipAddonSetup
+          }}
+        />
       ) : null}
 
       {isDeleteUserDataConfirmOpen ? (
@@ -5185,6 +5497,55 @@ export default function App() {
                 eyebrow="Delta Virtual Sync"
                 title="Syncing data from Delta Virtual"
                 description="Refreshing your schedule and logbook data."
+                className="w-full"
+              />
+              <div className="flex w-full items-center gap-3">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5 shrink-0 animate-spin text-[var(--delta-red)]"
+                  aria-hidden="true"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeOpacity="0.18"
+                    strokeWidth="2.25"
+                  />
+                  <path
+                    d="M21 12a9 9 0 0 0-9-9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeWidth="2.25"
+                  />
+                </svg>
+              </div>
+            </Panel>
+          </div>
+        </div>
+      ) : null}
+
+      {isAddonAutoScanning ? (
+        <div
+          className={cn("fixed inset-0 z-50 flex items-center justify-center overflow-auto px-4 bp-1024:px-3", modalBackdropClassName)}
+          role="presentation"
+        >
+          <div className="w-full max-w-[32rem]">
+            <Panel
+              as="section"
+              padding="lg"
+              className="grid w-full gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
+              role="status"
+              aria-live="polite"
+              aria-label="Addon folder scan in progress"
+            >
+              <SectionHeader
+                eyebrow="Addon Airports"
+                title="Scanning Addon Folders"
+                description="Refreshing your addon airport cache."
                 className="w-full"
               />
               <div className="flex w-full items-center gap-3">

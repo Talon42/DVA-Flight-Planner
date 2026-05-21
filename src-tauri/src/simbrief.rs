@@ -86,6 +86,17 @@ pub struct SimBriefAircraftTypesResponse {
     pub warning: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimBriefRefreshPayload {
+    pub flight_id: String,
+    pub static_id: String,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub pilot_id: String,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SimBriefAircraftTypeOption {
@@ -470,7 +481,14 @@ fn spawn_simbrief_background_fetch(
 ) {
     tauri::async_runtime::spawn(async move {
         append_simbrief_log(&app, "fetch-started");
-        let result = fetch_simbrief_plan_summary(&app, &payload, &static_id).await;
+        let result = fetch_simbrief_plan_summary(
+            &app,
+            &payload.flight_id,
+            &payload.username,
+            &payload.pilot_id,
+            &static_id,
+        )
+        .await;
         let fetch_succeeded = result.is_ok();
         append_simbrief_log(&app, &format!("fetch-finished ok={fetch_succeeded}"));
         let dispatch_error = result.as_ref().err().cloned();
@@ -499,13 +517,12 @@ fn spawn_simbrief_background_fetch(
 }
 
 fn resolve_simbrief_log_path(app: &AppHandle) -> Option<PathBuf> {
-    let resolved = app
-        .path()
-        .app_data_dir()
-        .ok()
-        .map(|base_dir| base_dir.join(SIMBRIEF_LOG_STORAGE_DIR));
-    let fallback = std::env::temp_dir().join(SIMBRIEF_LOG_STORAGE_DIR);
-    let storage_dir = resolved.unwrap_or(fallback);
+    if let Ok(base_dir) = app.path().app_data_dir() {
+        let _ = fs::create_dir_all(&base_dir);
+        return Some(base_dir.join(SIMBRIEF_LOG_FILE));
+    }
+
+    let storage_dir = std::env::temp_dir().join(SIMBRIEF_LOG_STORAGE_DIR);
     let _ = fs::create_dir_all(&storage_dir);
     Some(storage_dir.join(SIMBRIEF_LOG_FILE))
 }
@@ -1045,15 +1062,7 @@ fn normalize_simbrief_plan(json: &Value, static_id: &str) -> SimBriefPlanSummary
         },
         static_id: static_id.to_string(),
         ofp_xml_id: String::new(),
-        aircraft_type: find_first_string(
-            json,
-            &[
-                &["params", "type"],
-                &["aircraft", "icao"],
-                &["general", "icao_aircraft"],
-            ],
-            &["type", "icao_aircraft", "icao"],
-        ),
+        aircraft_type: extract_simbrief_aircraft_type(json),
         callsign: find_first_string(json, &[&["params", "callsign"]], &["callsign"]),
         route: find_first_string(
             json,
@@ -1127,6 +1136,50 @@ fn normalize_aircraft_code(value: &str) -> Option<String> {
     } else {
         Some(normalized)
     }
+}
+
+fn normalize_simbrief_aircraft_name(value: &str) -> Option<String> {
+    let normalized = value.trim().to_uppercase();
+    if normalized.len() < 3
+        || normalized.len() > 16
+        || normalized.contains('/')
+        || normalized.chars().any(|character| character.is_whitespace())
+        || !normalized
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '-')
+        || !normalized.chars().any(|character| character.is_ascii_alphabetic())
+    {
+        None
+    } else {
+        Some(normalized)
+    }
+}
+
+fn extract_simbrief_aircraft_type(json: &Value) -> String {
+    if let Some(name) = find_path_string(json, &["aircraft", "name"]).and_then(|value| {
+        normalize_simbrief_aircraft_name(&value).or_else(|| normalize_aircraft_code(&value))
+    }) {
+        return name;
+    }
+
+    let prioritized_paths: &[&[&str]] = &[
+        &["aircraft", "icao"],
+        &["aircraft", "type"],
+        &["aircraft", "code"],
+        &["aircraft", "basetype"],
+        &["general", "icao_aircraft"],
+        &["params", "type"],
+    ];
+
+    for path in prioritized_paths {
+        if let Some(code) =
+            find_path_string(json, path).and_then(|value| normalize_aircraft_code(&value))
+        {
+            return code;
+        }
+    }
+
+    String::new()
 }
 
 fn normalize_planformat(value: &str) -> Option<String> {
@@ -1415,17 +1468,6 @@ async fn load_simbrief_aircraft_types(
         })
 }
 
-async fn fetch_json_from_url(client: &reqwest::Client, url: &str) -> Result<Value, String> {
-    let body = fetch_text_from_url(client, url).await?;
-
-    serde_json::from_str::<Value>(&body).map_err(|error| {
-        format!(
-            "fetch_failed: SimBrief returned a non-JSON OFP payload: {} ({error})",
-            truncate_for_error(&body)
-        )
-    })
-}
-
 async fn fetch_text_from_url(client: &reqwest::Client, url: &str) -> Result<String, String> {
     let response = client
         .get(url)
@@ -1477,10 +1519,12 @@ async fn fetch_simbrief_xml_file_stem(client: &reqwest::Client, username: &str, 
 
 async fn fetch_simbrief_plan_summary(
     _app: &AppHandle,
-    payload: &SimBriefDispatchPayload,
+    flight_id: &str,
+    username: &str,
+    pilot_id: &str,
     static_id: &str,
 ) -> Result<SimBriefPlanSummary, String> {
-    let fetch_urls = build_fetch_urls(&payload.username, &payload.pilot_id, static_id)?;
+    let fetch_urls = build_fetch_urls(username, pilot_id, static_id)?;
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(20))
         .user_agent("flight-planner-app/0.1.0")
@@ -1493,15 +1537,17 @@ async fn fetch_simbrief_plan_summary(
 
     for attempt in 0..SIMBRIEF_FETCH_RETRY_COUNT {
         for url in &fetch_urls {
-            match fetch_json_from_url(&client, url).await {
-                Ok(json) => {
+            match fetch_text_from_url(&client, url).await {
+                Ok(body) => {
+                    let json = serde_json::from_str::<Value>(&body).map_err(|error| {
+                        format!(
+                            "fetch_failed: SimBrief returned a non-JSON OFP payload: {} ({error})",
+                            truncate_for_error(&body)
+                        )
+                    })?;
+
                     let mut plan = normalize_simbrief_plan(&json, static_id);
-                    let ofp_xml_id = fetch_simbrief_xml_file_stem(
-                        &client,
-                        &payload.username,
-                        static_id,
-                    )
-                    .await;
+                    let ofp_xml_id = fetch_simbrief_xml_file_stem(&client, username, static_id).await;
 
                     if let Some(ofp_xml_id) = ofp_xml_id {
                         plan.ofp_xml_id = ofp_xml_id;
@@ -1533,6 +1579,45 @@ pub async fn fetch_simbrief_aircraft_types(
     app: AppHandle,
 ) -> Result<SimBriefAircraftTypesResponse, String> {
     load_simbrief_aircraft_types(&app).await
+}
+
+#[tauri::command]
+pub async fn refresh_simbrief_dispatch(
+    app: AppHandle,
+    payload: SimBriefRefreshPayload,
+) -> Result<SimBriefPlanSummary, String> {
+    let flight_id = payload.flight_id.trim().to_string();
+    let static_id = payload.static_id.trim().to_string();
+    let username = payload.username.trim().to_string();
+    let pilot_id = payload.pilot_id.trim().to_string();
+
+    append_simbrief_log(
+        &app,
+        &format!(
+            "refresh-requested flightId={} staticId={}",
+            flight_id, static_id
+        ),
+    );
+
+    if static_id.is_empty() {
+        return Err("validation_failed: A SimBrief plan id is required before refreshing.".into());
+    }
+
+    if username.is_empty() && pilot_id.is_empty() {
+        return Err("validation_failed: Save a SimBrief Navigraph Alias or Pilot ID before refreshing.".into());
+    }
+
+    let plan = fetch_simbrief_plan_summary(&app, &flight_id, &username, &pilot_id, &static_id).await?;
+
+    append_simbrief_log(
+        &app,
+        &format!(
+            "refresh-succeeded flightId={} staticId={} aircraftType={}",
+            flight_id, static_id, plan.aircraft_type
+        ),
+    );
+
+    Ok(plan)
 }
 
 #[tauri::command]
@@ -1815,6 +1900,41 @@ mod tests {
         let plan = normalize_simbrief_plan(&value, "FP_TEST_3");
 
         assert_eq!(plan.pax, Some(42));
+    }
+
+    #[test]
+    fn normalize_simbrief_plan_ignores_generic_type_fields_for_aircraft_code() {
+        let value = serde_json::json!({
+            "type": "DEP/ARR",
+            "params": {
+                "type": "DEP/ARR"
+            },
+            "aircraft": {
+                "name": "A321",
+                "code": "A320"
+            },
+            "general": {
+                "icao_aircraft": "A320"
+            }
+        });
+
+        let plan = normalize_simbrief_plan(&value, "FP_TEST_4");
+
+        assert_eq!(plan.aircraft_type, "A321");
+    }
+
+    #[test]
+    fn normalize_simbrief_plan_prefers_hyphenated_aircraft_name() {
+        let value = serde_json::json!({
+            "aircraft": {
+                "name": "A350-900",
+                "icao": "A359"
+            }
+        });
+
+        let plan = normalize_simbrief_plan(&value, "FP_TEST_5");
+
+        assert_eq!(plan.aircraft_type, "A350-900");
     }
 
     #[test]

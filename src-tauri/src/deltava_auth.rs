@@ -2,8 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
-use crate::APP_STORAGE_DIR;
-
 #[cfg(windows)]
 use keyring::{Entry, Error as KeyringError};
 
@@ -45,7 +43,7 @@ fn auth_settings_path(app: &AppHandle) -> Result<PathBuf, String> {
     fs::create_dir_all(&app_data_dir)
         .map_err(|error| format!("Unable to create app data directory: {error}"))?;
 
-    Ok(app_data_dir.join(APP_STORAGE_DIR).join(DVA_AUTH_FILE))
+    Ok(app_data_dir.join(DVA_AUTH_FILE))
 }
 
 fn ensure_auth_storage_dir(app: &AppHandle) -> Result<PathBuf, String> {

@@ -2,7 +2,7 @@
 
 Desktop flight planning tool for Delta Virtual Airlines schedules.
 
-Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, and I built this app to make schedule filtering, flight selection, and board management faster, more practical, and fun for day-to-day planning.
+Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, and I built this app to make schedule filtering, flight selection, and board management faster, more practical, and fun for day-to-day flight simming.
 
 ## Table of Contents
 
@@ -23,23 +23,11 @@ Hi, I'm Jacob! I have been with Delta Virtual Airlines (`DVA11384`) since 2013, 
 
 ## Disclaimer
 
-For flight simulation purposes only. Not a commercial application. In no way is this application affiliated with Delta Air Lines, its affiliates, or any other airline. All logos, images, and trademarks remain the property of their respective owners.
+*For flight simulation purposes only. Not a commercial application. In no way is this application affiliated with Delta Air Lines, its affiliates, or any other airline. All logos, images, and trademarks remain the property of their respective owners.*
 
 ## What It Does
 
-- Imports a Delta Virtual PFPX schedule XML
-- Filters flights by route, geography, time, distance, and aircraft compatibility
-- Scans your MSFS addon folders and uses that airport coverage in filtering
-- Builds a connected duty schedule
-- Lets you maintain a persistent Flight Board between sessions
-- Lets you drag Flight Board cards to reorder your working sequence
-- Includes a Tours tab with DVA tour legs and local completion tracking
-- Includes an Accomplishments tab with DVA accomplishment airport checklist tracking
-- Includes a map view with route plotting, flight-path filters, weather radar, satellite overlay, and airport labels
-- Supports direct schedule and logbook sync from the Delta Virtual website
-- Supports draft flight report submission from Flight Board entries
-- Supports SimBrief dispatch from Flight Board entries
-- Supports saved custom SimBrief airframes mapped to specific aircraft types
+DVA Flight Planner helps you sync, organize, and plan Delta Virtual Airlines flights from one desktop app. It combines schedule filtering, aircraft compatibility, addon airport awareness, and route planning tools so you can quickly find flights that match how and where you want to fly. You can build connected duty schedules, manage a persistent Flight Board, and reorder planned flights as your route takes shape. The app also includes map, tour, and accomplishment tools to help visualize routes and track progress over time. When you are ready to fly, it supports SimBrief dispatch and draft flight report creation directly from your selected Flight Board entries.
 
 <table>
   <tr>
@@ -60,45 +48,33 @@ That warning is common for small or newly released Windows applications that are
 
 This app is a niche desktop tool distributed directly through this repository, so SmartScreen may warn even when the executable is the expected release build.
 
-If you downloaded the release from this repository, click `More info`, then click `Run anyway`.
+**To continue, click `More info`, then click `Run anyway`.**
 
 ## Quick Start
 
 1. Open the app.
-2. Import a schedule:
-   - `Import Schedule XML` to load a PFPX XML manually, or
-   - `Sync from Delta Virtual` to download it directly from DVA.
-3. Review the schedule table.
-4. Use `Basic Filters` or `Duty Schedule`.
-5. Double-click a flight to add it to the Flight Board.
-6. Drag Flight Board cards to reorder them if needed.
-7. Expand a Flight Board entry to dispatch, repair, or remove it.
-
-## Importing a PFPX XML Manually
-
-1. Download your PFPX schedule XML from the Delta Virtual Airlines website.
-2. Click `Import Schedule XML`.
-3. Select the XML file.
-4. The app will:
-   - parse each `<FLIGHT>` entry
-   - validate airport coverage
-   - convert times to UTC and local views
-   - calculate block time and route distance
-   - calculate compatible aircraft based on passenger, MTOW, MLW, and range limits
-
-If you already have a schedule loaded, importing a new one replaces the current saved schedule and re-checks your existing Flight Board against the new schedule.
+2. Use the `Getting Started` popup to complete the initial setup:
+   - Enter your Delta Virtual credentials.
+   - Enter your SimBrief information.
+   - Add your MSFS addon folder, or skip addon setup.
+3. Click `Sync from Delta Virtual` to download your schedule and refresh your logbook data.
+4. Review the schedule table and use `Basic Filters` or `Duty Schedule` to find flights.
+5. Double-click a flight to add it to the `Flight Board`.
+6. Drag Flight Board cards to reorder your planned sequence if needed.
+7. Expand a Flight Board entry and select `Generate Dispatch Package` to create a SimBrief flight plan and draft Delta Virtual flight report.
+8. Review the generated dispatch details. You can review the draft flight report on the DVA website or load it directly into ACARS using the `Load Draft Flight Report` feature in ACARS.
 
 ## Syncing from Delta Virtual
 
 ### How it works
 
-1. Click `Sync from Delta Virtual`.
-2. The app opens a hidden WebView2 session for Delta Virtual and shows an in-app syncing modal.
-3. Delta Virtual login is handled by the host app using the credentials saved in `Settings`.
-4. The app waits for the official schedule XML download and imports it automatically.
+1. After entering your DVA and SimBrief credentials, click `Sync from Delta Virtual`.
+2. The app logs into Delta Virtual via a background process automatically.
+3. The app syncs the daily schedule and imports information from your logbook.
 
-When the sync succeeds, the app also saves a local copy of the Delta Virtual logbook JSON export. That logbook data powers Accomplishments airport completion tracking.
+When the sync succeeds, the app also saves a local copy of the Delta Virtual logbook JSON export. That logbook data powers Accomplishments, Tours, and airport completion tracking.
 
+*NOTE* Logbook information is only imported from the DVA site. The app does not create or modify any logbook information other than creating draft flight reports.
 
 ### Security and privacy
 
@@ -119,6 +95,7 @@ Addon folder support is for matching your installed scenery coverage against the
 2. In `Addon Airports`, click `Add Folder`.
 
 3. Select one or more top-level addon roots such as your MSFS `Community` folder or another addon root.
+
 4. Click `Scan Now`.
 
 The app recursively scans for `ContentHistory.json` files and builds a cached airport list from airport entries it finds.
@@ -193,6 +170,8 @@ The build header actions are `Generate Schedule`, `Reroll`, and `Reset`.
 
 ### Airline mode
 
+Airline mode allows the app to build flights based on a single airline of your choosing.
+
 1. Choose `By Airline`.
 2. Select an airline.
 3. Select one aircraft type.
@@ -201,13 +180,13 @@ The build header actions are `Generate Schedule`, `Reroll`, and `Reset`.
 
 ### Location mode
 
+Location mode will randomly select an airline based on geographic route location. All flights will still be based on a single airline.
+
 1. Choose `Location`.
 2. Select `Country` or `Region`.
 3. Select the target country or region.
 4. Select one aircraft type.
 5. Click `Generate Schedule`.
-
-In location mode, the app resolves a qualifying airline for that location before building the duty. It then loads the selected flights directly into the Flight Board.
 
 Use `Unique Destinations` when you want the built sequence to avoid reusing the same destination airport.
 
@@ -343,7 +322,7 @@ The Flight Board is saved locally with the rest of the app state, so it is resto
 
 ## What Happens When a New Schedule Is Loaded
 
-When you import or sync a new schedule:
+When you sync a new schedule:
 
 1. The old saved schedule is replaced.
 2. Filters are reset to defaults for the new schedule.
@@ -368,30 +347,22 @@ If a repair is found, the board entry is relinked to the current schedule.
 
 If no repair match is found, the entry stays stale until you remove it.
 
-## Draft Flight Report
+## SimBrief/Flight Report Dispatch
 
-The Flight Board includes a draft flight report action for Delta Virtual.
-
-### What changed recently
-
-- The draft report now submits against the production `deltava.org` domain.
-- The payload includes the stored SimBrief `simBriefID` again when a valid OFP XML or legacy ID is available.
-- The draft flow still uses SimBrief route and plan data already loaded on the flight board entry.
-
-## SimBrief Dispatch
-
-SimBrief dispatch is available from Flight Board entries in the desktop app.
+SimBrief dispatch is available from Flight Board entries as well a Draft flight Reports
 
 ### How it works
 
-1. Open `Settings`.
-2. Save your SimBrief `Navigraph Alias` or `Pilot ID`.
-3. Optional: save one or more custom airframes.
-4. Add a flight to the Flight Board.
-5. Expand the entry and choose a SimBrief aircraft type.
-6. Click `SimBrief Dispatch`.
-7. Sign in to SimBrief/Navigraph in the popup window if prompted.
-8. The app sends the dispatch request for that board entry using the selected aircraft type, route, and planned departure time.
+1. Add a flight to the Flight Board.
+2. Expand the entry and choose a SimBrief aircraft type.
+3. Click `Generate Dispatch`.
+4. Sign in to SimBrief/Navigraph in the popup window if prompted.
+5. The app sends the dispatch request for that board entry using the selected aircraft type, route, and planned departure time.
+6. A draft flight report is then created, based on the simBrief plan
+
+## Create Draft Only
+
+If you don't want to link your SimBrief profile, you can still create a draft flight report that includes equipment type, origin, and destination. 
 
 ### SimBrief settings
 
@@ -423,19 +394,6 @@ The custom airframe internal ID is the SimBrief airframe's internal identifier. 
 
 Saved custom airframes are then available as dispatch choices on Flight Board entries.
 
-### Notes
-
-- The app ships with a bundled SimBrief API key for desktop dispatch requests.
-- Pilots still sign in with their own SimBrief/Navigraph account. The app does not bypass SimBrief authentication.
-- `Navigraph Alias` is preferred for OFP fetches. `Pilot ID` is supported as a fallback.
-- At least one of those identifiers must be saved in `Settings` before dispatching.
-
-### Current limitation
-
-The app sends the SimBrief dispatch request correctly, but returned dispatch details may not always be surfaced back into the Flight Board the way you expect.
-
-The code is set up to store returned SimBrief plan data and OFP/PDF links on the board entry when that data is available, but if no plan details come back from the dispatch flow then the dispatch is still sent without a populated plan summary in the app.
-
 ## Map View
 
 The map shows flight routes and lets you narrow the view to the selected flight or all active flights.
@@ -448,7 +406,3 @@ The map shows flight routes and lets you narrow the view to the selected flight 
 - Weather radar overlay
 - Satellite imagery overlay
 - Standard and World map modes
-
-## Logs
-
-The app keeps an import/app log locally. It records import issues, addon scan details, and sync diagnostics that help troubleshoot parsing or schedule problems.

@@ -1,13 +1,6 @@
-import Papa from "papaparse";
-import airlinesCsv from "../data/airlines.csv?raw";
+import airlinesData from "../data/airlines.json";
 
-const CSV_OPTIONS = {
-  header: true,
-  skipEmptyLines: true,
-  transformHeader: (header) => header.trim()
-};
-
-const airlineRows = Papa.parse(airlinesCsv, CSV_OPTIONS).data;
+const airlineRows = Array.isArray(airlinesData) ? airlinesData : [];
 const airlineLogoModules = import.meta.glob("../data/images/Logos/*", {
   eager: true,
   import: "default"

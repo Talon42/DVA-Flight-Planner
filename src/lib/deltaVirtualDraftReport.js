@@ -1,4 +1,4 @@
-import equipmentTypeCsv from "../data/equipment_type.csv?raw";
+import equipmentTypeData from "../data/equipment_type.json";
 import { resolveSimBriefFallbackEquipmentTypeCandidates } from "./simbrief";
 
 const DRAFT_COMMAND_NAME = "submit_deltava_draft_flight_report";
@@ -29,10 +29,49 @@ function normalizeEquipmentTypeKey(value) {
   return normalizeText(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-const equipmentTypes = equipmentTypeCsv
-  .trim()
-  .split(/\r?\n/)
-  .map((value) => normalizeText(value))
+function unwrapEquipmentTypeRows(source) {
+  if (Array.isArray(source)) {
+    return source;
+  }
+
+  if (!source || typeof source !== "object") {
+    return [];
+  }
+
+  for (const key of ["equipmentTypes", "equipment_type", "rows", "data", "items", "values"]) {
+    if (Array.isArray(source[key])) {
+      return source[key];
+    }
+  }
+
+  return [source];
+}
+
+function normalizeEquipmentTypeValue(row) {
+  if (Array.isArray(row)) {
+    const parts = row.map(normalizeText).filter(Boolean);
+    if (!parts.length) {
+      return "";
+    }
+
+    const firstPart = normalizeText(row[0]);
+    return firstPart ? parts.join("A") : `A${parts.join("A")}`;
+  }
+
+  if (row && typeof row === "object") {
+    for (const key of ["eq_type", "eqType", "equipment_type", "equipmentType", "code", "value"]) {
+      const normalized = normalizeText(row[key]);
+      if (normalized) {
+        return normalized;
+      }
+    }
+  }
+
+  return normalizeText(row);
+}
+
+const equipmentTypes = unwrapEquipmentTypeRows(equipmentTypeData)
+  .map((row) => normalizeEquipmentTypeValue(row))
   .filter(Boolean);
 
 const equipmentTypeEntries = equipmentTypes.map((equipmentType, index) => ({
@@ -49,7 +88,7 @@ function normalizeSimBriefAircraftLabel(value) {
   return normalizeText(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-// Snaps detailed SimBrief variants like A319-100 to the nearest CSV equipment label.
+// Snaps detailed SimBrief variants like A319-100 to the nearest equipment label.
 function resolveClosestEquipmentTypeFromSimBriefAircraft(selectedType) {
   const normalizedSelectedType = normalizeSimBriefAircraftLabel(selectedType);
   if (!normalizedSelectedType) {
@@ -151,6 +190,11 @@ function normalizeDraftPassengerCount(pax) {
   return "";
 }
 
+function isValidSimBriefAircraftCode(value) {
+  const normalized = normalizeText(value).toUpperCase();
+  return Boolean(normalized) && !/[\/\s]/.test(normalized);
+}
+
 function deriveDraftFlightNumber(flight) {
   const explicitFlightNumber = normalizeText(flight?.flightNumber || flight?.tourFlightNumber);
   if (explicitFlightNumber) {
@@ -179,13 +223,17 @@ function deriveDraftFlightNumber(flight) {
 }
 
 function deriveDraftEquipmentType(flight) {
-  const selectedType = normalizeText(flight?.simbriefSelectedType || flight?.simbriefPlan?.aircraftType);
+  const selectedType = normalizeText(flight?.simbriefSelectedType).toUpperCase();
+  if (!isValidSimBriefAircraftCode(selectedType)) {
+    return "";
+  }
+
   const resolvedType = resolveEquipmentTypeFromSimBrief(selectedType);
   if (resolvedType) {
     return resolvedType;
   }
 
-  return "";
+  return selectedType;
 }
 
 function normalizePositiveDraftReportId(value) {

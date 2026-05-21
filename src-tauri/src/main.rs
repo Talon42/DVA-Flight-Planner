@@ -16,8 +16,8 @@ use deltava_draft::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use simbrief::{
-    close_simbrief_dispatch_window, fetch_simbrief_aircraft_types, start_simbrief_dispatch,
-    SimBriefDispatchManager,
+    close_simbrief_dispatch_window, fetch_simbrief_aircraft_types, refresh_simbrief_dispatch,
+    start_simbrief_dispatch, SimBriefDispatchManager,
 };
 use std::{
     collections::BTreeSet,
@@ -53,6 +53,8 @@ const APP_STORAGE_DIR: &str = "flight-planner";
 const APP_LOG_FILE: &str = "log.txt";
 const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
 const MAIN_WINDOW_STATE_FILE: &str = "main-window-state.json";
+const MAIN_WINDOW_MIN_WIDTH: u32 = 1024;
+const MAIN_WINDOW_MIN_HEIGHT: u32 = 768;
 const APP_LOG_MAX_BYTES: u64 = 262_144;
 const DELTAVA_SYNC_DOWNLOAD_FILE: &str = "deltava-pfpxsched.xml";
 const DELTAVA_LOGBOOK_FALLBACK_FILE: &str = "dva-logbook.json";
@@ -562,11 +564,7 @@ fn addon_airport_cache_path(app: &AppHandle) -> Result<PathBuf, String> {
     fs::create_dir_all(&app_data_dir)
         .map_err(|error| format!("Unable to create app data directory: {error}"))?;
 
-    let storage_dir = app_data_dir.join(APP_STORAGE_DIR);
-    fs::create_dir_all(&storage_dir)
-        .map_err(|error| format!("Unable to create app storage directory: {error}"))?;
-
-    Ok(storage_dir.join(ADDON_AIRPORT_CACHE_FILE))
+    Ok(app_data_dir.join(ADDON_AIRPORT_CACHE_FILE))
 }
 
 fn app_storage_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -578,11 +576,7 @@ fn app_storage_dir(app: &AppHandle) -> Result<PathBuf, String> {
     fs::create_dir_all(&app_data_dir)
         .map_err(|error| format!("Unable to create app data directory: {error}"))?;
 
-    let storage_dir = app_data_dir.join(APP_STORAGE_DIR);
-    fs::create_dir_all(&storage_dir)
-        .map_err(|error| format!("Unable to create app storage directory: {error}"))?;
-
-    Ok(storage_dir)
+    Ok(app_data_dir)
 }
 
 fn main_window_state_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -715,8 +709,15 @@ fn restore_main_window_state(window: &WebviewWindow) {
     let Some(saved_state) = read_saved_main_window_state(&window.app_handle()) else {
         return;
     };
-    let state = sanitize_saved_main_window_state(window, saved_state);
-    let _ = write_saved_main_window_state(&window.app_handle(), &state);
+    let mut state = sanitize_saved_main_window_state(window, saved_state);
+
+    if state.width < MAIN_WINDOW_MIN_WIDTH {
+        state.width = MAIN_WINDOW_MIN_WIDTH;
+    }
+
+    if state.height < MAIN_WINDOW_MIN_HEIGHT {
+        state.height = MAIN_WINDOW_MIN_HEIGHT;
+    }
 
     if state.width > 0 && state.height > 0 {
         let _ = window.set_size(Size::Physical(PhysicalSize::new(state.width, state.height)));
@@ -727,6 +728,8 @@ fn restore_main_window_state(window: &WebviewWindow) {
     if state.maximized {
         let _ = window.maximize();
     }
+
+    let _ = write_saved_main_window_state(&window.app_handle(), &state);
 }
 
 fn normalize_addon_roots(roots: Vec<String>) -> Vec<String> {
@@ -1516,9 +1519,8 @@ fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
 
     let resolved = match app.path().app_data_dir() {
         Ok(base_dir) => {
-            let storage_dir = base_dir.join(APP_STORAGE_DIR);
-            if fs::create_dir_all(&storage_dir).is_ok() {
-                Some(storage_dir.join(APP_LOG_FILE))
+            if fs::create_dir_all(&base_dir).is_ok() {
+                Some(base_dir.join(APP_LOG_FILE))
             } else {
                 resolve_default_log_path()
             }
@@ -1656,7 +1658,7 @@ fn clear_user_data_internal(app: &AppHandle) -> Result<(), String> {
     close_simbrief_dispatch_window(app.clone());
 
     if let Ok(app_data_dir) = app.path().app_data_dir() {
-        remove_path_if_exists(&app_data_dir.join(APP_STORAGE_DIR));
+        remove_path_if_exists(&app_data_dir);
     }
 
     let _ = clear_auth_settings_internal(app);
@@ -2349,6 +2351,7 @@ fn main() {
             submit_deltava_draft_flight_report,
             clear_user_data,
             start_simbrief_dispatch,
+            refresh_simbrief_dispatch,
             fetch_simbrief_aircraft_types,
             close_simbrief_dispatch_window,
             read_addon_airport_cache,

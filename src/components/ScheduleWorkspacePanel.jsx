@@ -1,6 +1,5 @@
 import Panel from "./ui/Panel";
 import { cn } from "./ui/cn";
-import { supportCopyTextClassName, sectionTitleTextClassName } from "./ui/typography";
 import { cardFrameClassName } from "./ui/patterns";
 import ScheduleWorkspaceHeader from "./ScheduleWorkspaceHeader";
 import ScheduleTablePanel from "./ScheduleTablePanel";
@@ -117,18 +116,16 @@ export default function ScheduleWorkspacePanel({
           </div>
         </>
       ) : (
-        <div className="grid content-start gap-3 p-5 bp-1024:p-4">
-          <h2 className={cn("m-0 bp-1024:text-[1.04rem]", sectionTitleTextClassName)}>
-            No Active Schedule
-          </h2>
-          <p
-            className={cn(
-              "m-0 max-w-[56ch] text-[var(--text-muted)] bp-1024:text-[0.88rem]",
-              supportCopyTextClassName
-            )}
-          >
-            The app validates airport coverage, converts local schedule times to UTC, calculates route distance, and filters routes by compatible aircraft families and equipment based on weight, capacity, and range.
-          </p>
+        <div className="flex h-full items-center justify-center p-5 bp-1024:p-4">
+          <div className="grid max-w-[28rem] gap-2 text-center">
+            <h2 className="m-0 text-[1rem] font-semibold text-[var(--text-heading)]">No schedule loaded</h2>
+            <p className="m-0 text-[var(--text-muted)]">
+              Save your Delta Virtual credentials in Settings, then click Sync from Delta Virtual to load your schedule.
+            </p>
+            <p className="m-0 text-[var(--text-muted)]">
+              The imported flights will appear here and update the Flight Board automatically.
+            </p>
+          </div>
         </div>
       )}
     </Panel>

@@ -1,9 +1,9 @@
 import {
   IMPORT_LOG_FILE,
+  GETTING_STARTED_STATE_FILE,
   SAVED_SCHEDULE_FILE,
   SIMBRIEF_SETTINGS_FILE,
-  UI_STATE_FILE,
-  STORAGE_DIR
+  UI_STATE_FILE
 } from "./constants";
 
 const LEGACY_PERSISTED_SCHEDULE_VERSION = 2;
@@ -12,6 +12,7 @@ const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
 const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
 const LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
 const DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
+const GETTING_STARTED_STORAGE_KEY = "flight-planner.getting-started";
 const DELTAVA_LOGBOOK_STORAGE_DIR = "flight-planner/deltava-sync/logbook";
 const DELTAVA_LOGBOOK_FALLBACK_FILE = "deltava-logbook.json";
 const textEncoder = new TextEncoder();
@@ -23,6 +24,14 @@ function isTauriRuntime() {
 
 async function loadFsModule() {
   return import("@tauri-apps/plugin-fs");
+}
+
+async function ensureAppDataRoot() {
+  const { appDataDir } = await import("@tauri-apps/api/path");
+  const { mkdir } = await loadFsModule();
+  await mkdir(await appDataDir(), {
+    recursive: true
+  });
 }
 
 function buildCompactLabel(values, visibleCount) {
@@ -104,6 +113,22 @@ function normalizeSimBriefPax(pax) {
 
   const numeric = Number(String(pax).trim());
   return Number.isInteger(numeric) ? numeric : null;
+}
+
+function getDefaultGettingStartedState() {
+  return {
+    gettingStartedDismissed: false,
+    gettingStartedFinalized: false,
+    addonSetupSkipped: false
+  };
+}
+
+function normalizeGettingStartedState(state) {
+  return {
+    gettingStartedDismissed: Boolean(state?.gettingStartedDismissed),
+    gettingStartedFinalized: Boolean(state?.gettingStartedFinalized),
+    addonSetupSkipped: Boolean(state?.addonSetupSkipped)
+  };
 }
 
 function isValidSimBriefXmlId(value) {
@@ -475,12 +500,8 @@ export async function writeSavedSchedule(savedSchedule) {
   const serializedSchedule = await serializeSavedSchedule(savedSchedule);
 
   if (isTauriRuntime()) {
-    const { mkdir, writeTextFile, BaseDirectory } = await loadFsModule();
-    await mkdir(STORAGE_DIR, {
-      baseDir: BaseDirectory.AppData,
-      recursive: true
-    });
-
+    const { writeTextFile, BaseDirectory } = await loadFsModule();
+    await ensureAppDataRoot();
     await writeTextFile(
       SAVED_SCHEDULE_FILE,
       serializedSchedule,
@@ -518,12 +539,8 @@ export async function writeSavedUiState(uiState) {
   const serialized = JSON.stringify(uiState || {});
 
   if (isTauriRuntime()) {
-    const { mkdir, writeTextFile, BaseDirectory } = await loadFsModule();
-    await mkdir(STORAGE_DIR, {
-      baseDir: BaseDirectory.AppData,
-      recursive: true
-    });
-
+    const { writeTextFile, BaseDirectory } = await loadFsModule();
+    await ensureAppDataRoot();
     await writeTextFile(UI_STATE_FILE, serialized, {
       baseDir: BaseDirectory.AppData
     });
@@ -608,12 +625,8 @@ export async function writeSimBriefSettings(settings) {
   });
 
   if (isTauriRuntime()) {
-    const { mkdir, writeTextFile, BaseDirectory } = await loadFsModule();
-    await mkdir(STORAGE_DIR, {
-      baseDir: BaseDirectory.AppData,
-      recursive: true
-    });
-
+    const { writeTextFile, BaseDirectory } = await loadFsModule();
+    await ensureAppDataRoot();
     await writeTextFile(SIMBRIEF_SETTINGS_FILE, serialized, {
       baseDir: BaseDirectory.AppData
     });
@@ -621,6 +634,54 @@ export async function writeSimBriefSettings(settings) {
   }
 
   window.localStorage.setItem("flight-planner.simbrief-settings", serialized);
+}
+
+export async function readGettingStartedState() {
+  if (isTauriRuntime()) {
+    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
+    const hasFile = await exists(GETTING_STARTED_STATE_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+
+    if (!hasFile) {
+      return getDefaultGettingStartedState();
+    }
+
+    try {
+      const text = await readTextFile(GETTING_STARTED_STATE_FILE, {
+        baseDir: BaseDirectory.AppData
+      });
+      return normalizeGettingStartedState(text ? JSON.parse(text) : null);
+    } catch {
+      return getDefaultGettingStartedState();
+    }
+  }
+
+  const text = window.localStorage.getItem(GETTING_STARTED_STORAGE_KEY);
+  if (!text) {
+    return getDefaultGettingStartedState();
+  }
+
+  try {
+    return normalizeGettingStartedState(JSON.parse(text));
+  } catch {
+    return getDefaultGettingStartedState();
+  }
+}
+
+export async function writeGettingStartedState(state) {
+  const serialized = JSON.stringify(normalizeGettingStartedState(state));
+
+  if (isTauriRuntime()) {
+    const { writeTextFile, BaseDirectory } = await loadFsModule();
+    await ensureAppDataRoot();
+    await writeTextFile(GETTING_STARTED_STATE_FILE, serialized, {
+      baseDir: BaseDirectory.AppData
+    });
+    return;
+  }
+
+  window.localStorage.setItem(GETTING_STARTED_STORAGE_KEY, serialized);
 }
 
 async function resolveAppDataPath(relativePath) {
@@ -640,13 +701,9 @@ async function appendLogFile(relativePath, storageKey, logText) {
 
   if (isTauriRuntime()) {
     try {
-      const { mkdir, exists, readTextFile, writeTextFile, BaseDirectory } =
+      const { exists, readTextFile, writeTextFile, BaseDirectory } =
         await loadFsModule();
-
-      await mkdir(STORAGE_DIR, {
-        baseDir: BaseDirectory.AppData,
-        recursive: true
-      });
+      await ensureAppDataRoot();
 
       const hasFile = await exists(relativePath, {
         baseDir: BaseDirectory.AppData
@@ -682,12 +739,8 @@ async function ensureLogFile(relativePath, storageKey) {
   const header = `[${new Date().toISOString()}] [App] log-file-created`;
 
   if (isTauriRuntime()) {
-    const { mkdir, exists, writeTextFile, BaseDirectory } = await loadFsModule();
-    await mkdir(STORAGE_DIR, {
-      baseDir: BaseDirectory.AppData,
-      recursive: true
-    });
-
+    const { exists, writeTextFile, BaseDirectory } = await loadFsModule();
+    await ensureAppDataRoot();
     const hasFile = await exists(relativePath, {
       baseDir: BaseDirectory.AppData
     });
@@ -786,6 +839,7 @@ export async function deleteStoredUserData() {
     "flight-planner.ui-state",
     "flight-planner.simbrief-settings",
     "flight-planner.deltava-auth",
+    GETTING_STARTED_STORAGE_KEY,
     "flight-planner.import-log",
     DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
     "flight-planner.theme",

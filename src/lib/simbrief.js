@@ -308,6 +308,23 @@ export async function startSimBriefDispatch(payload) {
   }
 }
 
+export async function refreshSimBriefDispatch(payload) {
+  if (!isTauriRuntime()) {
+    throw new Error("SimBrief refresh is only available in the desktop app.");
+  }
+
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return await invoke("refresh_simbrief_dispatch", { payload });
+  } catch (error) {
+    if (error instanceof Error) {
+      throw normalizeSimBriefError(error.message);
+    }
+
+    throw normalizeSimBriefError(String(error));
+  }
+}
+
 export async function fetchSimBriefAircraftTypes() {
   if (!isTauriRuntime()) {
     return {

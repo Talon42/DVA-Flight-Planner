@@ -1,34 +1,101 @@
-import Papa from "papaparse";
 import { DateTime } from "luxon";
-import airlinesCsv from "../../data/airlines.csv?raw";
-import airportsCsv from "../../data/airports.csv?raw";
-import aircraftProfilesCsv from "../../data/aircraft_profiles.csv?raw";
-import aircraftFamilyCsv from "../../data/aircraft_family.csv?raw";
-import equipmentTypeCsv from "../../data/equipment_type.csv?raw";
-
-const CSV_OPTIONS = {
-  header: true,
-  skipEmptyLines: true,
-  transformHeader: (header) => header.trim()
-};
+import airlinesData from "../../data/airlines.json";
+import airportsData from "../../data/airports.json";
+import aircraftProfilesData from "../../data/aircraft_profiles.json";
+import aircraftFamilyData from "../../data/aircraft_family.json";
+import equipmentTypeData from "../../data/equipment_type.json";
 
 const DATE_FORMAT = "MM/dd/yyyy HH:mm";
 
-const airlineRows = Papa.parse(airlinesCsv, CSV_OPTIONS).data;
-const airportRows = Papa.parse(airportsCsv, CSV_OPTIONS).data;
-const aircraftProfileRows = Papa.parse(aircraftProfilesCsv, CSV_OPTIONS).data;
+function normalizeText(value) {
+  return String(value ?? "").trim();
+}
 
-const aircraftFamilies = aircraftFamilyCsv
-  .trim()
-  .split(/\r?\n/)
-  .slice(1)
-  .map((value) => value.trim())
-  .filter(Boolean);
+function extractReferenceValue(row, preferredKeys = []) {
+  if (Array.isArray(row)) {
+    for (const value of row) {
+      const normalized = normalizeText(value);
+      if (normalized) {
+        return normalized;
+      }
+    }
 
-const equipmentTypes = equipmentTypeCsv
-  .trim()
-  .split(/\r?\n/)
-  .map((value) => value.trim())
+    return "";
+  }
+
+  if (row && typeof row === "object") {
+    for (const key of preferredKeys) {
+      const normalized = normalizeText(row[key]);
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    for (const value of Object.values(row)) {
+      const normalized = normalizeText(value);
+      if (normalized) {
+        return normalized;
+      }
+    }
+  }
+
+  return normalizeText(row);
+}
+
+function normalizeReferenceRows(rows, preferredKeys = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => extractReferenceValue(row, preferredKeys))
+    .filter(Boolean);
+}
+
+function unwrapEquipmentTypeRows(source) {
+  if (Array.isArray(source)) {
+    return source;
+  }
+
+  if (!source || typeof source !== "object") {
+    return [];
+  }
+
+  for (const key of ["equipmentTypes", "equipment_type", "rows", "data", "items", "values"]) {
+    if (Array.isArray(source[key])) {
+      return source[key];
+    }
+  }
+
+  return [source];
+}
+
+function normalizeEquipmentTypeValue(row) {
+  if (Array.isArray(row)) {
+    const parts = row.map(normalizeText).filter(Boolean);
+    if (!parts.length) {
+      return "";
+    }
+
+    const firstPart = normalizeText(row[0]);
+    return firstPart ? parts.join("A") : `A${parts.join("A")}`;
+  }
+
+  if (row && typeof row === "object") {
+    for (const key of ["eq_type", "eqType", "equipment_type", "equipmentType", "code", "value"]) {
+      const normalized = normalizeText(row[key]);
+      if (normalized) {
+        return normalized;
+      }
+    }
+  }
+
+  return normalizeText(row);
+}
+
+const airlineRows = Array.isArray(airlinesData) ? airlinesData : [];
+const airportRows = airportsData.airports || [];
+const aircraftProfileRows = Array.isArray(aircraftProfilesData) ? aircraftProfilesData : [];
+
+const aircraftFamilies = normalizeReferenceRows(aircraftFamilyData, ["eq_type"]);
+const equipmentTypes = unwrapEquipmentTypeRows(equipmentTypeData)
+  .map((row) => normalizeEquipmentTypeValue(row))
   .filter(Boolean);
 
 const airlineMap = new Map(
@@ -47,15 +114,16 @@ const airlineIcaoMap = new Map(
 
 const airportMap = new Map(
   airportRows.map((row) => [
-    String(row.ICAO || "").trim().toUpperCase(),
+    String(row.icao || "").trim().toUpperCase(),
     {
-      icao: String(row.ICAO || "").trim().toUpperCase(),
-      name: row.Name,
-      country: row.Country,
-      state: row["State/Territory"],
-      timezone: row.Timezone,
-      latitude: parseCoordinate(row.Latitude),
-      longitude: parseCoordinate(row.Longitude)
+      icao: String(row.icao || "").trim().toUpperCase(),
+      name: String(row.name || "").trim(),
+      country: String(row.countryName || "").trim(),
+      state: String(row.stateTerritory || "").trim(),
+      timezone: String(row.timezone || "").trim(),
+      latitude: parseCoordinate(row.lat),
+      longitude: parseCoordinate(row.lng),
+      runwayLength: parseNumeric(row.runwayLength)
     }
   ])
 );
@@ -76,6 +144,7 @@ const equipmentMatcherRows = equipmentTypes
 
 const aircraftCatalog = buildAircraftCatalog();
 
+// Parses imported schedule XML using the normalized airport lookup shape.
 export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
   debug(`parse:start file=${fileName} chars=${xmlText?.length || 0}`);
   const flightBlocks = extractFlightBlocks(xmlText);
@@ -274,12 +343,12 @@ function decodeXmlEntities(value) {
 }
 
 function parseNumeric(value) {
-  const normalized = String(value || "").replace(/[^0-9-]/g, "");
+  const normalized = String(value ?? "").replace(/[^0-9-]/g, "");
   return normalized ? Number(normalized) : null;
 }
 
 function parseCoordinate(value) {
-  const parsed = Number(value);
+  const parsed = Number(String(value ?? "").trim());
   return Number.isFinite(parsed) ? parsed : null;
 }
 

@@ -171,25 +171,39 @@ function SimBriefSummary({ flight }) {
   if (!simbriefPlan) {
     return <p className={mutedTextClassName}>No SimBrief plan has been loaded for this flight yet.</p>;
   }
+  const generatedAtUtc = simbriefPlan.generatedAtUtc || simbriefPlan.generated_at_utc || "";
+  const aircraftType =
+    simbriefPlan.aircraftType ||
+    simbriefPlan.aircraft?.icao ||
+    simbriefPlan.aircraft?.code ||
+    simbriefPlan.aircraft?.type ||
+    simbriefPlan.aircraft?.name ||
+    "";
+  const staticId = simbriefPlan.staticId || simbriefPlan.static_id || "";
+  const routePoints = Array.isArray(simbriefPlan.routePoints)
+    ? simbriefPlan.routePoints
+    : Array.isArray(simbriefPlan.route_points)
+      ? simbriefPlan.route_points
+      : [];
 
   return (
     <div className="grid gap-4">
       <div className={gridClassNames.detailSummary}>
-        <DetailRow label="Generated" value={formatUtc(simbriefPlan.generatedAtUtc)} />
+        <DetailRow label="Generated" value={formatUtc(generatedAtUtc)} />
         <DetailRow label="Status" value={simbriefPlan.status || "Ready"} />
-        <DetailRow label="Type" value={simbriefPlan.aircraftType || "N/A"} />
+        <DetailRow label="Type" value={aircraftType || "N/A"} />
         <DetailRow label="Callsign" value={simbriefPlan.callsign || "N/A"} />
         <DetailRow label="Route" value={simbriefPlan.route || "Recommended by SimBrief"} />
         <DetailRow label="Cruise" value={simbriefPlan.cruiseAltitude || "N/A"} />
         <DetailRow label="Alternate" value={simbriefPlan.alternate || "N/A"} />
         <DetailRow label="ETE" value={simbriefPlan.ete || "N/A"} />
         <DetailRow label="Block Fuel" value={simbriefPlan.blockFuel || "N/A"} />
-        <DetailRow label="Static ID" value={simbriefPlan.staticId || "N/A"} />
+        <DetailRow label="Static ID" value={staticId || "N/A"} />
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <SimBriefLink href={simbriefPlan.ofpUrl}>Open OFP</SimBriefLink>
-        <SimBriefLink href={simbriefPlan.pdfUrl}>Open PDF</SimBriefLink>
+        <SimBriefLink href={simbriefPlan.ofpUrl || simbriefPlan.ofp_url}>Open OFP</SimBriefLink>
+        <SimBriefLink href={simbriefPlan.pdfUrl || simbriefPlan.pdf_url}>Open PDF</SimBriefLink>
       </div>
     </div>
   );
@@ -214,26 +228,41 @@ function FlightCardAircraftSelector({
   options,
   selectedValue,
   isLoading,
-  onChange
+  onChange,
+  locked = false,
+  readOnly = false,
+  disabled = false
 }) {
+  const isLocked = locked || readOnly || disabled;
+
   return (
-    <SearchableMultiSelect
-      label="SimBrief Aircraft"
-      labelPlacement="inline"
-      placeholder={isLoading ? "Loading aircraft..." : "Search aircraft"}
-      emptyLabel="No matching aircraft"
-      allLabel="Select aircraft"
-      allowMultiple={false}
-      hideChips
-      showClearAction={false}
-      showOptionMark={false}
-      showSingleSelectedLabel
-      options={options}
-      selectedValues={selectedValue ? [selectedValue] : [""]}
-      onChange={(values) => onChange(values[0] || "")}
-    />
+    <div className="grid gap-1">
+      <SearchableMultiSelect
+        label="SimBrief Aircraft"
+        labelPlacement="inline"
+        placeholder={isLoading ? "Loading aircraft..." : "Search aircraft"}
+        emptyLabel="No matching aircraft"
+        allLabel="Select aircraft"
+        allowMultiple={false}
+        hideChips
+        showClearAction={false}
+        showOptionMark={false}
+        showSingleSelectedLabel
+        options={options}
+        selectedValues={selectedValue ? [selectedValue] : [""]}
+        onChange={(values) => onChange(values[0] || "")}
+        disabled={isLocked}
+      />
+    </div>
   );
 }
+
+// SimBrief writes the loading and success copy into the same state field as failures.
+// Only the non-success values should surface in the dismissible error popup.
+const SIMBRIEF_SUCCESS_STATUS_MESSAGES = new Set([
+  "SimBrief flight plan loaded.",
+  "SimBrief flight plan refreshed."
+]);
 
 function SimBriefInlinePanel({
   flight,
@@ -244,6 +273,10 @@ function SimBriefInlinePanel({
     error: "",
     result: null
   },
+  deltaDraftReportUrlState = {
+    boardEntryId: "",
+    url: ""
+  },
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
   simBriefAircraftTypes,
@@ -252,30 +285,51 @@ function SimBriefInlinePanel({
   onRemoveFromFlightBoard,
   onCompleteTourFlight,
   onSimBriefTypeChange,
-  onSimBriefDispatch,
+  onDispatchWorkflow,
   onOpenSimBriefFlight,
-  onPushToAcars
+  onDraftOnlySubmit
 }) {
-  const selectedType = String(flight.simbriefSelectedType || "").trim().toUpperCase();
-  const simBriefStaticId = String(flight?.simbriefPlan?.staticId || "").trim();
+  const selectedType = String(flight?.simbriefSelectedType || "").trim().toUpperCase();
+  const lockedSelectedType = selectedType && !/[\/\s]/.test(selectedType) ? selectedType : "";
+  const simBriefStaticId = String(
+    flight?.simbriefPlan?.staticId || flight?.simbriefPlan?.static_id || ""
+  ).trim();
   const hasSimBriefPlan = Boolean(simBriefStaticId);
-  const hasDraftReportId = Number.isInteger(Number(flight?.draftReportId)) && Number(flight.draftReportId) > 0;
+  const draftReportId = Number.parseInt(
+    String(flight?.draftReportId ?? flight?.dvaDraftReportId ?? ""),
+    10
+  );
+  const hasDraftReportId = Number.isInteger(draftReportId) && draftReportId > 0;
   const draftPayload = buildDeltaVirtualDraftReportPayload(flight);
   const draftValidation = validateDeltaVirtualDraftReportPayload(draftPayload);
   const isDraftSubmitting =
     deltaDraftSubmitState.boardEntryId === flight.boardEntryId &&
     deltaDraftSubmitState.isSubmitting;
+  const draftOnlyErrorMessage =
+    deltaDraftSubmitState.boardEntryId === flight.boardEntryId
+      ? String(deltaDraftSubmitState.error || "").trim()
+      : "";
+  const simBriefStatusMessage =
+    simBriefDispatchState.flightId === flight.boardEntryId
+      ? String(simBriefDispatchState.message || "").trim()
+      : "";
+  const simBriefErrorMessage =
+    simBriefStatusMessage &&
+    !simBriefDispatchState.isDispatching &&
+    !SIMBRIEF_SUCCESS_STATUS_MESSAGES.has(simBriefStatusMessage)
+      ? simBriefStatusMessage
+      : "";
   const availableAircraftTypes = Array.isArray(simBriefAircraftTypes) ? simBriefAircraftTypes : [];
   const aircraftTypeOptions = useMemo(
     () => {
       const groupedTypes = groupSimBriefAircraftTypesByManufacturer(availableAircraftTypes);
       const groupedOptions = groupedTypes.flatMap((group) =>
         group.items.map((type) => ({
-          value: String(type.code || "").trim().toUpperCase(),
-          label: String(type.name || type.code || "").trim(),
-          selectedLabel: String(type.name || type.code || "").trim(),
-          groupLabel: group.manufacturer,
-          keywords: `${type.code || ""} ${type.name || ""} ${group.manufacturer || ""}`.trim()
+          value: String(type?.code || "").trim().toUpperCase(),
+          label: String(type?.name || type?.code || "").trim(),
+          selectedLabel: String(type?.name || type?.code || "").trim(),
+          groupLabel: group?.manufacturer || "",
+          keywords: `${type?.code || ""} ${type?.name || ""} ${group?.manufacturer || ""}`.trim()
         }))
       );
 
@@ -283,34 +337,66 @@ function SimBriefInlinePanel({
     },
     [availableAircraftTypes]
   );
-  const selectedTypeSupported =
-    !selectedType || availableAircraftTypes.some((type) => type.code === selectedType);
   const isDispatching =
     simBriefDispatchState.flightId === flight.boardEntryId && simBriefDispatchState.isDispatching;
-  const dispatchDisabled =
-    !isDesktopSimBriefAvailable ||
-    isDispatching ||
-    (!availableAircraftTypes.length && isSimBriefAircraftTypesLoading) ||
-    (!availableAircraftTypes.length && Boolean(simBriefAircraftTypesError)) ||
-    !selectedType ||
-    !selectedTypeSupported ||
-    !simBriefCredentialsConfigured;
+  const selectedTypeSupported =
+    !selectedType || availableAircraftTypes.some((type) => type?.code === selectedType);
+  const dispatchDisabled = hasSimBriefPlan
+    ? !isDesktopSimBriefAvailable ||
+      isDispatching ||
+      isDraftSubmitting ||
+      !simBriefStaticId ||
+      !simBriefCredentialsConfigured
+    : !isDesktopSimBriefAvailable ||
+      isDispatching ||
+      isDraftSubmitting ||
+      (!availableAircraftTypes.length && isSimBriefAircraftTypesLoading) ||
+      (!availableAircraftTypes.length && Boolean(simBriefAircraftTypesError)) ||
+      !selectedType ||
+      !selectedTypeSupported ||
+      !simBriefCredentialsConfigured;
   const dispatchLabel = isDispatching
     ? hasSimBriefPlan
-      ? "Regenerating..."
-      : "Dispatching..."
+      ? "Refreshing Dispatch..."
+      : "Generating Dispatch..."
     : hasSimBriefPlan
-      ? "Regenerate"
-      : "SimBrief Dispatch";
+      ? "Refresh Dispatch"
+      : "Generate Dispatch";
   const draftDisabled = isDraftSubmitting || !draftValidation.valid;
+  const draftDisabledTitle =
+    draftDisabled && draftValidation.errors.length ? draftValidation.errors.join("; ") : "";
+  const draftReportUrl = hasDraftReportId
+    ? `https://www.deltava.org/pirep.do?id=0x${Number(draftReportId).toString(16)}`
+    : "";
   const draftLabel = isDraftSubmitting
     ? hasDraftReportId
-      ? "Updating Draft Flight Report..."
-      : "Generating Draft Flight Report..."
+      ? "Updating Draft Only..."
+      : "Creating Draft Only..."
     : hasDraftReportId
-      ? "Update Draft Flight Report"
-      : "Create Draft Flight Report";
+      ? "Update Draft Only"
+      : "Create Draft Only";
   const actionGridClassName = gridClassNames.boardActionsQuad;
+  const actionErrorMessage = draftOnlyErrorMessage || simBriefErrorMessage;
+  const actionErrorSignature = actionErrorMessage
+    ? `${draftOnlyErrorMessage ? "draft" : "simbrief"}:${actionErrorMessage}`
+    : "";
+  const [dismissedErrorSignature, setDismissedErrorSignature] = useState("");
+  const actionErrorOverlayHost = typeof document !== "undefined" ? document.body : null;
+
+  // Keep the popup closed until the underlying error changes or clears.
+  useEffect(() => {
+    if (!actionErrorSignature) {
+      setDismissedErrorSignature("");
+      return;
+    }
+
+    if (dismissedErrorSignature && dismissedErrorSignature !== actionErrorSignature) {
+      setDismissedErrorSignature("");
+    }
+  }, [actionErrorSignature, dismissedErrorSignature]);
+
+  const isActionErrorVisible =
+    Boolean(actionErrorSignature) && dismissedErrorSignature !== actionErrorSignature;
 
   return (
     <div
@@ -318,13 +404,20 @@ function SimBriefInlinePanel({
     >
       <FlightCardAircraftSelector
         options={aircraftTypeOptions}
-        selectedValue={selectedType}
+        selectedValue={hasSimBriefPlan ? lockedSelectedType : selectedType}
         isLoading={isSimBriefAircraftTypesLoading}
+        locked={hasSimBriefPlan}
         onChange={(value) => onSimBriefTypeChange(flight.boardEntryId, value || "")}
       />
 
       <div className={actionGridClassName}>
-        <Button className="min-w-0 w-full" variant="board" size="sm" onClick={onSimBriefDispatch} disabled={dispatchDisabled}>
+        <Button
+          className="min-w-0 w-full"
+          variant="board"
+          size="sm"
+          onClick={onDispatchWorkflow}
+          disabled={dispatchDisabled}
+        >
           {dispatchLabel}
         </Button>
         {hasSimBriefPlan && (
@@ -337,15 +430,31 @@ function SimBriefInlinePanel({
             Open in Simbrief
           </Button>
         )}
-        <Button
-          className="min-w-0 w-full"
-          variant="board"
-          size="sm"
-          onClick={() => onPushToAcars(flight.boardEntryId)}
-          disabled={draftDisabled}
-        >
-          {draftLabel}
-        </Button>
+        {!hasSimBriefPlan ? (
+          <Button
+            className="min-w-0 w-full"
+            variant="board"
+            size="sm"
+            onClick={() => onDraftOnlySubmit(flight.boardEntryId)}
+            disabled={draftDisabled}
+            title={draftDisabledTitle}
+          >
+            {draftLabel}
+          </Button>
+        ) : null}
+        {draftReportUrl ? (
+          <Button
+            as="a"
+            className="min-w-0 w-full"
+            variant="board"
+            size="sm"
+            href={draftReportUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open in DVA
+          </Button>
+        ) : null}
         <Button
           className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
           variant={flight.isCompleted ? "ghost" : "success"}
@@ -363,6 +472,38 @@ function SimBriefInlinePanel({
           Remove from Flight Board
         </Button>
       </div>
+      {isActionErrorVisible && actionErrorOverlayHost
+        ? createPortal(
+            <ModalBackdrop onClick={() => setDismissedErrorSignature(actionErrorSignature)}>
+              <Panel
+                className={cn(
+                  modalPanelClassName,
+                  "relative z-[61] w-[min(520px,calc(100%-2rem))] p-5 bp-1024:w-[min(500px,calc(100%-1.5rem))] bp-1024:p-4"
+                )}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Dispatch error"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="grid gap-4">
+                  <p className={cn("m-0 text-[var(--danger)]", bodySmTextClassName)}>
+                    {actionErrorMessage}
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setDismissedErrorSignature(actionErrorSignature)}
+                    >
+                      OK
+                    </Button>
+                  </div>
+                </div>
+              </Panel>
+            </ModalBackdrop>,
+            actionErrorOverlayHost
+          )
+        : null}
     </div>
   );
 }
@@ -681,44 +822,69 @@ function FlightBoardCardSummary({ flight, selectedAccomplishment = null }) {
 
   return (
     <div
-      className={cn(
-        "route-banner route-banner--board grid min-w-0 gap-2 rounded-none bg-[var(--route-banner)] px-3 py-2.5 text-[var(--text-primary)] bp-1024:gap-1.5 bp-1024:px-2.5 bp-1024:py-2 dark:text-white",
-        isCompletedFlight && "opacity-45"
-      )}
+      className="route-banner route-banner--board grid min-w-0 gap-2 rounded-none bg-[var(--route-banner)] px-3 py-2.5 text-[var(--text-primary)] bp-1024:gap-1.5 bp-1024:px-2.5 bp-1024:py-2 dark:text-white"
     >
-      <div className={cn("route-banner__meta flex flex-wrap items-center justify-between gap-2 bp-1024:gap-1.5", bodySmTextClassName)}>
+      <div
+        className={cn(
+          "route-banner__meta flex flex-wrap items-center justify-between gap-2 bp-1024:gap-1.5",
+          isCompletedFlight && "opacity-45"
+        )}
+      >
         <FlightBoardAirline flight={flight} selectedAccomplishment={selectedAccomplishment} />
         <small className="text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]">
           {boardMetaTimeLabel}
         </small>
       </div>
       <div className="grid min-w-0 gap-2 bp-1024:gap-1.5">
-        <div className="grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_3.7rem] items-center gap-2.5 bp-1024:gap-2" aria-hidden="true">
-          <span className={cn("text-left text-[1.1rem] font-semibold tracking-[-0.03em]")}>
-            {flight.from}
-          </span>
+        <div className="relative">
+          <div
+            className={cn(
+              "grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_3.7rem] items-center gap-2.5 bp-1024:gap-2",
+              isCompletedFlight && "opacity-45"
+            )}
+            aria-hidden="true"
+          >
+            <span className={cn("text-left text-[1.1rem] font-semibold tracking-[-0.03em]")}>
+              {flight.from}
+            </span>
+            {isCompletedFlight ? (
+              <span className="flex min-w-0 items-center justify-center">
+                <span className="inline-flex min-h-[1.75rem] min-w-[6.5rem]" aria-hidden="true" />
+              </span>
+            ) : (
+              <span className="flex min-w-0 items-center gap-2">
+                <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
+                <img
+                  src={planeLight}
+                  alt=""
+                  className="route-banner__plane h-[18px] w-[34px] shrink-0 object-contain brightness-0 opacity-80 dark:brightness-100 dark:opacity-100"
+                />
+                <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
+              </span>
+            )}
+            <span className={cn("text-right text-[1.1rem] font-semibold tracking-[-0.03em]")}>
+              {flight.to}
+            </span>
+          </div>
           {isCompletedFlight ? (
-            <span className="flex min-w-0 items-center justify-center">
-              <span className={cn("rounded-none bg-[var(--status-resolved-bg)] px-3 py-1 text-[var(--status-resolved-text)]", labelTextClassName)}>
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-center">
+              <span
+                className={cn(
+                  "rounded-none bg-[var(--status-resolved-bg)] px-3 py-1 text-[var(--status-resolved-text)] opacity-100",
+                  labelTextClassName
+                )}
+              >
                 Completed
               </span>
-            </span>
-          ) : (
-            <span className="flex min-w-0 items-center gap-2">
-              <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
-              <img
-                src={planeLight}
-                alt=""
-                className="route-banner__plane h-[18px] w-[34px] shrink-0 object-contain brightness-0 opacity-80 dark:brightness-100 dark:opacity-100"
-              />
-              <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
-            </span>
-          )}
-          <span className={cn("text-right text-[1.1rem] font-semibold tracking-[-0.03em]")}>
-            {flight.to}
-          </span>
+            </div>
+          ) : null}
         </div>
-        <div className="grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_3.7rem] items-start gap-2.5 bp-1024:gap-2 bp-1400:hidden">
+        <div
+          className={cn(
+            "grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_3.7rem] items-start gap-2.5 bp-1024:gap-2 bp-1400:hidden",
+            isCompletedFlight && "opacity-45"
+          )}
+        >
           <span aria-hidden="true" />
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_34px_minmax(0,1fr)] items-start gap-2">
             <small
@@ -741,7 +907,12 @@ function FlightBoardCardSummary({ flight, selectedAccomplishment = null }) {
           </div>
           <span aria-hidden="true" />
         </div>
-        <div className="hidden min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 bp-1400:grid">
+        <div
+          className={cn(
+            "hidden min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 bp-1400:grid",
+            isCompletedFlight && "opacity-45"
+          )}
+        >
           <small className={cn("min-w-0 truncate text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
             {simplifyAirportName(flight.fromAirport)}
           </small>
@@ -785,6 +956,10 @@ export default function DetailsPanel({
     error: "",
     result: null
   },
+  deltaDraftReportUrlState = {
+    boardEntryId: "",
+    url: ""
+  },
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
   simBriefAircraftTypes,
@@ -799,9 +974,9 @@ export default function DetailsPanel({
   onRenameFlightBoard,
   onDeleteFlightBoard,
   onSimBriefTypeChange,
-  onSimBriefDispatch,
+  onDispatchWorkflow,
   onOpenSimBriefFlight = () => {},
-  onPushToAcars = () => {},
+  onDraftOnlySubmit = () => {},
   onCompleteTourFlight,
   showFlightBoard = true
 }) {
@@ -1161,6 +1336,7 @@ export default function DetailsPanel({
                         flight={flight}
                         simBriefDispatchState={simBriefDispatchState}
                         deltaDraftSubmitState={deltaDraftSubmitState}
+                        deltaDraftReportUrlState={deltaDraftReportUrlState}
                         simBriefCredentialsConfigured={simBriefCredentialsConfigured}
                         isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
                         simBriefAircraftTypes={simBriefAircraftTypes}
@@ -1169,9 +1345,9 @@ export default function DetailsPanel({
                         onRemoveFromFlightBoard={onRemoveFromFlightBoard}
                         onCompleteTourFlight={onCompleteTourFlight}
                         onSimBriefTypeChange={onSimBriefTypeChange}
-                        onSimBriefDispatch={onSimBriefDispatch}
+                        onDispatchWorkflow={onDispatchWorkflow}
                         onOpenSimBriefFlight={onOpenSimBriefFlight}
-                        onPushToAcars={onPushToAcars}
+                        onDraftOnlySubmit={onDraftOnlySubmit}
                       />
                     )
                   ) : null}

@@ -12,3 +12,6 @@ git_workflow.md
 release.ps1
 test-data/
 Flight Planner App.code-workspace
+skills-lock.json
+.agents
+.npm-cache

@@ -25,10 +25,10 @@
       "identifier": "fs:scope",
       "allow": [
         {
-          "path": "$APPDATA/flight-planner"
+          "path": "$APPDATA"
         },
         {
-          "path": "$APPDATA/flight-planner/*"
+          "path": "$APPDATA/*"
         }
       ]
     },
@@ -36,10 +36,10 @@
       "identifier": "opener:allow-open-path",
       "allow": [
         {
-          "path": "$APPDATA/flight-planner/log.txt"
+          "path": "$APPDATA/log.txt"
         },
         {
-          "path": "$APPDATA/flight-planner/*"
+          "path": "$APPDATA/*"
         }
       ]
     }
