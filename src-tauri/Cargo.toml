@@ -1,6 +1,6 @@
 [package]
 name = "flight-planner-app"
-version = "0.5.0-alpha"
+version = "0.6.0-beta"
 description = "Desktop flight planner for flight simulator schedule imports."
 authors = ["Jake"]
 edition = "2021"
