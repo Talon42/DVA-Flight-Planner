@@ -10,9 +10,7 @@ use deltava_auth::{
     clear_auth_settings_internal, clear_deltava_auth_settings, read_auth_context_internal,
     read_deltava_auth_settings, save_deltava_auth_settings, save_password_to_credential_manager,
 };
-use deltava_draft::{
-    close_deltava_draft_window, submit_deltava_draft_flight_report, DraftSubmitManager,
-};
+use deltava_draft::{submit_deltava_draft_flight_report, DraftSubmitManager};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use simbrief::{
@@ -49,7 +47,6 @@ const DELTAVA_XML_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_PFPX_XML__";
 const DELTAVA_SYNC_RESULT_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_RESULT__";
 const DELTAVA_DEBUG_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_DEBUG__";
 const DELTAVA_AUTH_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_DVA_AUTH__";
-const APP_STORAGE_DIR: &str = "flight-planner";
 const APP_LOG_FILE: &str = "log.txt";
 const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
 const MAIN_WINDOW_STATE_FILE: &str = "main-window-state.json";
@@ -58,7 +55,6 @@ const MAIN_WINDOW_MIN_HEIGHT: u32 = 768;
 const APP_LOG_MAX_BYTES: u64 = 262_144;
 const DELTAVA_SYNC_DOWNLOAD_FILE: &str = "deltava-pfpxsched.xml";
 const DELTAVA_LOGBOOK_FALLBACK_FILE: &str = "dva-logbook.json";
-const SIMBRIEF_WEBVIEW_DIR: &str = "simbrief-webview";
 const DVA_DRAFT_WEBVIEW_DIR: &str = "deltava-draft-webview";
 static DELTAVA_SYNC_LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 const WEBVIEW_ROOT_PRUNE_DIRS: &[&str] = &[
@@ -1595,6 +1591,16 @@ fn remove_path_if_exists(path: &Path) {
     }
 }
 
+fn remove_dir_contents_if_exists(path: &Path) {
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        remove_path_if_exists(&entry.path());
+    }
+}
+
 fn prune_webview_profile(root: &Path) {
     if !root.exists() {
         return;
@@ -1645,26 +1651,16 @@ fn prune_deltava_storage_internal(
 }
 
 fn clear_user_data_internal(app: &AppHandle) -> Result<(), String> {
-    close_sync_window(app);
-    close_deltava_draft_window(app);
-    close_simbrief_dispatch_window(app.clone());
-
     if let Ok(app_data_dir) = app.path().app_data_dir() {
-        remove_path_if_exists(&app_data_dir);
+        remove_dir_contents_if_exists(&app_data_dir);
     }
 
     let _ = clear_auth_settings_internal(app);
 
     if let Ok(local_data_dir) = app.path().app_local_data_dir() {
-        remove_path_if_exists(&local_data_dir.join("deltava-sync"));
-        remove_path_if_exists(&local_data_dir.join("deltava-webview"));
-        remove_path_if_exists(&local_data_dir.join(DVA_DRAFT_WEBVIEW_DIR));
-        remove_path_if_exists(&local_data_dir.join(SIMBRIEF_WEBVIEW_DIR));
-        remove_path_if_exists(&local_data_dir.join("EBWebView"));
-        remove_path_if_exists(&local_data_dir);
+        remove_dir_contents_if_exists(&local_data_dir);
     }
 
-    remove_path_if_exists(&std::env::temp_dir().join(APP_STORAGE_DIR));
     Ok(())
 }
 
