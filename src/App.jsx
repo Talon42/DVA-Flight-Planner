@@ -1084,6 +1084,14 @@ function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     normalizedFlightNumber && (normalizedAirlineIcao || normalizedAirline)
       ? `${normalizedAirlineIcao || normalizedAirline}${normalizedFlightNumber}`
       : normalizedFlightCode;
+  const normalizedFrom = String(flight?.from || parsedRoute.from || "").trim().toUpperCase();
+  const normalizedTo = String(flight?.to || parsedRoute.to || "").trim().toUpperCase();
+  const normalizedFromAirport = String(
+    flight?.fromAirport || flight?.departureName || parsedRoute.fromAirport || ""
+  ).trim();
+  const normalizedToAirport = String(
+    flight?.toAirport || flight?.destinationName || parsedRoute.toAirport || ""
+  ).trim();
 
   return {
     boardEntryId: overrides.boardEntryId || buildBoardEntryId(flight?.flightId),
@@ -1108,11 +1116,11 @@ function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     airlineName: normalizedAirlineName,
     airlineIcao: normalizedAirlineIcao,
     callsign: normalizedCallsign,
-    from: parsedRoute.from,
-    to: parsedRoute.to,
+    from: normalizedFrom,
+    to: normalizedTo,
     route: String(flight?.route || "").trim(),
-    fromAirport: parsedRoute.fromAirport,
-    toAirport: parsedRoute.toAirport,
+    fromAirport: normalizedFromAirport,
+    toAirport: normalizedToAirport,
     missingAirportIcaos: [],
     hasMissingAirportData: false,
     fromTimezone: "",
@@ -3280,17 +3288,25 @@ export default function App() {
     }
   }
 
-  function handleSelectFlight(flightId, row = null) {
+  function handleSelectFlight(flightId, clickedRow = null) {
     if (scheduleView === "tours") {
-      if (isDevToolsEnabled && row) {
+      const nextSelectedTourRowId = String(
+        clickedRow?.tourRowId || clickedRow?.flightId || flightId || ""
+      ).trim();
+
+      if (isDevToolsEnabled && clickedRow) {
         logAppEvent("tour-row-selected", {
-          clickedTourRowId: String(row?.tourRowId || flightId || "").trim(),
-          clickedTourRoute: String(row?.route || "").trim(),
-          clickedTourFlight: String(row?.flightCode || row?.flightNumber || "").trim(),
-          clickedTourLeg: Number.isFinite(row?.tourLeg) ? row.tourLeg : Number.isFinite(row?.leg) ? row.leg : null
+          clickedTourRowId: nextSelectedTourRowId,
+          clickedTourRoute: String(clickedRow?.route || "").trim(),
+          clickedTourFlight: String(clickedRow?.flightCode || clickedRow?.flightNumber || "").trim(),
+          clickedTourLeg: Number.isFinite(clickedRow?.tourLeg)
+            ? clickedRow.tourLeg
+            : Number.isFinite(clickedRow?.leg)
+              ? clickedRow.leg
+              : null
         }).catch(() => {});
       }
-      setSelectedTourRowId(flightId);
+      setSelectedTourRowId(nextSelectedTourRowId);
       return;
     }
 
@@ -3301,13 +3317,19 @@ export default function App() {
     setExpandedBoardFlightId((current) => (current === flightId ? null : flightId));
   }
 
-  function handleAddToFlightBoard(flightId, row = null) {
+  function handleAddToFlightBoard(flightId, clickedRow = null) {
     if (scheduleView === "tours") {
       const normalizedFlightId = String(flightId || "").trim();
       const matchedTourFlight =
-        row && String(row?.tourRowId || row?.flightId || "").trim() === normalizedFlightId
-          ? row
-          : activeTourRows.find((flight) => flight.tourRowId === normalizedFlightId || flight.flightId === normalizedFlightId);
+        clickedRow?.isTourFlight === true &&
+        String(clickedRow?.tourRowId || clickedRow?.flightId || "").trim() === normalizedFlightId
+          ? clickedRow
+          : activeTourRows.find(
+              (flight) =>
+                flight.tourRowId === normalizedFlightId ||
+                flight.flightId === normalizedFlightId ||
+                flight.linkedFlightId === normalizedFlightId
+            );
       if (!matchedTourFlight) {
         return;
       }
@@ -3332,6 +3354,7 @@ export default function App() {
           current.some(
             (entry) =>
               entry.isTourFlight &&
+              String(entry.tourPath || "").trim() === String(nextBoardEntry.tourPath || "").trim() &&
               String(entry.tourRowId || "").trim() === String(nextBoardEntry.tourRowId || "").trim()
           )
         ) {
