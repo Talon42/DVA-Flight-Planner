@@ -174,6 +174,34 @@ function formatTourLabelFromPath(path) {
     .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
 }
 
+function resolveTourSelectionId(tourOrId) {
+  if (typeof tourOrId === "string") {
+    const normalizedId = String(tourOrId || "").trim();
+    if (!normalizedId) {
+      return "";
+    }
+
+    return normalizedId.startsWith("dva:") ? normalizedId : `dva:${normalizedId}`;
+  }
+
+  const explicitId = String(tourOrId?.id || "").trim();
+  if (explicitId.startsWith("dva:")) {
+    return explicitId;
+  }
+
+  const sourceId = String(tourOrId?.sourceId || "").trim();
+  if (sourceId) {
+    return sourceId.startsWith("dva:") ? sourceId : `dva:${sourceId}`;
+  }
+
+  const path = String(tourOrId?.path || tourOrId?.tourPath || "").trim();
+  if (!path) {
+    return "";
+  }
+
+  return path.startsWith("dva:") ? path : `dva:${path}`;
+}
+
 function buildTourRowIdentity(path, row, index) {
   const explicitId = String(row?.id || row?.flightId || "").trim();
   if (explicitId) {
@@ -1660,10 +1688,12 @@ export default function App() {
       (Array.isArray(deltaVirtualToursCache?.tours) ? deltaVirtualToursCache.tours : [])
         .map((tour) => {
           const path = String(tour?.path || tour?.id || tour?.sourceId || "").trim();
+          const selectionId = resolveTourSelectionId(tour);
           const rows = normalizeTourRows(tour, tour?.rows || tour?.flights || [], tourProgress?.[path]?.rows);
           return {
             ...tour,
             path,
+            selectionId,
             label: String(tour?.label || tour?.name || formatTourLabelFromPath(path)).trim(),
             rows
           };
@@ -1676,7 +1706,7 @@ export default function App() {
       return null;
     }
 
-    return availableTours.find((tour) => tour.path === selectedTourPath) || availableTours[0];
+    return availableTours.find((tour) => tour.selectionId === selectedTourPath) || availableTours[0];
   }, [availableTours, selectedTourPath]);
   const selectedAccomplishment = useMemo(() => {
     if (!ACCOMPLISHMENTS.length) {
@@ -1728,10 +1758,26 @@ export default function App() {
       return;
     }
 
-    if (!selectedTourPath || !availableTours.some((tour) => tour.path === selectedTourPath)) {
-      setSelectedTourPath(availableTours[0].path);
+    if (!selectedTourPath || !availableTours.some((tour) => tour.selectionId === selectedTourPath)) {
+      setSelectedTourPath(availableTours[0].selectionId);
     }
   }, [availableTours, scheduleView, selectedTourPath]);
+
+  function handleSelectTourPath(nextTourSelectionId) {
+    const nextSelectionId = resolveTourSelectionId(nextTourSelectionId);
+    const clickedTour = availableTours.find((tour) => tour.selectionId === nextSelectionId) || null;
+
+    if (isDevToolsEnabled) {
+      logAppEvent("tour-selection-changed", {
+        clickedTourId: clickedTour?.selectionId || nextSelectionId,
+        clickedTourName: clickedTour?.label || clickedTour?.name || "",
+        previousSelectedId: selectedTourPath || "",
+        nextSelectedId: nextSelectionId
+      }).catch(() => {});
+    }
+
+    setSelectedTourPath(nextSelectionId);
+  }
 
   useEffect(() => {
     if (!ACCOMPLISHMENTS.length) {
@@ -2258,7 +2304,7 @@ export default function App() {
         setSort(savedUiState.sort || DEFAULT_SORT);
         // Always reopen on Flights after a full app restart.
         setScheduleView("flights");
-        setSelectedTourPath(String(savedUiState.selectedTourPath || "").trim());
+        setSelectedTourPath(resolveTourSelectionId(savedUiState.selectedTourPath || ""));
         setSelectedAccomplishmentName(
           String(savedUiState.selectedAccomplishmentName || "").trim()
         );
@@ -5374,11 +5420,11 @@ export default function App() {
             pendingMapFitToRoute={pendingMapFitToRoute}
             onConsumePendingMapFitToRoute={() => setPendingMapFitToRoute(false)}
             availableTours={availableTours}
-            selectedTourPath={selectedTour?.path || ""}
+            selectedTourPath={selectedTourPath}
             accomplishmentOptions={ACCOMPLISHMENTS}
             selectedAccomplishmentName={selectedAccomplishment?.name || ""}
             onPrimaryViewChange={handlePrimaryViewChange}
-            onSelectTourPath={setSelectedTourPath}
+            onSelectTourPath={handleSelectTourPath}
             onSelectAccomplishmentName={setSelectedAccomplishmentName}
             accomplishmentRows={accomplishmentRows}
             selectedAccomplishment={selectedAccomplishment}

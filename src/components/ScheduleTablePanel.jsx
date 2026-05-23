@@ -72,13 +72,13 @@ export default function ScheduleTablePanel({
     String(tourSyncMessage || "").trim() ||
     "Run Sync from Delta Virtual to load the current tour list.";
   const selectedTourOption = selectedTourPath
-    ? availableTours.find((tour) => tour.path === selectedTourPath)
+    ? availableTours.find((tour) => tour.selectionId === selectedTourPath)
     : availableTours[0] || null;
   const tourOptions = availableTours.map((tour) => ({
-    value: tour.path,
+    value: tour.selectionId || tour.path,
     label: tour.label,
     selectedLabel: tour.label,
-    keywords: tour.label
+    keywords: `${tour.label} ${tour.name || ""} ${tour.sourceId || ""}`
   }));
   const accomplishmentSelectOptions = accomplishmentOptions.map((accomplishment) => ({
     value: accomplishment.name,
@@ -136,7 +136,7 @@ export default function ScheduleTablePanel({
             showClearAction={false}
             showSingleSelectedLabel
             options={tourOptions}
-            selectedValues={selectedTourOption ? [selectedTourOption.path] : []}
+            selectedValues={selectedTourOption ? [selectedTourOption.selectionId || selectedTourOption.path] : []}
             onChange={(values) => onSelectTourPath?.(values[0] || "")}
           />
         </div>
