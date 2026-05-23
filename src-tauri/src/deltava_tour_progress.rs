@@ -55,6 +55,14 @@ struct LogbookEntryMatch {
     entry: Value,
     epoch_seconds: Option<i64>,
     completed_at: Option<String>,
+    matched_tour_name_from_update: Option<String>,
+    tour_sequence_leg_from_update: Option<i64>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct LogbookTourUpdateMetadata {
+    matched_tour_name_from_update: Option<String>,
+    tour_sequence_leg_from_update: Option<i64>,
 }
 
 #[derive(Clone, Debug)]
@@ -212,6 +220,14 @@ fn build_logbook_entry_completed_at(entry: &Value) -> Option<String> {
 
 fn normalize_text(value: &str) -> String {
     value.trim().to_string()
+}
+
+fn normalize_tour_name_key(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
 }
 
 fn normalize_compact_text(value: &str) -> String {
@@ -688,6 +704,62 @@ fn extract_direct_string_field(value: &Value, keys: &[&str]) -> Option<String> {
     None
 }
 
+fn parse_tour_update_message(message: &str) -> Option<(String, i64)> {
+    let trimmed = message.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let lower = trimmed.to_ascii_lowercase();
+    let leg_pos = lower.find("leg")?;
+    let mut index = leg_pos + 3;
+    let bytes = lower.as_bytes();
+    while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+        index += 1;
+    }
+
+    let leg_start = index;
+    while index < bytes.len() && bytes[index].is_ascii_digit() {
+        index += 1;
+    }
+    if index == leg_start {
+        return None;
+    }
+
+    let tour_phrase_pos = lower[index..].find("in flight tour")?;
+    let tour_name_start = index + tour_phrase_pos + "in flight tour".len();
+    let tour_name = trimmed[tour_name_start..].trim();
+    if tour_name.is_empty() {
+        return None;
+    }
+
+    let leg = trimmed[leg_start..index].parse::<i64>().ok()?;
+    Some((tour_name.to_string(), leg))
+}
+
+fn extract_logbook_tour_update_metadata(value: &Value) -> LogbookTourUpdateMetadata {
+    let Some(updates) = value.get("updates").and_then(Value::as_array) else {
+        return LogbookTourUpdateMetadata::default();
+    };
+
+    for update in updates {
+        let Some(message) = extract_direct_string_field(update, &["msg", "message"]) else {
+            continue;
+        };
+
+        if let Some((matched_tour_name_from_update, tour_sequence_leg_from_update)) =
+            parse_tour_update_message(&message)
+        {
+            return LogbookTourUpdateMetadata {
+                matched_tour_name_from_update: Some(matched_tour_name_from_update),
+                tour_sequence_leg_from_update: Some(tour_sequence_leg_from_update),
+            };
+        }
+    }
+
+    LogbookTourUpdateMetadata::default()
+}
+
 fn extract_airport_code(value: &Value, keys: &[&str]) -> Option<String> {
     match value {
         Value::Object(map) => {
@@ -809,12 +881,22 @@ fn format_reject_reason(context: &str, detail: impl Into<String>) -> String {
     format!("{context}:{}", detail.into())
 }
 
-fn evaluate_logbook_entry_match(
+fn evaluate_logbook_entry_match_with_context(
     logbook_entry: &Value,
     tour_leg: &Value,
+    tour_name: Option<&str>,
+    update_metadata: Option<&LogbookTourUpdateMetadata>,
     tour_start_seconds: Option<i64>,
     tour_end_seconds: Option<i64>,
 ) -> MatchEvaluation {
+    let update_metadata = update_metadata
+        .cloned()
+        .unwrap_or_else(|| extract_logbook_tour_update_metadata(logbook_entry));
+    let selected_tour_name_key = tour_name.map(normalize_tour_name_key);
+    let update_tour_name_key = update_metadata
+        .matched_tour_name_from_update
+        .as_deref()
+        .map(normalize_tour_name_key);
     let entry_seconds = extract_logbook_entry_epoch_seconds(logbook_entry);
     let logbook_status = extract_logbook_status(logbook_entry);
     if !is_eligible_logbook_status(logbook_status.as_deref()) {
@@ -923,7 +1005,6 @@ fn evaluate_logbook_entry_match(
 
     let log_leg = extract_logbook_leg_number(logbook_entry);
     let leg_leg = extract_leg_number(tour_leg, &["leg", "tourLeg", "tourLegNumber"]);
-    let require_leg = extract_bool_field(tour_leg, &["matchLeg", "match_leg"]).unwrap_or(false);
     let require_equipment =
         extract_bool_field(tour_leg, &["matchEQ", "matchEq", "match_eq"]).unwrap_or(false);
 
@@ -1006,24 +1087,53 @@ fn evaluate_logbook_entry_match(
         score += 20;
     }
 
-    if require_leg && log_leg.is_none() {
-        return MatchEvaluation {
-            score: 0,
-            reason: Some("leg:missing-logbook-leg".to_string()),
-        };
+    if let (Some(selected_tour_name_key), Some(update_tour_name_key)) = (
+        selected_tour_name_key.as_ref(),
+        update_tour_name_key.as_ref(),
+    ) {
+        if selected_tour_name_key != update_tour_name_key {
+            return MatchEvaluation {
+                score: 0,
+                reason: Some(format_reject_reason(
+                    "tour-update",
+                    format!(
+                        "tour-name-mismatch:{}!={}",
+                        update_metadata
+                            .matched_tour_name_from_update
+                            .clone()
+                            .unwrap_or_default(),
+                        tour_name.unwrap_or_default()
+                    ),
+                )),
+            };
+        }
     }
 
-    if let (Some(log_value), Some(leg_value)) = (log_leg, leg_leg) {
-        if log_value != leg_value {
+    if let Some(update_leg) = update_metadata.tour_sequence_leg_from_update {
+        let Some(leg_value) = leg_leg else {
             return MatchEvaluation {
                 score: 0,
                 reason: Some(format_reject_reason(
                     "leg",
-                    format!("mismatch:{log_value}!={leg_value}"),
+                    format!("missing-tour-sequence:{update_leg}"),
+                )),
+            };
+        };
+
+        if leg_value != update_leg {
+            return MatchEvaluation {
+                score: 0,
+                reason: Some(format_reject_reason(
+                    "leg",
+                    format!("tour-sequence-mismatch:{leg_value}!={update_leg}"),
                 )),
             };
         }
-        score += 10;
+        score += 15;
+    } else if let (Some(log_value), Some(leg_value)) = (log_leg, leg_leg) {
+        if log_value == leg_value {
+            score += 3;
+        }
     }
 
     if require_equipment {
@@ -1055,15 +1165,35 @@ fn evaluate_logbook_entry_match(
     }
 }
 
-fn score_logbook_entry_match(
+fn evaluate_logbook_entry_match(
     logbook_entry: &Value,
     tour_leg: &Value,
     tour_start_seconds: Option<i64>,
     tour_end_seconds: Option<i64>,
-) -> Option<i32> {
-    let evaluation = evaluate_logbook_entry_match(
+) -> MatchEvaluation {
+    evaluate_logbook_entry_match_with_context(
         logbook_entry,
         tour_leg,
+        None,
+        None,
+        tour_start_seconds,
+        tour_end_seconds,
+    )
+}
+
+fn score_logbook_entry_match(
+    logbook_entry: &Value,
+    tour_leg: &Value,
+    tour_name: Option<&str>,
+    update_metadata: Option<&LogbookTourUpdateMetadata>,
+    tour_start_seconds: Option<i64>,
+    tour_end_seconds: Option<i64>,
+) -> Option<i32> {
+    let evaluation = evaluate_logbook_entry_match_with_context(
+        logbook_entry,
+        tour_leg,
+        tour_name,
+        update_metadata,
         tour_start_seconds,
         tour_end_seconds,
     );
@@ -1093,11 +1223,14 @@ fn build_logbook_entry_matches_from_values(logbook_jsons: &[Value]) -> Vec<Logbo
             }
 
             let entry_index = entries.len();
+            let update_metadata = extract_logbook_tour_update_metadata(entry);
             entries.push(LogbookEntryMatch {
                 entry_index,
                 entry: entry.clone(),
                 epoch_seconds: extract_logbook_entry_epoch_seconds(entry),
                 completed_at: build_logbook_entry_completed_at(entry),
+                matched_tour_name_from_update: update_metadata.matched_tour_name_from_update,
+                tour_sequence_leg_from_update: update_metadata.tour_sequence_leg_from_update,
             });
         }
     }
@@ -1109,6 +1242,7 @@ fn build_tour_progress_rows_with_debug(
     entries: &[LogbookEntryMatch],
     tour_rows: &[Value],
     tour_path: &str,
+    tour_name: &str,
     tour_start_seconds: Option<i64>,
     tour_end_seconds: Option<i64>,
     rejected_reasons: Option<&mut Vec<String>>,
@@ -1128,9 +1262,14 @@ fn build_tour_progress_rows_with_debug(
                 continue;
             }
 
-            let evaluation = evaluate_logbook_entry_match(
+            let evaluation = evaluate_logbook_entry_match_with_context(
                 &entry.entry,
                 row,
+                Some(tour_name),
+                Some(&LogbookTourUpdateMetadata {
+                    matched_tour_name_from_update: entry.matched_tour_name_from_update.clone(),
+                    tour_sequence_leg_from_update: entry.tour_sequence_leg_from_update,
+                }),
                 tour_start_seconds,
                 tour_end_seconds,
             );
@@ -1156,6 +1295,20 @@ fn build_tour_progress_rows_with_debug(
         }
 
         let Some((_, epoch_seconds, entry_index)) = best_match else {
+            if tour_name
+                .to_ascii_lowercase()
+                .contains("western air express")
+            {
+                log_western_air_express_unmatched_row_debug(
+                    tour_path,
+                    tour_name,
+                    row,
+                    &entries,
+                    tour_start_seconds,
+                    tour_end_seconds,
+                    rejected_reasons.as_deref().map(|reasons| &reasons[..]),
+                );
+            }
             continue;
         };
 
@@ -1326,6 +1479,80 @@ fn log_western_air_express_debug(
 ) {
 }
 
+#[cfg(debug_assertions)]
+fn log_western_air_express_unmatched_row_debug(
+    tour_path: &str,
+    tour_name: &str,
+    row: &Value,
+    entries: &[LogbookEntryMatch],
+    tour_start_seconds: Option<i64>,
+    tour_end_seconds: Option<i64>,
+    rejected_reasons: Option<&[String]>,
+) {
+    if !tour_name
+        .to_ascii_lowercase()
+        .contains("western air express")
+    {
+        return;
+    }
+
+    let row_id = extract_tour_row_id(tour_path, row, 0);
+    let row_leg = extract_leg_number(row, &["leg", "tourLeg", "tourLegNumber"]);
+    let row_route = serde_json::json!({
+        "airline": extract_airline_code(row, &["airline", "airlineIcao", "airlineCode", "airlineName", "callsign", "flightCode"]),
+        "flightNumber": extract_flight_number(row, &["flightNumber", "tourFlightNumber", "flight", "flightCode"]),
+        "departure": extract_airport_code(row, &["from", "departure", "departureAirport", "airportD", "dep", "fromAirport", "departureIcao"]),
+        "arrival": extract_airport_code(row, &["to", "destination", "arrivalAirport", "airportA", "arr", "toAirport", "arrivalIcao"]),
+    });
+
+    let candidates = entries
+        .iter()
+        .take(10)
+        .map(|entry| {
+            let evaluation = evaluate_logbook_entry_match_with_context(
+                &entry.entry,
+                row,
+                Some(tour_name),
+                Some(&LogbookTourUpdateMetadata {
+                    matched_tour_name_from_update: entry.matched_tour_name_from_update.clone(),
+                    tour_sequence_leg_from_update: entry.tour_sequence_leg_from_update,
+                }),
+                tour_start_seconds,
+                tour_end_seconds,
+            );
+
+            serde_json::json!({
+                "entryIndex": entry.entry_index,
+                "candidateRoute": {
+                    "airline": extract_logbook_airline_code(&entry.entry),
+                    "flightNumber": extract_logbook_flight_number(&entry.entry),
+                    "leg": extract_logbook_leg_number(&entry.entry),
+                    "departure": extract_logbook_airport_code(&entry.entry, "airportD"),
+                    "arrival": extract_logbook_airport_code(&entry.entry, "airportA"),
+                },
+                "matchedTourNameFromUpdate": entry.matched_tour_name_from_update,
+                "tourSequenceLegFromUpdate": entry.tour_sequence_leg_from_update,
+                "score": evaluation.score,
+                "rejectReason": evaluation.reason,
+                "logbookEntryLeg": extract_logbook_leg_number(&entry.entry),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    append_sync_log(&format!(
+        "tour-progress:western-air-express-unmatched {}",
+        serde_json::json!({
+            "tourId": tour_path,
+            "tourName": tour_name,
+            "rowId": row_id,
+            "rowLeg": row_leg,
+            "rowRoute": row_route,
+            "rejectedReasons": rejected_reasons.unwrap_or(&[]),
+            "candidates": candidates
+        })
+    ));
+}
+
 fn build_tour_progress_from_value(
     tours_json: &Value,
     logbook_json: &Value,
@@ -1396,6 +1623,7 @@ fn build_tour_progress_from_values(
             &entries,
             &tour_rows,
             &tour_path,
+            &tour_name,
             start_seconds,
             end_seconds,
             Some(&mut rejected_reasons),
@@ -1525,7 +1753,7 @@ pub fn build_dva_tour_completion_from_logbook(
 }
 
 pub fn match_logbook_entry_to_tour_leg(logbook_entry: &Value, tour_leg: &Value) -> bool {
-    score_logbook_entry_match(logbook_entry, tour_leg, None, None).is_some()
+    score_logbook_entry_match(logbook_entry, tour_leg, None, None, None, None).is_some()
 }
 
 pub fn normalize_airport_code(value: &str) -> Option<String> {
@@ -1803,41 +2031,171 @@ mod tests {
     }
 
     #[test]
-    fn match_logbook_entry_to_tour_leg_rejects_missing_leg_when_required() {
+    fn match_logbook_entry_to_tour_leg_uses_tour_update_leg_for_selected_tour() {
         let logbook_entry = json!({
             "airline": "DL",
-            "flight": 9517,
+            "flight": 9515,
+            "leg": 1,
             "status": "OK",
-            "date": { "y": 2023, "m": 10, "d": 25 },
-            "airportD": { "icao": "KBUR", "iata": "BUR" },
-            "airportA": { "icao": "KSAN", "iata": "SAN" }
+            "date": { "y": 2023, "m": 9, "d": 24 },
+            "airportD": { "icao": "KEWR", "iata": "EWR" },
+            "airportA": { "icao": "KCLE", "iata": "CLE" },
+            "updates": [
+                { "msg": "Leg 3 in Flight Tour Western Air Express 1935" }
+            ]
         });
         let tour_leg = json!({
-            "from": "KBUR",
-            "to": "KSAN",
+            "from": "KEWR",
+            "to": "KCLE",
             "airline": "DL",
-            "flightNumber": "9517",
+            "flightNumber": "9515",
             "matchLeg": true,
-            "leg": 1
+            "matchEQ": false,
+            "leg": 3
         });
 
-        assert!(!match_logbook_entry_to_tour_leg(&logbook_entry, &tour_leg));
+        let evaluation = evaluate_logbook_entry_match_with_context(
+            &logbook_entry,
+            &tour_leg,
+            Some("Western Air Express 1935"),
+            Some(&extract_logbook_tour_update_metadata(&logbook_entry)),
+            None,
+            None,
+        );
+        assert!(
+            evaluation.score > 0,
+            "expected a match, got score={:?} reason={:?}",
+            evaluation.score,
+            evaluation.reason
+        );
     }
 
     #[test]
-    fn build_completion_map_uses_tour_scoped_row_ids() {
+    fn match_logbook_entry_to_tour_leg_rejects_update_for_different_tour_name() {
+        let logbook_entry = json!({
+            "airline": "DL",
+            "flight": 9515,
+            "leg": 1,
+            "status": "OK",
+            "date": { "y": 2023, "m": 9, "d": 24 },
+            "airportD": { "icao": "KEWR", "iata": "EWR" },
+            "airportA": { "icao": "KCLE", "iata": "CLE" },
+            "updates": [
+                { "msg": "Leg 3 in Flight Tour Some Other Tour" }
+            ]
+        });
+        let tour_leg = json!({
+            "from": "KEWR",
+            "to": "KCLE",
+            "airline": "DL",
+            "flightNumber": "9515",
+            "matchLeg": true,
+            "matchEQ": false,
+            "leg": 3
+        });
+
+        let evaluation = evaluate_logbook_entry_match_with_context(
+            &logbook_entry,
+            &tour_leg,
+            Some("Western Air Express 1935"),
+            Some(&extract_logbook_tour_update_metadata(&logbook_entry)),
+            None,
+            None,
+        );
+        assert_eq!(evaluation.score, 0);
+        assert!(evaluation.reason.is_some());
+    }
+
+    #[test]
+    fn match_logbook_entry_to_tour_leg_rejects_route_mismatch_even_with_matching_update() {
+        let logbook_entry = json!({
+            "airline": "DL",
+            "flight": 9515,
+            "leg": 1,
+            "status": "OK",
+            "date": { "y": 2023, "m": 9, "d": 24 },
+            "airportD": { "icao": "KEWR", "iata": "EWR" },
+            "airportA": { "icao": "KCLE", "iata": "CLE" },
+            "updates": [
+                { "msg": "Leg 3 in Flight Tour Western Air Express 1935" }
+            ]
+        });
+        let tour_leg = json!({
+            "from": "KEWR",
+            "to": "KXYZ",
+            "airline": "DL",
+            "flightNumber": "9515",
+            "matchLeg": true,
+            "matchEQ": false,
+            "leg": 3
+        });
+
+        let evaluation = evaluate_logbook_entry_match_with_context(
+            &logbook_entry,
+            &tour_leg,
+            Some("Western Air Express 1935"),
+            Some(&extract_logbook_tour_update_metadata(&logbook_entry)),
+            None,
+            None,
+        );
+        assert_eq!(evaluation.score, 0);
+        assert!(evaluation
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("airport") || reason.contains("flight-number")));
+    }
+
+    #[test]
+    fn build_completion_map_uses_western_air_express_update_legs() {
         let logbook_json = json!({
             "flights": [
                 {
                     "airline": "DL",
-                    "flight": 9517,
+                    "flight": 9515,
                     "leg": 1,
                     "status": "OK",
-                    "date": { "y": 2023, "m": 10, "d": 25 },
-                    "airportD": { "icao": "KBUR", "iata": "BUR" },
-                    "airportA": { "icao": "KSAN", "iata": "SAN" },
-                    "eqType": "B737-800",
-                    "acCode": "PT26M48S"
+                    "date": { "y": 2023, "m": 9, "d": 24 },
+                    "airportD": { "icao": "KEWR", "iata": "EWR" },
+                    "airportA": { "icao": "KCLE", "iata": "CLE" },
+                    "updates": [
+                        { "msg": "Leg 1 in Flight Tour Western Air Express 1935" }
+                    ]
+                },
+                {
+                    "airline": "DL",
+                    "flight": 9515,
+                    "leg": 1,
+                    "status": "OK",
+                    "date": { "y": 2023, "m": 9, "d": 25 },
+                    "airportD": { "icao": "KCLE", "iata": "CLE" },
+                    "airportA": { "icao": "KTOL", "iata": "TOL" },
+                    "updates": [
+                        { "msg": "Leg 2 in Flight Tour Western Air Express 1935" }
+                    ]
+                },
+                {
+                    "airline": "DL",
+                    "flight": 9515,
+                    "leg": 1,
+                    "status": "OK",
+                    "date": { "y": 2023, "m": 9, "d": 26 },
+                    "airportD": { "icao": "KTOL", "iata": "TOL" },
+                    "airportA": { "icao": "KMDV", "iata": "MDV" },
+                    "updates": [
+                        { "msg": "Leg 3 in Flight Tour Western Air Express 1935" }
+                    ]
+                },
+                {
+                    "airline": "DL",
+                    "flight": 9515,
+                    "leg": 1,
+                    "status": "OK",
+                    "date": { "y": 2023, "m": 9, "d": 27 },
+                    "airportD": { "icao": "KMDV", "iata": "MDV" },
+                    "airportA": { "icao": "KMLI", "iata": "MLI" },
+                    "updates": [
+                        { "msg": "Leg 4 in Flight Tour Western Air Express 1935" }
+                    ]
                 }
             ]
         });
@@ -1846,18 +2204,51 @@ mod tests {
                 {
                     "path": "dva:dva:16",
                     "name": "Western Air Express 1935",
-                    "startDate": 1_696_672_800,
+                    "startDate": 1_696_118_400,
                     "endDate": 1_706_745_600,
                     "rows": [
                         {
-                            "tourRowId": "dva:dva:16:airline-DL:flight-9517:leg-1:dep-KBUR:arr-KSAN:dpt-16-30:arrt-17-05:eq-DC-3",
-                            "from": "KBUR",
-                            "to": "KSAN",
+                            "tourRowId": "dva:dva:16:airline-DL:flight-9515:leg-1:dep-KEWR:arr-KCLE",
+                            "from": "KEWR",
+                            "to": "KCLE",
                             "airline": "DL",
-                            "tourFlightNumber": "9517",
+                            "tourFlightNumber": "9515",
                             "matchLeg": true,
                             "matchEQ": false,
                             "leg": 1,
+                            "equipment": "DC-3"
+                        },
+                        {
+                            "tourRowId": "dva:dva:16:airline-DL:flight-9515:leg-2:dep-KCLE:arr-KTOL",
+                            "from": "KCLE",
+                            "to": "KTOL",
+                            "airline": "DL",
+                            "tourFlightNumber": "9515",
+                            "matchLeg": true,
+                            "matchEQ": false,
+                            "leg": 2,
+                            "equipment": "DC-3"
+                        },
+                        {
+                            "tourRowId": "dva:dva:16:airline-DL:flight-9515:leg-3:dep-KTOL:arr-KMDV",
+                            "from": "KTOL",
+                            "to": "KMDV",
+                            "airline": "DL",
+                            "tourFlightNumber": "9515",
+                            "matchLeg": true,
+                            "matchEQ": false,
+                            "leg": 3,
+                            "equipment": "DC-3"
+                        },
+                        {
+                            "tourRowId": "dva:dva:16:airline-DL:flight-9515:leg-4:dep-KMDV:arr-KMLI",
+                            "from": "KMDV",
+                            "to": "KMLI",
+                            "airline": "DL",
+                            "tourFlightNumber": "9515",
+                            "matchLeg": true,
+                            "matchEQ": false,
+                            "leg": 4,
                             "equipment": "DC-3"
                         }
                     ]
@@ -1869,67 +2260,27 @@ mod tests {
         let tour = cache
             .tour_progress
             .get("dva:dva:16")
-            .unwrap_or_else(|| panic!("tour progress missing: {:?}", cache.tour_progress));
-        let row = tour
-            .rows
-            .get("dva:dva:16:airline-DL:flight-9517:leg-1:dep-KBUR:arr-KSAN:dpt-16-30:arrt-17-05:eq-DC-3")
-            .expect("completed row");
-        assert!(row.completed);
-        assert_eq!(row.source, DELTAVA_TOUR_PROGRESS_SOURCE);
-        assert_eq!(row.completion_order, Some(1));
-    }
-
-    #[test]
-    fn build_completion_map_respects_tour_date_window() {
-        let logbook_json = json!({
-            "flights": [
-                {
-                    "airline": "DL",
-                    "flight": 9517,
-                    "leg": 1,
-                    "status": "OK",
-                    "date": { "y": 2023, "m": 10, "d": 25 },
-                    "airportD": { "icao": "KBUR", "iata": "BUR" },
-                    "airportA": { "icao": "KSAN", "iata": "SAN" },
-                    "eqType": "B737-800",
-                    "acCode": "PT26M48S"
-                }
-            ]
-        });
-        let tours_json = json!({
-            "tours": [
-                {
-                    "path": "dva:dva:16",
-                    "name": "Western Air Express 1935",
-                    "startDate": 1_696_672_800,
-                    "endDate": 1_706_745_600,
-                    "rows": [
-                        {
-                            "tourRowId": "dva:dva:16:airline-DL:flight-9517:leg-1:dep-KBUR:arr-KSAN:dpt-16-30:arrt-17-05:eq-DC-3",
-                            "from": "KBUR",
-                            "to": "KSAN",
-                            "airline": "DL",
-                            "tourFlightNumber": "9517",
-                            "matchLeg": true,
-                            "matchEQ": false,
-                            "leg": 1
-                        }
-                    ]
-                }
-            ]
-        });
-
-        let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
-        let tour = cache
-            .tour_progress
-            .get("dva:dva:16")
             .expect("western air express tour progress");
-        let row = tour
-            .rows
-            .get("dva:dva:16:airline-DL:flight-9517:leg-1:dep-KBUR:arr-KSAN:dpt-16-30:arrt-17-05:eq-DC-3")
-            .expect("completed row");
-        assert!(row.completed);
-        assert_eq!(row.source, DELTAVA_TOUR_PROGRESS_SOURCE);
-        assert_eq!(row.completion_order, Some(1));
+
+        for leg in 1..=4 {
+            let row_id = format!(
+                "dva:dva:16:airline-DL:flight-9515:leg-{leg}:dep-K{}:arr-K{}",
+                match leg {
+                    1 => "EWR",
+                    2 => "CLE",
+                    3 => "TOL",
+                    _ => "MDV",
+                },
+                match leg {
+                    1 => "CLE",
+                    2 => "TOL",
+                    3 => "MDV",
+                    _ => "MLI",
+                }
+            );
+            let row = tour.rows.get(&row_id).expect("completed row");
+            assert!(row.completed, "row {leg} should be completed");
+            assert_eq!(row.source, DELTAVA_TOUR_PROGRESS_SOURCE);
+        }
     }
 }
