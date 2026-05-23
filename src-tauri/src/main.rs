@@ -1661,6 +1661,7 @@ fn clear_user_data_internal(app: &AppHandle) -> Result<(), String> {
         remove_path_if_exists(&local_data_dir.join(DVA_DRAFT_WEBVIEW_DIR));
         remove_path_if_exists(&local_data_dir.join(SIMBRIEF_WEBVIEW_DIR));
         remove_path_if_exists(&local_data_dir.join("EBWebView"));
+        remove_path_if_exists(&local_data_dir);
     }
 
     remove_path_if_exists(&std::env::temp_dir().join(APP_STORAGE_DIR));
