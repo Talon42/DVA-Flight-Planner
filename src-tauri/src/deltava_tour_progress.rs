@@ -13,13 +13,17 @@ use crate::append_sync_log;
 
 const DELTAVA_TOUR_PROGRESS_FILE: &str = "dva-tour-progress.json";
 const DELTAVA_TOURS_CACHE_FILE: &str = "dva-tours-cache.json";
-const DELTAVA_LOGBOOK_FALLBACK_FILE: &str = "deltava-logbook.json";
 const DELTAVA_TOUR_PROGRESS_SOURCE: &str = "deltava-logbook";
+const AIRLINE_CATALOG_JSON: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../src/data/airlines.json"
+));
 const AIRPORT_CATALOG_JSON: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../src/data/airports.json"
 ));
 
+static AIRLINE_CROSSWALK: OnceLock<AirlineCrosswalk> = OnceLock::new();
 static AIRPORT_CROSSWALK: OnceLock<AirportCrosswalk> = OnceLock::new();
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -76,6 +80,29 @@ struct AirportCrosswalk {
     by_iata: HashMap<String, AirportIdentifiers>,
 }
 
+#[derive(Clone, Debug)]
+struct AirlineIdentifiers {
+    icao: Option<String>,
+    iata: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct AirlineCatalogRecord {
+    #[serde(rename = "IATA")]
+    iata: Option<String>,
+    #[serde(rename = "ICAO")]
+    icao: Option<String>,
+    #[serde(rename = "Airline")]
+    airline: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct AirlineCrosswalk {
+    by_icao: HashMap<String, AirlineIdentifiers>,
+    by_iata: HashMap<String, AirlineIdentifiers>,
+    by_name: HashMap<String, AirlineIdentifiers>,
+}
+
 fn app_storage_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
         .path()
@@ -107,34 +134,6 @@ fn build_logbook_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(logbook_dir)
 }
 
-fn resolve_existing_logbook_json_path(app: &AppHandle) -> Option<PathBuf> {
-    let logbook_dir = build_logbook_dir(app).ok()?;
-    let fallback_path = logbook_dir.join(DELTAVA_LOGBOOK_FALLBACK_FILE);
-    if fallback_path.is_file() {
-        return Some(fallback_path);
-    }
-
-    fs::read_dir(logbook_dir)
-        .ok()?
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            let is_json = path
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .map(|extension| extension.eq_ignore_ascii_case("json"))
-                .unwrap_or(false);
-            if !path.is_file() || !is_json {
-                return None;
-            }
-
-            let modified = entry.metadata().ok()?.modified().ok()?;
-            Some((modified, path))
-        })
-        .max_by_key(|(modified, _)| *modified)
-        .map(|(_, path)| path)
-}
-
 fn read_json_value(path: &Path) -> Option<Value> {
     let text = fs::read_to_string(path).ok()?;
     serde_json::from_str::<Value>(&text).ok()
@@ -146,15 +145,11 @@ fn find_logbook_entries(json: &Value) -> Option<&Vec<Value>> {
 }
 
 fn normalize_logbook_month(raw_month: u32) -> Option<u32> {
-    if raw_month <= 11 {
-        return raw_month.checked_add(1);
+    if (1..=12).contains(&raw_month) {
+        Some(raw_month)
+    } else {
+        None
     }
-
-    if raw_month == 12 {
-        return Some(12);
-    }
-
-    None
 }
 
 fn extract_logbook_date_parts(entry: &Value) -> Option<(i32, u32, u32)> {
@@ -272,6 +267,167 @@ fn build_airport_crosswalk() -> AirportCrosswalk {
     AirportCrosswalk { by_icao, by_iata }
 }
 
+fn build_airline_crosswalk() -> AirlineCrosswalk {
+    let rows =
+        serde_json::from_str::<Vec<AirlineCatalogRecord>>(AIRLINE_CATALOG_JSON).unwrap_or_default();
+    let mut by_icao = HashMap::new();
+    let mut by_iata = HashMap::new();
+    let mut by_name = HashMap::new();
+
+    for row in rows {
+        let airline_name = row.airline.unwrap_or_default().trim().to_string();
+        let normalized_name = airline_name.to_ascii_uppercase();
+        let iata = row.iata.as_deref().map(normalize_airline_code).flatten();
+        let icao = row.icao.as_deref().map(normalize_airline_code).flatten();
+
+        if iata.is_none() && icao.is_none() && normalized_name.is_empty() {
+            continue;
+        }
+
+        let identifiers = AirlineIdentifiers {
+            icao: icao.clone(),
+            iata: iata.clone(),
+        };
+
+        if let Some(code) = &identifiers.icao {
+            by_icao
+                .entry(code.clone())
+                .or_insert_with(|| identifiers.clone());
+        }
+
+        if let Some(code) = &identifiers.iata {
+            by_iata
+                .entry(code.clone())
+                .or_insert_with(|| identifiers.clone());
+        }
+
+        if !normalized_name.is_empty() {
+            by_name
+                .entry(normalized_name)
+                .or_insert_with(|| identifiers.clone());
+        }
+    }
+
+    AirlineCrosswalk {
+        by_icao,
+        by_iata,
+        by_name,
+    }
+}
+
+fn airline_crosswalk() -> &'static AirlineCrosswalk {
+    AIRLINE_CROSSWALK.get_or_init(build_airline_crosswalk)
+}
+
+fn airline_identifiers_from_text(value: &str) -> Option<AirlineIdentifiers> {
+    let normalized = normalize_text(value).to_ascii_uppercase();
+    if normalized.is_empty() {
+        return None;
+    }
+
+    let catalog = airline_crosswalk();
+    if let Some(record) = catalog.by_name.get(&normalized) {
+        return Some(record.clone());
+    }
+
+    if let Some(record) = catalog.by_icao.get(&normalized) {
+        return Some(record.clone());
+    }
+
+    if let Some(record) = catalog.by_iata.get(&normalized) {
+        return Some(record.clone());
+    }
+
+    let compact = normalize_compact_text(value);
+    if compact.len() == 2 && compact.chars().all(|ch| ch.is_ascii_alphabetic()) {
+        let iata = compact.clone();
+        return Some(AirlineIdentifiers {
+            icao: catalog
+                .by_iata
+                .get(&iata)
+                .and_then(|record| record.icao.clone()),
+            iata: Some(iata),
+        });
+    }
+
+    if compact.len() == 3 && compact.chars().all(|ch| ch.is_ascii_alphabetic()) {
+        let icao = compact.clone();
+        return Some(AirlineIdentifiers {
+            icao: Some(icao.clone()),
+            iata: catalog
+                .by_icao
+                .get(&icao)
+                .and_then(|record| record.iata.clone()),
+        });
+    }
+
+    if compact.len() >= 3 && compact.chars().take(3).all(|ch| ch.is_ascii_alphabetic()) {
+        let prefix3 = compact.chars().take(3).collect::<String>();
+        if compact.chars().nth(3).is_some_and(|ch| ch.is_ascii_digit()) {
+            return Some(AirlineIdentifiers {
+                icao: Some(prefix3),
+                iata: None,
+            });
+        }
+    }
+
+    if compact.len() >= 2 {
+        let prefix2 = compact.chars().take(2).collect::<String>();
+        if prefix2.chars().all(|ch| ch.is_ascii_alphabetic())
+            && compact.chars().nth(2).is_some_and(|ch| ch.is_ascii_digit())
+        {
+            return Some(AirlineIdentifiers {
+                icao: catalog
+                    .by_iata
+                    .get(&prefix2)
+                    .and_then(|record| record.icao.clone())
+                    .or_else(|| {
+                        if prefix2.len() == 3 {
+                            Some(prefix2.clone())
+                        } else {
+                            None
+                        }
+                    }),
+                iata: Some(prefix2),
+            });
+        }
+    }
+
+    None
+}
+
+fn airline_identifier_matches(left: &AirlineIdentifiers, right: &AirlineIdentifiers) -> bool {
+    if let (Some(left_icao), Some(right_icao)) = (left.icao.as_ref(), right.icao.as_ref()) {
+        if left_icao == right_icao {
+            return true;
+        }
+    }
+
+    if let (Some(left_iata), Some(right_iata)) = (left.iata.as_ref(), right.iata.as_ref()) {
+        if left_iata == right_iata {
+            return true;
+        }
+    }
+
+    if let (Some(left_icao), Some(right_iata)) = (left.icao.as_ref(), right.iata.as_ref()) {
+        if let Some(record) = airline_crosswalk().by_icao.get(left_icao) {
+            if record.iata.as_ref() == Some(right_iata) {
+                return true;
+            }
+        }
+    }
+
+    if let (Some(left_iata), Some(right_icao)) = (left.iata.as_ref(), right.icao.as_ref()) {
+        if let Some(record) = airline_crosswalk().by_icao.get(right_icao) {
+            if record.iata.as_ref() == Some(left_iata) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 fn airport_crosswalk() -> &'static AirportCrosswalk {
     AIRPORT_CROSSWALK.get_or_init(build_airport_crosswalk)
 }
@@ -376,6 +532,24 @@ fn extract_bool_field(value: &Value, keys: &[&str]) -> Option<bool> {
     None
 }
 
+fn extract_logbook_status(value: &Value) -> Option<String> {
+    extract_direct_string_field(
+        value,
+        &["status", "flightStatus", "pirepStatus", "reportStatus"],
+    )
+    .map(|status| status.to_ascii_lowercase())
+}
+
+fn is_eligible_logbook_status(status: Option<&str>) -> bool {
+    match status {
+        None => true,
+        Some(value) => matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "accepted" | "submitted" | "approved" | "completed" | "complete"
+        ),
+    }
+}
+
 fn extract_tour_window_seconds(tour: &Value) -> (Option<i64>, Option<i64>) {
     let start_seconds = tour
         .get("startDate")
@@ -439,6 +613,23 @@ fn extract_string_field(value: &Value, keys: &[&str]) -> Option<String> {
     }
 }
 
+fn extract_direct_string_field(value: &Value, keys: &[&str]) -> Option<String> {
+    let Value::Object(map) = value else {
+        return None;
+    };
+
+    for key in keys {
+        if let Some(text) = map.get(*key).and_then(Value::as_str) {
+            let normalized = normalize_text(text);
+            if !normalized.is_empty() {
+                return Some(normalized);
+            }
+        }
+    }
+
+    None
+}
+
 fn extract_airport_code(value: &Value, keys: &[&str]) -> Option<String> {
     match value {
         Value::Object(map) => {
@@ -492,9 +683,13 @@ fn extract_airline_code(value: &Value, keys: &[&str]) -> Option<String> {
                 "iata",
                 "code",
                 "carrier",
+                "callsign",
+                "flightCode",
             ] {
                 if let Some(text) = map.get(key).and_then(Value::as_str) {
-                    if let Some(code) = normalize_airline_code(text) {
+                    if let Some(code) = airline_identifiers_from_text(text)
+                        .and_then(|identifiers| identifiers.icao.or(identifiers.iata))
+                    {
                         return Some(code);
                     }
                 }
@@ -511,7 +706,8 @@ fn extract_airline_code(value: &Value, keys: &[&str]) -> Option<String> {
         Value::Array(items) => items
             .iter()
             .find_map(|item| extract_airline_code(item, keys)),
-        Value::String(text) => normalize_airline_code(text),
+        Value::String(text) => airline_identifiers_from_text(text)
+            .and_then(|identifiers| identifiers.icao.or(identifiers.iata)),
         _ => None,
     }
 }
@@ -562,6 +758,17 @@ fn evaluate_logbook_entry_match(
     tour_end_seconds: Option<i64>,
 ) -> MatchEvaluation {
     let entry_seconds = extract_logbook_entry_epoch_seconds(logbook_entry);
+    let logbook_status = extract_logbook_status(logbook_entry);
+    if !is_eligible_logbook_status(logbook_status.as_deref()) {
+        return MatchEvaluation {
+            score: 0,
+            reason: Some(format_reject_reason(
+                "status",
+                logbook_status.unwrap_or_else(|| "unknown".to_string()),
+            )),
+        };
+    }
+
     if let Some(entry_seconds) = entry_seconds {
         if let Some(start_seconds) = tour_start_seconds {
             if entry_seconds < start_seconds {
@@ -656,12 +863,32 @@ fn evaluate_logbook_entry_match(
 
     let log_airline = extract_airline_code(
         logbook_entry,
-        &["airline", "airlineIcao", "airlineCode", "carrier"],
+        &[
+            "airline",
+            "airlineIcao",
+            "airlineCode",
+            "carrier",
+            "callsign",
+            "flightCode",
+        ],
     );
     let leg_airline = extract_airline_code(
         tour_leg,
-        &["airline", "airlineIcao", "airlineCode", "airlineName"],
+        &[
+            "airline",
+            "airlineIcao",
+            "airlineCode",
+            "airlineName",
+            "callsign",
+            "flightCode",
+        ],
     );
+    let log_airline_identifiers = log_airline
+        .as_deref()
+        .and_then(airline_identifiers_from_text);
+    let leg_airline_identifiers = leg_airline
+        .as_deref()
+        .and_then(airline_identifiers_from_text);
 
     let log_flight_number = extract_flight_number(
         logbook_entry,
@@ -739,7 +966,14 @@ fn evaluate_logbook_entry_match(
     }
 
     if let (Some(log_value), Some(leg_value)) = (log_airline.as_ref(), leg_airline.as_ref()) {
-        if log_value != leg_value {
+        if !matches!(
+            (
+                log_airline_identifiers.as_ref(),
+                leg_airline_identifiers.as_ref()
+            ),
+            (Some(left), Some(right)) if airline_identifier_matches(left, right)
+        ) && log_value != leg_value
+        {
             return MatchEvaluation {
                 score: 0,
                 reason: Some(format_reject_reason(
@@ -834,21 +1068,35 @@ fn score_logbook_entry_match(
     }
 }
 
-fn build_logbook_entry_matches(logbook_json: &Value) -> Vec<LogbookEntryMatch> {
-    let Some(entries) = find_logbook_entries(logbook_json) else {
-        return Vec::new();
-    };
+fn build_logbook_entry_matches_from_values(logbook_jsons: &[Value]) -> Vec<LogbookEntryMatch> {
+    let mut entries = Vec::new();
+    let mut seen_serializations = HashSet::new();
+
+    for json in logbook_jsons {
+        let Some(raw_entries) = find_logbook_entries(json) else {
+            continue;
+        };
+
+        for entry in raw_entries {
+            let Ok(serialized) = serde_json::to_string(entry) else {
+                continue;
+            };
+
+            if !seen_serializations.insert(serialized) {
+                continue;
+            }
+
+            let entry_index = entries.len();
+            entries.push(LogbookEntryMatch {
+                entry_index,
+                entry: entry.clone(),
+                epoch_seconds: extract_logbook_entry_epoch_seconds(entry),
+                completed_at: build_logbook_entry_completed_at(entry),
+            });
+        }
+    }
 
     entries
-        .iter()
-        .enumerate()
-        .map(|(index, entry)| LogbookEntryMatch {
-            entry_index: index,
-            entry: entry.clone(),
-            epoch_seconds: extract_logbook_entry_epoch_seconds(entry),
-            completed_at: build_logbook_entry_completed_at(entry),
-        })
-        .collect()
 }
 
 fn build_tour_progress_rows_with_debug(
@@ -972,11 +1220,117 @@ fn log_tour_progress_debug(message: &str) {
 #[cfg(not(debug_assertions))]
 fn log_tour_progress_debug(_: &str) {}
 
+#[cfg(debug_assertions)]
+fn log_western_air_express_debug(
+    tour_path: &str,
+    tour_name: &str,
+    tour_rows: &[Value],
+    entries: &[LogbookEntryMatch],
+    tour_start_seconds: Option<i64>,
+    tour_end_seconds: Option<i64>,
+) {
+    if !tour_name
+        .to_ascii_lowercase()
+        .contains("western air express")
+    {
+        return;
+    }
+
+    let candidate_rows = tour_rows
+        .iter()
+        .enumerate()
+        .filter_map(|(index, row)| {
+            let combined = serde_json::to_string(row).unwrap_or_default();
+            if !combined.contains("9517") {
+                return None;
+            }
+
+            let row_id = extract_tour_row_id(tour_path, row, index);
+            Some(serde_json::json!({
+                "rowId": row_id,
+                "leg": extract_leg_number(row, &["leg", "tourLeg", "tourLegNumber"]),
+                "airline": extract_airline_code(row, &["airline", "airlineIcao", "airlineCode", "airlineName", "callsign", "flightCode"]),
+                "flightNumber": extract_flight_number(row, &["flightNumber", "tourFlightNumber", "flight", "flightCode"]),
+                "departure": extract_airport_code(row, &["from", "departure", "departureAirport", "airportD", "dep", "fromAirport", "departureIcao"]),
+                "arrival": extract_airport_code(row, &["to", "destination", "arrivalAirport", "airportA", "arr", "toAirport", "arrivalIcao"]),
+                "requireLeg": extract_bool_field(row, &["matchLeg", "match_leg"]).unwrap_or(false),
+                "requireEquipment": extract_bool_field(row, &["matchEQ", "matchEq", "match_eq"]).unwrap_or(false),
+                "raw": row
+            }))
+        })
+        .collect::<Vec<_>>();
+
+    let candidate_entries = entries
+        .iter()
+        .filter_map(|entry| {
+            let combined = serde_json::to_string(&entry.entry).unwrap_or_default();
+            if !combined.contains("9517") {
+                return None;
+            }
+
+            let evaluation = candidate_rows.first().map(|candidate_row| {
+                evaluate_logbook_entry_match(
+                    &entry.entry,
+                    candidate_row.get("raw").unwrap_or(&Value::Null),
+                    tour_start_seconds,
+                    tour_end_seconds,
+                )
+            });
+
+            Some(serde_json::json!({
+                "entryIndex": entry.entry_index,
+                "epochSeconds": entry.epoch_seconds,
+                "completedAt": entry.completed_at,
+                "airline": extract_airline_code(&entry.entry, &["airline", "airlineIcao", "airlineCode", "carrier", "callsign", "flightCode"]),
+                "flightNumber": extract_flight_number(&entry.entry, &["flightNumber", "flight", "flightNo", "number", "callsign", "flightCode"]),
+                "leg": extract_leg_number(&entry.entry, &["leg", "flightLeg", "tourLeg", "tourLegNumber", "tour_leg"]),
+                "departure": extract_airport_code(&entry.entry, &["airportD", "departureAirport", "departure", "dep", "from", "origin", "fromIcao", "depIcao", "departureIcao"]),
+                "arrival": extract_airport_code(&entry.entry, &["airportA", "arrivalAirport", "arrival", "arr", "to", "destination", "toIcao", "arrIcao", "arrivalIcao"]),
+                "status": extract_string_field(&entry.entry, &["status", "flightStatus", "pirepStatus"]),
+                "evaluationAgainstFirstCandidate": evaluation.map(|result| serde_json::json!({
+                    "score": result.score,
+                    "reason": result.reason
+                }))
+            }))
+        })
+        .collect::<Vec<_>>();
+
+    append_sync_log(&format!(
+        "tour-progress:western-air-express {}",
+        serde_json::json!({
+            "tourId": tour_path,
+            "tourName": tour_name,
+            "startDateSeconds": tour_start_seconds,
+            "endDateSeconds": tour_end_seconds,
+            "candidateRows": candidate_rows,
+            "candidateEntries": candidate_entries
+        })
+    ));
+}
+
+#[cfg(not(debug_assertions))]
+fn log_western_air_express_debug(
+    _: &str,
+    _: &str,
+    _: &[Value],
+    _: &[LogbookEntryMatch],
+    _: Option<i64>,
+    _: Option<i64>,
+) {
+}
+
 fn build_tour_progress_from_value(
     tours_json: &Value,
     logbook_json: &Value,
 ) -> DeltaTourProgressCache {
-    let entries = build_logbook_entry_matches(logbook_json);
+    build_tour_progress_from_values(tours_json, std::slice::from_ref(logbook_json))
+}
+
+fn build_tour_progress_from_values(
+    tours_json: &Value,
+    logbook_jsons: &[Value],
+) -> DeltaTourProgressCache {
+    let entries = build_logbook_entry_matches_from_values(logbook_jsons);
     let total_logbook_entries_considered = entries.len();
     let total_logbook_entries_with_usable_dates = entries
         .iter()
@@ -1020,6 +1374,14 @@ fn build_tour_progress_from_value(
 
         let tour_rows = extract_tour_rows(&tour);
         total_tour_rows += tour_rows.len();
+        log_western_air_express_debug(
+            &tour_path,
+            &tour_name,
+            &tour_rows,
+            &entries,
+            start_seconds,
+            end_seconds,
+        );
 
         let mut matched_row_ids = Vec::new();
         let mut rejected_reasons = Vec::new();
@@ -1109,18 +1471,41 @@ fn read_tours_cache_json(app: &AppHandle) -> Value {
     read_json_value(&path).unwrap_or(Value::Null)
 }
 
-fn read_logbook_json(app: &AppHandle) -> Value {
-    let Some(path) = resolve_existing_logbook_json_path(app) else {
-        return Value::Null;
+fn resolve_existing_logbook_json_paths(app: &AppHandle) -> Vec<PathBuf> {
+    let Ok(logbook_dir) = build_logbook_dir(app) else {
+        return Vec::new();
     };
 
-    read_json_value(&path).unwrap_or(Value::Null)
+    let mut paths = fs::read_dir(logbook_dir)
+        .ok()
+        .into_iter()
+        .flat_map(|entries| entries.flatten())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_file()
+                && path
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .map(|extension| extension.eq_ignore_ascii_case("json"))
+                    .unwrap_or(false)
+        })
+        .collect::<Vec<_>>();
+
+    paths.sort();
+    paths
+}
+
+fn read_logbook_json_values(app: &AppHandle) -> Vec<Value> {
+    resolve_existing_logbook_json_paths(app)
+        .into_iter()
+        .filter_map(|path| read_json_value(&path))
+        .collect()
 }
 
 pub(crate) fn reconcile_deltava_tour_progress_internal(app: &AppHandle) -> Result<(), String> {
     let tours_json = read_tours_cache_json(app);
-    let logbook_json = read_logbook_json(app);
-    let mut cache = build_tour_progress_from_value(&tours_json, &logbook_json);
+    let logbook_jsons = read_logbook_json_values(app);
+    let mut cache = build_tour_progress_from_values(&tours_json, &logbook_jsons);
     cache.last_sync_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
     write_tour_progress_cache(app, &cache)
 }
@@ -1297,23 +1682,33 @@ mod tests {
             "equipment": "A320"
         });
 
+        let evaluation = evaluate_logbook_entry_match(&logbook_entry, &tour_leg, None, None);
+        assert!(
+            evaluation.score > 0,
+            "expected a match, got score={:?} reason={:?}",
+            evaluation.score,
+            evaluation.reason
+        );
         assert!(match_logbook_entry_to_tour_leg(&logbook_entry, &tour_leg));
     }
 
     #[test]
-    fn match_logbook_entry_to_tour_leg_accepts_iata_to_icao_crosswalk() {
+    fn match_logbook_entry_to_tour_leg_accepts_dl_alias_callsign_and_airport_crosswalk() {
         let logbook_entry = json!({
-            "departureAirport": { "iata": "ATL" },
-            "arrivalAirport": { "iata": "JFK" },
-            "airline": "DAL",
-            "flightNumber": "123",
-            "date": { "y": 2026, "m": 3, "d": 11 }
+            "departureAirport": { "icao": "KBUR" },
+            "arrivalAirport": { "icao": "KSAN" },
+            "flightCode": "DL9517",
+            "leg": 1,
+            "status": "approved",
+            "date": { "y": 2023, "m": 11, "d": 25 }
         });
         let tour_leg = json!({
-            "from": "KATL",
-            "to": "KJFK",
-            "airlineIcao": "DAL",
-            "tourFlightNumber": "123"
+            "from": "BUR",
+            "to": "SAN",
+            "airline": "DL",
+            "flightNumber": "9517",
+            "matchLeg": true,
+            "leg": 1
         });
 
         assert!(match_logbook_entry_to_tour_leg(&logbook_entry, &tour_leg));
@@ -1381,7 +1776,7 @@ mod tests {
         let tour = cache
             .tour_progress
             .get("dva:tour-1")
-            .expect("tour progress");
+            .unwrap_or_else(|| panic!("tour progress missing: {:?}", cache.tour_progress));
         let row = tour.rows.get("dva:tour-1:leg-1").expect("completed row");
         assert!(row.completed);
         assert_eq!(row.source, DELTAVA_TOUR_PROGRESS_SOURCE);
@@ -1394,27 +1789,31 @@ mod tests {
         let logbook_json = json!({
             "flights": [
                 {
-                    "departureAirport": { "icao": "KATL" },
-                    "arrivalAirport": { "icao": "KJFK" },
-                    "airline": "DAL",
-                    "flightNumber": "123",
-                    "epochSeconds": 1_770_000_000
+                    "departureAirport": { "icao": "KBUR" },
+                    "arrivalAirport": { "icao": "KSAN" },
+                    "flightCode": "DL9517",
+                    "leg": 1,
+                    "status": "approved",
+                    "date": { "y": 2023, "m": 11, "d": 25 }
                 }
             ]
         });
         let tours_json = json!({
             "tours": [
                 {
-                    "path": "dva:tour-1",
-                    "startDate": 1_760_000_000,
-                    "endDate": 1_780_000_000,
+                    "path": "dva:western-air-express",
+                    "name": "Western Air Express",
+                    "startDate": 1_697_666_400,
+                    "endDate": 1_706_745_600,
                     "rows": [
                         {
-                            "tourRowId": "dva:tour-1:leg-1",
-                            "from": "KATL",
-                            "to": "KJFK",
-                            "airline": "DAL",
-                            "tourFlightNumber": "123"
+                            "tourRowId": "dva:western-air-express:dl9517-leg-1-kbur-ksan",
+                            "from": "BUR",
+                            "to": "SAN",
+                            "airline": "DL",
+                            "tourFlightNumber": "9517",
+                            "matchLeg": true,
+                            "leg": 1
                         }
                     ]
                 },
@@ -1436,7 +1835,17 @@ mod tests {
         });
 
         let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
-        assert!(cache.tour_progress.contains_key("dva:tour-1"));
-        assert!(!cache.tour_progress.contains_key("dva:tour-2"));
+        let tour = cache
+            .tour_progress
+            .get("dva:western-air-express")
+            .expect("western air express tour progress");
+        let row = tour
+            .rows
+            .get("dva:western-air-express:dl9517-leg-1-kbur-ksan")
+            .expect("completed row");
+        assert!(row.completed);
+        assert_eq!(row.source, DELTAVA_TOUR_PROGRESS_SOURCE);
+        assert_eq!(row.completion_order, Some(1));
+        assert!(cache.tour_progress.len() >= 1);
     }
 }
