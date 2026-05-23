@@ -245,9 +245,20 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
       isTourFlight: true
     };
   };
-  const normalizeTour = (tour, flights) => {
+  const normalizeTour = (tour, flights, nowSeconds = Math.floor(Date.now() / 1000)) => {
     const sourceId = normalizeId(tour?.id || tour?.sourceId);
     const normalizedFlights = flights.map((flight, index) => normalizeTourFlight(tour, flight, index));
+    const startDate = normalizeDvaEpochSeconds(tour?.startDate || tour?.start_date || '');
+    const endDate = normalizeDvaEpochSeconds(tour?.endDate || tour?.end_date || '');
+    const active = Boolean(tour?.active);
+    const isExpired = endDate !== null && endDate > 0 && endDate < nowSeconds;
+    const isCurrent =
+      active &&
+      !isExpired &&
+      (startDate === null || startDate <= nowSeconds) &&
+      (endDate === null || endDate >= nowSeconds);
+    const isUpcoming = active && !isExpired && !isCurrent && startDate !== null && startDate > nowSeconds;
+    const visibilityStatus = isExpired ? 'expired' : isUpcoming ? 'upcoming' : 'current';
 
     return {
       id: sourceId,
@@ -257,9 +268,13 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
       owner: normalizeText(tour?.owner || ''),
       name: normalizeText(tour?.name || sourceId),
       status: normalizeText(tour?.status || ''),
-      active: Boolean(tour?.active),
+      active,
       startDate: normalizeText(tour?.startDate || tour?.start_date || '') || null,
       endDate: normalizeText(tour?.endDate || tour?.end_date || '') || null,
+      isExpired,
+      isCurrent,
+      isUpcoming,
+      visibilityStatus,
       networks: toArray(tour?.networks).map((value) => normalizeText(value)).filter(Boolean),
       rows: normalizedFlights,
       flights: normalizedFlights
@@ -279,18 +294,20 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
     const rawEndDate = tour?.endDate ?? tour?.end_date ?? null;
     const startDate = normalizeDvaEpochSeconds(rawStartDate);
     const endDate = normalizeDvaEpochSeconds(rawEndDate);
-    let reason = '';
+    const isExpired = endDate !== null && endDate > 0 && endDate < nowSeconds;
+    const isCurrent =
+      active &&
+      !isExpired &&
+      (startDate === null || startDate <= nowSeconds) &&
+      (endDate === null || endDate >= nowSeconds);
+    const isUpcoming = active && !isExpired && !isCurrent && startDate !== null && startDate > nowSeconds;
+    const visibilityStatus = isExpired ? 'expired' : isUpcoming ? 'upcoming' : 'current';
+    let reason = 'include';
 
     if (!isValidId(tourId)) {
       reason = 'exclude:invalid-id';
     } else if (!active) {
       reason = 'exclude:inactive';
-    } else if (startDate !== null && startDate > nowSeconds) {
-      reason = 'exclude:starts-future';
-    } else if (endDate !== null && endDate < nowSeconds) {
-      reason = 'exclude:ended';
-    } else {
-      reason = 'include';
     }
 
     emitDebug(
@@ -301,6 +318,7 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
         status,
         startDate: startDate,
         endDate: endDate,
+        visibilityStatus,
         nowSeconds,
         reason
       })}`
@@ -387,7 +405,7 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
         continue;
       }
 
-      tours.push(cloneTour(normalizeTour(detailTour, detailFlights)));
+      tours.push(cloneTour(normalizeTour(detailTour, detailFlights, nowSeconds)));
     }
 
     const syncedTours = tours.length;
@@ -530,6 +548,14 @@ struct DeltaTourRecord {
     active: bool,
     start_date: Option<String>,
     end_date: Option<String>,
+    #[serde(default)]
+    is_expired: bool,
+    #[serde(default)]
+    is_current: bool,
+    #[serde(default)]
+    is_upcoming: bool,
+    #[serde(default)]
+    visibility_status: String,
     networks: Vec<String>,
     rows: Vec<DeltaTourFlightRecord>,
     flights: Vec<DeltaTourFlightRecord>,

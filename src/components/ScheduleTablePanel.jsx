@@ -20,6 +20,37 @@ const WORKSPACE_META = {
   map: { eyebrow: "MAP" }
 };
 
+function TourStatusBadge({ label, tone }) {
+  const toneClassName =
+    tone === "expired"
+      ? "border-[color:var(--status-ambiguous-bg)] bg-[var(--status-ambiguous-bg)] text-[var(--delta-red)]"
+      : "border-[color:var(--status-resolved-bg)] bg-[var(--status-resolved-bg)] text-[var(--status-resolved-text)]";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-none border px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase leading-none tracking-[0.16em]",
+        toneClassName
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function renderTourOptionContent(option) {
+  const isExpired = String(option?.visibilityStatus || "").trim() === "expired";
+  const isActive = Boolean(option?.active) && !isExpired;
+
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="min-w-0 truncate">{String(option?.selectedLabel || option?.label || "").trim()}</span>
+      {isActive ? <TourStatusBadge label="Active" tone="active" /> : null}
+      {isExpired ? <TourStatusBadge label="Expired" tone="expired" /> : null}
+    </span>
+  );
+}
+
 export default function ScheduleTablePanel({
   plannerMode,
   scheduleView,
@@ -79,7 +110,9 @@ export default function ScheduleTablePanel({
     value: tour.selectionId,
     label: tour.label,
     selectedLabel: tour.label,
-    keywords: `${tour.label} ${tour.name || ""} ${tour.sourceId || ""}`
+    keywords: `${tour.label} ${tour.name || ""} ${tour.sourceId || ""} ${tour.visibilityStatus || ""} ${
+      tour.active ? "active" : ""
+    }`
   }));
   const accomplishmentSelectOptions = accomplishmentOptions.map((accomplishment) => ({
     value: accomplishment.name,
@@ -139,6 +172,8 @@ export default function ScheduleTablePanel({
             prioritizeSelectedOptions={false}
             options={tourOptions}
             selectedValues={selectedTourOption ? [selectedTourOption.selectionId] : []}
+            renderOptionContent={renderTourOptionContent}
+            renderSelectedContent={renderTourOptionContent}
             onChange={(values) => {
               const nextValue = Array.isArray(values) ? values[0] || "" : "";
               onSelectTourPath?.(nextValue);
