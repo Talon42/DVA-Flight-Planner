@@ -3,9 +3,10 @@
 mod deltava_auth;
 mod deltava_draft;
 mod deltava_login;
+mod deltava_tours;
 mod simbrief;
 
-use chrono::{SecondsFormat, NaiveDate, Utc};
+use chrono::{NaiveDate, SecondsFormat, Utc};
 use deltava_auth::{
     clear_auth_settings_internal, clear_deltava_auth_settings, read_auth_context_internal,
     read_deltava_auth_settings, save_deltava_auth_settings, save_password_to_credential_manager,
@@ -26,12 +27,12 @@ use std::{
     sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
-use uuid::Uuid;
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, State, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 use tokio::sync::oneshot;
+use uuid::Uuid;
 #[cfg(windows)]
 use webview2_com::{
     CoTaskMemPWSTR, Microsoft::Web::WebView2::Win32::ICoreWebView2Settings4,
@@ -42,8 +43,8 @@ use windows::core::{Interface, PWSTR};
 
 const DELTAVA_LOGIN_URL: &str = "https://www.deltava.org/login.do";
 const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
-const DELTAVA_TOURS_SYNC_LABEL: &str = "deltava-tours-sync";
 const DELTAVA_SYNC_TIMEOUT_SECONDS: u64 = 300;
+const DELTAVA_TOURS_SYNC_LABEL: &str = "deltava-tours-sync";
 const DELTAVA_TOURS_SYNC_TIMEOUT_SECONDS: u64 = 300;
 const DELTAVA_CLOSE_AFTER_PROMPT_WAIT_SECONDS: u64 = 30;
 const DELTAVA_FOCUS_LOSS_RECENT_WINDOW_MILLIS: u64 = 3000;
@@ -51,7 +52,7 @@ const DELTAVA_XML_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_PFPX_XML__";
 const DELTAVA_SYNC_RESULT_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_RESULT__";
 const DELTAVA_TOURS_SYNC_RESULT_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_DVA_TOURS_SYNC_RESULT__";
 const DELTAVA_DEBUG_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_SYNC_DEBUG__";
-const DELTAVA_AUTH_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_DVA_AUTH__";
+pub(crate) const DELTAVA_AUTH_MESSAGE_PREFIX: &str = "__FLIGHT_PLANNER_DVA_AUTH__";
 const APP_LOG_FILE: &str = "log.txt";
 const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
 const MAIN_WINDOW_STATE_FILE: &str = "main-window-state.json";
@@ -1069,7 +1070,7 @@ struct DeltaWebLogbookResult {
     error: Option<String>,
 }
 
-fn new_dva_nonce() -> String {
+pub(crate) fn new_dva_nonce() -> String {
     Uuid::new_v4().to_string()
 }
 
@@ -1188,10 +1189,12 @@ fn write_delta_virtual_tours_cache_internal(
     payload: &DeltaToursSyncPayload,
 ) -> Result<(), String> {
     let path = delta_virtual_tours_cache_path(app)?;
-    let text = serde_json::to_string_pretty(payload)
-        .map_err(|error| format!("download_failed: Unable to serialize Delta Virtual tours cache: {error}"))?;
-    fs::write(path, text)
-        .map_err(|error| format!("download_failed: Unable to write Delta Virtual tours cache: {error}"))
+    let text = serde_json::to_string_pretty(payload).map_err(|error| {
+        format!("download_failed: Unable to serialize Delta Virtual tours cache: {error}")
+    })?;
+    fs::write(path, text).map_err(|error| {
+        format!("download_failed: Unable to write Delta Virtual tours cache: {error}")
+    })
 }
 
 fn log_delta_virtual_tours_failure(failure: &DeltaTourSyncFailure) {
@@ -1652,7 +1655,7 @@ fn scan_addon_airports_for_roots(roots: Vec<String>) -> AddonAirportCache {
     }
 }
 
-fn is_allowed_deltava_url(url: &tauri::webview::Url) -> bool {
+pub(crate) fn is_allowed_deltava_url(url: &tauri::webview::Url) -> bool {
     url.scheme() == "https" && url.domain() == Some("www.deltava.org")
 }
 
@@ -1660,7 +1663,7 @@ fn is_schedule_download_url(url: &tauri::webview::Url) -> bool {
     is_allowed_deltava_url(url) && url.path() == "/pfpxsched.ws"
 }
 
-fn should_probe_for_schedule(url: &tauri::webview::Url) -> bool {
+pub(crate) fn should_probe_for_schedule(url: &tauri::webview::Url) -> bool {
     is_allowed_deltava_url(url)
 }
 
@@ -2169,7 +2172,7 @@ pub(crate) fn resolve_app_log_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(base_dir.join(APP_LOG_FILE))
 }
 
-fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
+pub(crate) fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
     if let Some(existing) = DELTAVA_SYNC_LOG_PATH.get() {
         return Some(existing.clone());
     }
@@ -2183,7 +2186,7 @@ fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
     resolved
 }
 
-fn append_sync_log(message: &str) {
+pub(crate) fn append_sync_log(message: &str) {
     let now = iso_now_utc();
     let line = format!("[{now}] [DVA Sync] {message}\n");
 
@@ -2207,7 +2210,7 @@ fn append_sync_log(message: &str) {
     }
 }
 
-fn iso_now_utc() -> String {
+pub(crate) fn iso_now_utc() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
@@ -2949,7 +2952,12 @@ async fn start_deltava_sync(
     })?;
 
     #[cfg(windows)]
-    attach_windows_xml_message_handler(&window, app.clone(), download_path.clone(), sync_nonce.clone())?;
+    attach_windows_xml_message_handler(
+        &window,
+        app.clone(),
+        download_path.clone(),
+        sync_nonce.clone(),
+    )?;
     append_sync_log("sync:webview-ready");
 
     window.on_window_event(move |event| {
@@ -3003,107 +3011,9 @@ async fn start_deltava_sync(
 #[tauri::command]
 async fn sync_delta_virtual_tours(
     app: AppHandle,
-    tours_sync_manager: State<'_, DeltaToursSyncManager>,
-) -> Result<DeltaToursSyncPayload, String> {
-    let initialized_log_path = initialize_sync_log_path(&app);
-    let _ = initialized_log_path;
-    let sync_nonce = new_dva_nonce();
-    append_sync_log("tours:started");
-    close_deltava_tours_sync_window(&app);
-
-    let (sender, receiver) = oneshot::channel();
-    tours_sync_manager.begin(DELTAVA_TOURS_SYNC_LABEL.to_string(), sender)?;
-
-    let webview_data_directory = build_webview_data_directory(&app)?;
-    let auth_context = match read_auth_context_internal(&app) {
-        Ok(context) => context,
-        Err(error) => {
-            append_sync_log(&format!("auth-failed error={error}"));
-            deltava_auth::DeltaVirtualAuthContext {
-                settings: Default::default(),
-                password: None,
-            }
-        }
-    };
-    append_sync_log(&format!(
-        "auth-succeeded hasPassword={} firstNameSaved={} lastNameSaved={}",
-        auth_context.settings.has_password,
-        !auth_context.settings.first_name.is_empty(),
-        !auth_context.settings.last_name.is_empty()
-    ));
-
-    let login_automation_script = deltava_login::build_deltava_login_automation_script(
-        &auth_context,
-        DELTAVA_LOGIN_URL,
-        "https://www.deltava.org/",
-        &sync_nonce,
-    );
-    let tours_sync_script = build_deltava_tours_sync_script(&sync_nonce);
-
-    let login_url = DELTAVA_LOGIN_URL
-        .parse()
-        .map_err(|error| format!("download_failed: Invalid Delta Virtual login URL: {error}"))?;
-
-    let window = WebviewWindowBuilder::new(
-        &app,
-        DELTAVA_TOURS_SYNC_LABEL,
-        WebviewUrl::External(login_url),
-    )
-    .title("Delta Virtual Tours Sync")
-    .inner_size(520.0, 760.0)
-    .min_inner_size(460.0, 680.0)
-    .resizable(true)
-    .visible(false)
-    .center()
-    .data_directory(webview_data_directory)
-    .on_navigation(|url| is_allowed_deltava_url(url))
-    .on_page_load(move |webview_window, payload| {
-        if payload.event() == tauri::webview::PageLoadEvent::Finished
-            && should_probe_for_schedule(payload.url())
-        {
-            let _ = webview_window.eval(&login_automation_script);
-            let _ = webview_window.eval(&tours_sync_script);
-        }
-    })
-    .build()
-    .map_err(|error| {
-        format!("download_failed: Unable to open Delta Virtual tours sync window: {error}")
-    })?;
-
-    #[cfg(windows)]
-    attach_windows_tours_message_handler(&window, app.clone(), sync_nonce.clone())?;
-    append_sync_log("tours:webview-ready");
-
-    let app_for_close = app.clone();
-    window.on_window_event(move |event| {
-        if matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed) {
-            app_for_close.state::<DeltaToursSyncManager>().finish(
-                DELTAVA_TOURS_SYNC_LABEL,
-                Err("cancelled: Delta Virtual tours sync window was closed before the response was downloaded.".into()),
-            );
-        }
-    });
-
-    match tokio::time::timeout(
-        Duration::from_secs(DELTAVA_TOURS_SYNC_TIMEOUT_SECONDS),
-        receiver,
-    )
-    .await
-    {
-        Ok(Ok(result)) => result,
-        Ok(Err(_)) => Err("download_failed: Delta Virtual tours sync stopped unexpectedly.".into()),
-        Err(_) => {
-            app.state::<DeltaToursSyncManager>().finish(
-                DELTAVA_TOURS_SYNC_LABEL,
-                Err(
-                    "auth_failed: Timed out waiting for Delta Virtual login or tour download."
-                        .into(),
-                ),
-            );
-            close_deltava_tours_sync_window(&app);
-            Err("auth_failed: Timed out waiting for Delta Virtual login or tour download.".into())
-        }
-    }
+    tours_sync_manager: State<'_, deltava_tours::DeltaToursSyncManager>,
+) -> Result<deltava_tours::DeltaToursSyncPayload, String> {
+    deltava_tours::sync_delta_virtual_tours(app, tours_sync_manager).await
 }
 
 #[cfg(test)]
@@ -3263,7 +3173,7 @@ mod tests {
 fn main() {
     tauri::Builder::default()
         .manage(DeltaSyncManager::default())
-        .manage(DeltaToursSyncManager::default())
+        .manage(deltava_tours::DeltaToursSyncManager::default())
         .manage(DraftSubmitManager::default())
         .manage(SimBriefDispatchManager::default())
         .setup(|app| {

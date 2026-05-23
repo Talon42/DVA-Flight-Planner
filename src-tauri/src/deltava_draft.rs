@@ -20,7 +20,9 @@ use webview2_com::{
 use windows::core::{Interface, PWSTR};
 
 use crate::{
-    deltava_auth::{read_auth_context_internal, save_password_to_credential_manager, DeltaVirtualAuthContext},
+    deltava_auth::{
+        read_auth_context_internal, save_password_to_credential_manager, DeltaVirtualAuthContext,
+    },
     deltava_login::{DvaLoginMessage, DvaLoginMessageKind},
     resolve_app_log_path,
 };
@@ -144,13 +146,10 @@ pub fn close_deltava_draft_window(app: &AppHandle) {
     }
 }
 
-fn finish_draft_submit_result(
-    app: &AppHandle,
-    debug_enabled: bool,
-    result: DraftSubmitResult,
-) {
+fn finish_draft_submit_result(app: &AppHandle, debug_enabled: bool, result: DraftSubmitResult) {
     let should_close = result.ok || !debug_enabled;
-    app.state::<DraftSubmitManager>().finish(DVA_DRAFT_LABEL, result);
+    app.state::<DraftSubmitManager>()
+        .finish(DVA_DRAFT_LABEL, result);
     if should_close {
         close_deltava_draft_window(app);
     }
@@ -192,9 +191,9 @@ fn draft_payload_text(payload: &Value, key: &str) -> String {
 fn is_simple_log_token(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 64
-        && value
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '.' | '/' | ':'))
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '.' | '/' | ':')
+        })
 }
 
 fn truncate_log_text(value: &str, limit: usize) -> String {
@@ -202,7 +201,10 @@ fn truncate_log_text(value: &str, limit: usize) -> String {
         return value.to_string();
     }
 
-    let mut truncated = value.chars().take(limit.saturating_sub(3)).collect::<String>();
+    let mut truncated = value
+        .chars()
+        .take(limit.saturating_sub(3))
+        .collect::<String>();
     truncated.push_str("...");
     truncated
 }
@@ -217,7 +219,15 @@ fn redact_app_log_key(key: &str) -> bool {
 
     matches!(
         normalized.as_str(),
-        "password" | "cookie" | "token" | "auth" | "apikey" | "authorization" | "setcookie" | "credential" | "secret"
+        "password"
+            | "cookie"
+            | "token"
+            | "auth"
+            | "apikey"
+            | "authorization"
+            | "setcookie"
+            | "credential"
+            | "secret"
     )
 }
 
@@ -270,8 +280,7 @@ fn format_app_log_data(data: Option<&Value>) -> String {
 }
 
 fn append_app_log_line(app: &AppHandle, line: &str) -> Result<(), String> {
-    let log_path = resolve_app_log_path(app)
-        .map_err(|error| format!("submit_failed: {error}"))?;
+    let log_path = resolve_app_log_path(app).map_err(|error| format!("submit_failed: {error}"))?;
 
     let mut file = OpenOptions::new()
         .create(true)
@@ -285,7 +294,10 @@ fn append_app_log_line(app: &AppHandle, line: &str) -> Result<(), String> {
 
 fn append_draft_app_log_event(app: &AppHandle, event: &str, data: Option<&Value>) {
     let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
-    let line = format!("[{timestamp}] [DVA Draft] {event}{}", format_app_log_data(data));
+    let line = format!(
+        "[{timestamp}] [DVA Draft] {event}{}",
+        format_app_log_data(data)
+    );
     if let Err(error) = append_app_log_line(app, &line) {
         append_draft_log(&format!("app-log-write-failed {error}"));
     }
@@ -303,10 +315,13 @@ fn build_draft_webview_data_directory(app: &AppHandle) -> Result<PathBuf, String
     let data_dir = app
         .path()
         .app_local_data_dir()
-        .map_err(|error| format!("submit_failed: Unable to resolve draft webview data path: {error}"))?
+        .map_err(|error| {
+            format!("submit_failed: Unable to resolve draft webview data path: {error}")
+        })?
         .join(DVA_DRAFT_WEBVIEW_DIR);
-    fs::create_dir_all(&data_dir)
-        .map_err(|error| format!("submit_failed: Unable to create draft webview data path: {error}"))?;
+    fs::create_dir_all(&data_dir).map_err(|error| {
+        format!("submit_failed: Unable to create draft webview data path: {error}")
+    })?;
     Ok(data_dir)
 }
 
@@ -529,7 +544,7 @@ fn build_deltava_draft_submission_script(
 "#;
 
     TEMPLATE
-    .replace("__PAYLOAD_DATA__", &payload_json)
+        .replace("__PAYLOAD_DATA__", &payload_json)
         .replace("__NONCE__", &nonce)
         .replace("__APP_LOG_PREFIX__", &app_log_prefix)
         .replace("__RESULT_PREFIX__", &result_prefix)
@@ -718,84 +733,87 @@ async fn run_deltava_draft_submission_attempt(
         DVA_DRAFT_LABEL,
         WebviewUrl::External("about:blank".parse().unwrap()),
     )
-        .title("Delta Virtual Draft Report")
-        .inner_size(520.0, 760.0)
-        .min_inner_size(460.0, 680.0)
-        .resizable(true)
-        .visible(false)
-        .center()
-        .data_directory(webview_data_directory)
-        .on_navigation(|url| is_allowed_deltava_draft_url(url))
-        .on_page_load(move |webview_window, payload| {
-            if payload.event() != tauri::webview::PageLoadEvent::Finished
-                || !is_allowed_deltava_draft_url(payload.url())
-            {
-                return;
-            }
+    .title("Delta Virtual Draft Report")
+    .inner_size(520.0, 760.0)
+    .min_inner_size(460.0, 680.0)
+    .resizable(true)
+    .visible(false)
+    .center()
+    .data_directory(webview_data_directory)
+    .on_navigation(|url| is_allowed_deltava_draft_url(url))
+    .on_page_load(move |webview_window, payload| {
+        if payload.event() != tauri::webview::PageLoadEvent::Finished
+            || !is_allowed_deltava_draft_url(payload.url())
+        {
+            return;
+        }
 
-            let current_url = payload.url().to_string();
-            let is_login_page = current_url.starts_with(DVA_DRAFT_LOGIN_URL);
-            let state_snapshot = flow_state_for_page_load.lock().ok().map(|state| state.clone());
+        let current_url = payload.url().to_string();
+        let is_login_page = current_url.starts_with(DVA_DRAFT_LOGIN_URL);
+        let state_snapshot = flow_state_for_page_load
+            .lock()
+            .ok()
+            .map(|state| state.clone());
 
-            if is_login_page {
-                if let Some(state) = state_snapshot.as_ref() {
-                    if state.authenticated || state.login_script_sent {
-                        return;
-                    }
-                }
-
-                if let Ok(mut state) = flow_state_for_page_load.lock() {
-                    if state.login_script_sent {
-                        return;
-                    }
-                    state.login_script_sent = true;
-                }
-
-                append_draft_app_log_event(
-                    &app_for_page_load,
-                    "login-started",
-                    Some(&json!({
-                        "status": "started"
-                    })),
-                );
-                let eval_result = webview_window.eval(&login_script);
-                if let Err(error) = eval_result {
-                    let submit_error = format!("Unable to inject Delta Virtual login script: {error}");
-                    append_draft_submit_failed_stage(&app_for_page_load, "login-script", &submit_error);
-                    finish_draft_submit_result(
-                        &app_for_page_load,
-                        debug_enabled,
-                        DraftSubmitResult {
-                            ok: false,
-                            status: 0,
-                            content_type: String::new(),
-                            response_text: String::new(),
-                            id: None,
-                            error: Some(submit_error),
-                        },
-                    );
-                }
-                return;
-            }
-
+        if is_login_page {
             if let Some(state) = state_snapshot.as_ref() {
-                if !state.authenticated && !state.login_script_sent {
+                if state.authenticated || state.login_script_sent {
                     return;
                 }
             }
 
-            schedule_deltava_draft_submit_script(
-                webview_window.clone(),
-                app_for_page_load.clone(),
-                debug_enabled,
-                flow_state_for_page_load.clone(),
-                submit_script_for_page_load.clone(),
-                flight_for_page_load.clone(),
-                airport_d_for_page_load.clone(),
-                airport_a_for_page_load.clone(),
+            if let Ok(mut state) = flow_state_for_page_load.lock() {
+                if state.login_script_sent {
+                    return;
+                }
+                state.login_script_sent = true;
+            }
+
+            append_draft_app_log_event(
+                &app_for_page_load,
+                "login-started",
+                Some(&json!({
+                    "status": "started"
+                })),
             );
-        })
-        .build()
+            let eval_result = webview_window.eval(&login_script);
+            if let Err(error) = eval_result {
+                let submit_error = format!("Unable to inject Delta Virtual login script: {error}");
+                append_draft_submit_failed_stage(&app_for_page_load, "login-script", &submit_error);
+                finish_draft_submit_result(
+                    &app_for_page_load,
+                    debug_enabled,
+                    DraftSubmitResult {
+                        ok: false,
+                        status: 0,
+                        content_type: String::new(),
+                        response_text: String::new(),
+                        id: None,
+                        error: Some(submit_error),
+                    },
+                );
+            }
+            return;
+        }
+
+        if let Some(state) = state_snapshot.as_ref() {
+            if !state.authenticated && !state.login_script_sent {
+                return;
+            }
+        }
+
+        schedule_deltava_draft_submit_script(
+            webview_window.clone(),
+            app_for_page_load.clone(),
+            debug_enabled,
+            flow_state_for_page_load.clone(),
+            submit_script_for_page_load.clone(),
+            flight_for_page_load.clone(),
+            airport_d_for_page_load.clone(),
+            airport_a_for_page_load.clone(),
+        );
+    })
+    .build()
     {
         Ok(window) => window,
         Err(error) => {
@@ -916,7 +934,11 @@ async fn run_deltava_draft_submission_attempt(
             }
         }
         Err(_) => {
-            append_draft_submit_failed_stage(app, "timeout", "Delta Virtual draft submission timed out.");
+            append_draft_submit_failed_stage(
+                app,
+                "timeout",
+                "Delta Virtual draft submission timed out.",
+            );
             finish_draft_submit_result(
                 app,
                 debug_enabled,
