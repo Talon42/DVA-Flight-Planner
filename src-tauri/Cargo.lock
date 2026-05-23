@@ -989,6 +989,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-opener",
  "tokio",
+ "uuid",
  "webview2-com",
  "windows",
 ]

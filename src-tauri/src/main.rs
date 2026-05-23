@@ -11,6 +11,7 @@ use deltava_auth::{
     read_deltava_auth_settings, save_deltava_auth_settings, save_password_to_credential_manager,
 };
 use deltava_draft::{submit_deltava_draft_flight_report, DraftSubmitManager};
+use deltava_login::{DvaLoginMessage, DvaLoginMessageKind};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use simbrief::{
@@ -25,6 +26,7 @@ use std::{
     sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
+use uuid::Uuid;
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, State, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder, WindowEvent,
@@ -135,11 +137,12 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
   const logbookPageUrl = 'https://www.deltava.org/logbook.do';
   const logbookExportUrl = 'https://www.deltava.org/mylogbook.ws';
   const syncFlagKey = 'flightPlannerDeltaSyncRequested';
+  const nonce = __NONCE__;
   const syncResultPrefix = '__FLIGHT_PLANNER_SYNC_RESULT__';
   const debugPrefix = '__FLIGHT_PLANNER_SYNC_DEBUG__';
   const emitDebug = (message) => {
     if (window.chrome?.webview?.postMessage) {
-      window.chrome.webview.postMessage(debugPrefix + message);
+      window.chrome.webview.postMessage(debugPrefix + JSON.stringify({ nonce, message }));
     }
   };
   const ensureSyncOverlay = () => {
@@ -266,7 +269,7 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
   };
   const postSyncResult = (payload) => {
     if (window.chrome?.webview?.postMessage) {
-      window.chrome.webview.postMessage(syncResultPrefix + JSON.stringify(payload));
+      window.chrome.webview.postMessage(syncResultPrefix + JSON.stringify({ nonce, ...payload }));
     }
   };
   const runSyncDownloads = async () => {
@@ -385,6 +388,11 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
 })();
 "#;
 
+fn build_deltava_auto_sync_script(nonce: &str) -> String {
+    let nonce = serde_json::to_string(nonce).unwrap_or_else(|_| "\"\"".to_string());
+    DELTAVA_AUTO_SYNC_SCRIPT.replace("__NONCE__", &nonce)
+}
+
 #[derive(Default)]
 struct DeltaSyncManager {
     active: Mutex<Option<ActiveDeltaSync>>,
@@ -482,16 +490,23 @@ struct DeltaLogbookProgress {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DeltaWebSyncResult {
+    nonce: String,
     xml: DeltaWebXmlResult,
     logbook: DeltaWebLogbookResult,
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-enum DeltaWebAuthMessage {
-    LoginSuccess,
-    StorePassword { password: String },
-    LoginFailed { reason: Option<String> },
+#[serde(rename_all = "camelCase")]
+struct DeltaWebDebugMessage {
+    nonce: String,
+    message: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeltaWebXmlCaptureMessage {
+    nonce: String,
+    xml_text: String,
 }
 
 #[derive(Deserialize)]
@@ -510,6 +525,10 @@ struct DeltaWebLogbookResult {
     filename: Option<String>,
     content_type: Option<String>,
     error: Option<String>,
+}
+
+fn new_dva_nonce() -> String {
+    Uuid::new_v4().to_string()
 }
 
 impl DeltaSyncManager {
@@ -1782,6 +1801,7 @@ fn attach_windows_xml_message_handler(
     window: &tauri::WebviewWindow,
     app: AppHandle,
     download_path: PathBuf,
+    sync_nonce: String,
 ) -> Result<(), String> {
     let registration_error = std::sync::Arc::new(Mutex::new(None::<String>));
     let registration_error_for_closure = registration_error.clone();
@@ -1797,15 +1817,16 @@ fn attach_windows_xml_message_handler(
                     .Settings()
                     .map_err(|error| format!("download_failed: Unable to access WebView2 settings: {error}"))?;
                 if let Ok(settings4) = settings.cast::<ICoreWebView2Settings4>() {
-                    let _ = settings4.SetIsPasswordAutosaveEnabled(true);
-                    let _ = settings4.SetIsGeneralAutofillEnabled(true);
-                    append_sync_log("webview:settings4-autofill-enabled");
+                    let _ = settings4.SetIsPasswordAutosaveEnabled(false);
+                    let _ = settings4.SetIsGeneralAutofillEnabled(false);
+                    append_sync_log("webview:settings4-autofill-disabled");
                 } else {
                     append_sync_log("webview:settings4-unavailable");
                 }
 
                 let app_handle = app.clone();
                 let xml_path = download_path.clone();
+                let sync_nonce = sync_nonce.clone();
                 let mut token = 0i64;
 
                 webview
@@ -1820,39 +1841,55 @@ fn attach_windows_xml_message_handler(
                             let message = CoTaskMemPWSTR::from(message).to_string();
 
                             if let Some(debug_line) = message.strip_prefix(DELTAVA_DEBUG_MESSAGE_PREFIX) {
-                                append_sync_log(&format!("webview:{debug_line}"));
+                                if let Ok(debug_line) = serde_json::from_str::<DeltaWebDebugMessage>(debug_line) {
+                                    if debug_line.nonce == sync_nonce {
+                                        append_sync_log(&format!("webview:{}", debug_line.message));
+                                    }
+                                }
                                 return Ok(());
                             }
 
                             if let Some(payload_text) = message.strip_prefix(DELTAVA_AUTH_MESSAGE_PREFIX) {
                                 let payload_text = payload_text.to_string();
                                 let app_handle = app_handle.clone();
+                                let sync_nonce = sync_nonce.clone();
 
                                 tauri::async_runtime::spawn(async move {
-                                    match serde_json::from_str::<DeltaWebAuthMessage>(&payload_text) {
-                                        Ok(DeltaWebAuthMessage::LoginSuccess) => {
-                                            append_sync_log("auth-succeeded");
-                                        }
-                                        Ok(DeltaWebAuthMessage::StorePassword { password }) => {
-                                            match save_password_to_credential_manager(&password) {
-                                                Ok(()) => append_sync_log("auth-succeeded"),
-                                                Err(error) => append_sync_log(&format!("auth-failed error={error}")),
+                                    match serde_json::from_str::<DvaLoginMessage>(&payload_text) {
+                                        Ok(message) if message.nonce == sync_nonce => {
+                                            let DvaLoginMessage {
+                                                kind,
+                                                reason,
+                                                password,
+                                                ..
+                                            } = message;
+
+                                            match kind {
+                                                DvaLoginMessageKind::LoginSuccess => {
+                                                    append_sync_log("auth-succeeded");
+                                                }
+                                                DvaLoginMessageKind::StorePassword => {
+                                                    if let Some(password) = password.as_deref() {
+                                                        match save_password_to_credential_manager(password) {
+                                                            Ok(()) => append_sync_log("auth-succeeded"),
+                                                            Err(error) => append_sync_log(&format!("auth-failed error={error}")),
+                                                        }
+                                                    }
+                                                }
+                                                DvaLoginMessageKind::LoginFailed => {
+                                                    let reason = reason
+                                                        .as_deref()
+                                                        .unwrap_or("Delta Virtual login failed.");
+                                                    append_sync_log(&format!("auth-failed error={reason}"));
+                                                    app_handle.state::<DeltaSyncManager>().finish(
+                                                        DELTAVA_SYNC_LABEL,
+                                                        Err(format!("auth_failed: {reason}")),
+                                                    );
+                                                    close_sync_window(&app_handle);
+                                                }
                                             }
                                         }
-                                        Ok(DeltaWebAuthMessage::LoginFailed { reason }) => {
-                                            let message = reason
-                                                .as_deref()
-                                                .unwrap_or("Delta Virtual login failed.");
-                                            append_sync_log(&format!("auth-failed error={message}"));
-                                            app_handle.state::<DeltaSyncManager>().finish(
-                                                DELTAVA_SYNC_LABEL,
-                                                Err(format!("auth_failed: {message}")),
-                                            );
-                                            close_sync_window(&app_handle);
-                                        }
-                                        Err(error) => {
-                                            append_sync_log(&format!("auth-failed error={error}"));
-                                        }
+                                        _ => {}
                                     }
                                 });
                                 return Ok(());
@@ -1861,12 +1898,14 @@ fn attach_windows_xml_message_handler(
                             if let Some(payload_text) = message.strip_prefix(DELTAVA_SYNC_RESULT_MESSAGE_PREFIX) {
                                 let payload_text = payload_text.to_string();
                                 let app_handle = app_handle.clone();
+                                let sync_nonce = sync_nonce.clone();
 
                                 tauri::async_runtime::spawn(async move {
                                     let result = match serde_json::from_str::<DeltaWebSyncResult>(&payload_text) {
-                                        Ok(web_result) => {
+                                        Ok(web_result) if web_result.nonce == sync_nonce => {
                                             build_delta_sync_payload_from_web_result(&app_handle, web_result).await
                                         }
+                                        Ok(_) => return,
                                         Err(error) => Err(format!(
                                             "download_failed: Unable to parse Delta Virtual sync result: {error}"
                                         )),
@@ -1884,17 +1923,24 @@ fn attach_windows_xml_message_handler(
                                 return Ok(());
                             }
 
-                            if let Some(xml_text) = message.strip_prefix(DELTAVA_XML_MESSAGE_PREFIX) {
-                                let xml_text = xml_text.to_string();
+                            if let Some(payload_text) = message.strip_prefix(DELTAVA_XML_MESSAGE_PREFIX) {
+                                let payload_text = payload_text.to_string();
                                 let app_handle = app_handle.clone();
                                 let xml_path = xml_path.clone();
-                                let trimmed = xml_text.trim_start().to_string();
-                                append_sync_log("schedule-fetch");
+                                let sync_nonce = sync_nonce.clone();
 
                                 tauri::async_runtime::spawn(async move {
-                                    let result = if !trimmed.starts_with('<')
-                                        || !xml_text.contains("<FLIGHT>")
-                                    {
+                                    let Ok(message) = serde_json::from_str::<DeltaWebXmlCaptureMessage>(&payload_text) else {
+                                        return;
+                                    };
+                                    if message.nonce != sync_nonce {
+                                        return;
+                                    }
+
+                                    let xml_text = message.xml_text;
+                                    let trimmed = xml_text.trim_start().to_string();
+                                    append_sync_log("schedule-fetch");
+                                    let result = if !trimmed.starts_with('<') || !xml_text.contains("<FLIGHT>") {
                                         Err("invalid_xml: Delta Virtual returned a non-schedule response.".to_string())
                                     } else {
                                         match tokio::fs::write(&xml_path, &xml_text).await {
@@ -1910,7 +1956,7 @@ fn attach_windows_xml_message_handler(
                                                 ],
                                             }),
                                             Err(error) => Err(format!(
-                                            "download_failed: Unable to persist Delta Virtual XML: {error}"
+                                                "download_failed: Unable to persist Delta Virtual XML: {error}"
                                             )),
                                         }
                                     };
@@ -1961,6 +2007,7 @@ async fn start_deltava_sync(
 ) -> Result<DeltaSyncPayload, String> {
     let initialized_log_path = initialize_sync_log_path(&app);
     let _ = initialized_log_path;
+    let sync_nonce = new_dva_nonce();
     append_sync_log("started");
     close_sync_window(&app);
 
@@ -1997,7 +2044,9 @@ async fn start_deltava_sync(
         &auth_context,
         DELTAVA_LOGIN_URL,
         "https://www.deltava.org/pfpxsched.ws",
+        &sync_nonce,
     );
+    let auto_sync_script = build_deltava_auto_sync_script(&sync_nonce);
 
     let login_url = DELTAVA_LOGIN_URL
         .parse()
@@ -2021,7 +2070,7 @@ async fn start_deltava_sync(
             && should_probe_for_schedule(payload.url())
         {
             let _ = webview_window.eval(&login_automation_script);
-            let _ = webview_window.eval(DELTAVA_AUTO_SYNC_SCRIPT);
+            let _ = webview_window.eval(&auto_sync_script);
         }
     })
     .on_download(move |_webview, event| match event {
@@ -2095,7 +2144,7 @@ async fn start_deltava_sync(
     })?;
 
     #[cfg(windows)]
-    attach_windows_xml_message_handler(&window, app.clone(), download_path.clone())?;
+    attach_windows_xml_message_handler(&window, app.clone(), download_path.clone(), sync_nonce.clone())?;
     append_sync_log("sync:webview-ready");
 
     window.on_window_event(move |event| {

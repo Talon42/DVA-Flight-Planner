@@ -21,7 +21,7 @@ use windows::core::{Interface, PWSTR};
 
 use crate::{
     deltava_auth::{read_auth_context_internal, save_password_to_credential_manager, DeltaVirtualAuthContext},
-    deltava_login,
+    deltava_login::{DvaLoginMessage, DvaLoginMessageKind},
     resolve_app_log_path,
 };
 
@@ -74,11 +74,19 @@ struct DraftFlowState {
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-enum DraftAuthMessage {
-    LoginSuccess,
-    StorePassword { password: String },
-    LoginFailed { reason: Option<String> },
+#[serde(rename_all = "camelCase")]
+struct DraftAppLogEnvelope {
+    nonce: String,
+    event: String,
+    data: Option<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DraftSubmitResultEnvelope {
+    nonce: String,
+    #[serde(flatten)]
+    result: DraftSubmitResult,
 }
 
 struct ActiveDraftSubmit {
@@ -307,12 +315,17 @@ fn login_required_error_message() -> String {
         .to_string()
 }
 
-fn build_deltava_draft_submission_script(payload_json: &str, app_log_prefix: &str) -> String {
+fn build_deltava_draft_submission_script(
+    payload_json: &str,
+    app_log_prefix: &str,
+    nonce: &str,
+) -> String {
     let payload_json = payload_json.to_string();
     let app_log_prefix = serde_json::to_string(app_log_prefix)
         .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_DVA_DRAFT_APP_LOG__\"".to_string());
     let result_prefix = serde_json::to_string(DVA_DRAFT_RESULT_MESSAGE_PREFIX)
         .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_DVA_DRAFT_RESULT__\"".to_string());
+    let nonce = serde_json::to_string(nonce).unwrap_or_else(|_| "\"\"".to_string());
 
     const TEMPLATE: &str = r#"
 (() => {
@@ -328,13 +341,14 @@ fn build_deltava_draft_submission_script(payload_json: &str, app_log_prefix: &st
 
     return nextPayload;
   })();
+  const nonce = __NONCE__;
   const appLogPrefix = __APP_LOG_PREFIX__;
   const resultPrefix = __RESULT_PREFIX__;
   const allowedOrigins = new Set(['https://www.deltava.org']);
 
   const emitAppLog = (event, data = null) => {
     if (window.chrome?.webview?.postMessage) {
-      window.chrome.webview.postMessage(appLogPrefix + JSON.stringify({ event, data }));
+      window.chrome.webview.postMessage(appLogPrefix + JSON.stringify({ nonce, event, data }));
     }
   };
 
@@ -404,7 +418,7 @@ fn build_deltava_draft_submission_script(payload_json: &str, app_log_prefix: &st
 
   const postResult = (result) => {
     if (window.chrome?.webview?.postMessage) {
-      window.chrome.webview.postMessage(resultPrefix + JSON.stringify(result));
+      window.chrome.webview.postMessage(resultPrefix + JSON.stringify({ nonce, ...result }));
     }
   };
 
@@ -515,7 +529,8 @@ fn build_deltava_draft_submission_script(payload_json: &str, app_log_prefix: &st
 "#;
 
     TEMPLATE
-        .replace("__PAYLOAD_DATA__", &payload_json)
+    .replace("__PAYLOAD_DATA__", &payload_json)
+        .replace("__NONCE__", &nonce)
         .replace("__APP_LOG_PREFIX__", &app_log_prefix)
         .replace("__RESULT_PREFIX__", &result_prefix)
 }
@@ -595,7 +610,9 @@ async fn run_deltava_draft_submission_attempt(
     flight: &str,
     airport_d: &str,
     airport_a: &str,
+    nonce: &str,
 ) -> DraftSubmitResult {
+    let draft_nonce = nonce.to_string();
     let flight_for_log = flight.to_string();
     let airport_d_for_log = airport_d.to_string();
     let airport_a_for_log = airport_a.to_string();
@@ -607,14 +624,16 @@ async fn run_deltava_draft_submission_attempt(
             password: None,
         },
     };
-    let login_script = deltava_login::build_deltava_login_automation_script(
+    let login_script = crate::deltava_login::build_deltava_login_automation_script(
         &auth_context,
         DVA_DRAFT_LOGIN_URL,
         DVA_DRAFT_TARGET_URL,
+        nonce,
     );
     let submit_script = build_deltava_draft_submission_script(
         payload_json,
         DVA_DRAFT_APP_LOG_MESSAGE_PREFIX,
+        nonce,
     );
 
     let login_url = match DVA_DRAFT_LOGIN_URL.parse::<tauri::webview::Url>() {
@@ -810,6 +829,7 @@ async fn run_deltava_draft_submission_attempt(
         window.clone(),
         app.clone(),
         debug_enabled,
+        draft_nonce.clone(),
         flow_state_for_event.clone(),
         submit_script.clone(),
         flight_for_log.clone(),
@@ -927,6 +947,7 @@ fn attach_windows_draft_message_handler(
     draft_window: tauri::WebviewWindow,
     app: AppHandle,
     debug_enabled: bool,
+    draft_nonce: String,
     flow_state: Arc<Mutex<DraftFlowState>>,
     submit_script: String,
     flight_for_log: String,
@@ -948,11 +969,17 @@ fn attach_windows_draft_message_handler(
                     .map_err(|error| format!("submit_failed: Unable to access WebView2 settings: {error}"))?;
 
                 if let Ok(settings4) = settings.cast::<ICoreWebView2Settings4>() {
-                    let _ = settings4.SetIsPasswordAutosaveEnabled(true);
-                    let _ = settings4.SetIsGeneralAutofillEnabled(true);
+                    let _ = settings4.SetIsPasswordAutosaveEnabled(false);
+                    let _ = settings4.SetIsGeneralAutofillEnabled(false);
+                    append_draft_app_log_event(
+                        &app,
+                        "webview-settings4-autofill-disabled",
+                        Some(&json!({ "status": "disabled" })),
+                    );
                 }
 
                 let app_handle = app.clone();
+                let draft_nonce = draft_nonce.clone();
                 let mut token = 0i64;
 
                 webview
@@ -968,13 +995,14 @@ fn attach_windows_draft_message_handler(
                                 let message = CoTaskMemPWSTR::from(message).to_string();
 
                                 if let Some(app_log_text) = message.strip_prefix(DVA_DRAFT_APP_LOG_MESSAGE_PREFIX) {
-                                    match serde_json::from_str::<Value>(app_log_text) {
-                                        Ok(payload) => {
-                                            if let Some(event) = payload.get("event").and_then(Value::as_str) {
-                                                append_draft_app_log_event(&app_handle, event, payload.get("data"));
-                                            }
+                                    if let Ok(payload) = serde_json::from_str::<DraftAppLogEnvelope>(app_log_text) {
+                                        if payload.nonce == draft_nonce {
+                                            append_draft_app_log_event(
+                                                &app_handle,
+                                                &payload.event,
+                                                payload.data.as_ref(),
+                                            );
                                         }
-                                        Err(_) => {}
                                     }
                                     return Ok(());
                                 }
@@ -988,130 +1016,132 @@ fn attach_windows_draft_message_handler(
                     let flight_for_log = flight_for_log.clone();
                     let airport_d_for_log = airport_d_for_log.clone();
                     let airport_a_for_log = airport_a_for_log.clone();
+                    let draft_nonce = draft_nonce.clone();
 
                     tauri::async_runtime::spawn(async move {
-                        match serde_json::from_str::<DraftAuthMessage>(&payload_text) {
-                            Ok(DraftAuthMessage::LoginSuccess) => {
-                                let mut should_navigate = false;
-                                let mut should_log_login_finished = false;
-                                if let Ok(mut state) = flow_state.lock() {
-                                    if !state.authenticated {
-                                        state.authenticated = true;
-                                        should_navigate = true;
-                                        should_log_login_finished = true;
+                        match serde_json::from_str::<DvaLoginMessage>(&payload_text) {
+                            Ok(message) if message.nonce == draft_nonce => {
+                                let DvaLoginMessage {
+                                    kind,
+                                    reason,
+                                    password,
+                                    ..
+                                } = message;
+
+                                match kind {
+                                    DvaLoginMessageKind::LoginSuccess => {
+                                        let mut should_navigate = false;
+                                        let mut should_log_login_finished = false;
+                                        if let Ok(mut state) = flow_state.lock() {
+                                            if !state.authenticated {
+                                                state.authenticated = true;
+                                                should_navigate = true;
+                                                should_log_login_finished = true;
+                                            }
+                                        }
+
+                                        if should_log_login_finished {
+                                            append_draft_app_log_event(
+                                                &app_handle,
+                                                "login-finished",
+                                                Some(&json!({
+                                                    "status": "success"
+                                                })),
+                                            );
+                                        }
+
+                                        if should_navigate {
+                                            let _ = draft_window.eval("window.location.assign('https://www.deltava.org/');");
+                                            schedule_deltava_draft_submit_script(
+                                                draft_window.clone(),
+                                                app_handle.clone(),
+                                                debug_enabled,
+                                                flow_state.clone(),
+                                                submit_script.clone(),
+                                                flight_for_log.clone(),
+                                                airport_d_for_log.clone(),
+                                                airport_a_for_log.clone(),
+                                            );
+                                        }
+                                    }
+                                    DvaLoginMessageKind::StorePassword => {
+                                        let Some(password) = password.as_deref() else {
+                                            return;
+                                        };
+
+                                        if let Err(error) = save_password_to_credential_manager(password) {
+                                            append_draft_submit_failed_stage(&app_handle, "login-password", &error);
+                                            finish_draft_submit_result(
+                                                &app_handle,
+                                                debug_enabled,
+                                                DraftSubmitResult {
+                                                    ok: false,
+                                                    status: 0,
+                                                    content_type: String::new(),
+                                                    response_text: String::new(),
+                                                    id: None,
+                                                    error: Some(login_required_error_message()),
+                                                },
+                                            );
+                                            return;
+                                        }
+
+                                        let mut should_navigate = false;
+                                        let mut should_log_login_finished = false;
+                                        if let Ok(mut state) = flow_state.lock() {
+                                            if !state.authenticated {
+                                                state.authenticated = true;
+                                                should_navigate = true;
+                                                should_log_login_finished = true;
+                                            }
+                                        }
+
+                                        if should_log_login_finished {
+                                            append_draft_app_log_event(
+                                                &app_handle,
+                                                "login-finished",
+                                                Some(&json!({
+                                                    "status": "success"
+                                                })),
+                                            );
+                                        }
+
+                                        if should_navigate {
+                                            let _ = draft_window.eval("window.location.assign('https://www.deltava.org/');");
+                                            schedule_deltava_draft_submit_script(
+                                                draft_window.clone(),
+                                                app_handle.clone(),
+                                                debug_enabled,
+                                                flow_state.clone(),
+                                                submit_script.clone(),
+                                                flight_for_log.clone(),
+                                                airport_d_for_log.clone(),
+                                                airport_a_for_log.clone(),
+                                            );
+                                        }
+                                    }
+                                    DvaLoginMessageKind::LoginFailed => {
+                                        let message = reason
+                                            .as_deref()
+                                            .unwrap_or("Delta Virtual login failed.")
+                                            .to_string();
+                                        append_draft_submit_failed_stage(&app_handle, "login", &message);
+                                        finish_draft_submit_result(
+                                            &app_handle,
+                                            debug_enabled,
+                                            DraftSubmitResult {
+                                                ok: false,
+                                                status: 0,
+                                                content_type: String::new(),
+                                                response_text: String::new(),
+                                                id: None,
+                                                error: Some(login_required_error_message()),
+                                            },
+                                        );
                                     }
                                 }
-
-                                if should_log_login_finished {
-                                    append_draft_app_log_event(
-                                        &app_handle,
-                                        "login-finished",
-                                        Some(&json!({
-                                            "status": "success"
-                                        })),
-                                    );
-                                }
-
-                                if should_navigate {
-                                    let _ = draft_window.eval("window.location.assign('https://www.deltava.org/');");
-                                    schedule_deltava_draft_submit_script(
-                                        draft_window.clone(),
-                                        app_handle.clone(),
-                                        debug_enabled,
-                                        flow_state.clone(),
-                                        submit_script.clone(),
-                                        flight_for_log.clone(),
-                                        airport_d_for_log.clone(),
-                                        airport_a_for_log.clone(),
-                                    );
-                                }
                             }
-                            Ok(DraftAuthMessage::StorePassword { password }) => {
-                                if let Err(error) = save_password_to_credential_manager(&password) {
-                                    append_draft_submit_failed_stage(&app_handle, "login-password", &error);
-                                    finish_draft_submit_result(
-                                        &app_handle,
-                                        debug_enabled,
-                                        DraftSubmitResult {
-                                            ok: false,
-                                            status: 0,
-                                            content_type: String::new(),
-                                            response_text: String::new(),
-                                            id: None,
-                                            error: Some(login_required_error_message()),
-                                        },
-                                    );
-                                    return;
-                                }
-
-                                let mut should_navigate = false;
-                                let mut should_log_login_finished = false;
-                                if let Ok(mut state) = flow_state.lock() {
-                                    if !state.authenticated {
-                                        state.authenticated = true;
-                                        should_navigate = true;
-                                        should_log_login_finished = true;
-                                    }
-                                }
-
-                                if should_log_login_finished {
-                                    append_draft_app_log_event(
-                                        &app_handle,
-                                        "login-finished",
-                                        Some(&json!({
-                                            "status": "success"
-                                        })),
-                                    );
-                                }
-
-                                if should_navigate {
-                                    let _ = draft_window.eval("window.location.assign('https://www.deltava.org/');");
-                                    schedule_deltava_draft_submit_script(
-                                        draft_window.clone(),
-                                        app_handle.clone(),
-                                        debug_enabled,
-                                        flow_state.clone(),
-                                        submit_script.clone(),
-                                        flight_for_log.clone(),
-                                        airport_d_for_log.clone(),
-                                        airport_a_for_log.clone(),
-                                    );
-                                }
-                            }
-                            Ok(DraftAuthMessage::LoginFailed { reason }) => {
-                                let message = reason
-                                    .as_deref()
-                                    .unwrap_or("Delta Virtual login failed.")
-                                    .to_string();
-                                append_draft_submit_failed_stage(&app_handle, "login", &message);
-                                finish_draft_submit_result(
-                                    &app_handle,
-                                    debug_enabled,
-                                    DraftSubmitResult {
-                                        ok: false,
-                                        status: 0,
-                                        content_type: String::new(),
-                                        response_text: String::new(),
-                                        id: None,
-                                        error: Some(login_required_error_message()),
-                                    },
-                                );
-                            }
-                            Err(error) => {
-                                append_draft_submit_failed_stage(&app_handle, "login-parse", &error.to_string());
-                                finish_draft_submit_result(
-                                    &app_handle,
-                                    debug_enabled,
-                                    DraftSubmitResult {
-                                        ok: false,
-                                        status: 0,
-                                        content_type: String::new(),
-                                        response_text: String::new(),
-                                        id: None,
-                                        error: Some(login_required_error_message()),
-                                    },
-                                );
-                            }
+                            _ => {}
                         }
                     });
                     return Ok(());
@@ -1121,10 +1151,12 @@ fn attach_windows_draft_message_handler(
                     let payload_text = payload_text.to_string();
                     let app_handle = app_handle.clone();
                     let debug_enabled = debug_enabled;
+                    let draft_nonce = draft_nonce.clone();
 
                                     tauri::async_runtime::spawn(async move {
-                                        match serde_json::from_str::<DraftSubmitResult>(&payload_text) {
-                                            Ok(result) => {
+                                        match serde_json::from_str::<DraftSubmitResultEnvelope>(&payload_text) {
+                                            Ok(envelope) if envelope.nonce == draft_nonce => {
+                                                let result = envelope.result;
                                                 if result.ok {
                                                     let mut data = serde_json::Map::new();
                                                     data.insert("status".to_string(), json!(result.status));
@@ -1157,6 +1189,7 @@ fn attach_windows_draft_message_handler(
                                                 }
                                                 finish_draft_submit_result(&app_handle, debug_enabled, result);
                                             }
+                                            Ok(_) => {}
                                             Err(error) => {
                                                 let payload = json!({
                                                     "status": 0,
@@ -1220,6 +1253,7 @@ fn attach_windows_draft_message_handler(
     _draft_window: tauri::WebviewWindow,
     _app: AppHandle,
     _debug_enabled: bool,
+    _draft_nonce: String,
     _flow_state: Arc<Mutex<DraftFlowState>>,
     _submit_script: String,
     _flight_for_log: String,
@@ -1235,6 +1269,7 @@ pub async fn submit_deltava_draft_flight_report(
     payload: Value,
     debug_enabled: bool,
 ) -> DraftSubmitResult {
+    let draft_nonce = crate::new_dva_nonce();
     let payload = sanitize_draft_payload(&payload);
 
     let payload_json = match serde_json::to_string(&payload) {
@@ -1349,6 +1384,7 @@ pub async fn submit_deltava_draft_flight_report(
         &flight,
         &airport_d,
         &airport_a,
+        &draft_nonce,
     )
     .await
 }
