@@ -11,35 +11,20 @@
     "core:webview:allow-create-webview-window",
     "core:webview:allow-webview-close",
     "dialog:default",
-    "fs:default",
-    "opener:default",
-    "opener:allow-open-path",
-    "opener:allow-reveal-item-in-dir",
-    "fs:allow-exists",
-    "fs:allow-mkdir",
+    "fs:create-app-specific-dirs",
     "fs:allow-read-text-file",
-    "fs:allow-write-text-file",
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",
-    {
-      "identifier": "fs:scope",
-      "allow": [
-        {
-          "path": "$APPDATA"
-        },
-        {
-          "path": "$APPDATA/*"
-        }
-      ]
-    },
+    "fs:allow-applocaldata-read-recursive",
+    "fs:allow-applocaldata-write-recursive",
+    "opener:allow-default-urls",
+    "opener:allow-open-url",
+    "opener:allow-reveal-item-in-dir",
     {
       "identifier": "opener:allow-open-path",
       "allow": [
         {
           "path": "$APPDATA/log.txt"
-        },
-        {
-          "path": "$APPDATA/*"
         }
       ]
     }
