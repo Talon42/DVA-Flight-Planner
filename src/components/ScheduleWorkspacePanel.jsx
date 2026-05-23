@@ -16,6 +16,7 @@ export default function ScheduleWorkspacePanel({
   onConsumePendingMapFitToRoute,
   availableTours = [],
   selectedTourPath,
+  selectedTourCompletionSummary = null,
   accomplishmentOptions = [],
   selectedAccomplishmentName,
   onPrimaryViewChange,
@@ -80,6 +81,7 @@ export default function ScheduleWorkspacePanel({
               onConsumePendingMapFitToRoute={onConsumePendingMapFitToRoute}
               availableTours={availableTours}
               selectedTourPath={selectedTourPath}
+              selectedTourCompletionSummary={selectedTourCompletionSummary}
               accomplishmentOptions={accomplishmentOptions}
               selectedAccomplishmentName={selectedAccomplishmentName}
               onSelectTourPath={onSelectTourPath}

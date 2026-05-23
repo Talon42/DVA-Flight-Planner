@@ -47,6 +47,10 @@ struct DeltaTourProgressRow {
     completed_at: Option<String>,
     completion_order: Option<u32>,
     source: String,
+    match_type: Option<String>,
+    credited_tour_name: Option<String>,
+    credited_tour_leg: Option<i64>,
+    logbook_entry_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -57,6 +61,13 @@ struct LogbookEntryMatch {
     completed_at: Option<String>,
     matched_tour_name_from_update: Option<String>,
     tour_sequence_leg_from_update: Option<i64>,
+    logbook_entry_id: Option<String>,
+    logbook_status: Option<String>,
+    logbook_departure: Option<String>,
+    logbook_arrival: Option<String>,
+    credited_tour_name: Option<String>,
+    credited_tour_leg: Option<i64>,
+    credit_message: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -220,6 +231,14 @@ fn build_logbook_entry_completed_at(entry: &Value) -> Option<String> {
 
 fn normalize_text(value: &str) -> String {
     value.trim().to_string()
+}
+
+fn normalize_tour_name_key(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
 }
 
 fn normalize_compact_text(value: &str) -> String {
@@ -622,6 +641,13 @@ fn extract_logbook_equipment(value: &Value) -> Option<String> {
         })
 }
 
+fn extract_logbook_entry_id(value: &Value) -> Option<String> {
+    extract_direct_string_field(
+        value,
+        &["id", "logbookId", "pirepId", "entryId", "flightId", "sourceId"],
+    )
+}
+
 fn extract_tour_window_seconds(tour: &Value) -> (Option<i64>, Option<i64>) {
     let start_seconds = tour
         .get("startDate")
@@ -702,7 +728,7 @@ fn extract_direct_string_field(value: &Value, keys: &[&str]) -> Option<String> {
     None
 }
 
-fn parse_tour_update_message(message: &str) -> Option<(String, i64)> {
+fn parse_system_tour_credit_message(message: &str) -> Option<(String, i64)> {
     let trimmed = message.trim();
     if trimmed.is_empty() {
         return None;
@@ -735,27 +761,39 @@ fn parse_tour_update_message(message: &str) -> Option<(String, i64)> {
     Some((tour_name.to_string(), leg))
 }
 
-fn extract_logbook_tour_update_metadata(value: &Value) -> LogbookTourUpdateMetadata {
+fn update_indicates_system_credit(update: &Value) -> bool {
+    if extract_bool_field(update, &["system", "isSystem", "systemUpdate"]).unwrap_or(false) {
+        return true;
+    }
+
+    extract_direct_string_field(update, &["type", "status", "source", "kind", "updateType"])
+        .map(|value| value.to_ascii_uppercase())
+        .is_some_and(|value| value.contains("SYSTEM"))
+}
+
+fn extract_logbook_tour_credit_metadata(value: &Value) -> Vec<(String, i64, String)> {
     let Some(updates) = value.get("updates").and_then(Value::as_array) else {
-        return LogbookTourUpdateMetadata::default();
+        return Vec::new();
     };
 
+    let mut credits = Vec::new();
     for update in updates {
+        if !update_indicates_system_credit(update) {
+            continue;
+        }
+
         let Some(message) = extract_direct_string_field(update, &["msg", "message"]) else {
             continue;
         };
 
-        if let Some((matched_tour_name_from_update, tour_sequence_leg_from_update)) =
-            parse_tour_update_message(&message)
+        if let Some((credited_tour_name, credited_tour_leg)) =
+            parse_system_tour_credit_message(&message)
         {
-            return LogbookTourUpdateMetadata {
-                matched_tour_name_from_update: Some(matched_tour_name_from_update),
-                tour_sequence_leg_from_update: Some(tour_sequence_leg_from_update),
-            };
+            credits.push((credited_tour_name, credited_tour_leg, message));
         }
     }
 
-    LogbookTourUpdateMetadata::default()
+    credits
 }
 
 fn extract_airport_code(value: &Value, keys: &[&str]) -> Option<String> {
@@ -874,6 +912,17 @@ fn extract_tour_row_id(tour_path: &str, row: &Value, index: usize) -> String {
 struct MatchEvaluation {
     score: i32,
     reason: Option<String>,
+}
+
+#[derive(Default)]
+struct TourProgressMatchStats {
+    total_system_tour_credit_candidates: usize,
+    total_entries_with_valid_completed_status: usize,
+    total_entries_inside_tour_date_windows: usize,
+    total_matched_tour_rows: usize,
+    total_skipped_tour_name_mismatches: usize,
+    total_skipped_route_mismatches: usize,
+    total_skipped_ambiguous_routes: usize,
 }
 
 fn format_reject_reason(context: &str, detail: impl Into<String>) -> String {
@@ -1250,19 +1299,93 @@ fn build_logbook_entry_matches_from_values(logbook_jsons: &[Value]) -> Vec<Logbo
             }
 
             let entry_index = entries.len();
-            let update_metadata = extract_logbook_tour_update_metadata(entry);
-            entries.push(LogbookEntryMatch {
-                entry_index,
-                entry: entry.clone(),
-                epoch_seconds: extract_logbook_entry_epoch_seconds(entry),
-                completed_at: build_logbook_entry_completed_at(entry),
-                matched_tour_name_from_update: update_metadata.matched_tour_name_from_update,
-                tour_sequence_leg_from_update: update_metadata.tour_sequence_leg_from_update,
-            });
+            let epoch_seconds = extract_logbook_entry_epoch_seconds(entry);
+            let completed_at = build_logbook_entry_completed_at(entry);
+            let logbook_status = extract_logbook_status(entry);
+            let logbook_departure = extract_logbook_airport_code(entry, "airportD");
+            let logbook_arrival = extract_logbook_airport_code(entry, "airportA");
+            let logbook_entry_id = extract_logbook_entry_id(entry);
+
+            for (credited_tour_name, credited_tour_leg, credit_message) in
+                extract_logbook_tour_credit_metadata(entry)
+            {
+                entries.push(LogbookEntryMatch {
+                    entry_index,
+                    entry: entry.clone(),
+                    epoch_seconds,
+                    completed_at: completed_at.clone(),
+                    matched_tour_name_from_update: Some(credited_tour_name.clone()),
+                    tour_sequence_leg_from_update: Some(credited_tour_leg),
+                    logbook_entry_id: logbook_entry_id.clone(),
+                    logbook_status: logbook_status.clone(),
+                    logbook_departure: logbook_departure.clone(),
+                    logbook_arrival: logbook_arrival.clone(),
+                    credited_tour_name: Some(credited_tour_name),
+                    credited_tour_leg: Some(credited_tour_leg),
+                    credit_message: Some(credit_message),
+                });
+            }
         }
     }
 
     entries
+}
+
+fn count_logbook_entries_from_values(logbook_jsons: &[Value]) -> usize {
+    let mut count = 0usize;
+    let mut seen_serializations = HashSet::new();
+
+    for json in logbook_jsons {
+        let Some(raw_entries) = find_logbook_entries(json) else {
+            continue;
+        };
+
+        for entry in raw_entries {
+            let Ok(serialized) = serde_json::to_string(entry) else {
+                continue;
+            };
+
+            if seen_serializations.insert(serialized) {
+                count += 1;
+            }
+        }
+    }
+
+    count
+}
+
+fn count_logbook_entries_with_system_updates(logbook_jsons: &[Value]) -> usize {
+    let mut count = 0usize;
+    let mut seen_serializations = HashSet::new();
+
+    for json in logbook_jsons {
+        let Some(raw_entries) = find_logbook_entries(json) else {
+            continue;
+        };
+
+        for entry in raw_entries {
+            let Ok(serialized) = serde_json::to_string(entry) else {
+                continue;
+            };
+
+            if !seen_serializations.insert(serialized) {
+                continue;
+            }
+
+            if entry
+                .get("updates")
+                .and_then(Value::as_array)
+                .is_some_and(|updates| {
+                    updates.iter().any(update_indicates_system_credit)
+                        && !extract_logbook_tour_credit_metadata(entry).is_empty()
+                })
+            {
+                count += 1;
+            }
+        }
+    }
+
+    count
 }
 
 fn build_tour_progress_rows_with_debug(
@@ -1272,89 +1395,248 @@ fn build_tour_progress_rows_with_debug(
     tour_name: &str,
     tour_start_seconds: Option<i64>,
     tour_end_seconds: Option<i64>,
+    stats: &mut TourProgressMatchStats,
     rejected_reasons: Option<&mut Vec<String>>,
     matched_row_ids: Option<&mut Vec<String>>,
 ) -> BTreeMap<String, DeltaTourProgressRow> {
     let mut matched_rows = Vec::new();
-    let mut used_entry_indices = HashSet::new();
+    let mut used_row_ids = HashSet::new();
     let mut rejected_reasons = rejected_reasons;
     let mut matched_row_ids = matched_row_ids;
+    let normalized_tour_name = normalize_tour_name_key(tour_name);
+    let _ = (tour_start_seconds, tour_end_seconds);
 
-    for (index, row) in tour_rows.iter().enumerate() {
-        let tour_row_id = extract_tour_row_id(tour_path, row, index);
+    for entry in entries {
+        let Some(credited_tour_name) = entry.credited_tour_name.as_deref() else {
+            continue;
+        };
 
-        let mut best_match: Option<(i32, Option<i64>, usize)> = None;
-        for entry in entries {
-            if used_entry_indices.contains(&entry.entry_index) {
-                continue;
-            }
+        stats.total_system_tour_credit_candidates += 1;
 
-            let evaluation = evaluate_logbook_entry_match_with_context(
-                &entry.entry,
-                row,
-                Some(tour_name),
-                Some(&LogbookTourUpdateMetadata {
-                    matched_tour_name_from_update: entry.matched_tour_name_from_update.clone(),
-                    tour_sequence_leg_from_update: entry.tour_sequence_leg_from_update,
-                }),
-                tour_start_seconds,
-                tour_end_seconds,
-            );
-            if evaluation.score <= 0 {
-                if let Some(reason) = evaluation.reason {
-                    if let Some(rejected_reasons) = rejected_reasons.as_deref_mut() {
-                        if rejected_reasons.len() < 10 {
-                            rejected_reasons.push(format!(
-                                "tour={tour_path} row={tour_row_id} entry#{} reason={reason}",
-                                entry.entry_index
-                            ));
-                        }
-                    }
+        if normalize_tour_name_key(credited_tour_name) != normalized_tour_name {
+            stats.total_skipped_tour_name_mismatches += 1;
+            if let Some(rejected_reasons) = rejected_reasons.as_deref_mut() {
+                if rejected_reasons.len() < 10 {
+                    rejected_reasons.push(format!(
+                        "tour={tour_path} creditedTourName={credited_tour_name} reason=tour-name-mismatch"
+                    ));
                 }
-                continue;
             }
-
-            let score = evaluation.score;
-            let candidate = (score, entry.epoch_seconds, entry.entry_index);
-            if is_better_match(best_match, candidate) {
-                best_match = Some(candidate);
-            }
-        }
-
-        let Some((_, epoch_seconds, entry_index)) = best_match else {
-            log_tour_progress_unmatched_row_debug(
+            log_tour_progress_credit_skip_debug(
                 tour_path,
                 tour_name,
-                row,
-                &entries,
-                tour_start_seconds,
-                tour_end_seconds,
-                rejected_reasons.as_deref().map(|reasons| &reasons[..]),
+                entry,
+                "tour-name-mismatch",
+                None,
+            );
+            continue;
+        }
+
+        let Some(status) = entry.logbook_status.as_deref() else {
+            if let Some(rejected_reasons) = rejected_reasons.as_deref_mut() {
+                if rejected_reasons.len() < 10 {
+                    rejected_reasons.push(format!(
+                        "tour={tour_path} creditedTourName={credited_tour_name} reason=status-missing"
+                    ));
+                }
+            }
+            log_tour_progress_credit_skip_debug(
+                tour_path,
+                tour_name,
+                entry,
+                "status-missing",
+                Some((tour_path.to_string(), tour_name.to_string())),
             );
             continue;
         };
 
-        used_entry_indices.insert(entry_index);
+        if !is_eligible_logbook_status(Some(status)) {
+            if let Some(rejected_reasons) = rejected_reasons.as_deref_mut() {
+                if rejected_reasons.len() < 10 {
+                    rejected_reasons.push(format!(
+                        "tour={tour_path} creditedTourName={credited_tour_name} reason=status:{status}"
+                    ));
+                }
+            }
+            log_tour_progress_credit_skip_debug(
+                tour_path,
+                tour_name,
+                entry,
+                "status-not-eligible",
+                Some((tour_path.to_string(), tour_name.to_string())),
+            );
+            continue;
+        }
+        stats.total_entries_with_valid_completed_status += 1;
+
+        let entry_seconds = entry.epoch_seconds;
+        if entry_seconds.is_some() {
+            stats.total_entries_inside_tour_date_windows += 1;
+        }
+
+        let log_departure = entry.logbook_departure.as_deref();
+        let log_arrival = entry.logbook_arrival.as_deref();
+        let mut route_matches = Vec::new();
+        for (index, row) in tour_rows.iter().enumerate() {
+            let tour_row_id = extract_tour_row_id(tour_path, row, index);
+            if used_row_ids.contains(&tour_row_id) {
+                continue;
+            }
+
+            let row_departure = extract_airport_code(
+                row,
+                &[
+                    "from",
+                    "departure",
+                    "departureAirport",
+                    "airportD",
+                    "dep",
+                    "fromAirport",
+                    "departureIcao",
+                ],
+            );
+            let row_arrival = extract_airport_code(
+                row,
+                &[
+                    "to",
+                    "destination",
+                    "arrivalAirport",
+                    "airportA",
+                    "arr",
+                    "toAirport",
+                    "arrivalIcao",
+                ],
+            );
+
+            let Some(log_departure) = log_departure else {
+                continue;
+            };
+            let Some(log_arrival) = log_arrival else {
+                continue;
+            };
+
+            let Some(row_departure) = row_departure.as_deref() else {
+                continue;
+            };
+            let Some(row_arrival) = row_arrival.as_deref() else {
+                continue;
+            };
+
+            let Some(log_departure_ids) = airport_identifiers_from_code(log_departure) else {
+                continue;
+            };
+            let Some(log_arrival_ids) = airport_identifiers_from_code(log_arrival) else {
+                continue;
+            };
+            let Some(row_departure_ids) = airport_identifiers_from_code(row_departure) else {
+                continue;
+            };
+            let Some(row_arrival_ids) = airport_identifiers_from_code(row_arrival) else {
+                continue;
+            };
+
+            if airport_identifier_matches(&log_departure_ids, &row_departure_ids)
+                && airport_identifier_matches(&log_arrival_ids, &row_arrival_ids)
+            {
+                route_matches.push((index, row, tour_row_id, row_departure.to_string(), row_arrival.to_string()));
+            }
+        }
+
+        if route_matches.is_empty() {
+            stats.total_skipped_route_mismatches += 1;
+            if let Some(rejected_reasons) = rejected_reasons.as_deref_mut() {
+                if rejected_reasons.len() < 10 {
+                    rejected_reasons.push(format!(
+                        "tour={tour_path} creditedTourName={credited_tour_name} reason=route-mismatch departure={} arrival={}",
+                        log_departure.unwrap_or_default(),
+                        log_arrival.unwrap_or_default()
+                    ));
+                }
+            }
+            log_tour_progress_credit_skip_debug(
+                tour_path,
+                tour_name,
+                entry,
+                "route-mismatch",
+                Some((tour_path.to_string(), tour_name.to_string())),
+            );
+            continue;
+        }
+
+        let selected_route_match = if route_matches.len() == 1 {
+            Some(route_matches.remove(0))
+        } else if let Some(route_index) = entry
+            .credited_tour_leg
+            .and_then(|value| value.checked_sub(1))
+            .and_then(|value| usize::try_from(value).ok())
+        {
+            route_matches.get(route_index).cloned()
+        } else {
+            None
+        };
+
+        let Some((index, _row, tour_row_id, _, _)) = selected_route_match else {
+            stats.total_skipped_ambiguous_routes += 1;
+            if let Some(rejected_reasons) = rejected_reasons.as_deref_mut() {
+                if rejected_reasons.len() < 10 {
+                    rejected_reasons.push(format!(
+                        "tour={tour_path} creditedTourName={credited_tour_name} reason=ambiguous-route count={}",
+                        route_matches.len()
+                    ));
+                }
+            }
+            log_tour_progress_credit_skip_debug(
+                tour_path,
+                tour_name,
+                entry,
+                "ambiguous-route",
+                Some((tour_path.to_string(), tour_name.to_string())),
+            );
+            continue;
+        };
+
+        if used_row_ids.contains(&tour_row_id) {
+            if let Some(rejected_reasons) = rejected_reasons.as_deref_mut() {
+                if rejected_reasons.len() < 10 {
+                    rejected_reasons.push(format!(
+                        "tour={tour_path} row={tour_row_id} creditedTourName={credited_tour_name} reason=duplicate-row"
+                    ));
+                }
+            }
+            log_tour_progress_credit_skip_debug(
+                tour_path,
+                tour_name,
+                entry,
+                "duplicate-row",
+                Some((tour_path.to_string(), tour_name.to_string())),
+            );
+            continue;
+        }
+
+        used_row_ids.insert(tour_row_id.clone());
         if let Some(matched_row_ids) = matched_row_ids.as_deref_mut() {
             if matched_row_ids.len() < 10 {
                 matched_row_ids.push(tour_row_id.clone());
             }
         }
-        let completed_at = entries
-            .iter()
-            .find(|entry| entry.entry_index == entry_index)
-            .and_then(|entry| entry.completed_at.clone())
-            .or_else(|| epoch_seconds.and_then(epoch_seconds_to_iso));
+        let completed_at = entry
+            .completed_at
+            .clone()
+            .or_else(|| entry.epoch_seconds.and_then(epoch_seconds_to_iso));
 
         matched_rows.push((
             tour_row_id,
-            epoch_seconds,
+            entry.epoch_seconds,
             index,
             DeltaTourProgressRow {
                 completed: true,
                 completed_at,
                 completion_order: None,
                 source: DELTAVA_TOUR_PROGRESS_SOURCE.to_string(),
+                match_type: Some("dva-system-tour-credit".to_string()),
+                credited_tour_name: entry.credited_tour_name.clone(),
+                credited_tour_leg: entry.credited_tour_leg,
+                logbook_entry_id: entry.logbook_entry_id.clone(),
             },
         ));
     }
@@ -1431,34 +1713,19 @@ fn log_tour_progress_candidate_debug(
 
     let candidate_entries = entries
         .iter()
-        .filter_map(|entry| {
-            let evaluation = candidate_rows.first().map(|candidate_row| {
-                evaluate_logbook_entry_match(
-                    &entry.entry,
-                    candidate_row.get("raw").unwrap_or(&Value::Null),
-                    tour_start_seconds,
-                    tour_end_seconds,
-                )
-            });
-
-            Some(serde_json::json!({
+        .map(|entry| {
+            serde_json::json!({
                 "entryIndex": entry.entry_index,
                 "epochSeconds": entry.epoch_seconds,
                 "completedAt": entry.completed_at,
-                "airline": extract_logbook_airline_code(&entry.entry),
-                "flightNumber": extract_logbook_flight_number(&entry.entry),
-                "leg": extract_logbook_leg_number(&entry.entry),
-                "departure": extract_logbook_airport_code(&entry.entry, "airportD"),
-                "arrival": extract_logbook_airport_code(&entry.entry, "airportA"),
-                "status": extract_logbook_status(&entry.entry),
-                "equipment": extract_logbook_equipment(&entry.entry),
-                "updateTourName": entry.matched_tour_name_from_update,
-                "updateTourLeg": entry.tour_sequence_leg_from_update,
-                "evaluationAgainstFirstCandidate": evaluation.map(|result| serde_json::json!({
-                    "score": result.score,
-                    "reason": result.reason
-                }))
-            }))
+                "logbookEntryId": entry.logbook_entry_id,
+                "status": entry.logbook_status,
+                "departure": entry.logbook_departure,
+                "arrival": entry.logbook_arrival,
+                "creditedTourName": entry.credited_tour_name,
+                "creditedTourLeg": entry.credited_tour_leg,
+                "creditMessage": entry.credit_message,
+            })
         })
         .collect::<Vec<_>>();
 
@@ -1487,75 +1754,43 @@ fn log_tour_progress_candidate_debug(
 }
 
 #[cfg(debug_assertions)]
-fn log_tour_progress_unmatched_row_debug(
+fn log_tour_progress_credit_skip_debug(
     tour_path: &str,
     tour_name: &str,
-    row: &Value,
-    entries: &[LogbookEntryMatch],
-    tour_start_seconds: Option<i64>,
-    tour_end_seconds: Option<i64>,
-    rejected_reasons: Option<&[String]>,
+    entry: &LogbookEntryMatch,
+    reject_reason: &str,
+    matched_tour_candidate: Option<(String, String)>,
 ) {
-    let row_id = extract_tour_row_id(tour_path, row, 0);
-    let row_leg = extract_leg_number(row, &["leg", "tourLeg", "tourLegNumber"]);
-    let row_route = serde_json::json!({
-        "airline": extract_airline_code(row, &["airline", "airlineIcao", "airlineCode", "airlineName", "callsign", "flightCode"]),
-        "flightNumber": extract_flight_number(row, &["flightNumber", "tourFlightNumber", "flight", "flightCode"]),
-        "departure": extract_airport_code(row, &["from", "departure", "departureAirport", "airportD", "dep", "fromAirport", "departureIcao"]),
-        "arrival": extract_airport_code(row, &["to", "destination", "arrivalAirport", "airportA", "arr", "toAirport", "arrivalIcao"]),
-        "equipment": extract_equipment(row, &["equipment", "aircraft"]),
-        "matchLeg": extract_bool_field(row, &["matchLeg", "match_leg"]).unwrap_or(false),
-        "matchEQ": extract_bool_field(row, &["matchEQ", "matchEq", "match_eq"]).unwrap_or(false),
-    });
-
-    let candidates = entries
-        .iter()
-        .take(10)
-        .map(|entry| {
-            let evaluation = evaluate_logbook_entry_match_with_context(
-                &entry.entry,
-                row,
-                Some(tour_name),
-                Some(&LogbookTourUpdateMetadata {
-                    matched_tour_name_from_update: entry.matched_tour_name_from_update.clone(),
-                    tour_sequence_leg_from_update: entry.tour_sequence_leg_from_update,
-                }),
-                tour_start_seconds,
-                tour_end_seconds,
-            );
-
-            serde_json::json!({
-                "entryIndex": entry.entry_index,
-                "candidateRoute": {
-                    "airline": extract_logbook_airline_code(&entry.entry),
-                    "flightNumber": extract_logbook_flight_number(&entry.entry),
-                    "leg": extract_logbook_leg_number(&entry.entry),
-                    "departure": extract_logbook_airport_code(&entry.entry, "airportD"),
-                    "arrival": extract_logbook_airport_code(&entry.entry, "airportA"),
-                    "equipment": extract_logbook_equipment(&entry.entry),
-                    "status": extract_logbook_status(&entry.entry),
-                    "date": extract_logbook_entry_epoch_seconds(&entry.entry),
-                },
-                "matchedTourNameFromUpdate": entry.matched_tour_name_from_update,
-                "tourSequenceLegFromUpdate": entry.tour_sequence_leg_from_update,
-                "score": evaluation.score,
-                "rejectReason": evaluation.reason,
-            })
-        })
-        .collect::<Vec<_>>();
-
     append_sync_log(&format!(
-        "tour-progress:unmatched {}",
+        "tour-progress:credit-skip {}",
         serde_json::json!({
             "tourId": tour_path,
             "tourName": tour_name,
-            "rowId": row_id,
-            "rowLeg": row_leg,
-            "rowRoute": row_route,
-            "rejectedReasons": rejected_reasons.unwrap_or(&[]),
-            "candidates": candidates
+            "creditedTourName": entry.credited_tour_name,
+            "creditedTourLeg": entry.credited_tour_leg,
+            "logbookEntryId": entry.logbook_entry_id,
+            "status": entry.logbook_status,
+            "departure": entry.logbook_departure,
+            "arrival": entry.logbook_arrival,
+            "completedAt": entry.completed_at,
+            "rejectReason": reject_reason,
+            "matchedSyncedTourCandidate": matched_tour_candidate.map(|(tour_id, tour_name)| serde_json::json!({
+                "tourId": tour_id,
+                "tourName": tour_name
+            })),
+            "updateMessage": entry.credit_message
         })
     ));
+}
+
+#[cfg(not(debug_assertions))]
+fn log_tour_progress_credit_skip_debug(
+    _: &str,
+    _: &str,
+    _: &LogbookEntryMatch,
+    _: &str,
+    _: Option<(String, String)>,
+) {
 }
 
 fn build_tour_progress_from_value(
@@ -1570,11 +1805,9 @@ fn build_tour_progress_from_values(
     logbook_jsons: &[Value],
 ) -> DeltaTourProgressCache {
     let entries = build_logbook_entry_matches_from_values(logbook_jsons);
-    let total_logbook_entries_considered = entries.len();
-    let total_logbook_entries_with_usable_dates = entries
-        .iter()
-        .filter(|entry| entry.epoch_seconds.is_some())
-        .count();
+    let total_logbook_entries_considered = count_logbook_entries_from_values(logbook_jsons);
+    let total_logbook_entries_with_system_updates =
+        count_logbook_entries_with_system_updates(logbook_jsons);
     let mut tour_progress = BTreeMap::new();
     let tours = tours_json
         .as_array()
@@ -1585,8 +1818,7 @@ fn build_tour_progress_from_values(
     let mut total_upcoming_tours = 0usize;
     let mut total_expired_tours = 0usize;
     let mut total_tour_rows = 0usize;
-    let mut total_matched_tour_completions = 0usize;
-    let mut total_unmatched_candidates = 0usize;
+    let mut stats = TourProgressMatchStats::default();
 
     for tour in tours {
         let Some(tour_path) = extract_tour_path(&tour) else {
@@ -1631,15 +1863,11 @@ fn build_tour_progress_from_values(
             &tour_name,
             start_seconds,
             end_seconds,
+            &mut stats,
             Some(&mut rejected_reasons),
             Some(&mut matched_row_ids),
         );
-        total_matched_tour_completions += rows.len();
-        total_unmatched_candidates += entries
-            .iter()
-            .filter(|entry| entry.epoch_seconds.is_some())
-            .count()
-            .saturating_sub(rows.len());
+        stats.total_matched_tour_rows += rows.len();
 
         log_tour_progress_debug(&format!(
             "tour-progress:tour {}",
@@ -1653,6 +1881,7 @@ fn build_tour_progress_from_values(
                 "rowCount": tour_rows.len(),
                 "progressCount": rows.len(),
                 "matchedRowIds": matched_row_ids,
+                "matchedTourRows": rows.keys().take(10).cloned().collect::<Vec<_>>(),
                 "rejectedReasons": rejected_reasons
             })
         ));
@@ -1673,9 +1902,14 @@ fn build_tour_progress_from_values(
             "totalExpiredTours": total_expired_tours,
             "totalTourRows": total_tour_rows,
             "totalLogbookEntriesConsidered": total_logbook_entries_considered,
-            "totalLogbookEntriesWithUsableDates": total_logbook_entries_with_usable_dates,
-            "totalMatchedTourCompletions": total_matched_tour_completions,
-            "totalUnmatchedCandidates": total_unmatched_candidates,
+            "totalEntriesWithSystemUpdates": total_logbook_entries_with_system_updates,
+            "totalSystemTourCreditCandidates": stats.total_system_tour_credit_candidates,
+            "totalEntriesWithValidCompletedStatus": stats.total_entries_with_valid_completed_status,
+            "totalEntriesWithDateMetadata": stats.total_entries_inside_tour_date_windows,
+            "totalMatchedTourRows": stats.total_matched_tour_rows,
+            "totalSkippedTourNameMismatches": stats.total_skipped_tour_name_mismatches,
+            "totalSkippedRouteMismatches": stats.total_skipped_route_mismatches,
+            "totalSkippedAmbiguousRoutes": stats.total_skipped_ambiguous_routes,
             "derivedCompletionOutputKey": DELTAVA_TOUR_PROGRESS_FILE
         })
     ));
@@ -1886,6 +2120,53 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn build_tours_json(rows: Vec<Value>, name: &str) -> Value {
+        json!({
+            "tours": [
+                {
+                    "path": "dva:16",
+                    "name": name,
+                    "active": true,
+                    "startDate": 1_600_000_000,
+                    "endDate": 1_800_000_000,
+                    "rows": rows
+                }
+            ]
+        })
+    }
+
+    fn system_credit_entry(
+        tour_name: &str,
+        credited_leg: i64,
+        departure: &str,
+        arrival: &str,
+        date: Value,
+    ) -> Value {
+        json!({
+            "airline": "DL",
+            "flight": 9515,
+            "leg": 99,
+            "status": "OK",
+            "date": date,
+            "airportD": { "icao": departure, "iata": departure.trim_start_matches('K') },
+            "airportA": { "icao": arrival, "iata": arrival.trim_start_matches('K') },
+            "updates": [
+                {
+                    "type": "SYSTEM",
+                    "msg": format!("Leg {credited_leg} in Flight Tour {tour_name}")
+                }
+            ]
+        })
+    }
+
+    fn completed_row_id(cache: &DeltaTourProgressCache, tour_key: &str, row_id: &str) -> bool {
+        cache
+            .tour_progress
+            .get(tour_key)
+            .and_then(|tour| tour.rows.get(row_id))
+            .is_some_and(|row| row.completed)
+    }
+
     #[test]
     fn normalize_helpers_handle_expected_variants() {
         assert_eq!(normalize_airport_code(" kAtl "), Some("KATL".to_string()));
@@ -1910,12 +2191,8 @@ mod tests {
 
     #[test]
     fn extract_logbook_date_handles_zero_based_months() {
-        let november_entry = json!({
-            "date": { "y": 2023, "m": 10, "d": 25 }
-        });
-        let january_entry = json!({
-            "date": { "y": 2024, "m": 0, "d": 8 }
-        });
+        let november_entry = json!({ "date": { "y": 2023, "m": 10, "d": 25 } });
+        let january_entry = json!({ "date": { "y": 2024, "m": 0, "d": 8 } });
 
         let november_epoch =
             extract_logbook_entry_epoch_seconds(&november_entry).expect("november epoch");
@@ -1939,338 +2216,275 @@ mod tests {
     }
 
     #[test]
-    fn extract_logbook_flight_number_prefers_direct_flight_over_ac_code() {
-        let logbook_entry = json!({
-            "flight": 9517,
-            "acCode": "PT26M48S"
+    fn system_credit_update_completes_matching_row_even_when_date_would_not_match() {
+        let logbook_json = json!({
+            "flights": [
+                system_credit_entry(
+                    "Example Tour",
+                    7,
+                    "KBUR",
+                    "KSAN",
+                    json!({ "y": 2020, "m": 0, "d": 1 })
+                )
+            ]
         });
-
-        assert_eq!(
-            extract_logbook_flight_number(&logbook_entry),
-            Some("9517".to_string())
+        let tours_json = build_tours_json(
+            vec![json!({
+                "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN",
+                "from": "KBUR",
+                "to": "KSAN",
+                "airline": "AA",
+                "tourFlightNumber": "100",
+                "matchLeg": true,
+                "matchEQ": true,
+                "leg": 1,
+                "equipment": "B737"
+            })],
+            "Example Tour",
         );
+
+        let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(completed_row_id(
+            &cache,
+            "dva:16",
+            "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN"
+        ));
     }
 
     #[test]
-    fn logbook_status_ok_is_accepted_and_rejected_is_not() {
-        assert!(is_eligible_logbook_status(Some("OK")));
-        assert!(is_eligible_logbook_status(Some("ok")));
-        assert!(!is_eligible_logbook_status(Some("REJECTED")));
-    }
-
-    #[test]
-    fn exact_flight_identity_match_completes_the_row() {
-        let logbook_entry = json!({
-            "airline": "DL",
-            "flight": 9517,
-            "leg": 1,
-            "status": "OK",
-            "date": { "y": 2023, "m": 10, "d": 25 },
-            "airportD": { "icao": "KBUR", "iata": "BUR" },
-            "airportA": { "icao": "KSAN", "iata": "SAN" },
-            "eqType": "B737-800",
-            "acCode": "PT26M48S"
-        });
-        let tour_leg = json!({
-            "from": "BUR",
-            "to": "SAN",
-            "airline": "DL",
-            "flightNumber": "9517",
-            "matchLeg": true,
-            "matchEQ": false,
-            "leg": 1,
-            "equipment": "DC-3",
-            "tourRowId": "dva:dva:16:airline-DL:flight-9517:leg-1:dep-BUR:arr-SAN:dpt-16-30:arrt-17-05:eq-DC-3"
-        });
-
-        let evaluation = evaluate_logbook_entry_match(&logbook_entry, &tour_leg, None, None);
-        assert!(
-            evaluation.score > 0,
-            "expected a match, got score={:?} reason={:?}",
-            evaluation.score,
-            evaluation.reason
-        );
-        assert!(match_logbook_entry_to_tour_leg(&logbook_entry, &tour_leg));
-    }
-
-    #[test]
-    fn repeated_flight_number_isolated_by_leg_and_route() {
+    fn user_remarks_are_ignored_without_system_update() {
         let logbook_json = json!({
             "flights": [
                 {
-                    "airline": "DL",
-                    "flight": 9515,
-                    "leg": 1,
                     "status": "OK",
                     "date": { "y": 2023, "m": 10, "d": 25 },
-                    "airportD": { "icao": "KEWR", "iata": "EWR" },
-                    "airportA": { "icao": "KCLE", "iata": "CLE" }
+                    "airportD": { "icao": "KBUR", "iata": "BUR" },
+                    "airportA": { "icao": "KSAN", "iata": "SAN" },
+                    "remarks": "Leg 1 in Flight Tour Example Tour"
                 }
             ]
         });
-        let tours_json = json!({
-            "tours": [
+        let tours_json = build_tours_json(
+            vec![json!({
+                "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN",
+                "from": "KBUR",
+                "to": "KSAN",
+                "airline": "AA",
+                "tourFlightNumber": "100",
+                "matchLeg": true,
+                "matchEQ": false,
+                "leg": 1
+            })],
+            "Example Tour",
+        );
+
+        let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(!completed_row_id(
+            &cache,
+            "dva:16",
+            "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN"
+        ));
+    }
+
+    #[test]
+    fn system_credit_tour_name_mismatch_rejects() {
+        let logbook_json = json!({
+            "flights": [
+                system_credit_entry("Example Tour", 1, "KBUR", "KSAN", json!({ "y": 2023, "m": 10, "d": 25 }))
+            ]
+        });
+        let tours_json = build_tours_json(
+            vec![json!({
+                "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN",
+                "from": "KBUR",
+                "to": "KSAN",
+                "airline": "AA",
+                "tourFlightNumber": "100",
+                "matchLeg": true,
+                "matchEQ": false,
+                "leg": 1
+            })],
+            "Other Tour",
+        );
+
+        let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(!completed_row_id(
+            &cache,
+            "dva:16",
+            "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN"
+        ));
+    }
+
+    #[test]
+    fn system_credit_route_mismatch_rejects() {
+        let logbook_json = json!({
+            "flights": [
+                system_credit_entry("Example Tour", 1, "KLAX", "KSFO", json!({ "y": 2023, "m": 10, "d": 25 }))
+            ]
+        });
+        let tours_json = build_tours_json(
+            vec![json!({
+                "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN",
+                "from": "KBUR",
+                "to": "KSAN",
+                "airline": "AA",
+                "tourFlightNumber": "100",
+                "matchLeg": true,
+                "matchEQ": false,
+                "leg": 1
+            })],
+            "Example Tour",
+        );
+
+        let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(!completed_row_id(
+            &cache,
+            "dva:16",
+            "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN"
+        ));
+    }
+
+    #[test]
+    fn duplicate_routes_use_credited_leg_as_tie_breaker() {
+        let logbook_json = json!({
+            "flights": [
+                system_credit_entry("Example Tour", 2, "KBUR", "KSAN", json!({ "y": 2023, "m": 10, "d": 25 }))
+            ]
+        });
+        let tours_json = build_tours_json(
+            vec![
+                json!({
+                    "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN",
+                    "from": "KBUR",
+                    "to": "KSAN",
+                    "airline": "AA",
+                    "tourFlightNumber": "100",
+                    "matchLeg": true,
+                    "matchEQ": false,
+                    "leg": 1
+                }),
+                json!({
+                    "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-2:dep-KBUR:arr-KSAN",
+                    "from": "KBUR",
+                    "to": "KSAN",
+                    "airline": "AA",
+                    "tourFlightNumber": "100",
+                    "matchLeg": true,
+                    "matchEQ": false,
+                    "leg": 2
+                }),
+            ],
+            "Example Tour",
+        );
+
+        let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(!completed_row_id(
+            &cache,
+            "dva:16",
+            "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN"
+        ));
+        assert!(completed_row_id(
+            &cache,
+            "dva:16",
+            "dva:dva:16:airline-AA:flight-100:leg-2:dep-KBUR:arr-KSAN"
+        ));
+    }
+
+    #[test]
+    fn duplicate_routes_without_credited_leg_are_skipped() {
+        let tour_rows = vec![
+            json!({
+                "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN",
+                "from": "KBUR",
+                "to": "KSAN",
+                "airline": "AA",
+                "tourFlightNumber": "100",
+                "matchLeg": true,
+                "matchEQ": false,
+                "leg": 1
+            }),
+            json!({
+                "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-2:dep-KBUR:arr-KSAN",
+                "from": "KBUR",
+                "to": "KSAN",
+                "airline": "AA",
+                "tourFlightNumber": "100",
+                "matchLeg": true,
+                "matchEQ": false,
+                "leg": 2
+            }),
+        ];
+        let candidate = LogbookEntryMatch {
+            entry_index: 0,
+            entry: json!({}),
+            epoch_seconds: Some(1_700_000_000),
+            completed_at: Some("2023-11-14T00:00:00.000Z".to_string()),
+            matched_tour_name_from_update: Some("Example Tour".to_string()),
+            tour_sequence_leg_from_update: None,
+            logbook_entry_id: Some("entry-1".to_string()),
+            logbook_status: Some("OK".to_string()),
+            logbook_departure: Some("KBUR".to_string()),
+            logbook_arrival: Some("KSAN".to_string()),
+            credited_tour_name: Some("Example Tour".to_string()),
+            credited_tour_leg: None,
+            credit_message: Some("Leg in Flight Tour Example Tour".to_string()),
+        };
+        let mut stats = TourProgressMatchStats::default();
+        let mut rejected_reasons = Vec::new();
+        let mut matched_row_ids = Vec::new();
+
+        let rows = build_tour_progress_rows_with_debug(
+            &[candidate],
+            &tour_rows,
+            "dva:16",
+            "Example Tour",
+            None,
+            None,
+            &mut stats,
+            Some(&mut rejected_reasons),
+            Some(&mut matched_row_ids),
+        );
+
+        assert!(rows.is_empty());
+        assert!(rejected_reasons
+            .iter()
+            .any(|reason| reason.contains("ambiguous-route")));
+    }
+
+    #[test]
+    fn rejected_status_does_not_complete() {
+        let logbook_json = json!({
+            "flights": [
                 {
-                    "path": "dva:16",
-                    "name": "Example Tour",
-                    "startDate": 1_696_118_400,
-                    "endDate": 1_706_745_600,
-                    "rows": [
-                        {
-                            "tourRowId": "dva:dva:16:airline-DL:flight-9515:leg-1:dep-KEWR:arr-KCLE",
-                            "from": "KEWR",
-                            "to": "KCLE",
-                            "airline": "DL",
-                            "tourFlightNumber": "9515",
-                            "matchLeg": true,
-                            "matchEQ": false,
-                            "leg": 1,
-                            "equipment": "DC-3"
-                        },
-                        {
-                            "tourRowId": "dva:dva:16:airline-DL:flight-9515:leg-2:dep-KCLE:arr-KTOL",
-                            "from": "KCLE",
-                            "to": "KTOL",
-                            "airline": "DL",
-                            "tourFlightNumber": "9515",
-                            "matchLeg": true,
-                            "matchEQ": false,
-                            "leg": 2,
-                            "equipment": "DC-3"
-                        }
+                    "status": "REJECTED",
+                    "date": { "y": 2023, "m": 10, "d": 25 },
+                    "airportD": { "icao": "KBUR", "iata": "BUR" },
+                    "airportA": { "icao": "KSAN", "iata": "SAN" },
+                    "updates": [
+                        { "type": "SYSTEM", "msg": "Leg 1 in Flight Tour Example Tour" }
                     ]
                 }
             ]
         });
+        let tours_json = build_tours_json(
+            vec![json!({
+                "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN",
+                "from": "KBUR",
+                "to": "KSAN",
+                "airline": "AA",
+                "tourFlightNumber": "100",
+                "matchLeg": true,
+                "matchEQ": false,
+                "leg": 1
+            })],
+            "Example Tour",
+        );
 
         let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
-        let tour = cache
-            .tour_progress
-            .get("dva:16")
-            .expect("example tour progress");
-        assert!(tour
-            .rows
-            .get("dva:dva:16:airline-DL:flight-9515:leg-1:dep-KEWR:arr-KCLE")
-            .is_some_and(|row| row.completed));
-        assert!(!tour
-            .rows
-            .contains_key("dva:dva:16:airline-DL:flight-9515:leg-2:dep-KCLE:arr-KTOL"));
-    }
-
-    #[test]
-    fn tour_sequence_metadata_is_ignored_for_matching() {
-        let logbook_entry = json!({
-            "airline": "DL",
-            "flight": 9515,
-            "leg": 1,
-            "status": "OK",
-            "date": { "y": 2023, "m": 10, "d": 25 },
-            "airportD": { "icao": "KEWR", "iata": "EWR" },
-            "airportA": { "icao": "KCLE", "iata": "CLE" },
-            "updates": [
-                { "msg": "Leg 16 in Flight Tour Example Tour" }
-            ]
-        });
-        let tour_leg = json!({
-            "from": "KEWR",
-            "to": "KCLE",
-            "airline": "DL",
-            "flightNumber": "9515",
-            "matchLeg": true,
-            "matchEQ": false,
-            "leg": 1
-        });
-
-        let evaluation = evaluate_logbook_entry_match_with_context(
-            &logbook_entry,
-            &tour_leg,
-            Some("Example Tour"),
-            Some(&extract_logbook_tour_update_metadata(&logbook_entry)),
-            None,
-            None,
-        );
-        assert!(evaluation.score > 0, "expected match, got {:?}", evaluation);
-    }
-
-    #[test]
-    fn update_sequence_cannot_force_a_route_mismatch() {
-        let logbook_entry = json!({
-            "airline": "DL",
-            "flight": 9515,
-            "leg": 1,
-            "status": "OK",
-            "date": { "y": 2023, "m": 10, "d": 25 },
-            "airportD": { "icao": "KEWR", "iata": "EWR" },
-            "airportA": { "icao": "KCLE", "iata": "CLE" },
-            "updates": [
-                { "msg": "Leg 16 in Flight Tour Example Tour" }
-            ]
-        });
-        let tour_leg = json!({
-            "from": "KEWR",
-            "to": "KXYZ",
-            "airline": "DL",
-            "flightNumber": "9515",
-            "matchLeg": true,
-            "matchEQ": false,
-            "leg": 1
-        });
-
-        let evaluation = evaluate_logbook_entry_match_with_context(
-            &logbook_entry,
-            &tour_leg,
-            Some("Example Tour"),
-            Some(&extract_logbook_tour_update_metadata(&logbook_entry)),
-            None,
-            None,
-        );
-        assert_eq!(evaluation.score, 0);
-        assert!(evaluation
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("airport") || reason.contains("flight-number")));
-    }
-
-    #[test]
-    fn missing_leg_rejects_when_tour_row_has_one() {
-        let logbook_entry = json!({
-            "airline": "DL",
-            "flight": 9517,
-            "status": "OK",
-            "date": { "y": 2023, "m": 10, "d": 25 },
-            "airportD": { "icao": "KBUR", "iata": "BUR" },
-            "airportA": { "icao": "KSAN", "iata": "SAN" }
-        });
-        let tour_leg = json!({
-            "from": "KBUR",
-            "to": "KSAN",
-            "airline": "DL",
-            "flightNumber": "9517",
-            "matchLeg": true,
-            "matchEQ": false,
-            "leg": 1
-        });
-
-        let evaluation = evaluate_logbook_entry_match(&logbook_entry, &tour_leg, None, None);
-        assert_eq!(evaluation.score, 0);
-        assert!(evaluation
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("leg")));
-    }
-
-    #[test]
-    fn rejects_rejected_status() {
-        let logbook_entry = json!({
-            "airline": "DL",
-            "flight": 9517,
-            "leg": 1,
-            "status": "REJECTED",
-            "date": { "y": 2023, "m": 10, "d": 25 },
-            "airportD": { "icao": "KBUR", "iata": "BUR" },
-            "airportA": { "icao": "KSAN", "iata": "SAN" }
-        });
-        let tour_leg = json!({
-            "from": "KBUR",
-            "to": "KSAN",
-            "airline": "DL",
-            "flightNumber": "9517",
-            "matchLeg": true,
-            "matchEQ": false,
-            "leg": 1
-        });
-
-        assert!(!match_logbook_entry_to_tour_leg(&logbook_entry, &tour_leg));
-    }
-
-    #[test]
-    fn accepts_dl_vs_dal_alias() {
-        let logbook_entry = json!({
-            "airline": "DAL",
-            "flight": 9517,
-            "leg": 1,
-            "status": "OK",
-            "date": { "y": 2023, "m": 10, "d": 25 },
-            "airportD": { "icao": "KBUR", "iata": "BUR" },
-            "airportA": { "icao": "KSAN", "iata": "SAN" }
-        });
-        let tour_leg = json!({
-            "from": "BUR",
-            "to": "SAN",
-            "airline": "DL",
-            "flightNumber": "9517",
-            "matchLeg": true,
-            "matchEQ": false,
-            "leg": 1
-        });
-
-        assert!(match_logbook_entry_to_tour_leg(&logbook_entry, &tour_leg));
-    }
-
-    #[test]
-    fn airport_crosswalk_matches_icao_and_iata() {
-        let logbook_entry = json!({
-            "airline": "DL",
-            "flight": 9517,
-            "leg": 1,
-            "status": "OK",
-            "date": { "y": 2023, "m": 10, "d": 25 },
-            "airportD": { "icao": "KBUR", "iata": "BUR" },
-            "airportA": { "icao": "KSAN", "iata": "SAN" }
-        });
-        let tour_leg = json!({
-            "from": "BUR",
-            "to": "SAN",
-            "airline": "DL",
-            "flightNumber": "9517",
-            "matchLeg": true,
-            "matchEQ": false,
-            "leg": 1
-        });
-
-        assert!(match_logbook_entry_to_tour_leg(&logbook_entry, &tour_leg));
-    }
-
-    #[test]
-    fn equipment_mismatch_is_rejected_only_when_required() {
-        let logbook_entry = json!({
-            "airline": "DL",
-            "flight": 9517,
-            "leg": 1,
-            "status": "OK",
-            "date": { "y": 2023, "m": 10, "d": 25 },
-            "airportD": { "icao": "KBUR", "iata": "BUR" },
-            "airportA": { "icao": "KSAN", "iata": "SAN" },
-            "eqType": "B737-800"
-        });
-        let matching_required = json!({
-            "from": "BUR",
-            "to": "SAN",
-            "airline": "DL",
-            "flightNumber": "9517",
-            "matchLeg": true,
-            "matchEQ": true,
-            "leg": 1,
-            "equipment": "DC-3"
-        });
-        let matching_optional = json!({
-            "from": "BUR",
-            "to": "SAN",
-            "airline": "DL",
-            "flightNumber": "9517",
-            "matchLeg": true,
-            "matchEQ": false,
-            "leg": 1,
-            "equipment": "DC-3"
-        });
-
-        assert!(!match_logbook_entry_to_tour_leg(
-            &logbook_entry,
-            &matching_required
-        ));
-        assert!(match_logbook_entry_to_tour_leg(
-            &logbook_entry,
-            &matching_optional
+        assert!(!completed_row_id(
+            &cache,
+            "dva:16",
+            "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN"
         ));
     }
 }

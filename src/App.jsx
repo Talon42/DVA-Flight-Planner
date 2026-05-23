@@ -717,6 +717,21 @@ function normalizeTourRows(tour, rows, progressById = {}) {
   });
 }
 
+function summarizeTourCompletion(rows = []) {
+  const visibleRows = Array.isArray(rows) ? rows : [];
+  const totalRows = visibleRows.length;
+  const completedRows = visibleRows.reduce(
+    (count, row) => count + (row?.isCompleted ? 1 : 0),
+    0
+  );
+
+  return {
+    totalRows,
+    completedRows,
+    isCompleted: totalRows > 0 && completedRows === totalRows
+  };
+}
+
 function mergeTourProgressSources(manualProgress = {}, derivedProgress = {}) {
   const mergedProgress = {};
   const tourPaths = new Set([
@@ -2020,6 +2035,7 @@ export default function App() {
             tour?.rows || tour?.flights || [],
             resolvedTourProgress?.[selectionId]?.rows
           );
+          const completion = summarizeTourCompletion(rows);
           return {
             ...tour,
             ...visibility,
@@ -2027,6 +2043,9 @@ export default function App() {
             selectionId,
             label: String(tour?.label || tour?.name || "").trim(),
             rows,
+            totalRows: completion.totalRows,
+            completedRows: completion.completedRows,
+            isCompleted: completion.isCompleted,
             _tourSourceIndex: index
           };
         })
@@ -5921,6 +5940,15 @@ export default function App() {
             onConsumePendingMapFitToRoute={() => setPendingMapFitToRoute(false)}
             availableTours={availableTours}
             selectedTourPath={selectedTourPath}
+            selectedTourCompletionSummary={
+              selectedTour
+                ? {
+                    totalRows: selectedTour.totalRows || 0,
+                    completedRows: selectedTour.completedRows || 0,
+                    isCompleted: Boolean(selectedTour.isCompleted)
+                  }
+                : null
+            }
             accomplishmentOptions={ACCOMPLISHMENTS}
             selectedAccomplishmentName={selectedAccomplishment?.name || ""}
             onPrimaryViewChange={handlePrimaryViewChange}

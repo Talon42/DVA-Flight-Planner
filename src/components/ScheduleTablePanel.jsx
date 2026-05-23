@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import Panel from "./ui/Panel";
+import Button from "./ui/Button";
 import SectionHeader from "./ui/SectionHeader";
 import { cn } from "./ui/cn";
 import {
@@ -22,11 +24,11 @@ const WORKSPACE_META = {
 
 function TourStatusBadge({ label, tone }) {
   const toneClassName =
-    tone === "expired"
-      ? "border-[color:var(--status-ambiguous-bg)] bg-[var(--status-ambiguous-bg)] text-[var(--delta-red)]"
-      : tone === "upcoming"
-        ? "border-[color:var(--line-strong)] bg-[var(--surface-soft)] text-[var(--text-muted)]"
-      : "border-[color:var(--status-resolved-bg)] bg-[var(--status-resolved-bg)] text-[var(--status-resolved-text)]";
+    tone === "completed"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+      : tone === "expired"
+        ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
+        : "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300";
 
   return (
     <span
@@ -41,16 +43,16 @@ function TourStatusBadge({ label, tone }) {
 }
 
 function renderTourOptionContent(option) {
+  const isCompleted = Boolean(option?.isCompleted);
   const visibilityStatus = String(option?.visibilityStatus || "").trim();
-  const isExpired = visibilityStatus === "expired";
-  const isUpcoming = visibilityStatus === "upcoming";
-  const isCurrent = visibilityStatus === "current";
+  const isExpired = !isCompleted && visibilityStatus === "expired";
+  const isCurrent = !isCompleted && visibilityStatus === "current";
 
   return (
     <span className="flex min-w-0 items-center gap-2">
       <span className="min-w-0 truncate">{String(option?.selectedLabel || option?.label || "").trim()}</span>
+      {isCompleted ? <TourStatusBadge label="Completed" tone="completed" /> : null}
       {isCurrent ? <TourStatusBadge label="Active" tone="active" /> : null}
-      {isUpcoming ? <TourStatusBadge label="Upcoming" tone="upcoming" /> : null}
       {isExpired ? <TourStatusBadge label="Expired" tone="expired" /> : null}
     </span>
   );
@@ -68,6 +70,7 @@ export default function ScheduleTablePanel({
   onConsumePendingMapFitToRoute,
   availableTours = [],
   selectedTourPath,
+  selectedTourCompletionSummary = null,
   accomplishmentOptions = [],
   selectedAccomplishmentName,
   selectedAccomplishment,
@@ -111,10 +114,38 @@ export default function ScheduleTablePanel({
   const selectedTourOption = selectedTourPath
     ? availableTours.find((tour) => tour.selectionId === selectedTourPath)
     : availableTours[0] || null;
+  const selectedTourKey = String(selectedTourOption?.selectionId || selectedTourPath || "").trim();
+  const [dismissedCompletedTourKey, setDismissedCompletedTourKey] = useState("");
+  useEffect(() => {
+    setDismissedCompletedTourKey("");
+  }, [selectedTourKey]);
+  const selectedTourCompletion =
+    selectedTourCompletionSummary ||
+    (selectedTourOption
+      ? {
+          totalRows: Number(selectedTourOption.totalRows || 0),
+          completedRows: Number(selectedTourOption.completedRows || 0),
+          isCompleted: Boolean(selectedTourOption.isCompleted)
+        }
+      : null);
+  const showCompletedTourOverlay = Boolean(
+    selectedTourKey &&
+      selectedTourCompletion?.isCompleted &&
+      dismissedCompletedTourKey !== selectedTourKey
+  );
+  const completionOverlayTitle = String(selectedTourOption?.label || selectedTourOption?.name || "").trim();
+  const dismissCompletionOverlay = () => {
+    if (selectedTourKey) {
+      setDismissedCompletedTourKey(selectedTourKey);
+    }
+  };
   const tourOptions = availableTours.map((tour) => ({
     value: tour.selectionId,
     label: tour.label,
     selectedLabel: tour.label,
+    isCompleted: Boolean(tour.isCompleted),
+    totalRows: Number(tour.totalRows || 0),
+    completedRows: Number(tour.completedRows || 0),
     active: Boolean(tour.active),
     isCurrent: Boolean(tour.isCurrent),
     isUpcoming: Boolean(tour.isUpcoming),
@@ -122,7 +153,7 @@ export default function ScheduleTablePanel({
     visibilityStatus: String(tour.visibilityStatus || "").trim(),
     keywords: `${tour.label} ${tour.name || ""} ${tour.sourceId || ""} ${tour.visibilityStatus || ""} ${
       tour.active ? "active" : ""
-    }`
+    } ${tour.isCompleted ? "completed" : ""}`
   }));
   const accomplishmentSelectOptions = accomplishmentOptions.map((accomplishment) => ({
     value: accomplishment.name,
@@ -229,7 +260,7 @@ export default function ScheduleTablePanel({
           </div>
         ) : scheduleView === "tours" ? (
           hasTours ? (
-            <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
+            <div className="relative flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
               <ToursTable
                 key={`tour-table-${selectedTourPath || "none"}`}
                 rows={tourRows}
@@ -238,6 +269,31 @@ export default function ScheduleTablePanel({
                 onSelectRow={onSelectRow}
                 onActivateRow={onActivateRow}
               />
+
+              {showCompletedTourOverlay ? (
+                <div
+                  className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[rgba(240,245,250,0.18)] p-4 dark:bg-[rgba(4,12,22,0.26)]"
+                >
+                  <div className="pointer-events-auto grid w-full max-w-md gap-4 border border-[color:var(--line)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(10,24,43,0.2)] dark:bg-[var(--surface-elevated)] dark:shadow-[0_18px_48px_rgba(0,0,0,0.36)]">
+                    <div className="grid gap-2">
+                      <p className="m-0 text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                        Congratulations!
+                      </p>
+                      <h2 className="m-0 text-[1.15rem] font-semibold text-[var(--text-heading)]">
+                        You have completed the {completionOverlayTitle}
+                      </h2>
+                    </div>
+                    <p className="m-0 text-[var(--text-muted)]">
+                      All rows for this tour are complete for the current pilot.
+                    </p>
+                    <div className="flex justify-end">
+                      <Button variant="ghost" size="sm" className="rounded-none" onClick={dismissCompletionOverlay}>
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
