@@ -78,6 +78,7 @@
   --chip-bg: rgba(0, 58, 112, 0.08);
   --chip-border: rgba(0, 58, 112, 0.14);
   --chip-text: var(--delta-blue);
+  --help-link: #0057a8;
   --action-bg: rgba(16, 33, 54, 0.06);
   --slider-track: rgba(16, 33, 54, 0.1);
   --shadow: none;
@@ -136,6 +137,7 @@
   --chip-bg: rgba(0, 58, 112, 0.28);
   --chip-border: rgba(120, 166, 214, 0.28);
   --chip-text: #d4e6fb;
+  --help-link: #9fd0ff;
   --action-bg: rgba(236, 243, 251, 0.08);
   --slider-track: rgba(186, 209, 234, 0.2);
   --shadow: none;

@@ -16,6 +16,7 @@ export default function ScheduleWorkspacePanel({
   onConsumePendingMapFitToRoute,
   availableTours = [],
   selectedTourPath,
+  selectedTourCompletionSummary = null,
   accomplishmentOptions = [],
   selectedAccomplishmentName,
   onPrimaryViewChange,
@@ -31,6 +32,7 @@ export default function ScheduleWorkspacePanel({
   addonAirports,
   tourRows,
   selectedTourRowId,
+  tourSyncMessage,
   onShowAccomplishmentFlights,
   onSortFlights,
   onToggleTimeDisplayMode,
@@ -79,6 +81,7 @@ export default function ScheduleWorkspacePanel({
               onConsumePendingMapFitToRoute={onConsumePendingMapFitToRoute}
               availableTours={availableTours}
               selectedTourPath={selectedTourPath}
+              selectedTourCompletionSummary={selectedTourCompletionSummary}
               accomplishmentOptions={accomplishmentOptions}
               selectedAccomplishmentName={selectedAccomplishmentName}
               onSelectTourPath={onSelectTourPath}
@@ -93,6 +96,7 @@ export default function ScheduleWorkspacePanel({
               addonAirports={addonAirports}
               tourRows={tourRows}
               selectedTourRowId={selectedTourRowId}
+              tourSyncMessage={tourSyncMessage}
               onShowAccomplishmentFlights={onShowAccomplishmentFlights}
               onSortFlights={onSortFlights}
               onToggleTimeDisplayMode={onToggleTimeDisplayMode}

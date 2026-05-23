@@ -1,5 +1,4 @@
-import equipmentTypeData from "../data/equipment_type.json";
-import { resolveSimBriefFallbackEquipmentTypeCandidates } from "./simbrief";
+import { resolveSimBriefAircraftCompatibility } from "./simbrief";
 
 const DRAFT_COMMAND_NAME = "submit_deltava_draft_flight_report";
 const SIMBRIEF_OFP_ID_PATTERN = /^\d{10}_[A-Za-z0-9]{10}$/;
@@ -25,116 +24,21 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
-function normalizeEquipmentTypeKey(value) {
-  return normalizeText(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
-}
+export function resolveDraftAircraftCompatibility(flight) {
+  const simbriefCode = normalizeText(flight?.simbriefSelectedType).toUpperCase();
+  const simbriefName = normalizeText(
+    flight?.simbriefPlan?.aircraft?.name ||
+      flight?.simbriefPlan?.aircraft?.type ||
+      flight?.simbriefPlan?.aircraft?.code ||
+      flight?.simbriefPlan?.aircraftType ||
+      flight?.simbriefPlan?.aircraft_name ||
+      simbriefCode
+  );
 
-function unwrapEquipmentTypeRows(source) {
-  if (Array.isArray(source)) {
-    return source;
-  }
-
-  if (!source || typeof source !== "object") {
-    return [];
-  }
-
-  for (const key of ["equipmentTypes", "equipment_type", "rows", "data", "items", "values"]) {
-    if (Array.isArray(source[key])) {
-      return source[key];
-    }
-  }
-
-  return [source];
-}
-
-function normalizeEquipmentTypeValue(row) {
-  if (Array.isArray(row)) {
-    const parts = row.map(normalizeText).filter(Boolean);
-    if (!parts.length) {
-      return "";
-    }
-
-    const firstPart = normalizeText(row[0]);
-    return firstPart ? parts.join("A") : `A${parts.join("A")}`;
-  }
-
-  if (row && typeof row === "object") {
-    for (const key of ["eq_type", "eqType", "equipment_type", "equipmentType", "code", "value"]) {
-      const normalized = normalizeText(row[key]);
-      if (normalized) {
-        return normalized;
-      }
-    }
-  }
-
-  return normalizeText(row);
-}
-
-const equipmentTypes = unwrapEquipmentTypeRows(equipmentTypeData)
-  .map((row) => normalizeEquipmentTypeValue(row))
-  .filter(Boolean);
-
-const equipmentTypeEntries = equipmentTypes.map((equipmentType, index) => ({
-  equipmentType,
-  index,
-  key: normalizeEquipmentTypeKey(equipmentType)
-}));
-
-const equipmentTypeByKey = new Map(
-  equipmentTypeEntries.map(({ key, equipmentType }) => [key, equipmentType])
-);
-
-function normalizeSimBriefAircraftLabel(value) {
-  return normalizeText(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
-}
-
-// Snaps detailed SimBrief variants like A319-100 to the nearest equipment label.
-function resolveClosestEquipmentTypeFromSimBriefAircraft(selectedType) {
-  const normalizedSelectedType = normalizeSimBriefAircraftLabel(selectedType);
-  if (!normalizedSelectedType) {
-    return "";
-  }
-
-  const exactEquipmentType = equipmentTypeByKey.get(normalizedSelectedType);
-  if (exactEquipmentType) {
-    return exactEquipmentType;
-  }
-
-  const prefixMatches = equipmentTypeEntries
-    .filter(({ key }) => key && normalizedSelectedType.startsWith(key))
-    .sort((left, right) => right.key.length - left.key.length || left.index - right.index);
-
-  if (prefixMatches.length) {
-    return prefixMatches[0].equipmentType;
-  }
-
-  const containedMatches = equipmentTypeEntries
-    .filter(({ key }) => key && key.startsWith(normalizedSelectedType))
-    .sort((left, right) => left.key.length - right.key.length || left.index - right.index);
-
-  return containedMatches[0]?.equipmentType || "";
-}
-
-function resolveEquipmentTypeFromSimBrief(selectedType) {
-  const normalizedSelectedType = normalizeEquipmentTypeKey(selectedType);
-  if (!normalizedSelectedType) {
-    return "";
-  }
-
-  const exactEquipmentType = equipmentTypeByKey.get(normalizedSelectedType);
-  if (exactEquipmentType) {
-    return exactEquipmentType;
-  }
-
-  const candidateMatches = resolveSimBriefFallbackEquipmentTypeCandidates(selectedType)
-    .map((candidate) => equipmentTypeByKey.get(normalizeEquipmentTypeKey(candidate)))
-    .filter(Boolean);
-
-  if (candidateMatches.length) {
-    return candidateMatches[0];
-  }
-
-  return resolveClosestEquipmentTypeFromSimBriefAircraft(selectedType);
+  return resolveSimBriefAircraftCompatibility({
+    code: simbriefCode,
+    name: simbriefName
+  });
 }
 
 function deriveDraftNetwork(flight) {
@@ -222,18 +126,12 @@ function deriveDraftFlightNumber(flight) {
   return Number.isFinite(flightNumber) && flightNumber > 0 ? flightNumber : null;
 }
 
-function deriveDraftEquipmentType(flight) {
-  const selectedType = normalizeText(flight?.simbriefSelectedType).toUpperCase();
-  if (!isValidSimBriefAircraftCode(selectedType)) {
+function deriveDraftEquipmentType(flight, aircraftResolution = resolveDraftAircraftCompatibility(flight)) {
+  if (!isValidSimBriefAircraftCode(aircraftResolution?.simbriefCode)) {
     return "";
   }
 
-  const resolvedType = resolveEquipmentTypeFromSimBrief(selectedType);
-  if (resolvedType) {
-    return resolvedType;
-  }
-
-  return selectedType;
+  return aircraftResolution?.validForDvaDraft ? aircraftResolution.resolvedDvaEquipmentType : "";
 }
 
 function normalizePositiveDraftReportId(value) {
@@ -318,10 +216,11 @@ function normalizeDraftSubmitResult(result) {
   };
 }
 
-export function buildDeltaVirtualDraftReportPayload(flight) {
+export function buildDeltaVirtualDraftReportPayload(flight, aircraftResolution = null) {
   const simbriefPlan = flight?.simbriefPlan || null;
   const id = normalizePositiveDraftReportId(flight?.draftReportId ?? flight?.dvaDraftReportId);
   const { simBriefID } = resolveDraftSimBriefId(simbriefPlan);
+  const resolvedAircraft = aircraftResolution || resolveDraftAircraftCompatibility(flight);
 
   const payload = {
     airline: normalizeText(flight?.airline).toUpperCase(),
@@ -329,7 +228,7 @@ export function buildDeltaVirtualDraftReportPayload(flight) {
     leg: 1,
     airportD: normalizeText(flight?.from).toUpperCase(),
     airportA: normalizeText(flight?.to).toUpperCase(),
-    eqType: deriveDraftEquipmentType(flight),
+    eqType: deriveDraftEquipmentType(flight, resolvedAircraft),
     network: deriveDraftNetwork(flight),
     pax: normalizeDraftPassengerCount(simbriefPlan?.pax),
     alt: normalizeText(simbriefPlan?.cruiseAltitude),
@@ -345,9 +244,10 @@ export function buildDeltaVirtualDraftReportPayload(flight) {
   return sanitizeDraftPayload(payload);
 }
 
-export function validateDeltaVirtualDraftReportPayload(payload) {
+export function validateDeltaVirtualDraftReportPayload(payload, context = {}) {
   const sanitizedPayload = sanitizeDraftPayload(payload);
   const errors = [];
+  const selectedAircraft = context?.selectedSimBriefAircraft || null;
 
   if (!normalizeText(sanitizedPayload?.airline)) {
     errors.push("airline is missing");
@@ -366,7 +266,11 @@ export function validateDeltaVirtualDraftReportPayload(payload) {
   }
 
   if (!normalizeText(sanitizedPayload?.eqType)) {
-    errors.push("equipment type is missing");
+    if (selectedAircraft && selectedAircraft.validForDvaDraft === false && normalizeText(selectedAircraft.simbriefCode)) {
+      errors.push("Selected SimBrief aircraft is not supported by Delta Virtual equipment types.");
+    } else {
+      errors.push("equipment type is missing");
+    }
   }
 
   if (!["Offline", "VATSIM"].includes(normalizeText(sanitizedPayload?.network))) {
@@ -381,8 +285,11 @@ export function validateDeltaVirtualDraftReportPayload(payload) {
 
 export async function submitDeltaVirtualDraftReport(flight, options = {}) {
   const debugEnabled = Boolean(options?.debugEnabled);
-  const payload = sanitizeDraftPayload(buildDeltaVirtualDraftReportPayload(flight));
-  const validation = validateDeltaVirtualDraftReportPayload(payload);
+  const aircraftResolution = resolveDraftAircraftCompatibility(flight);
+  const payload = sanitizeDraftPayload(buildDeltaVirtualDraftReportPayload(flight, aircraftResolution));
+  const validation = validateDeltaVirtualDraftReportPayload(payload, {
+    selectedSimBriefAircraft: aircraftResolution
+  });
 
   if (!validation.valid) {
     return normalizeDraftSubmitResult({

@@ -1,3 +1,8 @@
+import {
+  equipmentTypeByKey,
+  normalizeEquipmentTypeKey
+} from "./equipmentTypes";
+
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -95,11 +100,123 @@ const SIMBRIEF_FALLBACK_TYPE_MAP = {
   "MD-90": "MD90"
 };
 
+const SIMBRIEF_TO_DVA_ALIAS_MAP = {
+  A20N: "A320",
+  A320NEO: "A320",
+  A21N: "A321",
+  A321NEO: "A321"
+};
+
 function normalizeFallbackKey(value) {
   return String(value || "")
     .trim()
     .toUpperCase()
     .replace(/\s+/g, " ");
+}
+
+function resolveAliasEquipmentType(normalizedValue) {
+  const alias = SIMBRIEF_TO_DVA_ALIAS_MAP[normalizedValue];
+  if (!alias) {
+    return "";
+  }
+
+  return equipmentTypeByKey.get(normalizeEquipmentTypeKey(alias)) || "";
+}
+
+// Resolves a SimBrief aircraft code into a DVA equipment type when a compatible mapping exists.
+export function resolveSimBriefAircraftCompatibility(aircraft) {
+  const simbriefCode = String(
+    typeof aircraft === "string"
+      ? aircraft
+      : aircraft?.code || aircraft?.dispatchType || aircraft?.matchType || ""
+  )
+    .trim()
+    .toUpperCase();
+  const simbriefName = String(
+    typeof aircraft === "string" ? "" : aircraft?.name || aircraft?.label || ""
+  ).trim();
+  const normalizedCode = normalizeEquipmentTypeKey(simbriefCode);
+  const normalizedName = normalizeEquipmentTypeKey(simbriefName);
+
+  const exactCodeMatch = equipmentTypeByKey.get(normalizedCode);
+  if (exactCodeMatch) {
+    return {
+      simbriefCode,
+      simbriefName,
+      resolvedDvaEquipmentType: exactCodeMatch,
+      resolutionSource: "exact_code",
+      validForDvaDraft: true
+    };
+  }
+
+  const aliasCodeMatch = resolveAliasEquipmentType(normalizedCode);
+  if (aliasCodeMatch) {
+    return {
+      simbriefCode,
+      simbriefName,
+      resolvedDvaEquipmentType: aliasCodeMatch,
+      resolutionSource: "alias_code",
+      validForDvaDraft: true
+    };
+  }
+
+  const aliasNameMatch = resolveAliasEquipmentType(normalizedName);
+  if (aliasNameMatch) {
+    return {
+      simbriefCode,
+      simbriefName,
+      resolvedDvaEquipmentType: aliasNameMatch,
+      resolutionSource: "alias_name",
+      validForDvaDraft: true
+    };
+  }
+
+  const exactNameMatch = equipmentTypeByKey.get(normalizedName);
+  if (exactNameMatch) {
+    return {
+      simbriefCode,
+      simbriefName,
+      resolvedDvaEquipmentType: exactNameMatch,
+      resolutionSource: "exact_name",
+      validForDvaDraft: true
+    };
+  }
+
+  const fallbackCandidates = resolveSimBriefFallbackEquipmentTypeCandidates(simbriefCode);
+  for (const candidate of fallbackCandidates) {
+    const resolved = equipmentTypeByKey.get(normalizeEquipmentTypeKey(candidate));
+    if (resolved) {
+      return {
+        simbriefCode,
+        simbriefName,
+        resolvedDvaEquipmentType: resolved,
+        resolutionSource: "legacy_alias_code",
+        validForDvaDraft: true
+      };
+    }
+  }
+
+  const fallbackNameCandidates = resolveSimBriefFallbackEquipmentTypeCandidates(simbriefName);
+  for (const candidate of fallbackNameCandidates) {
+    const resolved = equipmentTypeByKey.get(normalizeEquipmentTypeKey(candidate));
+    if (resolved) {
+      return {
+        simbriefCode,
+        simbriefName,
+        resolvedDvaEquipmentType: resolved,
+        resolutionSource: "legacy_alias_name",
+        validForDvaDraft: true
+      };
+    }
+  }
+
+  return {
+    simbriefCode,
+    simbriefName,
+    resolvedDvaEquipmentType: "",
+    resolutionSource: "unsupported",
+    validForDvaDraft: false
+  };
 }
 
 export function deriveSimBriefFallbackTypes(equipmentTypes = []) {
@@ -258,33 +375,58 @@ export function buildSimBriefDispatchOptions(aircraftTypes = [], customAirframes
   }
 
   const customIndexByMatchType = new Map();
-  const customOptions = (Array.isArray(customAirframes) ? customAirframes : []).map((entry) => {
-    const nextIndex = (customIndexByMatchType.get(entry.matchType) || 0) + 1;
-    customIndexByMatchType.set(entry.matchType, nextIndex);
+  const standardOptions = (Array.isArray(aircraftTypes) ? aircraftTypes : [])
+    .map((type) => {
+      const resolution = resolveSimBriefAircraftCompatibility(type);
+      if (!resolution.validForDvaDraft) {
+        return null;
+      }
 
-    const matchedType = baseTypeByCode.get(entry.matchType);
-    const baseName = matchedType?.name || entry.matchType;
-    const totalForType = customCountsByMatchType.get(entry.matchType) || 0;
-    const suffix =
-      totalForType > 1 ? ` (Custom #${nextIndex})` : " (Custom Airframe)";
-    const displayName = String(entry.name || "").trim();
+      return {
+        code: type.code,
+        name: type.name,
+        dispatchType: type.code,
+        matchType: type.code,
+        kind: "standard",
+        resolvedDvaEquipmentType: resolution.resolvedDvaEquipmentType,
+        resolutionSource: resolution.resolutionSource,
+        validForDvaDraft: true
+      };
+    })
+    .filter(Boolean);
 
-    return {
-      code: entry.internalId,
-      name: displayName || `${baseName}${suffix}`,
-      dispatchType: entry.internalId,
-      matchType: entry.matchType,
-      kind: "custom"
-    };
-  });
+  const customOptions = (Array.isArray(customAirframes) ? customAirframes : [])
+    .map((entry) => {
+      const nextIndex = (customIndexByMatchType.get(entry.matchType) || 0) + 1;
+      customIndexByMatchType.set(entry.matchType, nextIndex);
 
-  const standardOptions = (Array.isArray(aircraftTypes) ? aircraftTypes : []).map((type) => ({
-    code: type.code,
-    name: type.name,
-    dispatchType: type.code,
-    matchType: type.code,
-    kind: "standard"
-  }));
+      const matchedType = baseTypeByCode.get(entry.matchType);
+      const baseName = matchedType?.name || entry.matchType;
+      const totalForType = customCountsByMatchType.get(entry.matchType) || 0;
+      const suffix =
+        totalForType > 1 ? ` (Custom #${nextIndex})` : " (Custom Airframe)";
+      const displayName = String(entry.name || "").trim();
+      const resolution = resolveSimBriefAircraftCompatibility({
+        code: entry.matchType,
+        name: baseName
+      });
+
+      if (!resolution.validForDvaDraft) {
+        return null;
+      }
+
+      return {
+        code: entry.internalId,
+        name: displayName || `${baseName}${suffix}`,
+        dispatchType: entry.internalId,
+        matchType: entry.matchType,
+        kind: "custom",
+        resolvedDvaEquipmentType: resolution.resolvedDvaEquipmentType,
+        resolutionSource: resolution.resolutionSource,
+        validForDvaDraft: true
+      };
+    })
+    .filter(Boolean);
 
   return [...standardOptions, ...customOptions].sort((left, right) =>
     left.name.localeCompare(right.name) || left.code.localeCompare(right.code)

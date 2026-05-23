@@ -78,6 +78,7 @@ import {
   closeDeltaVirtualSyncWindow,
   pruneDeltaVirtualStorage,
   readDeltaVirtualLogbookProgress,
+  syncDeltaVirtualTours,
   syncScheduleFromDeltaVirtual
 } from "./lib/deltaVirtualSync";
 import { formatNumber } from "./lib/formatters";
@@ -94,17 +95,21 @@ import {
   closeSimBriefDispatchWindow,
   fetchSimBriefAircraftTypes,
   normalizeSimBriefCustomAirframe,
+  resolveSimBriefAircraftCompatibility,
   refreshSimBriefDispatch,
   startSimBriefDispatch
 } from "./lib/simbrief";
 import {
   buildDeltaVirtualDraftReportPayload,
+  resolveDraftAircraftCompatibility,
   resolveDraftSimBriefId,
   submitDeltaVirtualDraftReport
 } from "./lib/deltaVirtualDraftReport";
 import {
   appendImportLog,
   deleteStoredUserData,
+  readDeltaVirtualToursCache,
+  readDeltaVirtualTourProgress,
   readGettingStartedState,
   readSimBriefSettings,
   readSavedSchedule,
@@ -141,10 +146,6 @@ const DEV_WINDOW_WIDTH_PRESETS = [
   { width: 1400, height: 900, label: "1400x900" },
   { width: 1024, height: 768, label: "1024x768" }
 ];
-const TOUR_FILE_MODULES = import.meta.glob("./data/tours/*.json", {
-  eager: true,
-  import: "default"
-});
 const ACCOMPLISHMENTS = normalizeAccomplishments(accomplishmentsData);
 const MAX_FLIGHT_BOARDS = 4;
 const DEFAULT_FLIGHT_BOARD_NAME = "Board 1";
@@ -154,6 +155,11 @@ const DEFAULT_GETTING_STARTED_STATE = {
   gettingStartedFinalized: false,
   addonSetupSkipped: false
 };
+const DEFAULT_DERIVED_TOUR_PROGRESS = {
+  source: "deltava-logbook",
+  lastSyncAt: null,
+  tourProgress: {}
+};
 const SETTINGS_TABS = [
   { id: "general", label: "General" },
   { id: "delta-virtual", label: "Delta Virtual" },
@@ -161,31 +167,158 @@ const SETTINGS_TABS = [
   { id: "advanced", label: "Advanced" },
   { id: "about", label: "About" }
 ];
-function formatTourLabelFromPath(path) {
-  const fileName = String(path || "").split("/").pop() || "";
-  const stem = fileName.replace(/\.json$/i, "");
-  return stem
-    .replace(/[_-]+/g, " ")
-    .trim()
-    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+function normalizeDvaTourId(tourOrId) {
+  if (typeof tourOrId === "string") {
+    const normalizedId = String(tourOrId || "").trim();
+    if (!normalizedId) {
+      return "";
+    }
+
+    return normalizedId.startsWith("dva:") ? normalizedId : `dva:${normalizedId}`;
+  }
+
+  const explicitId = String(tourOrId?.id || "").trim();
+  if (explicitId.startsWith("dva:")) {
+    return explicitId;
+  }
+
+  const sourceId = String(tourOrId?.sourceId || "").trim();
+  if (sourceId) {
+    return sourceId.startsWith("dva:") ? sourceId : `dva:${sourceId}`;
+  }
+
+  return "";
 }
 
-function buildTourRowIdentity(path, row, index) {
-  const explicitId = String(row?.id || row?.flightId || "").trim();
-  if (explicitId) {
-    return `${path}:${explicitId}`;
+function buildDvaTourRowId(tourId, rowId) {
+  return buildDvaTourCanonicalRowId(tourId, rowId);
+}
+
+function normalizeDvaTourRowSegment(value) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function buildLegacyDvaTourRowId(tourId, rowOrId) {
+  const normalizedTourId = normalizeDvaTourId(tourId);
+  const rawId =
+    typeof rowOrId === "string"
+      ? rowOrId
+      : String(
+          rowOrId?.id || rowOrId?.flightId || rowOrId?.sourceId || rowOrId?.tourRowId || ""
+        ).trim();
+
+  if (!normalizedTourId || !rawId) {
+    return "";
   }
 
-  if (Number.isFinite(row?.leg)) {
-    return `${path}:leg:${row.leg}`;
+  return rawId.startsWith(`dva:${normalizedTourId}:`)
+    ? rawId
+    : `dva:${normalizedTourId}:${rawId}`;
+}
+
+function buildTourFlightLookupKey(tourPath, tourRowId) {
+  const normalizedTourPath = String(tourPath || "").trim();
+  const normalizedTourRowId = String(tourRowId || "").trim();
+
+  if (!normalizedTourPath || !normalizedTourRowId) {
+    return "";
   }
 
-  const segment = String(row?.segment || "").trim();
-  if (segment) {
-    return `${path}:segment:${segment}`;
+  return `${normalizedTourPath}::${normalizedTourRowId}`;
+}
+
+function buildDvaTourCanonicalRowId(tourId, row) {
+  const normalizedTourId = normalizeDvaTourId(tourId);
+
+  if (!normalizedTourId) {
+    return "";
   }
 
-  return `${path}:fallback:${String(row?.flight || "").trim()}:${String(row?.route || "").trim()}:${index}`;
+  const airline = normalizeDvaTourRowSegment(
+    row?.airline || row?.airlineIcao || row?.airlineName || ""
+  );
+  const flightNumber = normalizeDvaTourRowSegment(
+    row?.flightNumber || row?.tourFlightNumber || row?.flight || ""
+  );
+  const leg = Number.isFinite(Number(row?.leg)) ? `LEG-${Number(row.leg)}` : "";
+  const departure = normalizeDvaTourRowSegment(
+    row?.from || row?.departure || row?.departureIata || row?.departureName || ""
+  );
+  const destination = normalizeDvaTourRowSegment(
+    row?.to || row?.destination || row?.destinationIata || row?.destinationName || ""
+  );
+  const departureTime = normalizeDvaTourRowSegment(
+    row?.departureTime || row?.departureTimeLabel || row?.timeD?.text || ""
+  );
+  const arrivalTime = normalizeDvaTourRowSegment(
+    row?.arrivalTime || row?.arrivalTimeLabel || row?.timeA?.text || ""
+  );
+  const equipment = normalizeDvaTourRowSegment(row?.equipment || row?.aircraft || row?.eqType || "");
+  const route = normalizeDvaTourRowSegment(row?.route || "");
+
+  const segments = [
+    airline ? `airline-${airline}` : "",
+    flightNumber ? `flight-${flightNumber}` : "",
+    leg,
+    departure ? `dep-${departure}` : "",
+    destination ? `arr-${destination}` : "",
+    departureTime ? `dpt-${departureTime}` : "",
+    arrivalTime ? `arrt-${arrivalTime}` : "",
+    equipment ? `eq-${equipment}` : "",
+    route ? `route-${route}` : ""
+  ].filter(Boolean);
+
+  return segments.length ? `dva:${normalizedTourId}:${segments.join(":")}` : "";
+}
+
+// Builds the derived-progress row key written by the backend logbook reconciler.
+// This keeps the frontend able to match the AppData file without changing the
+// existing manual completion row IDs used by the UI.
+function buildDvaTourDerivedProgressRowId(tourId, row) {
+  const normalizedTourId = normalizeDvaTourId(tourId);
+
+  if (!normalizedTourId) {
+    return "";
+  }
+
+  const airline = normalizeDvaTourRowSegment(
+    row?.airline || row?.airlineIcao || row?.airlineName || ""
+  );
+  const flightNumber = normalizeDvaTourRowSegment(
+    row?.flightNumber || row?.tourFlightNumber || row?.flight || ""
+  );
+  const leg = Number.isFinite(Number(row?.leg)) ? `leg-${Number(row.leg)}` : "";
+  const departure = normalizeDvaTourRowSegment(
+    row?.from || row?.departure || row?.departureIata || row?.departureName || ""
+  );
+  const destination = normalizeDvaTourRowSegment(
+    row?.to || row?.destination || row?.destinationIata || row?.destinationName || ""
+  );
+  const departureTime = normalizeDvaTourRowSegment(
+    row?.departureTime || row?.departureTimeLabel || row?.timeD?.text || ""
+  );
+  const arrivalTime = normalizeDvaTourRowSegment(
+    row?.arrivalTime || row?.arrivalTimeLabel || row?.timeA?.text || ""
+  );
+  const equipment = normalizeDvaTourRowSegment(row?.equipment || row?.aircraft || row?.eqType || "");
+
+  const segments = [
+    airline ? `airline-${airline}` : "",
+    flightNumber ? `flight-${flightNumber}` : "",
+    leg,
+    departure ? `dep-${departure}` : "",
+    destination ? `arr-${destination}` : "",
+    departureTime ? `dpt-${departureTime}` : "",
+    arrivalTime ? `arrt-${arrivalTime}` : "",
+    equipment ? `eq-${equipment}` : ""
+  ].filter(Boolean);
+
+  return segments.length ? `dva:${normalizedTourId}:${segments.join(":")}` : "";
 }
 
 function parseTourRoute(route) {
@@ -235,13 +368,335 @@ function parseTourDepartureTimeLabel(scheduleLabel) {
   return normalizedLabel.split(" - ")[0]?.trim() || "";
 }
 
-function normalizeTourRows(path, rows, progressById = {}) {
+function formatTourDurationLabel(durationMs) {
+  const numericDuration = Number(durationMs);
+  if (!Number.isFinite(numericDuration) || numericDuration < 0) {
+    return "";
+  }
+
+  const totalMinutes = Math.round(numericDuration / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes}m`;
+}
+
+function normalizeDvaTourEpochSeconds(value) {
+  const normalizedValue = String(value ?? "").trim();
+  if (!normalizedValue || normalizedValue === "0" || normalizedValue === "null" || normalizedValue === "undefined") {
+    return null;
+  }
+
+  const numericValue = Number(normalizedValue);
+  if (Number.isFinite(numericValue) && numericValue > 0) {
+    return numericValue > 10000000000 ? Math.floor(numericValue / 1000) : Math.floor(numericValue);
+  }
+
+  const parsedValue = Date.parse(normalizedValue);
+  if (!Number.isFinite(parsedValue)) {
+    return null;
+  }
+
+  return Math.floor(parsedValue / 1000);
+}
+
+function buildDvaTourVisibilityMetadata(tour, nowSeconds = Math.floor(Date.now() / 1000)) {
+  const active = Boolean(tour?.active);
+  const startDate = normalizeDvaTourEpochSeconds(tour?.startDate ?? tour?.start_date ?? null);
+  const endDate = normalizeDvaTourEpochSeconds(tour?.endDate ?? tour?.end_date ?? null);
+  const isExpired = endDate !== null && endDate > 0 && endDate < nowSeconds;
+  const isCurrent =
+    active &&
+    !isExpired &&
+    (startDate === null || startDate <= nowSeconds) &&
+    (endDate === null || endDate >= nowSeconds);
+  const isUpcoming = active && !isExpired && !isCurrent && startDate !== null && startDate > nowSeconds;
+
+  return {
+    startDate,
+    endDate,
+    isExpired,
+    isCurrent,
+    isUpcoming,
+    visibilityStatus: isExpired ? "expired" : isUpcoming ? "upcoming" : "current"
+  };
+}
+
+function getDvaTourVisibilityRank(tour) {
+  switch (String(tour?.visibilityStatus || "").trim()) {
+    case "current":
+      return 0;
+    case "upcoming":
+      return 1;
+    case "expired":
+      return 2;
+    default:
+      return 3;
+  }
+}
+
+function compareDvaToursForDisplay(left, right) {
+  const leftRank = getDvaTourVisibilityRank(left);
+  const rightRank = getDvaTourVisibilityRank(right);
+
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+
+  if (leftRank === 2) {
+    const leftEndDate = normalizeDvaTourEpochSeconds(left?.endDate ?? left?.end_date ?? null);
+    const rightEndDate = normalizeDvaTourEpochSeconds(right?.endDate ?? right?.end_date ?? null);
+
+    if (leftEndDate !== rightEndDate) {
+      if (leftEndDate === null) {
+        return 1;
+      }
+      if (rightEndDate === null) {
+        return -1;
+      }
+
+      return rightEndDate - leftEndDate;
+    }
+  }
+
+  return Number(left?._tourSourceIndex ?? 0) - Number(right?._tourSourceIndex ?? 0);
+}
+
+function isModernTourFlight(row) {
+  return Boolean(
+    row &&
+      typeof row === "object" &&
+      (row.flightId ||
+        row.tourRowId ||
+        row.departure ||
+        row.destination ||
+        row.departureTime ||
+        row.arrivalTime ||
+        row.equipment ||
+        row.aircraft)
+  );
+}
+
+const tourTimezoneLabelCache = new Map();
+
+function getTourTimezoneAbbreviation(timezone, referenceEpochSeconds) {
+  const normalizedTimezone = String(timezone || "").trim();
+  if (!normalizedTimezone) {
+    return "";
+  }
+
+  const cacheKey = `${normalizedTimezone}:${Number.isFinite(referenceEpochSeconds) ? referenceEpochSeconds : 0}`;
+  if (tourTimezoneLabelCache.has(cacheKey)) {
+    return tourTimezoneLabelCache.get(cacheKey);
+  }
+
+  try {
+    const referenceDate = Number.isFinite(referenceEpochSeconds)
+      ? new Date(referenceEpochSeconds * 1000)
+      : new Date();
+    const preferredLocales = normalizedTimezone.startsWith("Europe/")
+      ? ["en-GB", "en-US"]
+      : ["en-US", "en-GB"];
+    let timezoneLabel = "";
+
+    for (const locale of preferredLocales) {
+      const formattedParts = new Intl.DateTimeFormat(locale, {
+        timeZone: normalizedTimezone,
+        timeZoneName: "short"
+      }).formatToParts(referenceDate);
+      timezoneLabel = String(
+        formattedParts.find((part) => part.type === "timeZoneName")?.value || ""
+      ).trim();
+
+      if (timezoneLabel && !/^(GMT|UTC)[+-]?\d*/i.test(timezoneLabel)) {
+        break;
+      }
+    }
+
+    tourTimezoneLabelCache.set(cacheKey, timezoneLabel);
+    return timezoneLabel;
+  } catch {
+    tourTimezoneLabelCache.set(cacheKey, "");
+    return "";
+  }
+}
+
+function buildTourLocalTimeLabel(timeLabel, timezone, referenceEpochSeconds) {
+  const normalizedTimeLabel = String(timeLabel || "").trim();
+  if (!normalizedTimeLabel) {
+    return "";
+  }
+
+  const normalizedTimezone = String(timezone || "").trim();
+  if (!normalizedTimezone) {
+    return normalizedTimeLabel;
+  }
+
+  if (/\s(?:GMT[+-]\d+|UTC[+-]?\d*|[A-Z]{2,5})$/i.test(normalizedTimeLabel)) {
+    return normalizedTimeLabel;
+  }
+
+  const timezoneLabel = getTourTimezoneAbbreviation(normalizedTimezone, referenceEpochSeconds);
+  if (!timezoneLabel) {
+    return normalizedTimeLabel;
+  }
+
+  return `${normalizedTimeLabel} ${timezoneLabel}`;
+}
+
+function normalizeTourRows(tour, rows, progressById = {}) {
   if (!Array.isArray(rows)) {
     return [];
   }
 
+  const tourId = normalizeDvaTourId(tour);
+  const tourLabel = String(tour?.label || tour?.name || "").trim();
+  const tourSourceId = String(tour?.sourceId || tour?.id || "").trim();
+  const tourTimeReferenceSeconds =
+    normalizeDvaTourEpochSeconds(
+      tour?.startDate || tour?.start_date || tour?.endDate || tour?.end_date || null
+    ) || Math.floor(Date.now() / 1000);
+  const legacyRowIdCounts = rows.reduce((counts, row) => {
+    const legacyRowId = buildLegacyDvaTourRowId(tourId, row);
+    if (legacyRowId) {
+      counts.set(legacyRowId, (counts.get(legacyRowId) || 0) + 1);
+    }
+
+    return counts;
+  }, new Map());
+
   return rows.map((row, index) => {
-    const identity = buildTourRowIdentity(path, row, index);
+    if (isModernTourFlight(row)) {
+      const flightId = buildDvaTourCanonicalRowId(tourId, row);
+      const derivedProgressFlightId = buildDvaTourDerivedProgressRowId(tourId, row);
+      const legacyFlightId = buildLegacyDvaTourRowId(tourId, row);
+      // Match the current UI row ID first, then the backend-derived progress ID, so
+      // manual completions stay intact while logbook-derived completions still load.
+      const manualProgressEntry = progressById?.[flightId] || null;
+      const derivedProgressEntry = derivedProgressFlightId
+        ? progressById?.[derivedProgressFlightId] || null
+        : null;
+      const legacyProgressEntry =
+        legacyFlightId && legacyRowIdCounts.get(legacyFlightId) === 1
+          ? progressById?.[legacyFlightId] || null
+          : null;
+      const progressEntry =
+        manualProgressEntry?.completed
+          ? manualProgressEntry
+          : derivedProgressEntry?.completed
+            ? derivedProgressEntry
+            : legacyProgressEntry?.completed
+              ? legacyProgressEntry
+              : null;
+      const tourLeg = index + 1;
+      const airline = String(row?.airline || "").trim().toUpperCase();
+      const airlineName = String(
+        getAirlineNameByIata(airline) || row?.airlineName || airline || ""
+      ).trim();
+      const explicitAirlineIcao = String(row?.airlineIcao || "").trim().toUpperCase();
+      const airlineIcao = String(
+        (explicitAirlineIcao.length === 3 ? explicitAirlineIcao : "") ||
+          getAirlineIcao({
+            airlineName,
+            airlineIata: airline
+          }) ||
+          ""
+      )
+        .trim()
+        .toUpperCase();
+      const flightNumber = String(
+        row?.flightNumber || row?.tourFlightNumber || row?.flight || ""
+      ).trim();
+      const flightCode =
+        String(row?.flightCode || "").trim() ||
+        (airline && flightNumber ? `${airline}${flightNumber}` : "");
+      const from = String(row?.from || row?.departure || "").trim().toUpperCase();
+      const to = String(row?.to || row?.destination || "").trim().toUpperCase();
+      const departureTimeLabel = String(
+        row?.departureTimeLabel || row?.departureTime || row?.timeD?.text || ""
+      ).trim();
+      const arrivalTimeLabel = String(
+        row?.arrivalTimeLabel || row?.arrivalTime || row?.timeA?.text || ""
+      ).trim();
+      const departureTimezone =
+        String(row?.departureTimezone || row?.timezone || "").trim() ||
+        String(getAirportByIcao(from)?.timezone || "").trim();
+      const arrivalTimezone =
+        String(row?.arrivalTimezone || row?.timezone || "").trim() ||
+        String(getAirportByIcao(to)?.timezone || "").trim();
+      const departureLocalTimeLabel =
+        String(row?.departureLocalTimeLabel || "").trim() ||
+        buildTourLocalTimeLabel(departureTimeLabel, departureTimezone, tourTimeReferenceSeconds);
+      const arrivalLocalTimeLabel =
+        String(row?.arrivalLocalTimeLabel || "").trim() ||
+        buildTourLocalTimeLabel(arrivalTimeLabel, arrivalTimezone, tourTimeReferenceSeconds);
+      const blockMinutes = Number.isFinite(row?.blockMinutes)
+        ? row.blockMinutes
+        : Number.isFinite(row?.durationMs)
+          ? Math.max(0, Math.round(Number(row.durationMs) / 60000))
+          : null;
+      const blockTimeLabel =
+        String(row?.blockTimeLabel || "").trim() || formatTourDurationLabel(row?.durationMs);
+      const parsedRoute = parseTourRoute(
+        row?.route ||
+          `${String(row?.departureName || row?.fromAirport || "").trim()} (${from}) - ${String(
+            row?.destinationName || row?.toAirport || ""
+          ).trim()} (${to})`
+      );
+
+      return {
+        ...row,
+        sourceIndex: index,
+        flightId,
+        linkedFlightId: flightId,
+        derivedProgressFlightId,
+        flightCode,
+        flightNumber,
+        tourFlightNumber: flightNumber,
+        airline,
+        airlineName,
+        airlineIcao,
+        route: String(row?.route || `${from} - ${to}`).trim(),
+        from,
+        to,
+        fromAirport: String(row?.fromAirport || row?.departureName || parsedRoute.fromAirport || "").trim(),
+        toAirport: String(row?.toAirport || row?.destinationName || parsedRoute.toAirport || "").trim(),
+        departureTimeLabel,
+        arrivalTimeLabel,
+        departureLocalTimeLabel,
+        arrivalLocalTimeLabel,
+        departureTimezone,
+        arrivalTimezone,
+        timezone: String(row?.timezone || departureTimezone || arrivalTimezone || "").trim(),
+        blockMinutes,
+        blockTimeLabel,
+        departureTime: departureTimeLabel,
+        arrivalTime: arrivalTimeLabel,
+        distanceNm: Number.isFinite(row?.distanceNm) ? row.distanceNm : null,
+        distanceMi: Number.isFinite(row?.distanceMi)
+          ? row.distanceMi
+          : Number.isFinite(row?.distance)
+            ? row.distance
+            : null,
+        isTourFlight: true,
+        tourPath: tourId,
+        tourRowId: flightId,
+        tourLeg,
+        tourLabel,
+        tourName: String(row?.tourName || tourLabel).trim(),
+        tourSourceId,
+        segment: String(row?.segment || `Leg ${tourLeg}`).trim(),
+        isCompleted: Boolean(
+          manualProgressEntry?.completed ||
+            derivedProgressEntry?.completed ||
+            legacyProgressEntry?.completed
+        ),
+        completedAt: progressEntry?.completedAt || null,
+        completionOrder: Number.isFinite(progressEntry?.completionOrder)
+          ? progressEntry.completionOrder
+          : null
+      };
+    }
+
     const parsedRoute = parseTourRoute(row?.route);
     const parsedFlightCode = parseTourFlightCode(row?.flight);
     const normalizedTourFlightNumber = String(
@@ -251,7 +706,6 @@ function normalizeTourRows(path, rows, progressById = {}) {
       parsedFlightCode.airline && normalizedTourFlightNumber
         ? `${parsedFlightCode.airline}${normalizedTourFlightNumber}`
         : String(row?.flight || "").trim();
-    const progressEntry = progressById?.[identity];
     const blockMinutesMatch = String(row?.schedule || "").match(/\((\d+)h\s+(\d+)m\)/i);
     const blockMinutes = blockMinutesMatch
       ? Number(blockMinutesMatch[1]) * 60 + Number(blockMinutesMatch[2])
@@ -260,13 +714,73 @@ function normalizeTourRows(path, rows, progressById = {}) {
       ? `${Number(blockMinutesMatch[1])}h ${Number(blockMinutesMatch[2])}m`
       : String(row?.schedule || "").trim();
     const departureTimeLabel = parseTourDepartureTimeLabel(row?.schedule);
+    const departureTimezone = String(row?.departureTimezone || row?.timezone || "").trim();
+    const arrivalTimezone = String(row?.arrivalTimezone || row?.timezone || "").trim();
+    const departureLocalTimeLabel =
+      String(row?.departureLocalTimeLabel || "").trim() ||
+      buildTourLocalTimeLabel(departureTimeLabel, departureTimezone, tourTimeReferenceSeconds);
+    const arrivalLocalTimeLabel =
+      String(row?.arrivalLocalTimeLabel || "").trim() ||
+      buildTourLocalTimeLabel(String(row?.arrivalTime || "").trim(), arrivalTimezone, tourTimeReferenceSeconds);
+    const flightId = buildDvaTourCanonicalRowId(tourId, {
+      ...row,
+      airline: parsedFlightCode.airline,
+      airlineName: parsedFlightCode.airlineName,
+      flightNumber: normalizedTourFlightNumber,
+      flightCode: normalizedTourFlightCode,
+      from: parsedRoute.from,
+      to: parsedRoute.to,
+      fromAirport: parsedRoute.fromAirport,
+      toAirport: parsedRoute.toAirport,
+      departureTime: departureTimeLabel,
+      arrivalTime: String(row?.arrivalTime || "").trim(),
+      equipment: String(row?.aircraft || row?.equipment || "").trim(),
+      leg: index + 1,
+      route: row?.route || ""
+    });
+    const derivedProgressFlightId = buildDvaTourDerivedProgressRowId(tourId, {
+      ...row,
+      airline: parsedFlightCode.airline,
+      airlineName: parsedFlightCode.airlineName,
+      flightNumber: normalizedTourFlightNumber,
+      flightCode: normalizedTourFlightCode,
+      from: parsedRoute.from,
+      to: parsedRoute.to,
+      fromAirport: parsedRoute.fromAirport,
+      toAirport: parsedRoute.toAirport,
+      departureTime: departureTimeLabel,
+      arrivalTime: String(row?.arrivalTime || "").trim(),
+      equipment: String(row?.aircraft || row?.equipment || "").trim(),
+      leg: index + 1
+    });
+    const legacyFlightId = buildLegacyDvaTourRowId(tourId, row);
+    // Match the current UI row ID first, then the backend-derived progress ID, so
+    // manual completions stay intact while logbook-derived completions still load.
+    const manualProgressEntry = progressById?.[flightId] || null;
+    const derivedProgressEntry = derivedProgressFlightId
+      ? progressById?.[derivedProgressFlightId] || null
+      : null;
+    const legacyProgressEntry =
+      legacyFlightId && legacyRowIdCounts.get(legacyFlightId) === 1
+        ? progressById?.[legacyFlightId] || null
+        : null;
+    const progressEntry =
+      manualProgressEntry?.completed
+        ? manualProgressEntry
+        : derivedProgressEntry?.completed
+          ? derivedProgressEntry
+          : legacyProgressEntry?.completed
+            ? legacyProgressEntry
+            : null;
+    const tourLeg = index + 1;
 
     return {
       ...row,
       sourceIndex: index,
       ...parsedRoute,
-      flightId: identity,
-      linkedFlightId: identity,
+      flightId,
+      linkedFlightId: flightId,
+      derivedProgressFlightId,
       flightCode: normalizedTourFlightCode,
       flightNumber: normalizedTourFlightNumber,
       tourFlightNumber: normalizedTourFlightNumber,
@@ -277,18 +791,78 @@ function normalizeTourRows(path, rows, progressById = {}) {
       blockMinutes,
       blockTimeLabel,
       departureTimeLabel,
+      departureLocalTimeLabel,
+      arrivalLocalTimeLabel,
+      departureTimezone,
+      arrivalTimezone,
+      timezone: String(row?.timezone || departureTimezone || arrivalTimezone || "").trim(),
       distanceNm: null,
       distanceMi: Number.isFinite(row?.distance_mi) ? row.distance_mi : null,
       isTourFlight: true,
-      tourPath: path,
-      tourRowId: identity,
-      isCompleted: Boolean(progressEntry?.completed),
+      tourPath: tourId,
+      tourRowId: flightId,
+      tourLeg,
+      tourLabel,
+      tourName: tourLabel,
+      tourSourceId,
+      isCompleted: Boolean(
+        manualProgressEntry?.completed ||
+          derivedProgressEntry?.completed ||
+          legacyProgressEntry?.completed
+      ),
       completedAt: progressEntry?.completedAt || null,
       completionOrder: Number.isFinite(progressEntry?.completionOrder)
         ? progressEntry.completionOrder
         : null
     };
   });
+}
+
+function summarizeTourCompletion(rows = []) {
+  const visibleRows = Array.isArray(rows) ? rows : [];
+  const totalRows = visibleRows.length;
+  const completedRows = visibleRows.reduce(
+    (count, row) => count + (row?.isCompleted ? 1 : 0),
+    0
+  );
+
+  return {
+    totalRows,
+    completedRows,
+    isCompleted: totalRows > 0 && completedRows === totalRows
+  };
+}
+
+function mergeTourProgressSources(manualProgress = {}, derivedProgress = {}) {
+  const mergedProgress = {};
+  const tourPaths = new Set([
+    ...Object.keys(derivedProgress || {}),
+    ...Object.keys(manualProgress || {})
+  ]);
+
+  for (const tourPath of tourPaths) {
+    const manualRows = manualProgress?.[tourPath]?.rows || {};
+    const derivedRows = derivedProgress?.[tourPath]?.rows || {};
+    const rowIds = new Set([...Object.keys(derivedRows), ...Object.keys(manualRows)]);
+    const rows = {};
+
+    for (const rowId of rowIds) {
+      const manualRow = manualRows[rowId];
+      const derivedRow = derivedRows[rowId];
+      if (manualRow || derivedRow) {
+        rows[rowId] = {
+          ...(derivedRow || {}),
+          ...(manualRow || {})
+        };
+      }
+    }
+
+    if (Object.keys(rows).length) {
+      mergedProgress[tourPath] = { rows };
+    }
+  }
+
+  return mergedProgress;
 }
 
 function isTauriRuntime() {
@@ -455,7 +1029,14 @@ function buildScheduleDateInfo(flights = []) {
 
   const midpointOffsetDays = Math.floor(latest.diff(earliest, "days").days / 2);
   const effectiveScheduleDate = earliest.plus({ days: midpointOffsetDays });
-  const isCurrent = effectiveScheduleDate.hasSame(DateTime.local().startOf("day"), "day");
+  // Delta Virtual publishes the next PFPX schedule at 09:00 UTC on the following day.
+  const staleAfterUtc = DateTime.utc(
+    effectiveScheduleDate.year,
+    effectiveScheduleDate.month,
+    effectiveScheduleDate.day,
+    9
+  ).plus({ days: 1 });
+  const isCurrent = DateTime.utc() < staleAfterUtc;
   const monthLabel = effectiveScheduleDate.toFormat("MMMM");
   const dayLabel = `${effectiveScheduleDate.day}${getDayOrdinal(effectiveScheduleDate.day)}`;
   const label =
@@ -469,14 +1050,6 @@ function buildScheduleDateInfo(flights = []) {
 function buildFooterDateLabel(dateIso) {
   const date = DateTime.fromISO(String(dateIso || ""));
   return date.isValid ? date.toFormat("MMMM d") : "--";
-}
-
-function getScheduleSourceLabel(importSummary) {
-  const source = String(importSummary?.source || "").trim().toLowerCase();
-  if (source === "deltava-sync") {
-    return "Delta Virtual";
-  }
-  return "Delta Virtual";
 }
 
 function ThemeToggleIcon({ theme }) {
@@ -937,6 +1510,14 @@ function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     normalizedFlightNumber && (normalizedAirlineIcao || normalizedAirline)
       ? `${normalizedAirlineIcao || normalizedAirline}${normalizedFlightNumber}`
       : normalizedFlightCode;
+  const normalizedFrom = String(flight?.from || parsedRoute.from || "").trim().toUpperCase();
+  const normalizedTo = String(flight?.to || parsedRoute.to || "").trim().toUpperCase();
+  const normalizedFromAirport = String(
+    flight?.fromAirport || flight?.departureName || parsedRoute.fromAirport || ""
+  ).trim();
+  const normalizedToAirport = String(
+    flight?.toAirport || flight?.destinationName || parsedRoute.toAirport || ""
+  ).trim();
 
   return {
     boardEntryId: overrides.boardEntryId || buildBoardEntryId(flight?.flightId),
@@ -945,6 +1526,9 @@ function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     isTourFlight: true,
     tourPath: String(flight?.tourPath || "").trim(),
     tourRowId: String(flight?.tourRowId || flight?.flightId || "").trim(),
+    tourLabel: String(flight?.tourLabel || flight?.tourName || "").trim(),
+    tourName: String(flight?.tourName || flight?.tourLabel || "").trim(),
+    tourSourceId: String(flight?.tourSourceId || "").trim(),
     isCompleted: Boolean(overrides.isCompleted ?? flight?.isCompleted),
     completedAt: overrides.completedAt ?? flight?.completedAt ?? null,
     completionOrder: Number.isFinite(overrides.completionOrder ?? flight?.completionOrder)
@@ -958,11 +1542,11 @@ function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     airlineName: normalizedAirlineName,
     airlineIcao: normalizedAirlineIcao,
     callsign: normalizedCallsign,
-    from: parsedRoute.from,
-    to: parsedRoute.to,
+    from: normalizedFrom,
+    to: normalizedTo,
     route: String(flight?.route || "").trim(),
-    fromAirport: parsedRoute.fromAirport,
-    toAirport: parsedRoute.toAirport,
+    fromAirport: normalizedFromAirport,
+    toAirport: normalizedToAirport,
     missingAirportIcaos: [],
     hasMissingAirportData: false,
     fromTimezone: "",
@@ -1055,6 +1639,15 @@ function normalizeBoardEntry(entry) {
     dvaDraftReportId: normalizePositiveDraftReportId(entry.dvaDraftReportId ?? entry.draftReportId),
     simbriefPlan: entry.simbriefPlan || null
   };
+
+  if (baseEntry.isTourFlight && baseEntry.tourPath) {
+    const canonicalTourRowId = buildDvaTourCanonicalRowId(baseEntry.tourPath, baseEntry);
+    if (canonicalTourRowId) {
+      baseEntry.tourRowId = canonicalTourRowId;
+      baseEntry.flightId = canonicalTourRowId;
+      baseEntry.linkedFlightId = canonicalTourRowId;
+    }
+  }
 
   return baseEntry;
 }
@@ -1354,6 +1947,8 @@ export default function App() {
   const [selectedTourPath, setSelectedTourPath] = useState("");
   const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
   const [tourProgress, setTourProgress] = useState({});
+  const [derivedTourProgress, setDerivedTourProgress] = useState(DEFAULT_DERIVED_TOUR_PROGRESS);
+  const [deltaVirtualToursCache, setDeltaVirtualToursCache] = useState(null);
   const [dutyBuildWarning, setDutyBuildWarning] = useState(null);
   const [theme, setTheme] = useState(readSavedTheme);
   const [isDevToolsEnabled, setIsDevToolsEnabled] = useState(readSavedDevToolsEnabled);
@@ -1461,7 +2056,6 @@ export default function App() {
   const logbookDateLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
   const footerMetadataItems = schedule?.importSummary
     ? [
-        { kind: "stat", label: "Source", value: getScheduleSourceLabel(schedule.importSummary) },
         {
           kind: "date",
           label: "Schedule Date",
@@ -1517,24 +2111,88 @@ export default function App() {
     setExpandedBoardFlightId(null);
   }, [expandedBoardFlightId, flightBoard]);
 
+  const resolvedTourProgress = useMemo(
+    () => mergeTourProgressSources(tourProgress, derivedTourProgress?.tourProgress || {}),
+    [derivedTourProgress, tourProgress]
+  );
+
   const availableTours = useMemo(
     () =>
-      Object.entries(TOUR_FILE_MODULES)
-        .map(([path, rows]) => ({
-          path,
-          label: formatTourLabelFromPath(path),
-          rows: normalizeTourRows(path, rows, tourProgress?.[path]?.rows)
-        }))
-        .sort((left, right) => left.label.localeCompare(right.label)),
-    [tourProgress]
+      (Array.isArray(deltaVirtualToursCache?.tours) ? deltaVirtualToursCache.tours : [])
+        .map((tour, index) => {
+          const selectionId = normalizeDvaTourId(tour);
+          const visibility = buildDvaTourVisibilityMetadata(tour);
+          const rows = normalizeTourRows(
+            tour,
+            tour?.rows || tour?.flights || [],
+            resolvedTourProgress?.[selectionId]?.rows
+          );
+          const completion = summarizeTourCompletion(rows);
+          return {
+            ...tour,
+            ...visibility,
+            id: selectionId,
+            selectionId,
+            label: String(tour?.label || tour?.name || "").trim(),
+            rows,
+            totalRows: completion.totalRows,
+            completedRows: completion.completedRows,
+            isCompleted: completion.isCompleted,
+            _tourSourceIndex: index
+          };
+        })
+        .sort(compareDvaToursForDisplay),
+    [deltaVirtualToursCache, resolvedTourProgress]
   );
   const selectedTour = useMemo(() => {
     if (!availableTours.length) {
       return null;
     }
 
-    return availableTours.find((tour) => tour.path === selectedTourPath) || availableTours[0];
+    return availableTours.find((tour) => tour.selectionId === selectedTourPath) || availableTours[0];
   }, [availableTours, selectedTourPath]);
+
+  useEffect(() => {
+    if (!isDevToolsEnabled || !selectedTour) {
+      return;
+    }
+
+    const normalizedTourKey = selectedTour.selectionId || selectedTourPath || "";
+    const visibleRows = Array.isArray(selectedTour.rows) ? selectedTour.rows : [];
+    const manualRows = tourProgress?.[normalizedTourKey]?.rows || {};
+    const derivedRows = derivedTourProgress?.tourProgress?.[normalizedTourKey]?.rows || {};
+    const mergedRows = resolvedTourProgress?.[normalizedTourKey]?.rows || {};
+    const visibleRowIds = visibleRows.map((row) => String(row?.tourRowId || "").trim()).filter(Boolean);
+    const derivedRowIds = Object.keys(derivedRows).filter(Boolean);
+    const completedRowIds = visibleRows
+      .filter((row) => Boolean(row?.isCompleted))
+      .map((row) => String(row?.tourRowId || "").trim())
+      .filter(Boolean);
+
+    logAppEvent("tour-selection-updated", {
+      selectedTourName: selectedTour.name || selectedTour.label || "",
+      selectedTourNormalizedId: String(selectedTour.id || "").trim(),
+      selectedTourRawPath: String(selectedTour.path || "").trim(),
+      selectedTourRawSourceId: String(selectedTour.sourceId || "").trim(),
+      normalizedTourKey,
+      visibleRowCount: visibleRows.length,
+      derivedRowsCount: Object.keys(derivedRows).length,
+      manualRowsCount: Object.keys(manualRows).length,
+      mergedCompletedCount: visibleRows.filter((row) => Boolean(row?.isCompleted)).length,
+      first10VisibleRowIds: visibleRowIds.slice(0, 10),
+      first10DerivedRowIds: derivedRowIds.slice(0, 10),
+      first10VisibleCompletedRowIds: completedRowIds.slice(0, 10),
+      mergedRowCount: Object.keys(mergedRows).length
+    }).catch(() => {});
+  }, [
+    derivedTourProgress,
+    isDevToolsEnabled,
+    resolvedTourProgress,
+    selectedTour,
+    selectedTourPath,
+    tourProgress
+  ]);
+
   const selectedAccomplishment = useMemo(() => {
     if (!ACCOMPLISHMENTS.length) {
       return null;
@@ -1546,15 +2204,31 @@ export default function App() {
       ) || ACCOMPLISHMENTS[0]
     );
   }, [selectedAccomplishmentName]);
+  const accomplishmentOptions = useMemo(
+    () =>
+      ACCOMPLISHMENTS.map((accomplishment) => {
+        const rows = buildAccomplishmentRows(accomplishment, logbookAirportProgress);
+        const totalCount = rows.length;
+        const completedCount = rows.reduce((count, row) => count + (row.isCompleted ? 1 : 0), 0);
+
+        return {
+          ...accomplishment,
+          totalCount,
+          completedCount,
+          isCompleted: totalCount > 0 && completedCount === totalCount
+        };
+      }),
+    [logbookAirportProgress]
+  );
   const accomplishmentRows = useMemo(
     () => buildAccomplishmentRows(selectedAccomplishment, logbookAirportProgress),
     [logbookAirportProgress, selectedAccomplishment]
   );
-  const tourFlightsById = useMemo(
+  const tourFlightsByKey = useMemo(
     () =>
       new Map(
         availableTours.flatMap((tour) =>
-          tour.rows.map((row) => [row.tourRowId, row])
+          tour.rows.map((row) => [buildTourFlightLookupKey(row.tourPath, row.tourRowId), row])
         )
       ),
     [availableTours]
@@ -1579,19 +2253,32 @@ export default function App() {
 
   useEffect(() => {
     if (!availableTours.length) {
-      if (scheduleView === "tours") {
-        setScheduleView("flights");
-      }
       if (selectedTourPath) {
         setSelectedTourPath("");
       }
       return;
     }
 
-    if (!selectedTourPath || !availableTours.some((tour) => tour.path === selectedTourPath)) {
-      setSelectedTourPath(availableTours[0].path);
+    if (!selectedTourPath || !availableTours.some((tour) => tour.selectionId === selectedTourPath)) {
+      setSelectedTourPath(availableTours[0].selectionId);
     }
   }, [availableTours, scheduleView, selectedTourPath]);
+
+  function handleSelectTourPath(nextTourSelectionId) {
+    const nextSelectionId = normalizeDvaTourId(nextTourSelectionId);
+    const clickedTour = availableTours.find((tour) => tour.selectionId === nextSelectionId) || null;
+
+    if (isDevToolsEnabled) {
+      logAppEvent("tour-selection-changed", {
+        clickedTourId: clickedTour?.selectionId || nextSelectionId,
+        clickedTourName: clickedTour?.label || clickedTour?.name || "",
+        previousSelectedId: selectedTourPath || "",
+        nextSelectedId: nextSelectionId
+      }).catch(() => {});
+    }
+
+    setSelectedTourPath(nextSelectionId);
+  }
 
   useEffect(() => {
     if (!ACCOMPLISHMENTS.length) {
@@ -1620,9 +2307,9 @@ export default function App() {
     }
 
     setSelectedTourRowId((current) =>
-      selectedTour?.rows.some((row) => row.flightId === current)
+      selectedTour?.rows.some((row) => row.tourRowId === current)
       ? current
-      : selectedTour?.rows[0]?.flightId || null
+      : selectedTour?.rows[0]?.tourRowId || null
     );
   }, [scheduleView, selectedTour]);
 
@@ -1886,6 +2573,24 @@ export default function App() {
             ? result.types
                 .map(normalizeSimBriefAircraftTypeOption)
                 .filter(Boolean)
+                .map((type) => {
+                  const resolution = resolveSimBriefAircraftCompatibility(type);
+                  if (isDevToolsEnabled) {
+                    logSystemEvent("SimBrief", "aircraft-type-resolved", {
+                      simbriefCode: resolution.simbriefCode,
+                      simbriefName: resolution.simbriefName,
+                      resolvedDvaEquipmentType: resolution.resolvedDvaEquipmentType,
+                      resolutionSource: resolution.resolutionSource,
+                      validForDvaDraft: resolution.validForDvaDraft
+                    }).catch(() => {});
+                  }
+
+                  return {
+                    ...type,
+                    ...resolution
+                  };
+                })
+                .filter((type) => type.validForDvaDraft)
                 .sort((left, right) => left.code.localeCompare(right.code))
             : [];
           setSimBriefAircraftTypes(normalizedTypes);
@@ -1928,7 +2633,7 @@ export default function App() {
         window.clearTimeout(timeoutHandle);
       }
     };
-  }, [isDesktopSimBriefAvailable]);
+  }, [isDesktopSimBriefAvailable, isDevToolsEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1942,7 +2647,9 @@ export default function App() {
         simBriefResult,
         gettingStartedResult,
         uiStateResult,
-        logbookProgressResult
+        logbookProgressResult,
+        tourProgressResult,
+        toursCacheResult
       ] = await Promise.allSettled([
         readSavedSchedule(),
         readAddonAirportCache(),
@@ -1950,7 +2657,9 @@ export default function App() {
         readSimBriefSettings(),
         readGettingStartedState(),
         readSavedUiState(),
-        readDeltaVirtualLogbookProgress()
+        readDeltaVirtualLogbookProgress(),
+        readDeltaVirtualTourProgress(),
+        readDeltaVirtualToursCache()
       ]);
 
       try {
@@ -2025,6 +2734,14 @@ export default function App() {
           );
         }
 
+        if (tourProgressResult.status === "fulfilled") {
+          setDerivedTourProgress(
+            tourProgressResult.value || DEFAULT_DERIVED_TOUR_PROGRESS
+          );
+        } else {
+          setDerivedTourProgress(DEFAULT_DERIVED_TOUR_PROGRESS);
+        }
+
         if (gettingStartedResult.status === "fulfilled") {
           setGettingStartedState({
             gettingStartedDismissed: Boolean(gettingStartedResult.value?.gettingStartedDismissed),
@@ -2035,6 +2752,13 @@ export default function App() {
           setGettingStartedState(DEFAULT_GETTING_STARTED_STATE);
         }
         setHasLoadedGettingStartedState(true);
+
+        if (toursCacheResult.status === "fulfilled") {
+          setDeltaVirtualToursCache(toursCacheResult.value);
+        } else {
+          setDeltaVirtualToursCache(null);
+          await logAppError("deltava-tours-cache-hydrate-failed", toursCacheResult.reason);
+        }
 
         if (
           scheduleResult.status !== "fulfilled" ||
@@ -2091,7 +2815,7 @@ export default function App() {
         setSort(savedUiState.sort || DEFAULT_SORT);
         // Always reopen on Flights after a full app restart.
         setScheduleView("flights");
-        setSelectedTourPath(String(savedUiState.selectedTourPath || "").trim());
+        setSelectedTourPath(normalizeDvaTourId(savedUiState.selectedTourPath || ""));
         setSelectedAccomplishmentName(
           String(savedUiState.selectedAccomplishmentName || "").trim()
         );
@@ -2423,7 +3147,9 @@ export default function App() {
           return entry;
         }
 
-        const sourceFlight = tourFlightsById.get(entry.tourRowId);
+        const sourceFlight = tourFlightsByKey.get(
+          buildTourFlightLookupKey(entry.tourPath, entry.tourRowId)
+        );
         if (!sourceFlight) {
           return entry;
         }
@@ -2438,7 +3164,7 @@ export default function App() {
         });
       }
       ),
-    [flightBoard, tourFlightsById]
+    [flightBoard, tourFlightsByKey]
   );
   const selectedShortlistFlight =
     shortlist.find((flight) => flight.boardEntryId === expandedBoardFlightId) || null;
@@ -2757,6 +3483,70 @@ export default function App() {
       if (syncedFile.warnings?.length) {
         setStatusMessage(`Delta Virtual schedule synced with warning: ${syncedFile.warnings[0]}`);
       }
+      setStatusMessage("Syncing Delta Virtual tours...");
+      try {
+        const tourSyncResult = await syncDeltaVirtualTours();
+        setDeltaVirtualToursCache(tourSyncResult);
+
+        if (tourSyncResult.ok) {
+          await logSystemEvent("DVA Tours Sync", "succeeded", {
+            totalListTours: tourSyncResult.totalListTours,
+            candidateTours: tourSyncResult.candidateTours,
+            syncedTours: tourSyncResult.syncedTours,
+            failedTourIds: tourSyncResult.failedTourIds.length
+          });
+          setStatusMessage(tourSyncResult.message || "Delta Virtual tours synced.");
+        } else if (tourSyncResult.syncedTours > 0) {
+          await logSystemEvent("DVA Tours Sync", "succeeded", {
+            partial: true,
+            totalListTours: tourSyncResult.totalListTours,
+            candidateTours: tourSyncResult.candidateTours,
+            syncedTours: tourSyncResult.syncedTours,
+            failedTourIds: tourSyncResult.failedTourIds.length
+          });
+          setStatusMessage(tourSyncResult.message || "Delta Virtual tours synced with warnings.");
+        } else {
+          await logSystemError("DVA Tours Sync", "failed", new Error(tourSyncResult.message || "Delta Virtual tours sync failed."), {
+            totalListTours: tourSyncResult.totalListTours,
+            candidateTours: tourSyncResult.candidateTours,
+            syncedTours: tourSyncResult.syncedTours,
+            failedTourIds: tourSyncResult.failedTourIds.length
+          });
+          setStatusMessage(tourSyncResult.message || "Delta Virtual tours sync failed.");
+        }
+      } catch (error) {
+        setStatusMessage(error.message || "Delta Virtual tours sync failed.");
+        await logSystemError("DVA Tours Sync", "failed", error);
+      }
+      if (isDevToolsEnabled) {
+        await logAppEvent("dva-tour-progress-reload-started", {
+          reason: "post-dva-sync"
+        });
+      }
+
+      try {
+        const reloadedTourProgress = await readDeltaVirtualTourProgress();
+        setDerivedTourProgress(reloadedTourProgress);
+
+        if (isDevToolsEnabled) {
+          const tourCount = Object.keys(reloadedTourProgress?.tourProgress || {}).length;
+          const completedRowCount = Object.values(reloadedTourProgress?.tourProgress || {}).reduce(
+            (count, tourEntry) => count + Object.keys(tourEntry?.rows || {}).length,
+            0
+          );
+
+          await logAppEvent("dva-tour-progress-reload-succeeded", {
+            totalDerivedTours: tourCount,
+            totalDerivedCompletedRows: completedRowCount,
+            lastSyncAt: reloadedTourProgress?.lastSyncAt || null
+          });
+        }
+      } catch (error) {
+        setDerivedTourProgress(DEFAULT_DERIVED_TOUR_PROGRESS);
+        if (isDevToolsEnabled) {
+          await logAppError("dva-tour-progress-reload-failed", error);
+        }
+      }
       shouldRemoveDownloadedSchedule = true;
     } catch (error) {
       if (error?.kind === "cancelled") {
@@ -3020,7 +3810,7 @@ export default function App() {
 
     if (nextView === "map") {
       nextScheduleView = "map";
-    } else if (nextView === "tours" && availableTours.length) {
+    } else if (nextView === "tours") {
       nextScheduleView = "tours";
     } else if (nextView === "accomplishments" && ACCOMPLISHMENTS.length) {
       nextScheduleView = "accomplishments";
@@ -3033,9 +3823,25 @@ export default function App() {
     }
   }
 
-  function handleSelectFlight(flightId) {
+  function handleSelectFlight(flightId, clickedRow = null) {
     if (scheduleView === "tours") {
-      setSelectedTourRowId(flightId);
+      const nextSelectedTourRowId = String(
+        clickedRow?.tourRowId || clickedRow?.flightId || flightId || ""
+      ).trim();
+
+      if (isDevToolsEnabled && clickedRow) {
+        logAppEvent("tour-row-selected", {
+          clickedTourRowId: nextSelectedTourRowId,
+          clickedTourRoute: String(clickedRow?.route || "").trim(),
+          clickedTourFlight: String(clickedRow?.flightCode || clickedRow?.flightNumber || "").trim(),
+          clickedTourLeg: Number.isFinite(clickedRow?.tourLeg)
+            ? clickedRow.tourLeg
+            : Number.isFinite(clickedRow?.leg)
+              ? clickedRow.leg
+              : null
+        }).catch(() => {});
+      }
+      setSelectedTourRowId(nextSelectedTourRowId);
       return;
     }
 
@@ -3046,27 +3852,91 @@ export default function App() {
     setExpandedBoardFlightId((current) => (current === flightId ? null : flightId));
   }
 
-  function handleAddToFlightBoard(flightId) {
+  function handleAddToFlightBoard(flightId, clickedRow = null) {
     if (scheduleView === "tours") {
-      const matchedTourFlight = activeTourRows.find((flight) => flight.flightId === flightId);
+      const normalizedFlightId = String(flightId || "").trim();
+      const matchedTourFlight =
+        clickedRow?.isTourFlight === true
+          ? clickedRow
+          : activeTourRows.find(
+              (flight) =>
+                flight.tourRowId === normalizedFlightId ||
+                flight.flightId === normalizedFlightId ||
+                flight.linkedFlightId === normalizedFlightId
+            );
       if (!matchedTourFlight) {
         return;
       }
 
-      updateActiveFlightBoardEntries((current) => {
-        if (
-          current.some(
-            (entry) =>
-              entry.isTourFlight &&
-              String(entry.tourPath || "").trim() === matchedTourFlight.tourPath &&
-              String(entry.tourRowId || "").trim() === matchedTourFlight.tourRowId
-          )
-        ) {
+      const nextBoardEntry = buildBoardEntryFromTourFlight(matchedTourFlight);
+      const nextTourBoardName = normalizeFlightBoardName(
+        matchedTourFlight?.tourLabel || matchedTourFlight?.tourName || matchedTourFlight?.route || "",
+        DEFAULT_FLIGHT_BOARD_NAME
+      );
+      if (isDevToolsEnabled) {
+        logAppEvent("tour-row-add-requested", {
+          clickedTourRowId: String(flightId || "").trim(),
+          clickedTourPath: String(clickedRow?.tourPath || "").trim(),
+          clickedTourRoute: String(matchedTourFlight?.route || "").trim(),
+          clickedTourFlight: String(matchedTourFlight?.flightCode || matchedTourFlight?.flightNumber || "").trim(),
+          clickedTourLeg: Number.isFinite(matchedTourFlight?.tourLeg)
+            ? matchedTourFlight.tourLeg
+          : Number.isFinite(matchedTourFlight?.leg)
+              ? matchedTourFlight.leg
+              : null
+        }).catch(() => {});
+      }
+
+      let didAddTourRow = false;
+      setFlightBoards((current) => {
+        const activeId =
+          activeFlightBoardId && current.some((board) => board.id === activeFlightBoardId)
+            ? activeFlightBoardId
+            : current[0]?.id;
+
+        if (!activeId) {
           return current;
         }
 
-        return [buildBoardEntryFromTourFlight(matchedTourFlight), ...current];
+        return current.map((board) => {
+          if (board.id !== activeId) {
+            return board;
+          }
+
+          const currentEntries = Array.isArray(board.entries) ? board.entries : [];
+          if (
+            currentEntries.some(
+              (entry) =>
+                entry.isTourFlight &&
+                String(entry.tourPath || "").trim() ===
+                  String(nextBoardEntry.tourPath || "").trim() &&
+                String(entry.tourRowId || "").trim() === String(nextBoardEntry.tourRowId || "").trim()
+            )
+          ) {
+            return board;
+          }
+
+          didAddTourRow = true;
+          return {
+            ...board,
+            name: currentEntries.length === 0 ? nextTourBoardName : board.name,
+            entries: [...currentEntries, nextBoardEntry]
+          };
+        });
       });
+      if (didAddTourRow && isDevToolsEnabled) {
+        logAppEvent("tour-row-added-to-board", {
+          boardEntryId: nextBoardEntry.boardEntryId,
+          tourRowId: nextBoardEntry.tourRowId,
+          route: nextBoardEntry.route,
+          flightCode: nextBoardEntry.flightCode,
+          flightNumber: nextBoardEntry.flightNumber,
+          airline: nextBoardEntry.airline,
+          airlineName: nextBoardEntry.airlineName,
+          from: nextBoardEntry.from,
+          to: nextBoardEntry.to
+        }).catch(() => {});
+      }
       setExpandedBoardFlightId(null);
       setPlannerControlsCollapsed(true);
       return;
@@ -3084,7 +3954,7 @@ export default function App() {
         return current;
       }
 
-      nextFlightBoard = [buildBoardEntryFromFlight(matchedFlight), ...current];
+      nextFlightBoard = [...current, buildBoardEntryFromFlight(matchedFlight)];
       return nextFlightBoard;
     });
     setExpandedBoardFlightId(null);
@@ -4040,6 +4910,9 @@ export default function App() {
 
     const getDraftFailureMessage = (error) => {
       const message = error instanceof Error ? error.message : String(error || "");
+      if (message.startsWith("validation_failed:")) {
+        return message.replace(/^validation_failed:\s*/, "");
+      }
       return message.startsWith("session_required:")
         ? message.replace(/^session_required:\s*/, "")
         : "Unable to send draft flight report to ACARS.";
@@ -4066,7 +4939,8 @@ export default function App() {
       return;
     }
 
-    const draftPayload = buildDeltaVirtualDraftReportPayload(currentFlight);
+    const draftAircraftResolution = resolveDraftAircraftCompatibility(currentFlight);
+    const draftPayload = buildDeltaVirtualDraftReportPayload(currentFlight, draftAircraftResolution);
     const simBriefResolution = resolveDraftSimBriefId(currentFlight?.simbriefPlan || null);
     const hasDraftReportId = normalizePositiveDraftReportId(draftPayload.id) !== null;
     const draftLogData = {
@@ -4074,6 +4948,11 @@ export default function App() {
       flight: currentFlight.flightCode,
       airportD: currentFlight.from,
       airportA: currentFlight.to,
+      simbriefCode: draftAircraftResolution.simbriefCode,
+      simbriefName: draftAircraftResolution.simbriefName,
+      resolvedDvaEquipmentType: draftAircraftResolution.resolvedDvaEquipmentType,
+      resolutionSource: draftAircraftResolution.resolutionSource,
+      validForDvaDraft: draftAircraftResolution.validForDvaDraft,
       eqType: draftPayload.eqType,
       hasDraftReportId,
       hasOfpXmlId: Boolean(simBriefResolution.simBriefID),
@@ -4342,7 +5221,12 @@ export default function App() {
 
         const sourceTourFlight =
           selectedShortlistFlight.isTourFlight && selectedShortlistFlight.tourRowId
-            ? tourFlightsById.get(selectedShortlistFlight.tourRowId) || null
+            ? tourFlightsByKey.get(
+                buildTourFlightLookupKey(
+                  selectedShortlistFlight.tourPath,
+                  selectedShortlistFlight.tourRowId
+                )
+              ) || null
             : null;
         const dispatchFlight = sourceTourFlight || currentBoardEntry || selectedShortlistFlight;
         const flightNumber = deriveFlightNumber(dispatchFlight);
@@ -5152,7 +6036,7 @@ export default function App() {
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="grid min-h-0 flex-1 gap-4 [grid-template-columns:minmax(0,1.42fr)_minmax(224px,0.9fr)] bp-1024:gap-3 bp-1024:[grid-template-columns:minmax(0,1.48fr)_minmax(248px,0.9fr)] bp-1400:[grid-template-columns:minmax(0,1.55fr)_minmax(260px,0.92fr)]">
-          <ScheduleWorkspacePanel
+            <ScheduleWorkspacePanel
             scheduleExists={Boolean(schedule)}
             scheduleView={scheduleView}
             theme={theme}
@@ -5163,11 +6047,20 @@ export default function App() {
             pendingMapFitToRoute={pendingMapFitToRoute}
             onConsumePendingMapFitToRoute={() => setPendingMapFitToRoute(false)}
             availableTours={availableTours}
-            selectedTourPath={selectedTour?.path || ""}
-            accomplishmentOptions={ACCOMPLISHMENTS}
+            selectedTourPath={selectedTourPath}
+            selectedTourCompletionSummary={
+              selectedTour
+                ? {
+                    totalRows: selectedTour.totalRows || 0,
+                    completedRows: selectedTour.completedRows || 0,
+                    isCompleted: Boolean(selectedTour.isCompleted)
+                  }
+                : null
+            }
+            accomplishmentOptions={accomplishmentOptions}
             selectedAccomplishmentName={selectedAccomplishment?.name || ""}
             onPrimaryViewChange={handlePrimaryViewChange}
-            onSelectTourPath={setSelectedTourPath}
+            onSelectTourPath={handleSelectTourPath}
             onSelectAccomplishmentName={setSelectedAccomplishmentName}
             accomplishmentRows={accomplishmentRows}
             selectedAccomplishment={selectedAccomplishment}
@@ -5179,6 +6072,7 @@ export default function App() {
             addonAirports={addonAirports}
             tourRows={sortedTourRows}
             selectedTourRowId={selectedTourRowId}
+            tourSyncMessage={deltaVirtualToursCache?.message || ""}
             onShowAccomplishmentFlights={handleShowAccomplishmentFlights}
             onSortFlights={handleSort}
             onToggleTimeDisplayMode={() =>
@@ -5484,11 +6378,11 @@ export default function App() {
           className={cn("fixed inset-0 z-50 flex items-center justify-center overflow-auto px-4 bp-1024:px-3", modalBackdropClassName)}
           role="presentation"
         >
-          <div className="w-full max-w-[32rem]">
+          <div className="w-full max-w-[26rem]">
             <Panel
               as="section"
-              padding="lg"
-              className="grid w-full gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
+              padding="none"
+              className="grid w-full gap-6 rounded-none bg-[var(--modal-shell-bg)] px-8 py-9 text-center shadow-none bp-1024:gap-5 bp-1024:px-7 bp-1024:py-8"
               role="status"
               aria-live="polite"
               aria-label="Delta Virtual sync in progress"
@@ -5497,12 +6391,14 @@ export default function App() {
                 eyebrow="Delta Virtual Sync"
                 title="Syncing data from Delta Virtual"
                 description="Refreshing your schedule and logbook data."
-                className="w-full"
+                className="!flex-col !items-center gap-2 text-center"
+                bodyClassName="grid w-full justify-items-center text-center"
+                titleClassName="text-[1.5rem] leading-[1.1] tracking-[-0.04em] bp-1024:text-[1.38rem]"
               />
-              <div className="flex w-full items-center gap-3">
+              <div className="flex w-full justify-center pt-2">
                 <svg
                   viewBox="0 0 24 24"
-                  className="h-5 w-5 shrink-0 animate-spin text-[var(--delta-red)]"
+                  className="h-11 w-11 shrink-0 animate-spin text-[var(--delta-red)]"
                   aria-hidden="true"
                 >
                   <circle
@@ -5512,14 +6408,14 @@ export default function App() {
                     fill="none"
                     stroke="currentColor"
                     strokeOpacity="0.18"
-                    strokeWidth="2.25"
+                    strokeWidth="2"
                   />
                   <path
                     d="M21 12a9 9 0 0 0-9-9"
                     fill="none"
                     stroke="currentColor"
                     strokeLinecap="round"
-                    strokeWidth="2.25"
+                    strokeWidth="2"
                   />
                 </svg>
               </div>

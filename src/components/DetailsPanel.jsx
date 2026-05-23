@@ -27,6 +27,7 @@ import {
 } from "./ui/typography";
 import {
   buildDeltaVirtualDraftReportPayload,
+  resolveDraftAircraftCompatibility,
   validateDeltaVirtualDraftReportPayload
 } from "../lib/deltaVirtualDraftReport";
 
@@ -106,9 +107,12 @@ function FlightBoardAirline({ flight, selectedAccomplishment }) {
 
   const flightBadges = [];
   if (flight?.isTourFlight) {
+    const tourTitle = String(
+      flight?.tourLabel || flight?.tourName || formatBadgeTitleFromPath(flight?.tourPath) || "Tour flight"
+    ).trim();
     flightBadges.push({
       label: "T",
-      title: `Tour: ${formatBadgeTitleFromPath(flight?.tourPath) || "Tour flight"}`
+      title: `Tour: ${tourTitle}`
     });
   }
 
@@ -300,8 +304,11 @@ function SimBriefInlinePanel({
     10
   );
   const hasDraftReportId = Number.isInteger(draftReportId) && draftReportId > 0;
-  const draftPayload = buildDeltaVirtualDraftReportPayload(flight);
-  const draftValidation = validateDeltaVirtualDraftReportPayload(draftPayload);
+  const draftAircraftResolution = resolveDraftAircraftCompatibility(flight);
+  const draftPayload = buildDeltaVirtualDraftReportPayload(flight, draftAircraftResolution);
+  const draftValidation = validateDeltaVirtualDraftReportPayload(draftPayload, {
+    selectedSimBriefAircraft: draftAircraftResolution
+  });
   const isDraftSubmitting =
     deltaDraftSubmitState.boardEntryId === flight.boardEntryId &&
     deltaDraftSubmitState.isSubmitting;

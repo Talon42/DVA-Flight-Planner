@@ -200,7 +200,7 @@ export default function MarkdownHelpContent({ markdown = "", scrollContainerRef 
                       });
                     }
                   }}
-                  className="font-[inherit] text-[var(--delta-blue)] no-underline hover:underline"
+                  className="font-[inherit] text-[var(--help-link)] no-underline hover:underline"
                   {...props}
                 >
                   {children}
@@ -213,7 +213,7 @@ export default function MarkdownHelpContent({ markdown = "", scrollContainerRef 
                 href={href}
                 target={external ? "_blank" : undefined}
                 rel={external ? "noreferrer noopener" : undefined}
-                className="font-[inherit] text-[var(--delta-blue)] no-underline hover:underline"
+                className="font-[inherit] text-[var(--help-link)] no-underline hover:underline"
                 {...props}
               >
                 {children}

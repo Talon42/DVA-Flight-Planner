@@ -974,8 +974,9 @@ dependencies = [
 
 [[package]]
 name = "flight-planner-app"
-version = "0.6.0-beta"
+version = "0.6.1-beta"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "keyring",
  "md5",
@@ -989,6 +990,7 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-opener",
  "tokio",
+ "uuid",
  "webview2-com",
  "windows",
 ]

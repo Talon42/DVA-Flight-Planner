@@ -1,11 +1,30 @@
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::deltava_auth::DeltaVirtualAuthContext;
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DvaLoginMessageKind {
+    LoginSuccess,
+    StorePassword,
+    LoginFailed,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DvaLoginMessage {
+    pub nonce: String,
+    pub kind: DvaLoginMessageKind,
+    pub reason: Option<String>,
+    pub password: Option<String>,
+}
 
 pub fn build_deltava_login_automation_script(
     auth: &DeltaVirtualAuthContext,
     login_url: &str,
     target_url: &str,
+    nonce: &str,
 ) -> String {
     let auth_json = serde_json::to_string(&json!({
         "firstName": auth.settings.first_name,
@@ -18,6 +37,7 @@ pub fn build_deltava_login_automation_script(
         .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_DVA_AUTH__\"".to_string());
     let debug_prefix = serde_json::to_string(crate::DELTAVA_DEBUG_MESSAGE_PREFIX)
         .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_SYNC_DEBUG__\"".to_string());
+    let nonce = serde_json::to_string(nonce).unwrap_or_else(|_| "\"\"".to_string());
     let login_url = serde_json::to_string(login_url)
         .unwrap_or_else(|_| "\"https://www.deltava.org/login.do\"".to_string());
     let target_url = serde_json::to_string(target_url)
@@ -26,6 +46,7 @@ pub fn build_deltava_login_automation_script(
     const TEMPLATE: &str = r#"
 (() => {
   const auth = __AUTH_DATA__;
+  const nonce = __NONCE__;
   const authMessagePrefix = __AUTH_MESSAGE_PREFIX__;
   const debugPrefix = __DEBUG_PREFIX__;
   const loginUrl = __LOGIN_URL__;
@@ -35,13 +56,13 @@ pub fn build_deltava_login_automation_script(
 
   const emitDebug = (message) => {
     if (window.chrome?.webview?.postMessage) {
-      window.chrome.webview.postMessage(debugPrefix + message);
+      window.chrome.webview.postMessage(debugPrefix + JSON.stringify({ nonce, message }));
     }
   };
 
   const postAuthMessage = (payload) => {
     if (window.chrome?.webview?.postMessage) {
-      window.chrome.webview.postMessage(authMessagePrefix + JSON.stringify(payload));
+      window.chrome.webview.postMessage(authMessagePrefix + JSON.stringify({ nonce, ...payload }));
     }
   };
 
@@ -303,6 +324,7 @@ pub fn build_deltava_login_automation_script(
 
     TEMPLATE
         .replace("__AUTH_DATA__", &auth_json)
+        .replace("__NONCE__", &nonce)
         .replace("__AUTH_MESSAGE_PREFIX__", &auth_message_prefix)
         .replace("__DEBUG_PREFIX__", &debug_prefix)
         .replace("__LOGIN_URL__", &login_url)

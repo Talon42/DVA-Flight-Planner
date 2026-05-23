@@ -72,7 +72,7 @@ This app is a niche desktop tool distributed directly through this repository, s
 2. The app logs into Delta Virtual via a background process automatically.
 3. The app syncs the daily schedule and imports information from your logbook.
 
-When the sync succeeds, the app also saves a local copy of the Delta Virtual logbook JSON export. That logbook data powers Accomplishments, Tours, and airport completion tracking.
+When the sync succeeds, the app also saves a local copy of the Delta Virtual logbook JSON export. That logbook data powers Accomplishments and airport completion tracking, while Tours are synced separately from Delta Virtual and cached locally.
 
 *NOTE* Logbook information is only imported from the DVA site. The app does not create or modify any logbook information other than creating draft flight reports.
 
@@ -209,7 +209,7 @@ The table shows airline, route, departure, arrival, block time, and distance. Ai
 
 ## Tours Tab
 
-Use the `Tours` tab to work through bundled Delta Virtual tour legs inside the schedule area.
+Use the `Tours` tab to work through Delta Virtual tour legs that are synced from the DVA website and cached locally inside the schedule area.
 
 <table>
   <tr>
@@ -246,8 +246,8 @@ When a tour leg is completed:
 
 ### Important note about tour progress
 
-- Tour data comes from Delta Virtual tour content included in the app.
-- Tour completion is tracked locally inside Flight Planner.
+- Tour data is synced from Delta Virtual and cached locally by Flight Planner.
+- Tour completion is tracked locally against the synced tour and flight IDs.
 - Tour completion does not use your DVA logbook.
 - If you complete a tour flight outside Flight Planner, that tour completed status will not appear in the app automatically.
 
