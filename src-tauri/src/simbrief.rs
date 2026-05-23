@@ -1519,7 +1519,7 @@ async fn fetch_simbrief_xml_file_stem(client: &reqwest::Client, username: &str, 
 
 async fn fetch_simbrief_plan_summary(
     _app: &AppHandle,
-    flight_id: &str,
+    _flight_id: &str,
     username: &str,
     pilot_id: &str,
     static_id: &str,
