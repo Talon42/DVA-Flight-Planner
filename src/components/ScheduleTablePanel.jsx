@@ -58,6 +58,19 @@ function renderTourOptionContent(option) {
   );
 }
 
+function formatTourDateLabel(epochSeconds) {
+  const normalizedEpochSeconds = Number(epochSeconds);
+  if (!Number.isFinite(normalizedEpochSeconds) || normalizedEpochSeconds <= 0) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric"
+  }).format(new Date(normalizedEpochSeconds * 1000));
+}
+
 export default function ScheduleTablePanel({
   plannerMode,
   scheduleView,
@@ -155,6 +168,12 @@ export default function ScheduleTablePanel({
       tour.active ? "active" : ""
     } ${tour.isCompleted ? "completed" : ""}`
   }));
+  const selectedTourStartDate = formatTourDateLabel(selectedTourOption?.startDate);
+  const selectedTourEndDate = formatTourDateLabel(selectedTourOption?.endDate);
+  const selectedTourCompletedLabel =
+    selectedTourCompletion && selectedTourCompletion.totalRows > 0
+      ? `Completed ${selectedTourCompletion.completedRows}/${selectedTourCompletion.totalRows}`
+      : "";
   const accomplishmentSelectOptions = accomplishmentOptions.map((accomplishment) => ({
     value: accomplishment.name,
     label: accomplishment.name,
@@ -220,6 +239,32 @@ export default function ScheduleTablePanel({
               onSelectTourPath?.(nextValue);
             }}
           />
+          {selectedTourOption ? (
+            <div
+              className={cn(
+                "mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 px-1 text-[var(--text-muted)]",
+                supportCopyTextClassName
+              )}
+            >
+              {selectedTourStartDate || selectedTourEndDate ? (
+                <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {selectedTourStartDate ? <span>Start: {selectedTourStartDate}</span> : null}
+                  {selectedTourEndDate ? <span>End: {selectedTourEndDate}</span> : null}
+                </span>
+              ) : null}
+              {selectedTourCompletedLabel ? (
+                <span className="inline-flex items-baseline gap-2">
+                  <span>Completed</span>
+                  <strong className="font-semibold text-[var(--text-heading)]">
+                    {selectedTourCompletion.completedRows}
+                  </strong>
+                  <strong className="font-semibold text-[var(--text-heading)]">
+                    / {selectedTourCompletion.totalRows}
+                  </strong>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
