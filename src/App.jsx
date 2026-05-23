@@ -3461,6 +3461,10 @@ export default function App() {
       }
 
       const nextBoardEntry = buildBoardEntryFromTourFlight(matchedTourFlight);
+      const nextTourBoardName = normalizeFlightBoardName(
+        matchedTourFlight?.tourLabel || matchedTourFlight?.tourName || matchedTourFlight?.route || "",
+        DEFAULT_FLIGHT_BOARD_NAME
+      );
       if (isDevToolsEnabled) {
         logAppEvent("tour-row-add-requested", {
           clickedTourRowId: String(flightId || "").trim(),
@@ -3476,20 +3480,41 @@ export default function App() {
       }
 
       let didAddTourRow = false;
-      updateActiveFlightBoardEntries((current) => {
-        if (
-          current.some(
-            (entry) =>
-              entry.isTourFlight &&
-              String(entry.tourPath || "").trim() === String(nextBoardEntry.tourPath || "").trim() &&
-              String(entry.tourRowId || "").trim() === String(nextBoardEntry.tourRowId || "").trim()
-          )
-        ) {
+      setFlightBoards((current) => {
+        const activeId =
+          activeFlightBoardId && current.some((board) => board.id === activeFlightBoardId)
+            ? activeFlightBoardId
+            : current[0]?.id;
+
+        if (!activeId) {
           return current;
         }
 
-        didAddTourRow = true;
-        return [nextBoardEntry, ...current];
+        return current.map((board) => {
+          if (board.id !== activeId) {
+            return board;
+          }
+
+          const currentEntries = Array.isArray(board.entries) ? board.entries : [];
+          if (
+            currentEntries.some(
+              (entry) =>
+                entry.isTourFlight &&
+                String(entry.tourPath || "").trim() ===
+                  String(nextBoardEntry.tourPath || "").trim() &&
+                String(entry.tourRowId || "").trim() === String(nextBoardEntry.tourRowId || "").trim()
+            )
+          ) {
+            return board;
+          }
+
+          didAddTourRow = true;
+          return {
+            ...board,
+            name: currentEntries.length === 0 ? nextTourBoardName : board.name,
+            entries: [...currentEntries, nextBoardEntry]
+          };
+        });
       });
       if (didAddTourRow && isDevToolsEnabled) {
         logAppEvent("tour-row-added-to-board", {
@@ -3521,7 +3546,7 @@ export default function App() {
         return current;
       }
 
-      nextFlightBoard = [buildBoardEntryFromFlight(matchedFlight), ...current];
+      nextFlightBoard = [...current, buildBoardEntryFromFlight(matchedFlight)];
       return nextFlightBoard;
     });
     setExpandedBoardFlightId(null);
