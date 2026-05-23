@@ -19,6 +19,7 @@ export default function ToursTable({
   rows,
   selectedRowId,
   viewportWidth,
+  resetKey,
   onSelectRow,
   onActivateRow
 }) {
@@ -35,7 +36,8 @@ export default function ToursTable({
       selectedRowId={selectedRowId}
       onSelectRow={onSelectRow}
       onActivateRow={onActivateRow}
-      getRowId={(row) => row.flightId}
+      resetKey={resetKey}
+      getRowId={(row) => row.tourRowId || row.flightId}
       getRowClassName={(row) => (row?.isCompleted ? "opacity-45" : "")}
       renderRowOverlay={renderCompletedRowOverlay}
     />

@@ -28,7 +28,7 @@ function HeaderButton({
     <button
       type="button"
       className={cn(
-        "relative block h-full w-full overflow-hidden border-b border-[color:transparent] p-0 text-[var(--text-muted)] transition-colors duration-150",
+        "relative block h-full w-full overflow-hidden border-b border-[color:transparent] bg-[inherit] p-0 text-[var(--text-muted)] transition-colors duration-150",
         labelTextClassName,
         sortable ? "hover:text-[var(--text-heading)]" : "cursor-default",
         isActive && "border-b-[color:var(--delta-red)] text-[var(--text-heading)]"
@@ -134,7 +134,7 @@ export default function TableHeader({
 }) {
   return (
     <div
-      className="grid w-full min-w-0 border-b border-[color:var(--line)]"
+      className="relative z-20 grid w-full min-w-0 border-b border-[color:var(--line)] bg-[var(--surface-raised)]"
       style={{
         gridTemplateColumns: columnTemplate,
         paddingRight: scrollbarOffset ? `${scrollbarOffset}px` : undefined

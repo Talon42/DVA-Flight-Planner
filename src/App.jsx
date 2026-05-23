@@ -220,6 +220,19 @@ function buildTourRowIdentity(path, row, index) {
   return `${path}:fallback:${String(row?.flight || "").trim()}:${String(row?.route || "").trim()}:${index}`;
 }
 
+function scopeTourRowId(path, rowId) {
+  const normalizedRowId = String(rowId || "").trim();
+  if (!normalizedRowId) {
+    return "";
+  }
+
+  if (!path) {
+    return normalizedRowId;
+  }
+
+  return normalizedRowId.startsWith(`${path}:`) ? normalizedRowId : `${path}:${normalizedRowId}`;
+}
+
 function parseTourRoute(route) {
   const normalizedRoute = String(route || "").trim();
   if (!normalizedRoute) {
@@ -305,10 +318,12 @@ function normalizeTourRows(tour, rows, progressById = {}) {
 
   return rows.map((row, index) => {
     const identity = buildTourRowIdentity(rawTourPath, row, index);
-    const progressEntry = progressById?.[identity] || progressById?.[String(row?.flightId || "").trim()];
 
     if (isModernTourFlight(row)) {
-      const flightId = String(row?.flightId || row?.tourRowId || row?.id || identity).trim() || identity;
+      const rawFlightId = String(row?.flightId || row?.tourRowId || row?.id || identity).trim() || identity;
+      const flightId = scopeTourRowId(rawTourPath, rawFlightId);
+      const progressEntry =
+        progressById?.[identity] || progressById?.[rawFlightId] || progressById?.[flightId];
       const airline = String(row?.airline || "").trim().toUpperCase();
       const airlineName = String(
         getAirlineNameByIata(airline) || row?.airlineName || airline || ""
@@ -412,6 +427,8 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       ? `${Number(blockMinutesMatch[1])}h ${Number(blockMinutesMatch[2])}m`
       : String(row?.schedule || "").trim();
     const departureTimeLabel = parseTourDepartureTimeLabel(row?.schedule);
+    const progressEntry =
+      progressById?.[identity] || progressById?.[String(row?.flightId || "").trim()];
 
     return {
       ...row,

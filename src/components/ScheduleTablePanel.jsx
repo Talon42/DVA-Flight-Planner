@@ -187,6 +187,7 @@ export default function ScheduleTablePanel({
             <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
               <ToursTable
                 key={`tour-table-${selectedTourPath || "none"}`}
+                resetKey={selectedTourPath || "none"}
                 rows={tourRows}
                 selectedRowId={selectedTourRowId}
                 viewportWidth={viewportWidth}

@@ -17,7 +17,7 @@ const TableListOuter = forwardRef(function TableListOuter(props, ref) {
     <div
       {...rest}
       ref={ref}
-      className={cn(className, "app-scrollbar")}
+      className={cn(className, "app-scrollbar relative z-0 bg-[var(--surface-table-row)]")}
       style={{
         ...style,
         overflowX: "hidden",
@@ -66,9 +66,11 @@ export default function DataTable({
   getRowId = (row) => row.id,
   getRowClassName,
   renderRowOverlay,
-  rowHeight = TABLE_ROW_HEIGHT
+  rowHeight = TABLE_ROW_HEIGHT,
+  resetKey
 }) {
   const tableRef = useRef(null);
+  const listRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(0);
   const baseColumns = useMemo(
     () => resolveColumns(columns, viewportWidth),
@@ -91,6 +93,7 @@ export default function DataTable({
   );
   const [listHeight, setListHeight] = useState(320);
   const [headerScrollbarOffset, setHeaderScrollbarOffset] = useState(0);
+  const previousResetKeyRef = useRef(resetKey);
 
   useEffect(() => {
     setVisibleRowCount(Math.min(rows.length, INITIAL_VISIBLE_ROWS));
@@ -141,6 +144,23 @@ export default function DataTable({
     window.addEventListener("resize", updateListHeight);
     return () => window.removeEventListener("resize", updateListHeight);
   }, [rows.length, viewportWidth]);
+
+  useEffect(() => {
+    if (resetKey === undefined || previousResetKeyRef.current === resetKey) {
+      return;
+    }
+
+    previousResetKeyRef.current = resetKey;
+    setVisibleRowCount(Math.min(rows.length, INITIAL_VISIBLE_ROWS));
+
+    if (typeof listRef.current?.scrollTo === "function") {
+      listRef.current.scrollTo(0);
+    }
+
+    if (listOuterRef.current) {
+      listOuterRef.current.scrollTop = 0;
+    }
+  }, [resetKey, rows.length]);
 
   const visibleRows = useMemo(
     () => rows.slice(0, visibleRowCount),
@@ -211,7 +231,7 @@ export default function DataTable({
   return (
     <div
       ref={tableRef}
-      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)]"
+      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)]"
     >
       <div className="w-full min-w-0 flex-none overflow-hidden">
         <TableHeader
@@ -227,6 +247,8 @@ export default function DataTable({
 
       <div ref={bodyRef} className="min-h-0 w-full min-w-0 flex-1">
         <List
+          key={resetKey || "default"}
+          ref={listRef}
           className="flight-list"
           height={listHeight}
           itemCount={visibleRows.length}
