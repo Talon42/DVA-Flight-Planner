@@ -3280,8 +3280,16 @@ export default function App() {
     }
   }
 
-  function handleSelectFlight(flightId) {
+  function handleSelectFlight(flightId, row = null) {
     if (scheduleView === "tours") {
+      if (isDevToolsEnabled && row) {
+        logAppEvent("tour-row-selected", {
+          clickedTourRowId: String(row?.tourRowId || flightId || "").trim(),
+          clickedTourRoute: String(row?.route || "").trim(),
+          clickedTourFlight: String(row?.flightCode || row?.flightNumber || "").trim(),
+          clickedTourLeg: Number.isFinite(row?.tourLeg) ? row.tourLeg : Number.isFinite(row?.leg) ? row.leg : null
+        }).catch(() => {});
+      }
       setSelectedTourRowId(flightId);
       return;
     }
@@ -3293,25 +3301,59 @@ export default function App() {
     setExpandedBoardFlightId((current) => (current === flightId ? null : flightId));
   }
 
-  function handleAddToFlightBoard(flightId) {
+  function handleAddToFlightBoard(flightId, row = null) {
     if (scheduleView === "tours") {
-      const matchedTourFlight = activeTourRows.find((flight) => flight.flightId === flightId);
+      const normalizedFlightId = String(flightId || "").trim();
+      const matchedTourFlight =
+        row && String(row?.tourRowId || row?.flightId || "").trim() === normalizedFlightId
+          ? row
+          : activeTourRows.find((flight) => flight.tourRowId === normalizedFlightId || flight.flightId === normalizedFlightId);
       if (!matchedTourFlight) {
         return;
       }
 
+      const nextBoardEntry = buildBoardEntryFromTourFlight(matchedTourFlight);
+      if (isDevToolsEnabled) {
+        logAppEvent("tour-row-add-requested", {
+          clickedTourRowId: String(flightId || "").trim(),
+          clickedTourRoute: String(matchedTourFlight?.route || "").trim(),
+          clickedTourFlight: String(matchedTourFlight?.flightCode || matchedTourFlight?.flightNumber || "").trim(),
+          clickedTourLeg: Number.isFinite(matchedTourFlight?.tourLeg)
+            ? matchedTourFlight.tourLeg
+          : Number.isFinite(matchedTourFlight?.leg)
+              ? matchedTourFlight.leg
+              : null
+        }).catch(() => {});
+      }
+
+      let didAddTourRow = false;
       updateActiveFlightBoardEntries((current) => {
         if (
           current.some(
             (entry) =>
-              entry.isTourFlight && String(entry.tourRowId || "").trim() === matchedTourFlight.tourRowId
+              entry.isTourFlight &&
+              String(entry.tourRowId || "").trim() === String(nextBoardEntry.tourRowId || "").trim()
           )
         ) {
           return current;
         }
 
-        return [buildBoardEntryFromTourFlight(matchedTourFlight), ...current];
+        didAddTourRow = true;
+        return [nextBoardEntry, ...current];
       });
+      if (didAddTourRow && isDevToolsEnabled) {
+        logAppEvent("tour-row-added-to-board", {
+          boardEntryId: nextBoardEntry.boardEntryId,
+          tourRowId: nextBoardEntry.tourRowId,
+          route: nextBoardEntry.route,
+          flightCode: nextBoardEntry.flightCode,
+          flightNumber: nextBoardEntry.flightNumber,
+          airline: nextBoardEntry.airline,
+          airlineName: nextBoardEntry.airlineName,
+          from: nextBoardEntry.from,
+          to: nextBoardEntry.to
+        }).catch(() => {});
+      }
       setExpandedBoardFlightId(null);
       setPlannerControlsCollapsed(true);
       return;

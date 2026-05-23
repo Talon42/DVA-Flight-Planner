@@ -55,9 +55,9 @@ export default function TableRow({
                 "block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[var(--text-primary)] outline-none transition-colors duration-150 hover:bg-[rgba(255,255,255,0.18)] dark:text-[rgb(255,255,255)]",
                 bodyMdTextClassName
               )}
-              onClick={() => onSelectRow?.(rowId)}
+              onClick={() => onSelectRow?.(rowId, row)}
               onDoubleClick={() =>
-                onActivateRow ? onActivateRow(rowId) : onSelectRow?.(rowId)
+                onActivateRow ? onActivateRow(rowId, row) : onSelectRow?.(rowId, row)
               }
             >
               <span
