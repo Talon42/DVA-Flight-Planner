@@ -66,7 +66,7 @@ import {
 import {
   prepareDutyScheduleBuild
 } from "./logic/dutySchedule/generateDutySchedule";
-import dalLogo from "./data/images/DAL.png";
+import dvaWidgetLogo from "./data/images/DVA_Widget.png";
 import {
   createEmptyAddonAirportScan,
   pickAddonAirportFolder,
@@ -5103,8 +5103,8 @@ export default function App() {
           <Eyebrow>Flight Planner</Eyebrow>
           <div className="flex items-center gap-3 bp-1024:gap-2.5">
             <img
-              src={dalLogo}
-              alt="Delta Virtual Airlines logo"
+              src={dvaWidgetLogo}
+              alt="DVA Widget logo"
               className="h-14 w-14 shrink-0 object-contain bp-1024:h-11 bp-1024:w-11"
             />
             <h1 className={cn("m-0 whitespace-nowrap text-[var(--text-heading)]", heroTitleTextClassName)}>
