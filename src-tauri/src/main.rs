@@ -544,7 +544,14 @@ fn build_deltava_tours_sync_script(nonce: &str) -> String {
     const flightNumber = normalizeText(flight?.flight || flight?.flightNumber || '');
     const departure = normalizeText(flight?.airportD?.icao || flight?.departure || '').toUpperCase();
     const destination = normalizeText(flight?.airportA?.icao || flight?.destination || '').toUpperCase();
-    return `dva:${tourId}:${index}:${airline}:${flightNumber}:${departure}:${destination}`;
+    const departureTime = normalizeText(flight?.timeD?.text || flight?.departureTime || '');
+    const arrivalTime = normalizeText(flight?.timeA?.text || flight?.arrivalTime || '');
+    const equipment = normalizeText(flight?.eqType || flight?.equipment || flight?.aircraft || '');
+    const segment = normalizeText(flight?.segment || '');
+    const composite = [tourId, airline, flightNumber, departure, destination, departureTime, arrivalTime, equipment, segment]
+      .filter(Boolean)
+      .join(':');
+    return `dva:${composite || tourId}`;
   };
   const normalizeTourFlight = (tour, flight, index) => {
     const tourId = normalizeId(tour?.id || tour?.sourceId);

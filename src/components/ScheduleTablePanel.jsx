@@ -1,6 +1,11 @@
 import Panel from "./ui/Panel";
 import SectionHeader from "./ui/SectionHeader";
 import { cn } from "./ui/cn";
+import {
+  labelTextClassName,
+  sectionTitleTextClassName,
+  supportCopyTextClassName
+} from "./ui/typography";
 import AccomplishmentsPanel from "./AccomplishmentsPanel";
 import DutySchedulePanel from "./dutySchedule/DutySchedulePanel";
 import { SearchableMultiSelect } from "./ui/SearchableSelect";
@@ -186,9 +191,14 @@ export default function ScheduleTablePanel({
           ) : (
             <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
               <div className="flex h-full min-h-0 w-full items-center justify-center rounded-none border border-dashed border-[color:var(--line)] bg-[rgba(255,255,255,0.45)] px-6 py-8 text-center dark:bg-[rgba(4,12,22,0.35)]">
-                <div className="grid max-w-xl gap-3">
-                  <SectionHeader eyebrow="TOURS" title="No synced tours available" />
-                  <p className="m-0 text-[var(--text-muted)]">{toursEmptyMessage}</p>
+                <div className="grid max-w-xl justify-items-center gap-3 text-center">
+                  <p className={cn("m-0 text-[var(--delta-red)] dark:text-white", labelTextClassName)}>
+                    TOURS
+                  </p>
+                  <h2 className={cn("m-0", sectionTitleTextClassName)}>No synced tours available</h2>
+                  <p className={cn("m-0 text-[var(--text-muted)]", supportCopyTextClassName)}>
+                    {toursEmptyMessage}
+                  </p>
                 </div>
               </div>
             </div>
