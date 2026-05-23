@@ -425,18 +425,22 @@ fn build_deltava_tours_sync_script(nonce: &str) -> String {
 
   const normalizeText = (value) => String(value ?? '').trim();
   const normalizeId = (value) => normalizeText(value);
-  const isValidId = (value) => {
-    const normalized = normalizeId(value);
-    return Boolean(normalized) && normalized !== '0' && normalized !== 'null' && normalized !== 'undefined';
-  };
-  const parseDate = (value) => {
+  const normalizeDvaEpochSeconds = (value) => {
     const normalized = normalizeText(value);
-    if (!normalized) {
+    if (!normalized || normalized === '0' || normalized === 'null' || normalized === 'undefined') {
       return null;
     }
 
-    const timestamp = Date.parse(normalized);
-    return Number.isFinite(timestamp) ? timestamp : null;
+    const numericValue = Number(normalized);
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+      return null;
+    }
+
+    return numericValue > 10000000000 ? Math.floor(numericValue / 1000) : Math.floor(numericValue);
+  };
+  const isValidId = (value) => {
+    const normalized = normalizeId(value);
+    return Boolean(normalized) && normalized !== '0' && normalized !== 'null' && normalized !== 'undefined';
   };
   const isJsonContentType = (value) => /json/i.test(String(value || ''));
   const buildPreview = (text) => normalizeText(text).replace(/\s+/g, ' ').slice(0, 160);
@@ -640,34 +644,46 @@ fn build_deltava_tours_sync_script(nonce: &str) -> String {
     rows: Array.isArray(tour.rows) ? tour.rows.map((row) => ({ ...row })) : [],
     flights: Array.isArray(tour.flights) ? tour.flights.map((row) => ({ ...row })) : []
   });
-  const isCandidateTour = (tour) => {
-    if (!tour || tour.active !== true || !isValidId(tour.id || tour.sourceId)) {
-      return false;
+  const evaluateCandidateTour = (tour, nowSeconds) => {
+    const tourId = normalizeId(tour?.id || tour?.sourceId);
+    const tourName = normalizeText(tour?.name || '');
+    const active = tour?.active === true;
+    const status = normalizeText(tour?.status || '');
+    const rawStartDate = tour?.startDate ?? tour?.start_date ?? null;
+    const rawEndDate = tour?.endDate ?? tour?.end_date ?? null;
+    const startDate = normalizeDvaEpochSeconds(rawStartDate);
+    const endDate = normalizeDvaEpochSeconds(rawEndDate);
+    let reason = '';
+
+    if (!isValidId(tourId)) {
+      reason = 'exclude:invalid-id';
+    } else if (!active) {
+      reason = 'exclude:inactive';
+    } else if (startDate !== null && startDate > nowSeconds) {
+      reason = 'exclude:starts-future';
+    } else if (endDate !== null && endDate < nowSeconds) {
+      reason = 'exclude:ended';
+    } else {
+      reason = 'include';
     }
 
-    const now = Date.now();
-    const startValue = normalizeText(tour.startDate || tour.start_date || '');
-    const endValue = normalizeText(tour.endDate || tour.end_date || '');
-    const startTime = parseDate(startValue);
-    const endTime = parseDate(endValue);
+    emitDebug(
+      `tours:filter:${JSON.stringify({
+        tourId: tourId || null,
+        name: tourName,
+        active,
+        status,
+        startDate: startDate,
+        endDate: endDate,
+        nowSeconds,
+        reason
+      })}`
+    );
 
-    if (startValue && startTime === null) {
-      return false;
-    }
-
-    if (endValue && endTime === null) {
-      return false;
-    }
-
-    if (startTime !== null && startTime > now) {
-      return false;
-    }
-
-    if (endTime !== null && endTime < now) {
-      return false;
-    }
-
-    return true;
+    return {
+      include: reason === 'include',
+      reason
+    };
   };
 
   const runToursSync = async () => {
@@ -698,7 +714,14 @@ fn build_deltava_tours_sync_script(nonce: &str) -> String {
     }
 
     const totalListTours = listResponse.json.length;
-    const candidateTours = listResponse.json.filter(isCandidateTour);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const candidateTours = [];
+    for (const tour of listResponse.json) {
+      const evaluation = evaluateCandidateTour(tour, nowSeconds);
+      if (evaluation.include) {
+        candidateTours.push(tour);
+      }
+    }
     const tours = [];
     const detailFailures = [];
     const failedTourIds = [];
