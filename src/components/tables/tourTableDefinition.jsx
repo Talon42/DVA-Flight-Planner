@@ -2,13 +2,12 @@ import { formatDuration, formatNumber } from "../../lib/formatters";
 import { AirlineCell } from "./flightTableDefinition";
 
 function getDurationLabel(row) {
-  const blockTimeLabel = String(row?.blockTimeLabel || "").trim();
-  if (blockTimeLabel) {
-    return blockTimeLabel;
+  if (Number.isFinite(row?.blockMinutes)) {
+    return formatDuration(Number(row.blockMinutes));
   }
 
-  if (Number.isFinite(row?.blockMinutes)) {
-    return formatDuration(row.blockMinutes);
+  if (Number.isFinite(row?.durationMs)) {
+    return formatDuration(Math.max(0, Math.round(Number(row.durationMs) / 60000)));
   }
 
   return "N/A";
@@ -16,6 +15,7 @@ function getDurationLabel(row) {
 
 export function getTourTableColumns({ viewportWidth }) {
   const useTabletCompactWidths = viewportWidth <= 1024;
+  const useAbbreviatedTourTimingLabels = viewportWidth < 1400;
   const compactColumnSizing = useTabletCompactWidths
     ? {
         tourLeg: { minWidth: 72, flexWeight: 0.65 },
@@ -24,12 +24,12 @@ export function getTourTableColumns({ viewportWidth }) {
         tourFlightNumber: { minWidth: 106, flexWeight: 1.1 },
         from: { minWidth: 78, flexWeight: 1.3 },
         to: { minWidth: 78, flexWeight: 1.3 },
-        departureTime: { minWidth: 94, flexWeight: 0.85 },
-        arrivalTime: { minWidth: 94, flexWeight: 0.85 },
+        departureTime: { minWidth: 106, flexWeight: 1 },
+        arrivalTime: { minWidth: 106, flexWeight: 1 },
         distanceMi: { minWidth: 98, flexWeight: 0.95 },
         duration: { minWidth: 98, flexWeight: 0.95 }
-      }
-    : {};
+    }
+  : {};
   const expandedColumnSizing =
     viewportWidth >= 1920
       ? {
@@ -40,8 +40,8 @@ export function getTourTableColumns({ viewportWidth }) {
           aircraft: { minWidth: 156, flexWeight: 1 },
           from: { minWidth: 82, flexWeight: 1 },
           to: { minWidth: 82, flexWeight: 1 },
-          departureTime: { minWidth: 104, flexWeight: 1 },
-          arrivalTime: { minWidth: 104, flexWeight: 1 },
+          departureTime: { minWidth: 116, flexWeight: 1 },
+          arrivalTime: { minWidth: 116, flexWeight: 1 },
           distanceMi: { minWidth: 112, flexWeight: 1 },
           duration: { minWidth: 112, flexWeight: 1 }
         }
@@ -50,8 +50,8 @@ export function getTourTableColumns({ viewportWidth }) {
   return [
     {
       key: "tourLeg",
-      label: "Tour Leg",
-      compactLabel: "Tour Leg",
+      label: "#",
+      compactLabel: "#",
       role: "compact",
       minWidth: 72,
       flexWeight: 0.75,
@@ -73,8 +73,9 @@ export function getTourTableColumns({ viewportWidth }) {
     },
     {
       key: "tourFlightNumber",
-      label: "Flight #",
-      compactLabel: "FL",
+      label: useAbbreviatedTourTimingLabels ? "FL#" : "Flight #",
+      compactLabel: useAbbreviatedTourTimingLabels ? "FL#" : "Flight #",
+      wideLabel: "Flight #",
       role: "code",
       minWidth: 104,
       flexWeight: 1.4,
@@ -122,11 +123,12 @@ export function getTourTableColumns({ viewportWidth }) {
     },
     {
       key: "departureTime",
-      label: "Departure",
-      compactLabel: "Dep",
+      label: "DEP LOCAL",
+      compactLabel: "DEP LOCAL",
       role: "secondary",
-      minWidth: 92,
+      minWidth: 106,
       flexWeight: 1,
+      hiddenAtOrBelow: 1919,
       ...compactColumnSizing.departureTime,
       ...expandedColumnSizing.departureTime,
       truncate: true,
@@ -134,11 +136,12 @@ export function getTourTableColumns({ viewportWidth }) {
     },
     {
       key: "arrivalTime",
-      label: "Arrival",
-      compactLabel: "Arr",
+      label: "ARR LOCAL",
+      compactLabel: "ARR LOCAL",
       role: "secondary",
-      minWidth: 92,
+      minWidth: 106,
       flexWeight: 1,
+      hiddenAtOrBelow: 1919,
       ...compactColumnSizing.arrivalTime,
       ...expandedColumnSizing.arrivalTime,
       truncate: true,
@@ -146,8 +149,9 @@ export function getTourTableColumns({ viewportWidth }) {
     },
     {
       key: "distanceMi",
-      label: "Distance",
-      compactLabel: "Dist",
+      label: useAbbreviatedTourTimingLabels ? "DIST" : "Distance",
+      compactLabel: useAbbreviatedTourTimingLabels ? "DIST" : "Distance",
+      wideLabel: "Distance",
       role: "numeric",
       minWidth: 108,
       flexWeight: 1.3,
@@ -158,7 +162,9 @@ export function getTourTableColumns({ viewportWidth }) {
     },
     {
       key: "duration",
-      label: "Duration",
+      label: useAbbreviatedTourTimingLabels ? "TIME" : "Duration",
+      compactLabel: useAbbreviatedTourTimingLabels ? "TIME" : "Duration",
+      wideLabel: "Duration",
       role: "numeric",
       minWidth: 108,
       flexWeight: 1.3,

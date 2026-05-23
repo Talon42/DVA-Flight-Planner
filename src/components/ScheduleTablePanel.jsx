@@ -272,7 +272,7 @@ export default function ScheduleTablePanel({
 
               {showCompletedTourOverlay ? (
                 <div
-                  className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[rgba(240,245,250,0.18)] p-4 dark:bg-[rgba(4,12,22,0.26)]"
+                  className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[var(--surface)] p-4 dark:bg-[var(--surface-elevated)]"
                 >
                   <div className="pointer-events-auto grid w-full max-w-md gap-4 border border-[color:var(--line)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(10,24,43,0.2)] dark:bg-[var(--surface-elevated)] dark:shadow-[0_18px_48px_rgba(0,0,0,0.36)]">
                     <div className="grid gap-2">
@@ -283,9 +283,6 @@ export default function ScheduleTablePanel({
                         You have completed the {completionOverlayTitle}
                       </h2>
                     </div>
-                    <p className="m-0 text-[var(--text-muted)]">
-                      All rows for this tour are complete for the current pilot.
-                    </p>
                     <div className="flex justify-end">
                       <Button variant="ghost" size="sm" className="rounded-none" onClick={dismissCompletionOverlay}>
                         Dismiss

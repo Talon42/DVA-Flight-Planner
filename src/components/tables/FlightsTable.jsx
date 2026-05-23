@@ -15,8 +15,8 @@ export default function FlightsTable({
   onActivateRow
 }) {
   const columns = useMemo(
-    () => getFlightTableColumns({ addonAirports, timeDisplayMode }),
-    [addonAirports, timeDisplayMode]
+    () => getFlightTableColumns({ addonAirports, timeDisplayMode, viewportWidth }),
+    [addonAirports, timeDisplayMode, viewportWidth]
   );
 
   return (

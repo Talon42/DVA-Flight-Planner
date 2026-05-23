@@ -476,6 +476,73 @@ function isModernTourFlight(row) {
   );
 }
 
+const tourTimezoneLabelCache = new Map();
+
+function getTourTimezoneAbbreviation(timezone, referenceEpochSeconds) {
+  const normalizedTimezone = String(timezone || "").trim();
+  if (!normalizedTimezone) {
+    return "";
+  }
+
+  const cacheKey = `${normalizedTimezone}:${Number.isFinite(referenceEpochSeconds) ? referenceEpochSeconds : 0}`;
+  if (tourTimezoneLabelCache.has(cacheKey)) {
+    return tourTimezoneLabelCache.get(cacheKey);
+  }
+
+  try {
+    const referenceDate = Number.isFinite(referenceEpochSeconds)
+      ? new Date(referenceEpochSeconds * 1000)
+      : new Date();
+    const preferredLocales = normalizedTimezone.startsWith("Europe/")
+      ? ["en-GB", "en-US"]
+      : ["en-US", "en-GB"];
+    let timezoneLabel = "";
+
+    for (const locale of preferredLocales) {
+      const formattedParts = new Intl.DateTimeFormat(locale, {
+        timeZone: normalizedTimezone,
+        timeZoneName: "short"
+      }).formatToParts(referenceDate);
+      timezoneLabel = String(
+        formattedParts.find((part) => part.type === "timeZoneName")?.value || ""
+      ).trim();
+
+      if (timezoneLabel && !/^(GMT|UTC)[+-]?\d*/i.test(timezoneLabel)) {
+        break;
+      }
+    }
+
+    tourTimezoneLabelCache.set(cacheKey, timezoneLabel);
+    return timezoneLabel;
+  } catch {
+    tourTimezoneLabelCache.set(cacheKey, "");
+    return "";
+  }
+}
+
+function buildTourLocalTimeLabel(timeLabel, timezone, referenceEpochSeconds) {
+  const normalizedTimeLabel = String(timeLabel || "").trim();
+  if (!normalizedTimeLabel) {
+    return "";
+  }
+
+  const normalizedTimezone = String(timezone || "").trim();
+  if (!normalizedTimezone) {
+    return normalizedTimeLabel;
+  }
+
+  if (/\s(?:GMT[+-]\d+|UTC[+-]?\d*|[A-Z]{2,5})$/i.test(normalizedTimeLabel)) {
+    return normalizedTimeLabel;
+  }
+
+  const timezoneLabel = getTourTimezoneAbbreviation(normalizedTimezone, referenceEpochSeconds);
+  if (!timezoneLabel) {
+    return normalizedTimeLabel;
+  }
+
+  return `${normalizedTimeLabel} ${timezoneLabel}`;
+}
+
 function normalizeTourRows(tour, rows, progressById = {}) {
   if (!Array.isArray(rows)) {
     return [];
@@ -484,6 +551,10 @@ function normalizeTourRows(tour, rows, progressById = {}) {
   const tourId = normalizeDvaTourId(tour);
   const tourLabel = String(tour?.label || tour?.name || "").trim();
   const tourSourceId = String(tour?.sourceId || tour?.id || "").trim();
+  const tourTimeReferenceSeconds =
+    normalizeDvaTourEpochSeconds(
+      tour?.startDate || tour?.start_date || tour?.endDate || tour?.end_date || null
+    ) || Math.floor(Date.now() / 1000);
   const legacyRowIdCounts = rows.reduce((counts, row) => {
     const legacyRowId = buildLegacyDvaTourRowId(tourId, row);
     if (legacyRowId) {
@@ -546,6 +617,18 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       const arrivalTimeLabel = String(
         row?.arrivalTimeLabel || row?.arrivalTime || row?.timeA?.text || ""
       ).trim();
+      const departureTimezone =
+        String(row?.departureTimezone || row?.timezone || "").trim() ||
+        String(getAirportByIcao(from)?.timezone || "").trim();
+      const arrivalTimezone =
+        String(row?.arrivalTimezone || row?.timezone || "").trim() ||
+        String(getAirportByIcao(to)?.timezone || "").trim();
+      const departureLocalTimeLabel =
+        String(row?.departureLocalTimeLabel || "").trim() ||
+        buildTourLocalTimeLabel(departureTimeLabel, departureTimezone, tourTimeReferenceSeconds);
+      const arrivalLocalTimeLabel =
+        String(row?.arrivalLocalTimeLabel || "").trim() ||
+        buildTourLocalTimeLabel(arrivalTimeLabel, arrivalTimezone, tourTimeReferenceSeconds);
       const blockMinutes = Number.isFinite(row?.blockMinutes)
         ? row.blockMinutes
         : Number.isFinite(row?.durationMs)
@@ -579,6 +662,11 @@ function normalizeTourRows(tour, rows, progressById = {}) {
         toAirport: String(row?.toAirport || row?.destinationName || parsedRoute.toAirport || "").trim(),
         departureTimeLabel,
         arrivalTimeLabel,
+        departureLocalTimeLabel,
+        arrivalLocalTimeLabel,
+        departureTimezone,
+        arrivalTimezone,
+        timezone: String(row?.timezone || departureTimezone || arrivalTimezone || "").trim(),
         blockMinutes,
         blockTimeLabel,
         departureTime: departureTimeLabel,
@@ -626,6 +714,14 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       ? `${Number(blockMinutesMatch[1])}h ${Number(blockMinutesMatch[2])}m`
       : String(row?.schedule || "").trim();
     const departureTimeLabel = parseTourDepartureTimeLabel(row?.schedule);
+    const departureTimezone = String(row?.departureTimezone || row?.timezone || "").trim();
+    const arrivalTimezone = String(row?.arrivalTimezone || row?.timezone || "").trim();
+    const departureLocalTimeLabel =
+      String(row?.departureLocalTimeLabel || "").trim() ||
+      buildTourLocalTimeLabel(departureTimeLabel, departureTimezone, tourTimeReferenceSeconds);
+    const arrivalLocalTimeLabel =
+      String(row?.arrivalLocalTimeLabel || "").trim() ||
+      buildTourLocalTimeLabel(String(row?.arrivalTime || "").trim(), arrivalTimezone, tourTimeReferenceSeconds);
     const flightId = buildDvaTourCanonicalRowId(tourId, {
       ...row,
       airline: parsedFlightCode.airline,
@@ -695,6 +791,11 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       blockMinutes,
       blockTimeLabel,
       departureTimeLabel,
+      departureLocalTimeLabel,
+      arrivalLocalTimeLabel,
+      departureTimezone,
+      arrivalTimezone,
+      timezone: String(row?.timezone || departureTimezone || arrivalTimezone || "").trim(),
       distanceNm: null,
       distanceMi: Number.isFinite(row?.distance_mi) ? row.distance_mi : null,
       isTourFlight: true,

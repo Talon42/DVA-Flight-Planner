@@ -100,15 +100,16 @@ function formatFlightCode(flightCode) {
   return stripped || flightCode;
 }
 
-export function getFlightTableColumns({ addonAirports, timeDisplayMode }) {
+export function getFlightTableColumns({ addonAirports, timeDisplayMode, viewportWidth = 0 }) {
   const timeKeyPrefix = timeDisplayMode === "local" ? "Local" : "Utc";
+  const useWideFlightNumberLabel = viewportWidth >= 1400;
 
   return [
     {
       key: "flightCode",
-      label: "Flight",
-      compactLabel: "#",
-      wideLabel: "Flight #",
+      label: useWideFlightNumberLabel ? "FLIGHT #" : "FL#",
+      compactLabel: "FL#",
+      wideLabel: "FLIGHT #",
       role: "code",
       minWidth: 94,
       flexWeight: 1.3,
@@ -182,17 +183,6 @@ export function getFlightTableColumns({ addonAirports, timeDisplayMode }) {
       renderCell: (row) => formatTimeOnly(row[`sta${timeKeyPrefix}`])
     },
     {
-      key: "blockMinutes",
-      label: "Time",
-      compactLabel: "ETE",
-      role: "numeric",
-      minWidth: 96,
-      flexWeight: 1.1,
-      sortable: true,
-      sortKey: "blockMinutes",
-      renderCell: (row) => formatDuration(row.blockMinutes)
-    },
-    {
       key: "distanceNm",
       label: "Distance",
       compactLabel: "Dist",
@@ -202,6 +192,17 @@ export function getFlightTableColumns({ addonAirports, timeDisplayMode }) {
       sortable: true,
       sortKey: "distanceNm",
       renderCell: (row) => formatDistanceNm(row.distanceNm)
+    },
+    {
+      key: "blockMinutes",
+      label: "Time",
+      compactLabel: "ETE",
+      role: "numeric",
+      minWidth: 96,
+      flexWeight: 1.1,
+      sortable: true,
+      sortKey: "blockMinutes",
+      renderCell: (row) => formatDuration(row.blockMinutes)
     }
   ];
 }
