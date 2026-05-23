@@ -1,5 +1,4 @@
 use chrono::{SecondsFormat, Utc};
-use md5;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -24,7 +23,8 @@ const SIMBRIEF_FETCH_RETRY_COUNT: usize = 120;
 const SIMBRIEF_FETCH_RETRY_DELAY_SECONDS: u64 = 2;
 const SIMBRIEF_CALLBACK_PAGE_CLOSE_DELAY_MS: u64 = 350;
 const SIMBRIEF_CALLBACK_URL_BASE: &str = "http://127.0.0.1:43123/simbrief-callback";
-const SIMBRIEF_DISPATCH_URL: &str = "https://www.simbrief.com/ofp/ofp.loader.api.php";
+const SIMBRIEF_SIGNING_SERVICE_URL: &str =
+    "https://dva-simbrief-signer.foxtwomodels.workers.dev/simbrief/dispatch-url";
 const SIMBRIEF_FETCH_URL: &str = "https://www.simbrief.com/api/xml.fetcher.php";
 const SIMBRIEF_INPUTS_LIST_URL: &str = "https://www.simbrief.com/api/inputs.list.json";
 const SIMBRIEF_LOG_MAX_BYTES: u64 = 262_144;
@@ -93,6 +93,29 @@ pub struct SimBriefRefreshPayload {
     pub username: String,
     #[serde(default)]
     pub pilot_id: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SimBriefDispatchSigningRequest {
+    airline: String,
+    flight_number: String,
+    callsign: String,
+    origin: String,
+    destination: String,
+    aircraft_type: String,
+    units: String,
+    departure_hour: String,
+    departure_minute: String,
+    static_id: String,
+    output_page: String,
+    pilot_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SimBriefDispatchSigningResponse {
+    dispatch_url: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
@@ -196,34 +219,96 @@ fn iso_now_utc() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
-fn normalize_api_key(value: Option<&str>) -> Option<String> {
-    let trimmed = value?.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
-    }
+// Builds the exact JSON payload that gets sent to the signing Worker.
+fn build_simbrief_dispatch_signing_request(
+    payload: &SimBriefDispatchPayload,
+    static_id: &str,
+    output_page: &str,
+) -> Result<SimBriefDispatchSigningRequest, String> {
+    let (departure_hour, departure_minute) = extract_departure_parts(&payload.departure_time_utc)?;
+
+    Ok(SimBriefDispatchSigningRequest {
+        airline: payload.airline.trim().to_uppercase(),
+        flight_number: payload.flight_number.trim().to_uppercase(),
+        callsign: payload.callsign.trim().to_uppercase(),
+        origin: payload.origin.trim().to_uppercase(),
+        destination: payload.destination.trim().to_uppercase(),
+        aircraft_type: payload.aircraft_type.trim().to_uppercase(),
+        units: payload.units.trim().to_uppercase(),
+        departure_hour,
+        departure_minute,
+        static_id: static_id.to_string(),
+        output_page: output_page.to_string(),
+        pilot_id: payload.pilot_id.trim().to_string(),
+    })
 }
 
-fn resolve_simbrief_api_key(
-    bundled_key: Option<&str>,
-    env_key: Option<&str>,
-    tauri_env_key: Option<&str>,
-) -> Result<String, String> {
-    normalize_api_key(bundled_key)
-        .or_else(|| normalize_api_key(env_key))
-        .or_else(|| normalize_api_key(tauri_env_key))
-        .ok_or_else(|| {
-            "config_failed: SimBrief API key not found. Add simbrief/api_key.txt for bundled desktop builds or set SIMBRIEF_API_KEY / TAURI_SIMBRIEF_API_KEY for local development.".into()
+fn validate_simbrief_dispatch_url(raw_dispatch_url: &str) -> Result<Url, String> {
+    let url = Url::parse(raw_dispatch_url).map_err(|_| {
+        "dispatch_failed: SimBrief signing service returned an invalid dispatch URL.".to_string()
+    })?;
+
+    let is_allowed_host = url
+        .host_str()
+        .map(|host| {
+            host.eq_ignore_ascii_case("simbrief.com")
+                || host.eq_ignore_ascii_case("www.simbrief.com")
         })
+        .unwrap_or(false);
+
+    if url.scheme() != "https" || !is_allowed_host || url.path() != "/ofp/ofp.loader.api.php" {
+        return Err(
+            "dispatch_failed: SimBrief signing service returned an invalid dispatch URL.".into(),
+        );
+    }
+
+    Ok(url)
 }
 
-fn simbrief_api_key() -> Result<String, String> {
-    resolve_simbrief_api_key(
-        option_env!("SIMBRIEF_BUNDLED_API_KEY"),
-        std::env::var("SIMBRIEF_API_KEY").ok().as_deref(),
-        std::env::var("TAURI_SIMBRIEF_API_KEY").ok().as_deref(),
-    )
+#[derive(Debug)]
+enum SimBriefSigningFailure {
+    Unavailable { context: String },
+    InvalidDispatchUrl,
+}
+
+async fn request_simbrief_dispatch_url(
+    request: &SimBriefDispatchSigningRequest,
+) -> Result<Url, SimBriefSigningFailure> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .user_agent("flight-planner-app/0.1.0")
+        .build()
+        .map_err(|_| SimBriefSigningFailure::Unavailable {
+            context: "client_init_failed".into(),
+        })?;
+
+    let response = client
+        .post(SIMBRIEF_SIGNING_SERVICE_URL)
+        .json(request)
+        .send()
+        .await
+        .map_err(|error| SimBriefSigningFailure::Unavailable {
+            context: if error.is_timeout() {
+                "request_timeout".into()
+            } else {
+                "request_failed".into()
+            },
+        })?;
+
+    let status = response.status();
+    if !status.is_success() {
+        return Err(SimBriefSigningFailure::Unavailable {
+            context: format!("http_status={status}"),
+        });
+    }
+
+    let response_body = response
+        .json::<SimBriefDispatchSigningResponse>()
+        .await
+        .map_err(|_| SimBriefSigningFailure::InvalidDispatchUrl)?;
+
+    validate_simbrief_dispatch_url(&response_body.dispatch_url)
+        .map_err(|_| SimBriefSigningFailure::InvalidDispatchUrl)
 }
 
 fn sanitize_static_id(value: &str) -> String {
@@ -272,49 +357,6 @@ fn build_outputpage(static_id: &str) -> Result<String, String> {
                 .to_string()
         })
         .map_err(|error| format!("dispatch_failed: Unable to build SimBrief callback URL: {error}"))
-}
-
-fn build_simbrief_dispatch_url(
-    payload: &SimBriefDispatchPayload,
-    api_key: &str,
-    timestamp: u64,
-    outputpage: &str,
-    static_id: &str,
-) -> Result<String, String> {
-    let (departure_hour, departure_minute) = extract_departure_parts(&payload.departure_time_utc)?;
-    let apicode_input = format!(
-        "{api_key}{}{}{}{timestamp}{outputpage}",
-        payload.origin.trim().to_uppercase(),
-        payload.destination.trim().to_uppercase(),
-        payload.aircraft_type.trim().to_uppercase(),
-    );
-    let apicode = format!("{:x}", md5::compute(apicode_input));
-
-    let mut params = vec![
-        ("airline", payload.airline.trim().to_uppercase()),
-        ("fltnum", payload.flight_number.trim().to_uppercase()),
-        ("callsign", payload.callsign.trim().to_uppercase()),
-        ("orig", payload.origin.trim().to_uppercase()),
-        ("dest", payload.destination.trim().to_uppercase()),
-        ("type", payload.aircraft_type.trim().to_uppercase()),
-        ("units", payload.units.trim().to_uppercase()),
-        ("navlog", "1".to_string()),
-        ("deph", departure_hour),
-        ("depm", departure_minute),
-        ("static_id", static_id.to_string()),
-        ("timestamp", timestamp.to_string()),
-        ("outputpage", outputpage.to_string()),
-        ("apicode", apicode),
-    ];
-
-    let pilot_id = payload.pilot_id.trim();
-    if !pilot_id.is_empty() {
-        params.push(("pid", pilot_id.to_string()));
-    }
-
-    Url::parse_with_params(SIMBRIEF_DISPATCH_URL, params)
-        .map(|url| url.to_string())
-        .map_err(|error| format!("dispatch_failed: Unable to build SimBrief dispatch URL: {error}"))
 }
 
 fn build_fetch_urls(
@@ -375,8 +417,12 @@ fn is_valid_simbrief_ofp_xml_id(value: &str) -> bool {
 
     timestamp.len() == 10
         && suffix.len() == 10
-        && timestamp.chars().all(|character| character.is_ascii_digit())
-        && suffix.chars().all(|character| character.is_ascii_alphanumeric())
+        && timestamp
+            .chars()
+            .all(|character| character.is_ascii_digit())
+        && suffix
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric())
 }
 
 fn is_valid_simbrief_xml_filename_stem(value: &str) -> bool {
@@ -393,7 +439,11 @@ fn is_valid_simbrief_xml_filename_stem(value: &str) -> bool {
         return false;
     };
 
-    if timestamp.is_empty() || !timestamp.chars().all(|character| character.is_ascii_digit()) {
+    if timestamp.is_empty()
+        || !timestamp
+            .chars()
+            .all(|character| character.is_ascii_digit())
+    {
         return false;
     }
 
@@ -403,7 +453,9 @@ fn is_valid_simbrief_xml_filename_stem(value: &str) -> bool {
 
     !name.is_empty()
         && marker == "XML"
-        && name.chars().all(|character| character.is_ascii_alphanumeric())
+        && name
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric())
 }
 
 fn extract_simbrief_xml_filename_stem(xml_file_value: &str) -> Option<String> {
@@ -503,7 +555,10 @@ fn spawn_simbrief_background_fetch(
             if let Some(error) = dispatch_error {
                 append_simbrief_log(
                     &app,
-                    &format!("dispatch-failed flightId={} error={error}", payload.flight_id),
+                    &format!(
+                        "dispatch-failed flightId={} error={error}",
+                        payload.flight_id
+                    ),
                 );
             }
             return;
@@ -523,11 +578,7 @@ fn simbrief_log_timestamp() -> String {
 }
 
 fn append_simbrief_log(app: &AppHandle, message: &str) {
-    let line = format!(
-        "[{}] [SimBrief] {}\n",
-        simbrief_log_timestamp(),
-        message
-    );
+    let line = format!("[{}] [SimBrief] {}\n", simbrief_log_timestamp(), message);
 
     let Some(log_path) = resolve_simbrief_log_path(app) else {
         return;
@@ -671,13 +722,11 @@ fn find_first_string(value: &Value, paths: &[&[&str]], keys: &[&str]) -> String 
 
 fn value_as_integer(value: &Value) -> Option<i64> {
     match value {
-        Value::Number(number) => number
-            .as_i64()
-            .or_else(|| {
-                number
-                    .as_u64()
-                    .and_then(|number| (number <= i64::MAX as u64).then_some(number as i64))
-            }),
+        Value::Number(number) => number.as_i64().or_else(|| {
+            number
+                .as_u64()
+                .and_then(|number| (number <= i64::MAX as u64).then_some(number as i64))
+        }),
         Value::String(text) => text.trim().parse::<i64>().ok(),
         _ => None,
     }
@@ -1134,11 +1183,15 @@ fn normalize_simbrief_aircraft_name(value: &str) -> Option<String> {
     if normalized.len() < 3
         || normalized.len() > 16
         || normalized.contains('/')
-        || normalized.chars().any(|character| character.is_whitespace())
+        || normalized
+            .chars()
+            .any(|character| character.is_whitespace())
         || !normalized
             .chars()
             .all(|character| character.is_ascii_alphanumeric() || character == '-')
-        || !normalized.chars().any(|character| character.is_ascii_alphabetic())
+        || !normalized
+            .chars()
+            .any(|character| character.is_ascii_alphabetic())
     {
         None
     } else {
@@ -1490,7 +1543,11 @@ fn extract_xml_file_value(body: &str) -> Option<String> {
     Some(body[start..end].trim().to_string())
 }
 
-async fn fetch_simbrief_xml_file_stem(client: &reqwest::Client, username: &str, static_id: &str) -> Option<String> {
+async fn fetch_simbrief_xml_file_stem(
+    client: &reqwest::Client,
+    username: &str,
+    static_id: &str,
+) -> Option<String> {
     // Fetches the SimBrief XML response and extracts only the XML filename stem.
     let normalized_username = username.trim();
     if normalized_username.is_empty() {
@@ -1538,7 +1595,8 @@ async fn fetch_simbrief_plan_summary(
                     })?;
 
                     let mut plan = normalize_simbrief_plan(&json, static_id);
-                    let ofp_xml_id = fetch_simbrief_xml_file_stem(&client, username, static_id).await;
+                    let ofp_xml_id =
+                        fetch_simbrief_xml_file_stem(&client, username, static_id).await;
 
                     if let Some(ofp_xml_id) = ofp_xml_id {
                         plan.ofp_xml_id = ofp_xml_id;
@@ -1595,10 +1653,14 @@ pub async fn refresh_simbrief_dispatch(
     }
 
     if username.is_empty() && pilot_id.is_empty() {
-        return Err("validation_failed: Save a SimBrief Navigraph Alias or Pilot ID before refreshing.".into());
+        return Err(
+            "validation_failed: Save a SimBrief Navigraph Alias or Pilot ID before refreshing."
+                .into(),
+        );
     }
 
-    let plan = fetch_simbrief_plan_summary(&app, &flight_id, &username, &pilot_id, &static_id).await?;
+    let plan =
+        fetch_simbrief_plan_summary(&app, &flight_id, &username, &pilot_id, &static_id).await?;
 
     append_simbrief_log(
         &app,
@@ -1657,17 +1719,55 @@ pub async fn start_simbrief_dispatch(
         return Err("validation_failed: SimBrief dispatch requires flight number, callsign, origin, destination, aircraft type, and departure time.".into());
     }
 
-    let api_key = simbrief_api_key()?;
     let timestamp = unix_timestamp();
     let static_id = build_static_id(&normalized_payload.flight_id, timestamp);
     let outputpage = build_outputpage(&static_id)?;
-    let dispatch_url = build_simbrief_dispatch_url(
-        &normalized_payload,
-        &api_key,
-        timestamp,
-        &outputpage,
-        &static_id,
-    )?;
+    let signing_request =
+        build_simbrief_dispatch_signing_request(&normalized_payload, &static_id, &outputpage)?;
+
+    append_simbrief_log(
+        &app,
+        &format!(
+            "dispatch-signing-requested flightId={} staticId={}",
+            normalized_payload.flight_id, static_id
+        ),
+    );
+
+    let dispatch_url = match request_simbrief_dispatch_url(&signing_request).await {
+        Ok(url) => {
+            append_simbrief_log(
+                &app,
+                &format!(
+                    "dispatch-signing-finished ok=true flightId={} staticId={}",
+                    normalized_payload.flight_id, static_id
+                ),
+            );
+            url
+        }
+        Err(SimBriefSigningFailure::Unavailable { context }) => {
+            append_simbrief_log(
+                &app,
+                &format!(
+                    "dispatch-signing-finished ok=false flightId={} staticId={} reason={}",
+                    normalized_payload.flight_id, static_id, context
+                ),
+            );
+            return Err("dispatch_failed: SimBrief signing service unavailable.".into());
+        }
+        Err(SimBriefSigningFailure::InvalidDispatchUrl) => {
+            append_simbrief_log(
+                &app,
+                &format!(
+                    "dispatch-signing-finished ok=false flightId={} staticId={} reason=invalid_dispatch_url",
+                    normalized_payload.flight_id, static_id
+                ),
+            );
+            return Err(
+                "dispatch_failed: SimBrief signing service returned an invalid dispatch URL."
+                    .into(),
+            );
+        }
+    };
 
     close_simbrief_dispatch_window_internal(&app);
     spawn_simbrief_callback_page_server();
@@ -1677,9 +1777,6 @@ pub async fn start_simbrief_dispatch(
 
     let app_for_close = app.clone();
     let app_for_timeout = app.clone();
-    let dispatch_url = dispatch_url
-        .parse()
-        .map_err(|error| format!("dispatch_failed: Invalid SimBrief dispatch URL: {error}"))?;
 
     let window = WebviewWindowBuilder::new(
         &app,
@@ -1705,11 +1802,7 @@ pub async fn start_simbrief_dispatch(
         format!("dispatch_failed: Unable to open SimBrief dispatch window: {error}")
     })?;
 
-    spawn_simbrief_background_fetch(
-        app.clone(),
-        normalized_payload.clone(),
-        static_id.clone(),
-    );
+    spawn_simbrief_background_fetch(app.clone(), normalized_payload.clone(), static_id.clone());
 
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed)
@@ -1770,46 +1863,62 @@ mod tests {
     }
 
     #[test]
-    fn build_simbrief_dispatch_url_includes_required_fields_and_apicode() {
+    fn build_simbrief_dispatch_signing_request_sanitizes_payload_and_departure_time() {
         let payload = sample_payload();
         let outputpage = build_outputpage("FP_TEST_1").expect("outputpage");
-        let url = build_simbrief_dispatch_url(
-            &payload,
-            "secret",
-            1_716_778_800,
-            &outputpage,
-            "FP_TEST_1",
+        let request = build_simbrief_dispatch_signing_request(&payload, "FP_TEST_1", &outputpage)
+            .expect("signing request");
+        let value = serde_json::to_value(request).expect("request json");
+
+        assert_eq!(value["airline"], "DAL");
+        assert_eq!(value["flightNumber"], "1234");
+        assert_eq!(value["callsign"], "DAL1234");
+        assert_eq!(value["origin"], "KATL");
+        assert_eq!(value["destination"], "KLAX");
+        assert_eq!(value["aircraftType"], "A321");
+        assert_eq!(value["units"], "LBS");
+        assert_eq!(value["departureHour"], "12");
+        assert_eq!(value["departureMinute"], "30");
+        assert_eq!(value["staticId"], "FP_TEST_1");
+        assert_eq!(value["outputPage"], outputpage);
+        assert_eq!(value["pilotId"], "1234567");
+    }
+
+    #[test]
+    fn validate_simbrief_dispatch_url_accepts_expected_loader_endpoint() {
+        let url = validate_simbrief_dispatch_url(
+            "https://www.simbrief.com/ofp/ofp.loader.api.php?foo=bar",
         )
-        .expect("dispatch url");
+        .expect("valid dispatch url");
 
-        let parsed = Url::parse(&url).expect("url parse");
-        let pairs: std::collections::HashMap<_, _> = parsed.query_pairs().into_owned().collect();
-        let expected_apicode = format!(
-            "{:x}",
-            md5::compute(format!(
-                "secret{}{}{}{}{}",
-                payload.origin,
-                payload.destination,
-                payload.aircraft_type,
-                1_716_778_800,
-                outputpage
-            ))
+        assert_eq!(url.scheme(), "https");
+        assert_eq!(url.host_str(), Some("www.simbrief.com"));
+        assert_eq!(url.path(), "/ofp/ofp.loader.api.php");
+    }
+
+    #[test]
+    fn validate_simbrief_dispatch_url_rejects_unexpected_host_or_scheme() {
+        let host_error =
+            validate_simbrief_dispatch_url("https://evil.example.com/ofp/ofp.loader.api.php")
+                .expect_err("unexpected host should fail");
+        let scheme_error =
+            validate_simbrief_dispatch_url("http://www.simbrief.com/ofp/ofp.loader.api.php")
+                .expect_err("http scheme should fail");
+        let path_error = validate_simbrief_dispatch_url("https://www.simbrief.com/ofp/other.php")
+            .expect_err("unexpected path should fail");
+
+        assert_eq!(
+            host_error,
+            "dispatch_failed: SimBrief signing service returned an invalid dispatch URL."
         );
-
-        assert_eq!(pairs.get("airline"), Some(&"DAL".to_string()));
-        assert_eq!(pairs.get("fltnum"), Some(&"1234".to_string()));
-        assert_eq!(pairs.get("callsign"), Some(&"DAL1234".to_string()));
-        assert_eq!(pairs.get("orig"), Some(&"KATL".to_string()));
-        assert_eq!(pairs.get("dest"), Some(&"KLAX".to_string()));
-        assert_eq!(pairs.get("type"), Some(&"A321".to_string()));
-        assert_eq!(pairs.get("units"), Some(&"LBS".to_string()));
-        assert_eq!(pairs.get("navlog"), Some(&"1".to_string()));
-        assert_eq!(pairs.get("deph"), Some(&"12".to_string()));
-        assert_eq!(pairs.get("depm"), Some(&"30".to_string()));
-        assert_eq!(pairs.get("static_id"), Some(&"FP_TEST_1".to_string()));
-        assert_eq!(pairs.get("timestamp"), Some(&"1716778800".to_string()));
-        assert_eq!(pairs.get("outputpage"), Some(&outputpage));
-        assert_eq!(pairs.get("apicode"), Some(&expected_apicode));
+        assert_eq!(
+            scheme_error,
+            "dispatch_failed: SimBrief signing service returned an invalid dispatch URL."
+        );
+        assert_eq!(
+            path_error,
+            "dispatch_failed: SimBrief signing service returned an invalid dispatch URL."
+        );
     }
 
     #[test]
@@ -1826,34 +1935,6 @@ mod tests {
     fn build_fetch_urls_errors_when_no_user_identifier_exists() {
         let error = build_fetch_urls("", "", "FP_TEST_1").expect_err("missing user id should fail");
         assert!(error.contains("Navigraph Alias or Pilot ID"));
-    }
-
-    #[test]
-    fn resolve_simbrief_api_key_prefers_bundled_key() {
-        let api_key =
-            resolve_simbrief_api_key(Some("bundled-key"), Some("env-key"), Some("tauri-key"))
-                .expect("bundled key should resolve");
-
-        assert_eq!(api_key, "bundled-key");
-    }
-
-    #[test]
-    fn resolve_simbrief_api_key_falls_back_to_environment_keys() {
-        let from_primary_env =
-            resolve_simbrief_api_key(None, Some("env-key"), Some("tauri-key")).expect("env key");
-        let from_tauri_env =
-            resolve_simbrief_api_key(None, None, Some("tauri-key")).expect("tauri env key");
-
-        assert_eq!(from_primary_env, "env-key");
-        assert_eq!(from_tauri_env, "tauri-key");
-    }
-
-    #[test]
-    fn resolve_simbrief_api_key_errors_when_all_sources_missing() {
-        let error =
-            resolve_simbrief_api_key(None, Some("   "), None).expect_err("missing key should fail");
-
-        assert!(error.contains("simbrief/api_key.txt"));
     }
 
     #[test]
