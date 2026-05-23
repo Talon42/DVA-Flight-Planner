@@ -3,6 +3,7 @@
 mod deltava_auth;
 mod deltava_draft;
 mod deltava_login;
+mod deltava_tour_progress;
 mod deltava_tours;
 mod simbrief;
 

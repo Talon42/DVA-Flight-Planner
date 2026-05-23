@@ -109,6 +109,7 @@ import {
   appendImportLog,
   deleteStoredUserData,
   readDeltaVirtualToursCache,
+  readDeltaVirtualTourProgress,
   readGettingStartedState,
   readSimBriefSettings,
   readSavedSchedule,
@@ -153,6 +154,11 @@ const DEFAULT_GETTING_STARTED_STATE = {
   gettingStartedDismissed: false,
   gettingStartedFinalized: false,
   addonSetupSkipped: false
+};
+const DEFAULT_DERIVED_TOUR_PROGRESS = {
+  source: "deltava-logbook",
+  lastSyncAt: null,
+  tourProgress: {}
 };
 const SETTINGS_TABS = [
   { id: "general", label: "General" },
@@ -531,6 +537,38 @@ function normalizeTourRows(tour, rows, progressById = {}) {
         : null
     };
   });
+}
+
+function mergeTourProgressSources(manualProgress = {}, derivedProgress = {}) {
+  const mergedProgress = {};
+  const tourPaths = new Set([
+    ...Object.keys(derivedProgress || {}),
+    ...Object.keys(manualProgress || {})
+  ]);
+
+  for (const tourPath of tourPaths) {
+    const manualRows = manualProgress?.[tourPath]?.rows || {};
+    const derivedRows = derivedProgress?.[tourPath]?.rows || {};
+    const rowIds = new Set([...Object.keys(derivedRows), ...Object.keys(manualRows)]);
+    const rows = {};
+
+    for (const rowId of rowIds) {
+      const manualRow = manualRows[rowId];
+      const derivedRow = derivedRows[rowId];
+      if (manualRow || derivedRow) {
+        rows[rowId] = {
+          ...(derivedRow || {}),
+          ...(manualRow || {})
+        };
+      }
+    }
+
+    if (Object.keys(rows).length) {
+      mergedProgress[tourPath] = { rows };
+    }
+  }
+
+  return mergedProgress;
 }
 
 function isTauriRuntime() {
@@ -1623,6 +1661,7 @@ export default function App() {
   const [selectedTourPath, setSelectedTourPath] = useState("");
   const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
   const [tourProgress, setTourProgress] = useState({});
+  const [derivedTourProgress, setDerivedTourProgress] = useState(DEFAULT_DERIVED_TOUR_PROGRESS);
   const [deltaVirtualToursCache, setDeltaVirtualToursCache] = useState(null);
   const [dutyBuildWarning, setDutyBuildWarning] = useState(null);
   const [theme, setTheme] = useState(readSavedTheme);
@@ -1787,12 +1826,21 @@ export default function App() {
     setExpandedBoardFlightId(null);
   }, [expandedBoardFlightId, flightBoard]);
 
+  const resolvedTourProgress = useMemo(
+    () => mergeTourProgressSources(tourProgress, derivedTourProgress?.tourProgress || {}),
+    [derivedTourProgress, tourProgress]
+  );
+
   const availableTours = useMemo(
     () =>
       (Array.isArray(deltaVirtualToursCache?.tours) ? deltaVirtualToursCache.tours : [])
         .map((tour) => {
           const selectionId = normalizeDvaTourId(tour);
-          const rows = normalizeTourRows(tour, tour?.rows || tour?.flights || [], tourProgress?.[selectionId]?.rows);
+          const rows = normalizeTourRows(
+            tour,
+            tour?.rows || tour?.flights || [],
+            resolvedTourProgress?.[selectionId]?.rows
+          );
           return {
             ...tour,
             id: selectionId,
@@ -1801,7 +1849,7 @@ export default function App() {
             rows
           };
         }),
-    [deltaVirtualToursCache, tourProgress]
+    [deltaVirtualToursCache, resolvedTourProgress]
   );
   const selectedTour = useMemo(() => {
     if (!availableTours.length) {
@@ -2279,6 +2327,7 @@ export default function App() {
         gettingStartedResult,
         uiStateResult,
         logbookProgressResult,
+        tourProgressResult,
         toursCacheResult
       ] = await Promise.allSettled([
         readSavedSchedule(),
@@ -2288,6 +2337,7 @@ export default function App() {
         readGettingStartedState(),
         readSavedUiState(),
         readDeltaVirtualLogbookProgress(),
+        readDeltaVirtualTourProgress(),
         readDeltaVirtualToursCache()
       ]);
 
@@ -2361,6 +2411,14 @@ export default function App() {
               arrivalAirports: []
             }
           );
+        }
+
+        if (tourProgressResult.status === "fulfilled") {
+          setDerivedTourProgress(
+            tourProgressResult.value || DEFAULT_DERIVED_TOUR_PROGRESS
+          );
+        } else {
+          setDerivedTourProgress(DEFAULT_DERIVED_TOUR_PROGRESS);
         }
 
         if (gettingStartedResult.status === "fulfilled") {
@@ -3139,6 +3197,7 @@ export default function App() {
         setStatusMessage(error.message || "Delta Virtual tours sync failed.");
         await logSystemError("DVA Tours Sync", "failed", error);
       }
+      setDerivedTourProgress(await readDeltaVirtualTourProgress());
       shouldRemoveDownloadedSchedule = true;
     } catch (error) {
       if (error?.kind === "cancelled") {

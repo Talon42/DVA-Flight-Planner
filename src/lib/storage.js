@@ -13,10 +13,12 @@ const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
 const LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
 const DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
 const DELTAVA_TOURS_CACHE_STORAGE_KEY = "flight-planner.deltava-tours-cache";
+const DELTAVA_TOUR_PROGRESS_STORAGE_KEY = "flight-planner.deltava-tour-progress";
 const GETTING_STARTED_STORAGE_KEY = "flight-planner.getting-started";
 const DELTAVA_LOGBOOK_STORAGE_DIR = "flight-planner/deltava-sync/logbook";
 const DELTAVA_LOGBOOK_FALLBACK_FILE = "deltava-logbook.json";
 const DELTAVA_TOURS_CACHE_FILE = "dva-tours-cache.json";
+const DELTAVA_TOUR_PROGRESS_FILE = "dva-tour-progress.json";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -158,6 +160,63 @@ function normalizeDeltaVirtualToursCache(cache) {
     failedTourIds,
     message: String(cache?.message || "").trim(),
     tours
+  };
+}
+
+function getDefaultDeltaVirtualTourProgress() {
+  return {
+    source: "deltava-logbook",
+    lastSyncAt: null,
+    tourProgress: {}
+  };
+}
+
+function normalizeDeltaVirtualTourProgress(progress) {
+  const defaultProgress = getDefaultDeltaVirtualTourProgress();
+  const rawTourProgress =
+    progress?.tourProgress && typeof progress.tourProgress === "object"
+      ? progress.tourProgress
+      : {};
+  const tourProgress = {};
+
+  for (const [tourPath, tourEntry] of Object.entries(rawTourProgress)) {
+    if (!tourEntry || typeof tourEntry !== "object") {
+      continue;
+    }
+
+    const rawRows = tourEntry.rows && typeof tourEntry.rows === "object" ? tourEntry.rows : {};
+    const rows = {};
+
+    for (const [tourRowId, rowEntry] of Object.entries(rawRows)) {
+      if (!rowEntry || typeof rowEntry !== "object" || !rowEntry.completed) {
+        continue;
+      }
+
+      rows[String(tourRowId || "").trim()] = {
+        completed: true,
+        completedAt: String(rowEntry.completedAt || rowEntry.completed_at || "").trim() || null,
+        completionOrder: Number.isFinite(rowEntry.completionOrder)
+          ? rowEntry.completionOrder
+          : Number.isFinite(rowEntry.completion_order)
+            ? rowEntry.completion_order
+            : null,
+        source: String(rowEntry.source || defaultProgress.source).trim() || defaultProgress.source
+      };
+    }
+
+    const normalizedTourPath = String(tourPath || "").trim();
+    if (normalizedTourPath && Object.keys(rows).length) {
+      tourProgress[normalizedTourPath] = { rows };
+    }
+  }
+
+  return {
+    source:
+      String(progress?.source || defaultProgress.source).trim().toLowerCase() === "deltava-logbook"
+        ? "deltava-logbook"
+        : defaultProgress.source,
+    lastSyncAt: String(progress?.lastSyncAt || progress?.last_sync_at || "").trim() || null,
+    tourProgress
   };
 }
 
@@ -757,6 +816,56 @@ export async function writeDeltaVirtualToursCache(cache) {
   window.localStorage.setItem(DELTAVA_TOURS_CACHE_STORAGE_KEY, serialized);
 }
 
+export async function readDeltaVirtualTourProgress() {
+  const defaultProgress = getDefaultDeltaVirtualTourProgress();
+
+  if (isTauriRuntime()) {
+    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
+    const hasFile = await exists(DELTAVA_TOUR_PROGRESS_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+
+    if (!hasFile) {
+      return defaultProgress;
+    }
+
+    try {
+      const text = await readTextFile(DELTAVA_TOUR_PROGRESS_FILE, {
+        baseDir: BaseDirectory.AppData
+      });
+      return normalizeDeltaVirtualTourProgress(text ? JSON.parse(text) : null);
+    } catch {
+      return defaultProgress;
+    }
+  }
+
+  const text = window.localStorage.getItem(DELTAVA_TOUR_PROGRESS_STORAGE_KEY);
+  if (!text) {
+    return defaultProgress;
+  }
+
+  try {
+    return normalizeDeltaVirtualTourProgress(JSON.parse(text));
+  } catch {
+    return defaultProgress;
+  }
+}
+
+export async function writeDeltaVirtualTourProgress(progress) {
+  const serialized = JSON.stringify(normalizeDeltaVirtualTourProgress(progress));
+
+  if (isTauriRuntime()) {
+    const { writeTextFile, BaseDirectory } = await loadFsModule();
+    await ensureAppDataRoot();
+    await writeTextFile(DELTAVA_TOUR_PROGRESS_FILE, serialized, {
+      baseDir: BaseDirectory.AppData
+    });
+    return;
+  }
+
+  window.localStorage.setItem(DELTAVA_TOUR_PROGRESS_STORAGE_KEY, serialized);
+}
+
 export async function writeGettingStartedState(state) {
   const serialized = JSON.stringify(normalizeGettingStartedState(state));
 
@@ -895,7 +1004,7 @@ export async function confirmOverwriteSchedule() {
 
 export async function confirmDeleteUserData() {
   const message =
-    "Delete all saved user data for this app? This removes saved schedules, SimBrief settings, addon folder roots, logs, and stored Delta Virtual login settings.";
+    "Delete all saved user data for this app? This removes saved schedules, SimBrief settings, addon folder roots, logs, stored Delta Virtual login settings, and Delta Virtual tour progress.";
 
   if (isTauriRuntime()) {
     const { confirm } = await import("@tauri-apps/plugin-dialog");
@@ -923,6 +1032,7 @@ export async function deleteStoredUserData() {
     GETTING_STARTED_STORAGE_KEY,
     "flight-planner.import-log",
     DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
+    DELTAVA_TOUR_PROGRESS_STORAGE_KEY,
     "flight-planner.theme",
     "flight-planner.dev-tools-enabled",
     "flight-planner.dev-window-width"

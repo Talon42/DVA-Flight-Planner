@@ -686,6 +686,10 @@ async fn build_tours_sync_payload_from_web_result(
     }
 
     write_delta_virtual_tours_cache_internal(app, &result)?;
+    if let Err(error) = crate::deltava_tour_progress::reconcile_deltava_tour_progress_internal(app)
+    {
+        append_sync_log(&format!("tour-progress:reconcile-failed {error}"));
+    }
 
     Ok(result)
 }
