@@ -2,9 +2,10 @@ use chrono::{NaiveDate, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 use tauri::{AppHandle, Manager};
 
@@ -14,6 +15,12 @@ const DELTAVA_TOUR_PROGRESS_FILE: &str = "dva-tour-progress.json";
 const DELTAVA_TOURS_CACHE_FILE: &str = "dva-tours-cache.json";
 const DELTAVA_LOGBOOK_FALLBACK_FILE: &str = "deltava-logbook.json";
 const DELTAVA_TOUR_PROGRESS_SOURCE: &str = "deltava-logbook";
+const AIRPORT_CATALOG_JSON: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../src/data/airports.json"
+));
+
+static AIRPORT_CROSSWALK: OnceLock<AirportCrosswalk> = OnceLock::new();
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +51,29 @@ struct LogbookEntryMatch {
     entry: Value,
     epoch_seconds: Option<i64>,
     completed_at: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct AirportIdentifiers {
+    icao: Option<String>,
+    iata: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct AirportCatalogRecord {
+    icao: Option<String>,
+    iata: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct AirportCatalogRoot {
+    airports: Vec<AirportCatalogRecord>,
+}
+
+#[derive(Clone, Debug)]
+struct AirportCrosswalk {
+    by_icao: HashMap<String, AirportIdentifiers>,
+    by_iata: HashMap<String, AirportIdentifiers>,
 }
 
 fn app_storage_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -194,6 +224,186 @@ fn normalize_compact_text(value: &str) -> String {
         .to_ascii_uppercase()
 }
 
+fn build_airport_crosswalk() -> AirportCrosswalk {
+    let root =
+        serde_json::from_str::<AirportCatalogRoot>(AIRPORT_CATALOG_JSON).unwrap_or_else(|_| {
+            AirportCatalogRoot {
+                airports: Vec::new(),
+            }
+        });
+
+    let mut by_icao = HashMap::new();
+    let mut by_iata = HashMap::new();
+
+    for airport in root.airports {
+        let icao = airport
+            .icao
+            .as_deref()
+            .and_then(normalize_airport_code)
+            .unwrap_or_default();
+        let iata = airport
+            .iata
+            .as_deref()
+            .and_then(normalize_airport_code)
+            .filter(|code| code.len() == 3);
+
+        if icao.is_empty() && iata.is_none() {
+            continue;
+        }
+
+        let identifiers = AirportIdentifiers {
+            icao: if icao.is_empty() {
+                None
+            } else {
+                Some(icao.clone())
+            },
+            iata: iata.clone(),
+        };
+
+        if let Some(code) = &identifiers.icao {
+            by_icao.insert(code.clone(), identifiers.clone());
+        }
+
+        if let Some(code) = &identifiers.iata {
+            by_iata.insert(code.clone(), identifiers.clone());
+        }
+    }
+
+    AirportCrosswalk { by_icao, by_iata }
+}
+
+fn airport_crosswalk() -> &'static AirportCrosswalk {
+    AIRPORT_CROSSWALK.get_or_init(build_airport_crosswalk)
+}
+
+fn airport_identifiers_from_code(value: &str) -> Option<AirportIdentifiers> {
+    let normalized = normalize_airport_code(value)?;
+    let catalog = airport_crosswalk();
+
+    if normalized.len() == 4 {
+        if let Some(record) = catalog.by_icao.get(&normalized) {
+            return Some(record.clone());
+        }
+        return Some(AirportIdentifiers {
+            icao: Some(normalized),
+            iata: None,
+        });
+    }
+
+    if normalized.len() == 3 {
+        if let Some(record) = catalog.by_iata.get(&normalized) {
+            return Some(record.clone());
+        }
+        return Some(AirportIdentifiers {
+            icao: None,
+            iata: Some(normalized),
+        });
+    }
+
+    None
+}
+
+fn airport_identifier_matches(left: &AirportIdentifiers, right: &AirportIdentifiers) -> bool {
+    if let (Some(left_icao), Some(right_icao)) = (left.icao.as_ref(), right.icao.as_ref()) {
+        if left_icao == right_icao {
+            return true;
+        }
+    }
+
+    if let (Some(left_iata), Some(right_iata)) = (left.iata.as_ref(), right.iata.as_ref()) {
+        if left_iata == right_iata {
+            return true;
+        }
+    }
+
+    if let (Some(left_icao), Some(right_iata)) = (left.icao.as_ref(), right.iata.as_ref()) {
+        if let Some(record) = airport_crosswalk().by_icao.get(left_icao) {
+            if record.iata.as_ref() == Some(right_iata) {
+                return true;
+            }
+        }
+    }
+
+    if let (Some(left_iata), Some(right_icao)) = (left.iata.as_ref(), right.icao.as_ref()) {
+        if let Some(record) = airport_crosswalk().by_icao.get(right_icao) {
+            if record.iata.as_ref() == Some(left_iata) {
+                return true;
+            }
+        }
+    }
+
+    if let (Some(left_icao), Some(right_icao)) = (left.icao.as_ref(), right.icao.as_ref()) {
+        if let (Some(left_record), Some(right_record)) = (
+            airport_crosswalk().by_icao.get(left_icao),
+            airport_crosswalk().by_icao.get(right_icao),
+        ) {
+            if left_record.icao == right_record.icao {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn extract_bool_field(value: &Value, keys: &[&str]) -> Option<bool> {
+    for key in keys {
+        if let Some(entry) = value.get(*key) {
+            match entry {
+                Value::Bool(flag) => return Some(*flag),
+                Value::Number(number) => {
+                    if number.as_i64() == Some(1) {
+                        return Some(true);
+                    }
+                    if number.as_i64() == Some(0) {
+                        return Some(false);
+                    }
+                }
+                Value::String(text) => {
+                    let normalized = text.trim().to_ascii_lowercase();
+                    if ["true", "yes", "1", "y"].contains(&normalized.as_str()) {
+                        return Some(true);
+                    }
+                    if ["false", "no", "0", "n"].contains(&normalized.as_str()) {
+                        return Some(false);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    None
+}
+
+fn extract_tour_window_seconds(tour: &Value) -> (Option<i64>, Option<i64>) {
+    let start_seconds = tour
+        .get("startDate")
+        .or_else(|| tour.get("start_date"))
+        .and_then(normalize_epoch_seconds);
+    let end_seconds = tour
+        .get("endDate")
+        .or_else(|| tour.get("end_date"))
+        .and_then(normalize_epoch_seconds);
+
+    (start_seconds, end_seconds)
+}
+
+fn extract_leg_number(value: &Value, keys: &[&str]) -> Option<i64> {
+    for key in keys {
+        if let Some(number) = value.get(*key).and_then(Value::as_i64) {
+            return Some(number);
+        }
+        if let Some(text) = value.get(*key).and_then(Value::as_str) {
+            if let Ok(number) = text.trim().parse::<i64>() {
+                return Some(number);
+            }
+        }
+    }
+
+    None
+}
+
 fn extract_string_field(value: &Value, keys: &[&str]) -> Option<String> {
     match value {
         Value::Object(map) => {
@@ -336,7 +546,48 @@ fn extract_tour_row_id(tour_path: &str, row: &Value, index: usize) -> String {
     })
 }
 
-fn score_logbook_entry_match(logbook_entry: &Value, tour_leg: &Value) -> Option<i32> {
+struct MatchEvaluation {
+    score: i32,
+    reason: Option<String>,
+}
+
+fn format_reject_reason(context: &str, detail: impl Into<String>) -> String {
+    format!("{context}:{}", detail.into())
+}
+
+fn evaluate_logbook_entry_match(
+    logbook_entry: &Value,
+    tour_leg: &Value,
+    tour_start_seconds: Option<i64>,
+    tour_end_seconds: Option<i64>,
+) -> MatchEvaluation {
+    let entry_seconds = extract_logbook_entry_epoch_seconds(logbook_entry);
+    if let Some(entry_seconds) = entry_seconds {
+        if let Some(start_seconds) = tour_start_seconds {
+            if entry_seconds < start_seconds {
+                return MatchEvaluation {
+                    score: 0,
+                    reason: Some(format_reject_reason(
+                        "date-window",
+                        format!("before-start:{entry_seconds}<{start_seconds}"),
+                    )),
+                };
+            }
+        }
+
+        if let Some(end_seconds) = tour_end_seconds {
+            if entry_seconds > end_seconds {
+                return MatchEvaluation {
+                    score: 0,
+                    reason: Some(format_reject_reason(
+                        "date-window",
+                        format!("after-end:{entry_seconds}>{end_seconds}"),
+                    )),
+                };
+            }
+        }
+    }
+
     let log_departure = extract_airport_code(
         logbook_entry,
         &[
@@ -390,6 +641,19 @@ fn score_logbook_entry_match(logbook_entry: &Value, tour_leg: &Value) -> Option<
         ],
     );
 
+    let log_airport_departure = log_departure
+        .as_deref()
+        .and_then(airport_identifiers_from_code);
+    let log_airport_arrival = log_arrival
+        .as_deref()
+        .and_then(airport_identifiers_from_code);
+    let leg_airport_departure = leg_departure
+        .as_deref()
+        .and_then(airport_identifiers_from_code);
+    let leg_airport_arrival = leg_arrival
+        .as_deref()
+        .and_then(airport_identifiers_from_code);
+
     let log_airline = extract_airline_code(
         logbook_entry,
         &["airline", "airlineIcao", "airlineCode", "carrier"],
@@ -421,20 +685,54 @@ fn score_logbook_entry_match(logbook_entry: &Value, tour_leg: &Value) -> Option<
     );
     let leg_equipment = extract_equipment(tour_leg, &["equipment", "aircraft"]);
 
+    let log_leg = extract_leg_number(
+        logbook_entry,
+        &["leg", "flightLeg", "tourLeg", "tourLegNumber", "tour_leg"],
+    );
+    let leg_leg = extract_leg_number(tour_leg, &["leg", "tourLeg", "tourLegNumber"]);
+    let require_leg = extract_bool_field(tour_leg, &["matchLeg", "match_leg"]).unwrap_or(false);
+    let require_equipment =
+        extract_bool_field(tour_leg, &["matchEQ", "matchEq", "match_eq"]).unwrap_or(false);
+
     let mut score = 0;
     let mut has_route_evidence = false;
 
-    if let (Some(log_value), Some(leg_value)) = (log_departure.as_ref(), leg_departure.as_ref()) {
-        if log_value != leg_value {
-            return None;
+    if let (Some(log_value), Some(leg_value)) = (
+        log_airport_departure.as_ref(),
+        leg_airport_departure.as_ref(),
+    ) {
+        if !airport_identifier_matches(log_value, leg_value) {
+            return MatchEvaluation {
+                score: 0,
+                reason: Some(format_reject_reason(
+                    "airport",
+                    format!(
+                        "departure-mismatch:{}!={}",
+                        log_departure.unwrap_or_default(),
+                        leg_departure.unwrap_or_default()
+                    ),
+                )),
+            };
         }
         score += 40;
         has_route_evidence = true;
     }
 
-    if let (Some(log_value), Some(leg_value)) = (log_arrival.as_ref(), leg_arrival.as_ref()) {
-        if log_value != leg_value {
-            return None;
+    if let (Some(log_value), Some(leg_value)) =
+        (log_airport_arrival.as_ref(), leg_airport_arrival.as_ref())
+    {
+        if !airport_identifier_matches(log_value, leg_value) {
+            return MatchEvaluation {
+                score: 0,
+                reason: Some(format_reject_reason(
+                    "airport",
+                    format!(
+                        "arrival-mismatch:{}!={}",
+                        log_arrival.unwrap_or_default(),
+                        leg_arrival.unwrap_or_default()
+                    ),
+                )),
+            };
         }
         score += 40;
         has_route_evidence = true;
@@ -442,7 +740,13 @@ fn score_logbook_entry_match(logbook_entry: &Value, tour_leg: &Value) -> Option<
 
     if let (Some(log_value), Some(leg_value)) = (log_airline.as_ref(), leg_airline.as_ref()) {
         if log_value != leg_value {
-            return None;
+            return MatchEvaluation {
+                score: 0,
+                reason: Some(format_reject_reason(
+                    "airline",
+                    format!("mismatch:{log_value}!={leg_value}"),
+                )),
+            };
         }
         score += 10;
     }
@@ -451,23 +755,83 @@ fn score_logbook_entry_match(logbook_entry: &Value, tour_leg: &Value) -> Option<
         (log_flight_number.as_ref(), leg_flight_number.as_ref())
     {
         if log_value != leg_value {
-            return None;
+            return MatchEvaluation {
+                score: 0,
+                reason: Some(format_reject_reason(
+                    "flight-number",
+                    format!("mismatch:{log_value}!={leg_value}"),
+                )),
+            };
         }
         score += 20;
     }
 
-    if let (Some(log_value), Some(leg_value)) = (log_equipment.as_ref(), leg_equipment.as_ref()) {
+    if require_leg && log_leg.is_none() {
+        return MatchEvaluation {
+            score: 0,
+            reason: Some("leg:missing-logbook-leg".to_string()),
+        };
+    }
+
+    if let (Some(log_value), Some(leg_value)) = (log_leg, leg_leg) {
         if log_value != leg_value {
-            return None;
+            return MatchEvaluation {
+                score: 0,
+                reason: Some(format_reject_reason(
+                    "leg",
+                    format!("mismatch:{log_value}!={leg_value}"),
+                )),
+            };
         }
-        score += 5;
+        score += 10;
+    }
+
+    if require_equipment {
+        if let (Some(log_value), Some(leg_value)) = (log_equipment.as_ref(), leg_equipment.as_ref())
+        {
+            if log_value != leg_value {
+                return MatchEvaluation {
+                    score: 0,
+                    reason: Some(format_reject_reason(
+                        "equipment",
+                        format!("mismatch:{log_value}!={leg_value}"),
+                    )),
+                };
+            }
+            score += 5;
+        }
     }
 
     if has_route_evidence || (log_airline.is_some() && log_flight_number.is_some()) {
-        return Some(score.max(1));
+        return MatchEvaluation {
+            score: score.max(1),
+            reason: None,
+        };
     }
 
-    None
+    MatchEvaluation {
+        score: 0,
+        reason: Some("insufficient-evidence:route-or-flight".to_string()),
+    }
+}
+
+fn score_logbook_entry_match(
+    logbook_entry: &Value,
+    tour_leg: &Value,
+    tour_start_seconds: Option<i64>,
+    tour_end_seconds: Option<i64>,
+) -> Option<i32> {
+    let evaluation = evaluate_logbook_entry_match(
+        logbook_entry,
+        tour_leg,
+        tour_start_seconds,
+        tour_end_seconds,
+    );
+    if evaluation.reason.is_some() && evaluation.score <= 0 {
+        None
+    } else {
+        Some(evaluation.score)
+    }
 }
 
 fn build_logbook_entry_matches(logbook_json: &Value) -> Vec<LogbookEntryMatch> {
@@ -487,13 +851,19 @@ fn build_logbook_entry_matches(logbook_json: &Value) -> Vec<LogbookEntryMatch> {
         .collect()
 }
 
-fn build_tour_progress_rows(
+fn build_tour_progress_rows_with_debug(
     entries: &[LogbookEntryMatch],
     tour_rows: &[Value],
     tour_path: &str,
+    tour_start_seconds: Option<i64>,
+    tour_end_seconds: Option<i64>,
+    rejected_reasons: Option<&mut Vec<String>>,
+    matched_row_ids: Option<&mut Vec<String>>,
 ) -> BTreeMap<String, DeltaTourProgressRow> {
     let mut matched_rows = Vec::new();
     let mut used_entry_indices = HashSet::new();
+    let mut rejected_reasons = rejected_reasons;
+    let mut matched_row_ids = matched_row_ids;
 
     for (index, row) in tour_rows.iter().enumerate() {
         let tour_row_id = extract_tour_row_id(tour_path, row, index);
@@ -504,9 +874,27 @@ fn build_tour_progress_rows(
                 continue;
             }
 
-            let Some(score) = score_logbook_entry_match(&entry.entry, row) else {
+            let evaluation = evaluate_logbook_entry_match(
+                &entry.entry,
+                row,
+                tour_start_seconds,
+                tour_end_seconds,
+            );
+            if evaluation.score <= 0 {
+                if let Some(reason) = evaluation.reason {
+                    if let Some(rejected_reasons) = rejected_reasons.as_deref_mut() {
+                        if rejected_reasons.len() < 10 {
+                            rejected_reasons.push(format!(
+                                "tour={tour_path} row={tour_row_id} entry#{} reason={reason}",
+                                entry.entry_index
+                            ));
+                        }
+                    }
+                }
                 continue;
-            };
+            }
+
+            let score = evaluation.score;
             let candidate = (score, entry.epoch_seconds, entry.entry_index);
             if is_better_match(best_match, candidate) {
                 best_match = Some(candidate);
@@ -518,6 +906,11 @@ fn build_tour_progress_rows(
         };
 
         used_entry_indices.insert(entry_index);
+        if let Some(matched_row_ids) = matched_row_ids.as_deref_mut() {
+            if matched_row_ids.len() < 10 {
+                matched_row_ids.push(tour_row_id.clone());
+            }
+        }
         let completed_at = entries
             .iter()
             .find(|entry| entry.entry_index == entry_index)
@@ -571,31 +964,119 @@ fn is_better_match(
     }
 }
 
+#[cfg(debug_assertions)]
+fn log_tour_progress_debug(message: &str) {
+    append_sync_log(message);
+}
+
+#[cfg(not(debug_assertions))]
+fn log_tour_progress_debug(_: &str) {}
+
 fn build_tour_progress_from_value(
     tours_json: &Value,
     logbook_json: &Value,
 ) -> DeltaTourProgressCache {
     let entries = build_logbook_entry_matches(logbook_json);
+    let total_logbook_entries_considered = entries.len();
+    let total_logbook_entries_with_usable_dates = entries
+        .iter()
+        .filter(|entry| entry.epoch_seconds.is_some())
+        .count();
     let mut tour_progress = BTreeMap::new();
     let tours = tours_json
         .as_array()
         .cloned()
         .or_else(|| tours_json.get("tours").and_then(Value::as_array).cloned())
         .unwrap_or_default();
+    let mut total_current_tours = 0usize;
+    let mut total_upcoming_tours = 0usize;
+    let mut total_expired_tours = 0usize;
+    let mut total_tour_rows = 0usize;
+    let mut total_matched_tour_completions = 0usize;
+    let mut total_unmatched_candidates = 0usize;
 
     for tour in tours {
         let Some(tour_path) = extract_tour_path(&tour) else {
             continue;
         };
 
+        let tour_name =
+            extract_string_field(&tour, &["name", "label"]).unwrap_or_else(|| tour_path.clone());
+        let active = extract_bool_field(&tour, &["active"]).unwrap_or(false);
+        let (start_seconds, end_seconds) = extract_tour_window_seconds(&tour);
+        let visibility_status = if end_seconds.is_some_and(|value| value < Utc::now().timestamp()) {
+            "expired"
+        } else if active && start_seconds.is_some_and(|value| value > Utc::now().timestamp()) {
+            "upcoming"
+        } else {
+            "current"
+        };
+        match visibility_status {
+            "current" => total_current_tours += 1,
+            "upcoming" => total_upcoming_tours += 1,
+            "expired" => total_expired_tours += 1,
+            _ => {}
+        }
+
         let tour_rows = extract_tour_rows(&tour);
-        let rows = build_tour_progress_rows(&entries, &tour_rows, &tour_path);
+        total_tour_rows += tour_rows.len();
+
+        let mut matched_row_ids = Vec::new();
+        let mut rejected_reasons = Vec::new();
+        let rows = build_tour_progress_rows_with_debug(
+            &entries,
+            &tour_rows,
+            &tour_path,
+            start_seconds,
+            end_seconds,
+            Some(&mut rejected_reasons),
+            Some(&mut matched_row_ids),
+        );
+        total_matched_tour_completions += rows.len();
+        total_unmatched_candidates += entries
+            .iter()
+            .filter(|entry| entry.epoch_seconds.is_some())
+            .count()
+            .saturating_sub(rows.len());
+
+        log_tour_progress_debug(&format!(
+            "tour-progress:tour {}",
+            serde_json::json!({
+                "tourId": tour_path,
+                "tourName": tour_name,
+                "visibilityStatus": visibility_status,
+                "rawActive": active,
+                "startDateSeconds": start_seconds,
+                "endDateSeconds": end_seconds,
+                "rowCount": tour_rows.len(),
+                "progressCount": rows.len(),
+                "matchedRowIds": matched_row_ids,
+                "rejectedReasons": rejected_reasons
+            })
+        ));
+
         if rows.is_empty() {
             continue;
         }
 
         tour_progress.insert(tour_path, DeltaTourProgressTour { rows });
     }
+
+    log_tour_progress_debug(&format!(
+        "tour-progress:summary {}",
+        serde_json::json!({
+            "totalSyncedTours": total_current_tours + total_upcoming_tours + total_expired_tours,
+            "totalCurrentTours": total_current_tours,
+            "totalUpcomingTours": total_upcoming_tours,
+            "totalExpiredTours": total_expired_tours,
+            "totalTourRows": total_tour_rows,
+            "totalLogbookEntriesConsidered": total_logbook_entries_considered,
+            "totalLogbookEntriesWithUsableDates": total_logbook_entries_with_usable_dates,
+            "totalMatchedTourCompletions": total_matched_tour_completions,
+            "totalUnmatchedCandidates": total_unmatched_candidates,
+            "derivedCompletionOutputKey": DELTAVA_TOUR_PROGRESS_FILE
+        })
+    ));
 
     DeltaTourProgressCache {
         source: DELTAVA_TOUR_PROGRESS_SOURCE.to_string(),
@@ -652,7 +1133,7 @@ pub fn build_dva_tour_completion_from_logbook(
 }
 
 pub fn match_logbook_entry_to_tour_leg(logbook_entry: &Value, tour_leg: &Value) -> bool {
-    score_logbook_entry_match(logbook_entry, tour_leg).is_some()
+    score_logbook_entry_match(logbook_entry, tour_leg, None, None).is_some()
 }
 
 pub fn normalize_airport_code(value: &str) -> Option<String> {
@@ -820,6 +1301,46 @@ mod tests {
     }
 
     #[test]
+    fn match_logbook_entry_to_tour_leg_accepts_iata_to_icao_crosswalk() {
+        let logbook_entry = json!({
+            "departureAirport": { "iata": "ATL" },
+            "arrivalAirport": { "iata": "JFK" },
+            "airline": "DAL",
+            "flightNumber": "123",
+            "date": { "y": 2026, "m": 3, "d": 11 }
+        });
+        let tour_leg = json!({
+            "from": "KATL",
+            "to": "KJFK",
+            "airlineIcao": "DAL",
+            "tourFlightNumber": "123"
+        });
+
+        assert!(match_logbook_entry_to_tour_leg(&logbook_entry, &tour_leg));
+    }
+
+    #[test]
+    fn match_logbook_entry_to_tour_leg_rejects_missing_leg_when_required() {
+        let logbook_entry = json!({
+            "departureAirport": { "icao": "KATL" },
+            "arrivalAirport": { "icao": "KJFK" },
+            "airline": "DAL",
+            "flightNumber": "123",
+            "date": { "y": 2026, "m": 3, "d": 11 }
+        });
+        let tour_leg = json!({
+            "from": "KATL",
+            "to": "KJFK",
+            "airlineIcao": "DAL",
+            "tourFlightNumber": "123",
+            "matchLeg": true,
+            "leg": 1
+        });
+
+        assert!(!match_logbook_entry_to_tour_leg(&logbook_entry, &tour_leg));
+    }
+
+    #[test]
     fn build_completion_map_uses_tour_scoped_row_ids() {
         let logbook_json = json!({
             "flights": [
@@ -866,5 +1387,56 @@ mod tests {
         assert_eq!(row.source, DELTAVA_TOUR_PROGRESS_SOURCE);
         assert_eq!(row.completion_order, Some(1));
         assert!(!tour.rows.contains_key("dva:tour-1:leg-2"));
+    }
+
+    #[test]
+    fn build_completion_map_respects_tour_date_window() {
+        let logbook_json = json!({
+            "flights": [
+                {
+                    "departureAirport": { "icao": "KATL" },
+                    "arrivalAirport": { "icao": "KJFK" },
+                    "airline": "DAL",
+                    "flightNumber": "123",
+                    "epochSeconds": 1_770_000_000
+                }
+            ]
+        });
+        let tours_json = json!({
+            "tours": [
+                {
+                    "path": "dva:tour-1",
+                    "startDate": 1_760_000_000,
+                    "endDate": 1_780_000_000,
+                    "rows": [
+                        {
+                            "tourRowId": "dva:tour-1:leg-1",
+                            "from": "KATL",
+                            "to": "KJFK",
+                            "airline": "DAL",
+                            "tourFlightNumber": "123"
+                        }
+                    ]
+                },
+                {
+                    "path": "dva:tour-2",
+                    "startDate": 1_700_000_000,
+                    "endDate": 1_710_000_000,
+                    "rows": [
+                        {
+                            "tourRowId": "dva:tour-2:leg-1",
+                            "from": "KATL",
+                            "to": "KJFK",
+                            "airline": "DAL",
+                            "tourFlightNumber": "123"
+                        }
+                    ]
+                }
+            ]
+        });
+
+        let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(cache.tour_progress.contains_key("dva:tour-1"));
+        assert!(!cache.tour_progress.contains_key("dva:tour-2"));
     }
 }

@@ -24,6 +24,8 @@ function TourStatusBadge({ label, tone }) {
   const toneClassName =
     tone === "expired"
       ? "border-[color:var(--status-ambiguous-bg)] bg-[var(--status-ambiguous-bg)] text-[var(--delta-red)]"
+      : tone === "upcoming"
+        ? "border-[color:var(--line-strong)] bg-[var(--surface-soft)] text-[var(--text-muted)]"
       : "border-[color:var(--status-resolved-bg)] bg-[var(--status-resolved-bg)] text-[var(--status-resolved-text)]";
 
   return (
@@ -39,13 +41,16 @@ function TourStatusBadge({ label, tone }) {
 }
 
 function renderTourOptionContent(option) {
-  const isExpired = String(option?.visibilityStatus || "").trim() === "expired";
-  const isActive = Boolean(option?.active) && !isExpired;
+  const visibilityStatus = String(option?.visibilityStatus || "").trim();
+  const isExpired = visibilityStatus === "expired";
+  const isUpcoming = visibilityStatus === "upcoming";
+  const isCurrent = visibilityStatus === "current";
 
   return (
     <span className="flex min-w-0 items-center gap-2">
       <span className="min-w-0 truncate">{String(option?.selectedLabel || option?.label || "").trim()}</span>
-      {isActive ? <TourStatusBadge label="Active" tone="active" /> : null}
+      {isCurrent ? <TourStatusBadge label="Active" tone="active" /> : null}
+      {isUpcoming ? <TourStatusBadge label="Upcoming" tone="upcoming" /> : null}
       {isExpired ? <TourStatusBadge label="Expired" tone="expired" /> : null}
     </span>
   );
@@ -110,6 +115,11 @@ export default function ScheduleTablePanel({
     value: tour.selectionId,
     label: tour.label,
     selectedLabel: tour.label,
+    active: Boolean(tour.active),
+    isCurrent: Boolean(tour.isCurrent),
+    isUpcoming: Boolean(tour.isUpcoming),
+    isExpired: Boolean(tour.isExpired),
+    visibilityStatus: String(tour.visibilityStatus || "").trim(),
     keywords: `${tour.label} ${tour.name || ""} ${tour.sourceId || ""} ${tour.visibilityStatus || ""} ${
       tour.active ? "active" : ""
     }`
