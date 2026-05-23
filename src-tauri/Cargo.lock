@@ -976,6 +976,7 @@ dependencies = [
 name = "flight-planner-app"
 version = "0.6.1-beta"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "keyring",
  "md5",

@@ -3,6 +3,7 @@
 mod deltava_auth;
 mod deltava_draft;
 mod deltava_login;
+mod deltava_tour_briefing;
 mod deltava_tour_progress;
 mod deltava_tours;
 mod simbrief;
@@ -14,6 +15,7 @@ use deltava_auth::{
 };
 use deltava_draft::{submit_deltava_draft_flight_report, DraftSubmitManager};
 use deltava_login::{DvaLoginMessage, DvaLoginMessageKind};
+use deltava_tour_briefing::fetch_delta_virtual_tour_briefing;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use simbrief::{
@@ -2404,6 +2406,7 @@ fn main() {
             save_deltava_auth_settings,
             clear_deltava_auth_settings,
             submit_deltava_draft_flight_report,
+            fetch_delta_virtual_tour_briefing,
             clear_user_data,
             start_simbrief_dispatch,
             refresh_simbrief_dispatch,

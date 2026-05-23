@@ -70,6 +70,104 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
   const isJsonContentType = (value) => /json/i.test(String(value || ''));
   const buildPreview = (text) => normalizeText(text).replace(/\s+/g, ' ').slice(0, 160);
   const toArray = (value) => (Array.isArray(value) ? value : []);
+  const briefingBaseUrl = 'https://www.deltava.org/attach/tbrief/';
+  const normalizeBriefingHexId = (value, fallbackId) => {
+    const normalized = normalizeText(value).toLowerCase();
+
+    if (normalized) {
+      if (/^0x[0-9a-f]+$/i.test(normalized)) {
+        return `0x${normalized.slice(2)}`;
+      }
+
+      if (/^[0-9]+$/.test(normalized)) {
+        return `0x${Number(normalized).toString(16)}`;
+      }
+
+      if (/^[0-9a-f]+$/i.test(normalized)) {
+        return `0x${normalized}`;
+      }
+    }
+
+    const fallbackNumeric = Number(normalizeText(fallbackId));
+    if (Number.isFinite(fallbackNumeric) && fallbackNumeric > 0) {
+      return `0x${Math.floor(fallbackNumeric).toString(16)}`;
+    }
+
+    return '';
+  };
+  const normalizeBriefingUrl = (value) => {
+    const normalized = normalizeText(value);
+    if (!normalized) {
+      return '';
+    }
+
+    if (normalized.startsWith('/attach/tbrief/')) {
+      return `https://www.deltava.org${normalized}`;
+    }
+
+    try {
+      const parsed = new URL(normalized);
+      if (
+        parsed.protocol === 'https:' &&
+        /^(?:www\.)?deltava\.org$/i.test(parsed.host) &&
+        parsed.pathname.startsWith('/attach/tbrief/')
+      ) {
+        return parsed.toString();
+      }
+    } catch (_) {}
+
+    return '';
+  };
+  const normalizeBriefingSizeBytes = (value) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) && numericValue > 0 ? Math.floor(numericValue) : null;
+  };
+  const buildBriefingUrl = (briefingHexId) => (briefingHexId ? `${briefingBaseUrl}${briefingHexId}` : '');
+  const probeBriefingAvailability = async (briefingUrl) => {
+    if (!briefingUrl) {
+      return {
+        available: false,
+        contentType: '',
+        sizeBytes: null
+      };
+    }
+
+    try {
+      const headResponse = await fetch(briefingUrl, {
+        method: 'HEAD',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      const headContentType = String(headResponse.headers.get('content-type') || '').trim();
+      const headSizeBytes = normalizeBriefingSizeBytes(headResponse.headers.get('content-length'));
+      if (headResponse.status === 200) {
+        return {
+          available: true,
+          contentType: headContentType,
+          sizeBytes: headSizeBytes
+        };
+      }
+
+      const getResponse = await fetch(briefingUrl, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      const contentType = String(getResponse.headers.get('content-type') || '').trim();
+      const sizeBytes = normalizeBriefingSizeBytes(getResponse.headers.get('content-length'));
+      return {
+        available: getResponse.status === 200,
+        contentType,
+        sizeBytes
+      };
+    } catch (_) {
+      return {
+        available: false,
+        contentType: '',
+        sizeBytes: null
+      };
+    }
+  };
   const formatDurationLabel = (durationMs) => {
     const numericDuration = Number(durationMs);
     if (!Number.isFinite(numericDuration) || numericDuration < 0) {
@@ -245,7 +343,77 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
       isTourFlight: true
     };
   };
-  const normalizeTour = (tour, flights, nowSeconds = Math.floor(Date.now() / 1000)) => {
+  const extractTourBriefingMetadata = async (tour, detailTour, tourId) => {
+    const rawBriefing = detailTour?.briefing && typeof detailTour.briefing === 'object'
+      ? detailTour.briefing
+      : tour?.briefing && typeof tour.briefing === 'object'
+        ? tour.briefing
+        : null;
+    const briefingHexId = normalizeBriefingHexId(
+      rawBriefing?.hexId ??
+        rawBriefing?.hexID ??
+        rawBriefing?.hex_id ??
+        rawBriefing?.briefingHexId ??
+        rawBriefing?.briefing_hex_id ??
+        tour?.briefingHexId ??
+        tour?.briefingHexID ??
+        tour?.briefing_hex_id ??
+        tour?.hexId ??
+        tour?.hexID ??
+        tour?.hex_id ??
+        '',
+      tourId
+    );
+    const briefingUrl = normalizeBriefingUrl(
+      rawBriefing?.url ??
+        rawBriefing?.href ??
+        rawBriefing?.briefingUrl ??
+        rawBriefing?.briefing_url ??
+        tour?.briefingUrl ??
+        tour?.briefing_url ??
+        buildBriefingUrl(briefingHexId)
+    );
+    const briefingSizeBytes = normalizeBriefingSizeBytes(
+      rawBriefing?.sizeBytes ??
+        rawBriefing?.size_bytes ??
+        rawBriefing?.size ??
+        rawBriefing?.bytes ??
+        tour?.briefingSizeBytes ??
+        tour?.briefing_size_bytes ??
+        tour?.briefingSize ??
+        tour?.sizeBytes ??
+        tour?.size_bytes ??
+        null
+    );
+    const briefingIsPdf = Boolean(
+      rawBriefing?.available ??
+        rawBriefing?.briefingAvailable ??
+        rawBriefing?.briefing_available ??
+      rawBriefing?.isPdf ??
+        rawBriefing?.is_pdf ??
+        tour?.briefingIsPdf ??
+        tour?.briefing_is_pdf ??
+        tour?.isPdf ??
+        tour?.is_pdf
+    );
+
+    let briefingAvailable = briefingSizeBytes !== null && briefingSizeBytes > 0;
+    let inferredContentType = '';
+    if (!briefingAvailable && briefingUrl) {
+      const probe = await probeBriefingAvailability(briefingUrl);
+      briefingAvailable = probe.available;
+      inferredContentType = probe.contentType;
+    }
+
+    return {
+      briefingAvailable,
+      briefingUrl,
+      briefingIsPdf: briefingIsPdf || /pdf/i.test(inferredContentType),
+      briefingSizeBytes,
+      briefingHexId
+    };
+  };
+  const normalizeTour = (tour, flights, briefingMeta = {}, nowSeconds = Math.floor(Date.now() / 1000)) => {
     const sourceId = normalizeId(tour?.id || tour?.sourceId);
     const normalizedFlights = flights.map((flight, index) => normalizeTourFlight(tour, flight, index));
     const startDate = normalizeDvaEpochSeconds(tour?.startDate || tour?.start_date || '');
@@ -259,6 +427,34 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
       (endDate === null || endDate >= nowSeconds);
     const isUpcoming = active && !isExpired && !isCurrent && startDate !== null && startDate > nowSeconds;
     const visibilityStatus = isExpired ? 'expired' : isUpcoming ? 'upcoming' : 'current';
+    const derivedBriefingHexId = normalizeBriefingHexId(
+      briefingMeta?.briefingHexId ||
+        tour?.briefingHexId ||
+        tour?.briefingHexID ||
+        tour?.briefing_hex_id ||
+        tour?.hexId ||
+        tour?.hexID ||
+        tour?.hex_id ||
+        '',
+      sourceId
+    );
+    const derivedBriefingUrl = normalizeBriefingUrl(
+      briefingMeta?.briefingUrl ||
+        tour?.briefingUrl ||
+        tour?.briefing_url ||
+        buildBriefingUrl(derivedBriefingHexId)
+    );
+    const derivedBriefingSizeBytes = briefingMeta?.briefingSizeBytes ?? normalizeBriefingSizeBytes(
+      tour?.briefingSizeBytes ||
+        tour?.briefing_size_bytes ||
+        tour?.briefingSize ||
+        tour?.sizeBytes ||
+        tour?.size_bytes ||
+        null
+    );
+    const derivedBriefingAvailable =
+      Boolean(briefingMeta?.briefingAvailable) ||
+      (derivedBriefingSizeBytes !== null && derivedBriefingSizeBytes > 0);
 
     return {
       id: sourceId,
@@ -275,6 +471,11 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
       isCurrent,
       isUpcoming,
       visibilityStatus,
+      briefingAvailable: derivedBriefingAvailable,
+      briefingUrl: derivedBriefingUrl,
+      briefingIsPdf: Boolean(briefingMeta?.briefingIsPdf),
+      briefingSizeBytes: derivedBriefingSizeBytes,
+      briefingHexId: derivedBriefingHexId,
       networks: toArray(tour?.networks).map((value) => normalizeText(value)).filter(Boolean),
       rows: normalizedFlights,
       flights: normalizedFlights
@@ -405,7 +606,8 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
         continue;
       }
 
-      tours.push(cloneTour(normalizeTour(detailTour, detailFlights, nowSeconds)));
+      const briefingMeta = await extractTourBriefingMetadata(candidateTour, detailTour, tourId);
+      tours.push(cloneTour(normalizeTour(detailTour, detailFlights, briefingMeta, nowSeconds)));
     }
 
     const syncedTours = tours.length;
@@ -556,6 +758,16 @@ struct DeltaTourRecord {
     is_upcoming: bool,
     #[serde(default)]
     visibility_status: String,
+    #[serde(default)]
+    briefing_available: bool,
+    #[serde(default)]
+    briefing_url: String,
+    #[serde(default)]
+    briefing_is_pdf: bool,
+    #[serde(default)]
+    briefing_size_bytes: Option<i64>,
+    #[serde(default)]
+    briefing_hex_id: String,
     networks: Vec<String>,
     rows: Vec<DeltaTourFlightRecord>,
     flights: Vec<DeltaTourFlightRecord>,

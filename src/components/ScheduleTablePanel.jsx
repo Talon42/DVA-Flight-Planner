@@ -14,6 +14,7 @@ import { SearchableMultiSelect } from "./ui/SearchableSelect";
 import FlightMapPanel from "./map/FlightMapPanel";
 import FlightsTable from "./tables/FlightsTable";
 import ToursTable from "./tables/ToursTable";
+import TourBriefingModal, { isAllowedDvaTourBriefingUrl } from "./TourBriefingModal";
 
 const WORKSPACE_META = {
   flights: { eyebrow: "SCHEDULE" },
@@ -141,6 +142,11 @@ export default function ScheduleTablePanel({
           isCompleted: Boolean(selectedTourOption.isCompleted)
         }
       : null);
+  const selectedTourBriefingUrl = String(selectedTourOption?.briefingUrl || "").trim();
+  const hasSelectedTourBriefing =
+    Boolean(selectedTourOption?.briefingAvailable) &&
+    isAllowedDvaTourBriefingUrl(selectedTourBriefingUrl);
+  const [isTourBriefingOpen, setIsTourBriefingOpen] = useState(false);
   const showCompletedTourOverlay = Boolean(
     selectedTourKey &&
       selectedTourCompletion?.isCompleted &&
@@ -242,27 +248,38 @@ export default function ScheduleTablePanel({
           {selectedTourOption ? (
             <div
               className={cn(
-                "mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 px-1 text-[var(--text-muted)]",
+                "mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[var(--text-muted)]",
                 supportCopyTextClassName
               )}
             >
-              {selectedTourStartDate || selectedTourEndDate ? (
-                <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-                  {selectedTourStartDate ? <span>Start: {selectedTourStartDate}</span> : null}
-                  {selectedTourEndDate ? <span>End: {selectedTourEndDate}</span> : null}
-                </span>
-              ) : null}
-              {selectedTourCompletedLabel ? (
-                <span className="inline-flex items-baseline gap-2">
-                  <span>Completed</span>
-                  <strong className="font-semibold text-[var(--text-heading)]">
-                    {selectedTourCompletion.completedRows}
-                  </strong>
-                  <strong className="font-semibold text-[var(--text-heading)]">
-                    / {selectedTourCompletion.totalRows}
-                  </strong>
-                </span>
-              ) : null}
+              <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                {selectedTourStartDate ? <span>Start: {selectedTourStartDate}</span> : null}
+                {selectedTourEndDate ? <span>End: {selectedTourEndDate}</span> : null}
+                {selectedTourCompletedLabel ? (
+                  <>
+                    <span className="inline-flex items-baseline gap-2">
+                      <span>Completed</span>
+                      <strong className="font-semibold text-[var(--text-heading)]">
+                        {selectedTourCompletion.completedRows}
+                      </strong>
+                      <strong className="font-semibold text-[var(--text-heading)]">
+                        / {selectedTourCompletion.totalRows}
+                      </strong>
+                    </span>
+                    <span aria-hidden="true" className="ml-1 h-4 w-px bg-[color:var(--line)]" />
+                  </>
+                ) : null}
+                {hasSelectedTourBriefing ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="shrink-0 rounded-none"
+                    onClick={() => setIsTourBriefingOpen(true)}
+                  >
+                    Open Briefing
+                  </Button>
+                ) : null}
+              </span>
             </div>
           ) : null}
         </div>
@@ -380,6 +397,12 @@ export default function ScheduleTablePanel({
           </div>
         )}
       </div>
+      <TourBriefingModal
+        isOpen={isTourBriefingOpen && hasSelectedTourBriefing}
+        briefingUrl={selectedTourBriefingUrl}
+        tourName={selectedTourOption?.label || selectedTourOption?.name || ""}
+        onClose={() => setIsTourBriefingOpen(false)}
+      />
     </Panel>
   );
 }
