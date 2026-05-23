@@ -78,6 +78,7 @@ import {
   closeDeltaVirtualSyncWindow,
   pruneDeltaVirtualStorage,
   readDeltaVirtualLogbookProgress,
+  syncDeltaVirtualTours,
   syncScheduleFromDeltaVirtual
 } from "./lib/deltaVirtualSync";
 import { formatNumber } from "./lib/formatters";
@@ -107,6 +108,7 @@ import {
 import {
   appendImportLog,
   deleteStoredUserData,
+  readDeltaVirtualToursCache,
   readGettingStartedState,
   readSimBriefSettings,
   readSavedSchedule,
@@ -143,10 +145,6 @@ const DEV_WINDOW_WIDTH_PRESETS = [
   { width: 1400, height: 900, label: "1400x900" },
   { width: 1024, height: 768, label: "1024x768" }
 ];
-const TOUR_FILE_MODULES = import.meta.glob("./data/tours/*.json", {
-  eager: true,
-  import: "default"
-});
 const ACCOMPLISHMENTS = normalizeAccomplishments(accomplishmentsData);
 const MAX_FLIGHT_BOARDS = 4;
 const DEFAULT_FLIGHT_BOARD_NAME = "Board 1";
@@ -164,7 +162,11 @@ const SETTINGS_TABS = [
   { id: "about", label: "About" }
 ];
 function formatTourLabelFromPath(path) {
-  const fileName = String(path || "").split("/").pop() || "";
+  const normalizedPath = String(path || "").trim();
+  const pathSegment = normalizedPath.includes(":")
+    ? normalizedPath.split(":").pop() || ""
+    : normalizedPath;
+  const fileName = pathSegment.split("/").pop() || "";
   const stem = fileName.replace(/\.json$/i, "");
   return stem
     .replace(/[_-]+/g, " ")
@@ -237,13 +239,134 @@ function parseTourDepartureTimeLabel(scheduleLabel) {
   return normalizedLabel.split(" - ")[0]?.trim() || "";
 }
 
-function normalizeTourRows(path, rows, progressById = {}) {
+function formatTourDurationLabel(durationMs) {
+  const numericDuration = Number(durationMs);
+  if (!Number.isFinite(numericDuration) || numericDuration < 0) {
+    return "";
+  }
+
+  const totalMinutes = Math.round(numericDuration / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes}m`;
+}
+
+function isModernTourFlight(row) {
+  return Boolean(
+    row &&
+      typeof row === "object" &&
+      (row.flightId ||
+        row.tourRowId ||
+        row.departure ||
+        row.destination ||
+        row.departureTime ||
+        row.arrivalTime ||
+        row.equipment ||
+        row.aircraft)
+  );
+}
+
+function normalizeTourRows(tour, rows, progressById = {}) {
   if (!Array.isArray(rows)) {
     return [];
   }
 
+  const rawTourPath = String(tour?.path || tour?.tourPath || tour?.id || tour?.sourceId || "").trim();
+  const tourLabel = String(tour?.label || tour?.name || formatTourLabelFromPath(rawTourPath)).trim();
+  const tourSourceId = String(tour?.sourceId || tour?.id || rawTourPath).trim();
+
   return rows.map((row, index) => {
-    const identity = buildTourRowIdentity(path, row, index);
+    const identity = buildTourRowIdentity(rawTourPath, row, index);
+    const progressEntry = progressById?.[identity] || progressById?.[String(row?.flightId || "").trim()];
+
+    if (isModernTourFlight(row)) {
+      const flightId = String(row?.flightId || row?.tourRowId || row?.id || identity).trim() || identity;
+      const airline = String(row?.airline || "").trim().toUpperCase();
+      const airlineName = String(
+        row?.airlineName || getAirlineNameByIata(airline) || airline || ""
+      ).trim();
+      const airlineIcao = String(
+        row?.airlineIcao ||
+          getAirlineIcao({
+            airlineName,
+            airlineIata: airline,
+            airlineIcao: airline
+          }) ||
+          airline
+      )
+        .trim()
+        .toUpperCase();
+      const flightNumber = String(
+        row?.flightNumber || row?.tourFlightNumber || row?.flight || ""
+      ).trim();
+      const flightCode =
+        String(row?.flightCode || "").trim() ||
+        (airline && flightNumber ? `${airline}${flightNumber}` : "");
+      const from = String(row?.from || row?.departure || "").trim().toUpperCase();
+      const to = String(row?.to || row?.destination || "").trim().toUpperCase();
+      const departureTimeLabel = String(
+        row?.departureTimeLabel || row?.departureTime || row?.timeD?.text || ""
+      ).trim();
+      const arrivalTimeLabel = String(
+        row?.arrivalTimeLabel || row?.arrivalTime || row?.timeA?.text || ""
+      ).trim();
+      const blockMinutes = Number.isFinite(row?.blockMinutes)
+        ? row.blockMinutes
+        : Number.isFinite(row?.durationMs)
+          ? Math.max(0, Math.round(Number(row.durationMs) / 60000))
+          : null;
+      const blockTimeLabel =
+        String(row?.blockTimeLabel || "").trim() || formatTourDurationLabel(row?.durationMs);
+      const parsedRoute = parseTourRoute(
+        row?.route ||
+          `${String(row?.departureName || row?.fromAirport || "").trim()} (${from}) - ${String(
+            row?.destinationName || row?.toAirport || ""
+          ).trim()} (${to})`
+      );
+
+      return {
+        ...row,
+        sourceIndex: index,
+        flightId,
+        linkedFlightId: flightId,
+        flightCode,
+        flightNumber,
+        tourFlightNumber: flightNumber,
+        airline,
+        airlineName,
+        airlineIcao,
+        route: String(row?.route || `${from} - ${to}`).trim(),
+        from,
+        to,
+        fromAirport: String(row?.fromAirport || row?.departureName || parsedRoute.fromAirport || "").trim(),
+        toAirport: String(row?.toAirport || row?.destinationName || parsedRoute.toAirport || "").trim(),
+        departureTimeLabel,
+        arrivalTimeLabel,
+        blockMinutes,
+        blockTimeLabel,
+        departureTime: departureTimeLabel,
+        arrivalTime: arrivalTimeLabel,
+        distanceNm: Number.isFinite(row?.distanceNm) ? row.distanceNm : null,
+        distanceMi: Number.isFinite(row?.distanceMi)
+          ? row.distanceMi
+          : Number.isFinite(row?.distance)
+            ? row.distance
+            : null,
+        isTourFlight: true,
+        tourPath: rawTourPath,
+        tourRowId: flightId,
+        tourLabel,
+        tourName: String(row?.tourName || tourLabel).trim(),
+        tourSourceId,
+        segment: String(row?.segment || `Leg ${Number.isFinite(Number(row?.leg)) ? Number(row.leg) : index + 1}`).trim(),
+        isCompleted: Boolean(progressEntry?.completed),
+        completedAt: progressEntry?.completedAt || null,
+        completionOrder: Number.isFinite(progressEntry?.completionOrder)
+          ? progressEntry.completionOrder
+          : null
+      };
+    }
+
     const parsedRoute = parseTourRoute(row?.route);
     const parsedFlightCode = parseTourFlightCode(row?.flight);
     const normalizedTourFlightNumber = String(
@@ -253,7 +376,6 @@ function normalizeTourRows(path, rows, progressById = {}) {
       parsedFlightCode.airline && normalizedTourFlightNumber
         ? `${parsedFlightCode.airline}${normalizedTourFlightNumber}`
         : String(row?.flight || "").trim();
-    const progressEntry = progressById?.[identity];
     const blockMinutesMatch = String(row?.schedule || "").match(/\((\d+)h\s+(\d+)m\)/i);
     const blockMinutes = blockMinutesMatch
       ? Number(blockMinutesMatch[1]) * 60 + Number(blockMinutesMatch[2])
@@ -282,8 +404,11 @@ function normalizeTourRows(path, rows, progressById = {}) {
       distanceNm: null,
       distanceMi: Number.isFinite(row?.distance_mi) ? row.distance_mi : null,
       isTourFlight: true,
-      tourPath: path,
+      tourPath: rawTourPath,
       tourRowId: identity,
+      tourLabel,
+      tourName: tourLabel,
+      tourSourceId,
       isCompleted: Boolean(progressEntry?.completed),
       completedAt: progressEntry?.completedAt || null,
       completionOrder: Number.isFinite(progressEntry?.completionOrder)
@@ -954,6 +1079,9 @@ function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     isTourFlight: true,
     tourPath: String(flight?.tourPath || "").trim(),
     tourRowId: String(flight?.tourRowId || flight?.flightId || "").trim(),
+    tourLabel: String(flight?.tourLabel || flight?.tourName || "").trim(),
+    tourName: String(flight?.tourName || flight?.tourLabel || "").trim(),
+    tourSourceId: String(flight?.tourSourceId || "").trim(),
     isCompleted: Boolean(overrides.isCompleted ?? flight?.isCompleted),
     completedAt: overrides.completedAt ?? flight?.completedAt ?? null,
     completionOrder: Number.isFinite(overrides.completionOrder ?? flight?.completionOrder)
@@ -1363,6 +1491,7 @@ export default function App() {
   const [selectedTourPath, setSelectedTourPath] = useState("");
   const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
   const [tourProgress, setTourProgress] = useState({});
+  const [deltaVirtualToursCache, setDeltaVirtualToursCache] = useState(null);
   const [dutyBuildWarning, setDutyBuildWarning] = useState(null);
   const [theme, setTheme] = useState(readSavedTheme);
   const [isDevToolsEnabled, setIsDevToolsEnabled] = useState(readSavedDevToolsEnabled);
@@ -1528,14 +1657,19 @@ export default function App() {
 
   const availableTours = useMemo(
     () =>
-      Object.entries(TOUR_FILE_MODULES)
-        .map(([path, rows]) => ({
-          path,
-          label: formatTourLabelFromPath(path),
-          rows: normalizeTourRows(path, rows, tourProgress?.[path]?.rows)
-        }))
+      (Array.isArray(deltaVirtualToursCache?.tours) ? deltaVirtualToursCache.tours : [])
+        .map((tour) => {
+          const path = String(tour?.path || tour?.id || tour?.sourceId || "").trim();
+          const rows = normalizeTourRows(tour, tour?.rows || tour?.flights || [], tourProgress?.[path]?.rows);
+          return {
+            ...tour,
+            path,
+            label: String(tour?.label || tour?.name || formatTourLabelFromPath(path)).trim(),
+            rows
+          };
+        })
         .sort((left, right) => left.label.localeCompare(right.label)),
-    [tourProgress]
+    [deltaVirtualToursCache, tourProgress]
   );
   const selectedTour = useMemo(() => {
     if (!availableTours.length) {
@@ -1563,7 +1697,7 @@ export default function App() {
     () =>
       new Map(
         availableTours.flatMap((tour) =>
-          tour.rows.map((row) => [row.tourRowId, row])
+          tour.rows.map((row) => [row.tourRowId || row.flightId, row])
         )
       ),
     [availableTours]
@@ -1588,9 +1722,6 @@ export default function App() {
 
   useEffect(() => {
     if (!availableTours.length) {
-      if (scheduleView === "tours") {
-        setScheduleView("flights");
-      }
       if (selectedTourPath) {
         setSelectedTourPath("");
       }
@@ -1969,7 +2100,8 @@ export default function App() {
         simBriefResult,
         gettingStartedResult,
         uiStateResult,
-        logbookProgressResult
+        logbookProgressResult,
+        toursCacheResult
       ] = await Promise.allSettled([
         readSavedSchedule(),
         readAddonAirportCache(),
@@ -1977,7 +2109,8 @@ export default function App() {
         readSimBriefSettings(),
         readGettingStartedState(),
         readSavedUiState(),
-        readDeltaVirtualLogbookProgress()
+        readDeltaVirtualLogbookProgress(),
+        readDeltaVirtualToursCache()
       ]);
 
       try {
@@ -2062,6 +2195,13 @@ export default function App() {
           setGettingStartedState(DEFAULT_GETTING_STARTED_STATE);
         }
         setHasLoadedGettingStartedState(true);
+
+        if (toursCacheResult.status === "fulfilled") {
+          setDeltaVirtualToursCache(toursCacheResult.value);
+        } else {
+          setDeltaVirtualToursCache(null);
+          await logAppError("deltava-tours-cache-hydrate-failed", toursCacheResult.reason);
+        }
 
         if (
           scheduleResult.status !== "fulfilled" ||
@@ -2784,6 +2924,41 @@ export default function App() {
       if (syncedFile.warnings?.length) {
         setStatusMessage(`Delta Virtual schedule synced with warning: ${syncedFile.warnings[0]}`);
       }
+      setStatusMessage("Syncing Delta Virtual tours...");
+      try {
+        const tourSyncResult = await syncDeltaVirtualTours();
+        setDeltaVirtualToursCache(tourSyncResult);
+
+        if (tourSyncResult.ok) {
+          await logSystemEvent("DVA Tours Sync", "succeeded", {
+            totalListTours: tourSyncResult.totalListTours,
+            candidateTours: tourSyncResult.candidateTours,
+            syncedTours: tourSyncResult.syncedTours,
+            failedTourIds: tourSyncResult.failedTourIds.length
+          });
+          setStatusMessage(tourSyncResult.message || "Delta Virtual tours synced.");
+        } else if (tourSyncResult.syncedTours > 0) {
+          await logSystemEvent("DVA Tours Sync", "succeeded", {
+            partial: true,
+            totalListTours: tourSyncResult.totalListTours,
+            candidateTours: tourSyncResult.candidateTours,
+            syncedTours: tourSyncResult.syncedTours,
+            failedTourIds: tourSyncResult.failedTourIds.length
+          });
+          setStatusMessage(tourSyncResult.message || "Delta Virtual tours synced with warnings.");
+        } else {
+          await logSystemError("DVA Tours Sync", "failed", new Error(tourSyncResult.message || "Delta Virtual tours sync failed."), {
+            totalListTours: tourSyncResult.totalListTours,
+            candidateTours: tourSyncResult.candidateTours,
+            syncedTours: tourSyncResult.syncedTours,
+            failedTourIds: tourSyncResult.failedTourIds.length
+          });
+          setStatusMessage(tourSyncResult.message || "Delta Virtual tours sync failed.");
+        }
+      } catch (error) {
+        setStatusMessage(error.message || "Delta Virtual tours sync failed.");
+        await logSystemError("DVA Tours Sync", "failed", error);
+      }
       shouldRemoveDownloadedSchedule = true;
     } catch (error) {
       if (error?.kind === "cancelled") {
@@ -3047,7 +3222,7 @@ export default function App() {
 
     if (nextView === "map") {
       nextScheduleView = "map";
-    } else if (nextView === "tours" && availableTours.length) {
+    } else if (nextView === "tours") {
       nextScheduleView = "tours";
     } else if (nextView === "accomplishments" && ACCOMPLISHMENTS.length) {
       nextScheduleView = "accomplishments";
@@ -5215,6 +5390,7 @@ export default function App() {
             addonAirports={addonAirports}
             tourRows={sortedTourRows}
             selectedTourRowId={selectedTourRowId}
+            tourSyncMessage={deltaVirtualToursCache?.message || ""}
             onShowAccomplishmentFlights={handleShowAccomplishmentFlights}
             onSortFlights={handleSort}
             onToggleTimeDisplayMode={() =>

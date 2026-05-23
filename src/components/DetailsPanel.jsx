@@ -107,9 +107,12 @@ function FlightBoardAirline({ flight, selectedAccomplishment }) {
 
   const flightBadges = [];
   if (flight?.isTourFlight) {
+    const tourTitle = String(
+      flight?.tourLabel || flight?.tourName || formatBadgeTitleFromPath(flight?.tourPath) || "Tour flight"
+    ).trim();
     flightBadges.push({
       label: "T",
-      title: `Tour: ${formatBadgeTitleFromPath(flight?.tourPath) || "Tour flight"}`
+      title: `Tour: ${tourTitle}`
     });
   }
 

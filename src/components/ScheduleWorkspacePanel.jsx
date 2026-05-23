@@ -31,6 +31,7 @@ export default function ScheduleWorkspacePanel({
   addonAirports,
   tourRows,
   selectedTourRowId,
+  tourSyncMessage,
   onShowAccomplishmentFlights,
   onSortFlights,
   onToggleTimeDisplayMode,
@@ -93,6 +94,7 @@ export default function ScheduleWorkspacePanel({
               addonAirports={addonAirports}
               tourRows={tourRows}
               selectedTourRowId={selectedTourRowId}
+              tourSyncMessage={tourSyncMessage}
               onShowAccomplishmentFlights={onShowAccomplishmentFlights}
               onSortFlights={onSortFlights}
               onToggleTimeDisplayMode={onToggleTimeDisplayMode}

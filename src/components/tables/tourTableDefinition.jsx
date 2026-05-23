@@ -1,4 +1,4 @@
-import { formatNumber } from "../../lib/formatters";
+import { formatDuration, formatNumber } from "../../lib/formatters";
 import { getAirlineLogo } from "../../lib/airlineBranding";
 import { cn } from "../ui/cn";
 import { bodyMdTextClassName } from "../ui/typography";
@@ -6,15 +6,17 @@ import { bodyMdTextClassName } from "../ui/typography";
 const BODY_CELL_CONTENT_CLASS =
   "flex h-full min-h-0 w-full items-center leading-none";
 
-function getCompactScheduleLabel(row) {
+function getDurationLabel(row) {
   const blockTimeLabel = String(row?.blockTimeLabel || "").trim();
   if (blockTimeLabel) {
     return blockTimeLabel;
   }
 
-  const schedule = String(row?.schedule || "").trim();
-  const durationMatch = schedule.match(/\(([^()]+)\)\s*$/);
-  return durationMatch?.[1]?.trim() || schedule;
+  if (Number.isFinite(row?.blockMinutes)) {
+    return formatDuration(row.blockMinutes);
+  }
+
+  return "N/A";
 }
 
 function AirlineCell({ flight }) {
@@ -49,8 +51,10 @@ export function getTourTableColumns({ viewportWidth }) {
         tourFlightNumber: { minWidth: 106, flexWeight: 1.1 },
         from: { minWidth: 78, flexWeight: 1.3 },
         to: { minWidth: 78, flexWeight: 1.3 },
+        departureTime: { minWidth: 94, flexWeight: 0.85 },
+        arrivalTime: { minWidth: 94, flexWeight: 0.85 },
         distanceMi: { minWidth: 98, flexWeight: 0.95 },
-        schedule: { minWidth: 98, flexWeight: 0.95 }
+        duration: { minWidth: 98, flexWeight: 0.95 }
       }
     : {};
   const expandedColumnSizing =
@@ -62,8 +66,10 @@ export function getTourTableColumns({ viewportWidth }) {
           aircraft: { minWidth: 156, flexWeight: 1 },
           from: { minWidth: 82, flexWeight: 1 },
           to: { minWidth: 82, flexWeight: 1 },
+          departureTime: { minWidth: 104, flexWeight: 1 },
+          arrivalTime: { minWidth: 104, flexWeight: 1 },
           distanceMi: { minWidth: 112, flexWeight: 1 },
-          schedule: { minWidth: 112, flexWeight: 1 }
+          duration: { minWidth: 112, flexWeight: 1 }
         }
       : {};
 
@@ -129,6 +135,30 @@ export function getTourTableColumns({ viewportWidth }) {
       renderCell: (row) => row.to
     },
     {
+      key: "departureTime",
+      label: "Departure",
+      compactLabel: "Dep",
+      role: "secondary",
+      minWidth: 92,
+      flexWeight: 1,
+      ...compactColumnSizing.departureTime,
+      ...expandedColumnSizing.departureTime,
+      truncate: true,
+      renderCell: (row) => row.departureTimeLabel || row.departureTime || "N/A"
+    },
+    {
+      key: "arrivalTime",
+      label: "Arrival",
+      compactLabel: "Arr",
+      role: "secondary",
+      minWidth: 92,
+      flexWeight: 1,
+      ...compactColumnSizing.arrivalTime,
+      ...expandedColumnSizing.arrivalTime,
+      truncate: true,
+      renderCell: (row) => row.arrivalTimeLabel || row.arrivalTime || "N/A"
+    },
+    {
       key: "distanceMi",
       label: "Distance",
       compactLabel: "Dist",
@@ -141,15 +171,14 @@ export function getTourTableColumns({ viewportWidth }) {
         Number.isFinite(row.distanceMi) ? `${formatNumber(row.distanceMi)} mi` : "N/A"
     },
     {
-      key: "schedule",
-      label: "ETE",
+      key: "duration",
+      label: "Duration",
       role: "numeric",
       minWidth: 108,
       flexWeight: 1.3,
-      ...compactColumnSizing.schedule,
-      ...expandedColumnSizing.schedule,
-      truncate: true,
-      renderCell: (row) => getCompactScheduleLabel(row)
+      ...compactColumnSizing.duration,
+      ...expandedColumnSizing.duration,
+      renderCell: (row) => getDurationLabel(row)
     }
   ];
 }

@@ -12,9 +12,11 @@ const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
 const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
 const LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
 const DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
+const DELTAVA_TOURS_CACHE_STORAGE_KEY = "flight-planner.deltava-tours-cache";
 const GETTING_STARTED_STORAGE_KEY = "flight-planner.getting-started";
 const DELTAVA_LOGBOOK_STORAGE_DIR = "flight-planner/deltava-sync/logbook";
 const DELTAVA_LOGBOOK_FALLBACK_FILE = "deltava-logbook.json";
+const DELTAVA_TOURS_CACHE_FILE = "dva-tours-cache.json";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -120,6 +122,42 @@ function getDefaultGettingStartedState() {
     gettingStartedDismissed: false,
     gettingStartedFinalized: false,
     addonSetupSkipped: false
+  };
+}
+
+function getDefaultDeltaVirtualToursCache() {
+  return {
+    source: "dva",
+    lastSyncAt: null,
+    ok: false,
+    totalListTours: 0,
+    candidateTours: 0,
+    syncedTours: 0,
+    failedTourIds: [],
+    message: "",
+    tours: []
+  };
+}
+
+function normalizeDeltaVirtualToursCache(cache) {
+  const defaultCache = getDefaultDeltaVirtualToursCache();
+  const tours = Array.isArray(cache?.tours) ? cache.tours : [];
+  const failedTourIds = Array.isArray(cache?.failedTourIds)
+    ? cache.failedTourIds.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
+
+  return {
+    source: String(cache?.source || defaultCache.source).trim().toLowerCase() === "dva"
+      ? "dva"
+      : defaultCache.source,
+    lastSyncAt: String(cache?.lastSyncAt || "").trim() || null,
+    ok: Boolean(cache?.ok),
+    totalListTours: Number.isFinite(cache?.totalListTours) ? cache.totalListTours : 0,
+    candidateTours: Number.isFinite(cache?.candidateTours) ? cache.candidateTours : 0,
+    syncedTours: Number.isFinite(cache?.syncedTours) ? cache.syncedTours : 0,
+    failedTourIds,
+    message: String(cache?.message || "").trim(),
+    tours
   };
 }
 
@@ -667,6 +705,56 @@ export async function readGettingStartedState() {
   } catch {
     return getDefaultGettingStartedState();
   }
+}
+
+export async function readDeltaVirtualToursCache() {
+  const defaultCache = getDefaultDeltaVirtualToursCache();
+
+  if (isTauriRuntime()) {
+    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
+    const hasFile = await exists(DELTAVA_TOURS_CACHE_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+
+    if (!hasFile) {
+      return defaultCache;
+    }
+
+    try {
+      const text = await readTextFile(DELTAVA_TOURS_CACHE_FILE, {
+        baseDir: BaseDirectory.AppData
+      });
+      return normalizeDeltaVirtualToursCache(text ? JSON.parse(text) : null);
+    } catch {
+      return defaultCache;
+    }
+  }
+
+  const text = window.localStorage.getItem(DELTAVA_TOURS_CACHE_STORAGE_KEY);
+  if (!text) {
+    return defaultCache;
+  }
+
+  try {
+    return normalizeDeltaVirtualToursCache(JSON.parse(text));
+  } catch {
+    return defaultCache;
+  }
+}
+
+export async function writeDeltaVirtualToursCache(cache) {
+  const serialized = JSON.stringify(normalizeDeltaVirtualToursCache(cache));
+
+  if (isTauriRuntime()) {
+    const { writeTextFile, BaseDirectory } = await loadFsModule();
+    await ensureAppDataRoot();
+    await writeTextFile(DELTAVA_TOURS_CACHE_FILE, serialized, {
+      baseDir: BaseDirectory.AppData
+    });
+    return;
+  }
+
+  window.localStorage.setItem(DELTAVA_TOURS_CACHE_STORAGE_KEY, serialized);
 }
 
 export async function writeGettingStartedState(state) {

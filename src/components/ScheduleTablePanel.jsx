@@ -44,6 +44,7 @@ export default function ScheduleTablePanel({
   onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow,
+  tourSyncMessage = "",
   dutyFilters,
   airlines,
   regionOptions,
@@ -62,6 +63,9 @@ export default function ScheduleTablePanel({
   const isDutyMode = plannerMode === "duty";
   const hasTours = availableTours.length > 0;
   const hasAccomplishments = accomplishmentOptions.length > 0;
+  const toursEmptyMessage =
+    String(tourSyncMessage || "").trim() ||
+    "Run Sync from Delta Virtual to load the current tour list.";
   const selectedTourOption = selectedTourPath
     ? availableTours.find((tour) => tour.path === selectedTourPath)
     : availableTours[0] || null;
@@ -169,15 +173,26 @@ export default function ScheduleTablePanel({
             />
           </div>
         ) : scheduleView === "tours" ? (
-          <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
-            <ToursTable
-              rows={tourRows}
-              selectedRowId={selectedTourRowId}
-              viewportWidth={viewportWidth}
-              onSelectRow={onSelectRow}
-              onActivateRow={onActivateRow}
-            />
-          </div>
+          hasTours ? (
+            <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
+              <ToursTable
+                rows={tourRows}
+                selectedRowId={selectedTourRowId}
+                viewportWidth={viewportWidth}
+                onSelectRow={onSelectRow}
+                onActivateRow={onActivateRow}
+              />
+            </div>
+          ) : (
+            <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
+              <div className="flex h-full min-h-0 w-full items-center justify-center rounded-none border border-dashed border-[color:var(--line)] bg-[rgba(255,255,255,0.45)] px-6 py-8 text-center dark:bg-[rgba(4,12,22,0.35)]">
+                <div className="grid max-w-xl gap-3">
+                  <SectionHeader eyebrow="TOURS" title="No synced tours available" />
+                  <p className="m-0 text-[var(--text-muted)]">{toursEmptyMessage}</p>
+                </div>
+              </div>
+            </div>
+          )
         ) : scheduleView === "map" ? (
           <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
             <FlightMapPanel

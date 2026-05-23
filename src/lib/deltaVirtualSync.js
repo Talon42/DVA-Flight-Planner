@@ -49,6 +49,38 @@ export async function syncScheduleFromDeltaVirtual() {
   }
 }
 
+export async function syncDeltaVirtualTours() {
+  if (!isTauriRuntime()) {
+    throw new Error("Delta Virtual tour sync is only available in the desktop app.");
+  }
+
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const result = await invoke("sync_delta_virtual_tours");
+    return {
+      ok: Boolean(result?.ok),
+      source: String(result?.source || "dva").trim().toLowerCase() || "dva",
+      lastSyncAt: result?.lastSyncAt ?? result?.last_sync_at ?? null,
+      totalListTours: Number(result?.totalListTours ?? result?.total_list_tours ?? 0),
+      candidateTours: Number(result?.candidateTours ?? result?.candidate_tours ?? 0),
+      syncedTours: Number(result?.syncedTours ?? result?.synced_tours ?? 0),
+      failedTourIds: Array.isArray(result?.failedTourIds ?? result?.failed_tour_ids)
+        ? result?.failedTourIds ?? result?.failed_tour_ids
+        : [],
+      message: String(result?.message || "").trim(),
+      tours: Array.isArray(result?.tours) ? result.tours : []
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      const normalized = normalizeSyncError(error.message);
+      normalized.syncResult = error.syncResult;
+      throw normalized;
+    }
+
+    throw normalizeSyncError(String(error));
+  }
+}
+
 export async function closeDeltaVirtualSyncWindow() {
   if (!isTauriRuntime()) {
     return;
