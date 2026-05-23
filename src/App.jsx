@@ -276,6 +276,51 @@ function buildDvaTourCanonicalRowId(tourId, row) {
   return segments.length ? `dva:${normalizedTourId}:${segments.join(":")}` : "";
 }
 
+// Builds the derived-progress row key written by the backend logbook reconciler.
+// This keeps the frontend able to match the AppData file without changing the
+// existing manual completion row IDs used by the UI.
+function buildDvaTourDerivedProgressRowId(tourId, row) {
+  const normalizedTourId = normalizeDvaTourId(tourId);
+
+  if (!normalizedTourId) {
+    return "";
+  }
+
+  const airline = normalizeDvaTourRowSegment(
+    row?.airline || row?.airlineIcao || row?.airlineName || ""
+  );
+  const flightNumber = normalizeDvaTourRowSegment(
+    row?.flightNumber || row?.tourFlightNumber || row?.flight || ""
+  );
+  const leg = Number.isFinite(Number(row?.leg)) ? `leg-${Number(row.leg)}` : "";
+  const departure = normalizeDvaTourRowSegment(
+    row?.from || row?.departure || row?.departureIata || row?.departureName || ""
+  );
+  const destination = normalizeDvaTourRowSegment(
+    row?.to || row?.destination || row?.destinationIata || row?.destinationName || ""
+  );
+  const departureTime = normalizeDvaTourRowSegment(
+    row?.departureTime || row?.departureTimeLabel || row?.timeD?.text || ""
+  );
+  const arrivalTime = normalizeDvaTourRowSegment(
+    row?.arrivalTime || row?.arrivalTimeLabel || row?.timeA?.text || ""
+  );
+  const equipment = normalizeDvaTourRowSegment(row?.equipment || row?.aircraft || row?.eqType || "");
+
+  const segments = [
+    airline ? `airline-${airline}` : "",
+    flightNumber ? `flight-${flightNumber}` : "",
+    leg,
+    departure ? `dep-${departure}` : "",
+    destination ? `arr-${destination}` : "",
+    departureTime ? `dpt-${departureTime}` : "",
+    arrivalTime ? `arrt-${arrivalTime}` : "",
+    equipment ? `eq-${equipment}` : ""
+  ].filter(Boolean);
+
+  return segments.length ? `dva:${normalizedTourId}:${segments.join(":")}` : "";
+}
+
 function parseTourRoute(route) {
   const normalizedRoute = String(route || "").trim();
   if (!normalizedRoute) {
@@ -451,12 +496,26 @@ function normalizeTourRows(tour, rows, progressById = {}) {
   return rows.map((row, index) => {
     if (isModernTourFlight(row)) {
       const flightId = buildDvaTourCanonicalRowId(tourId, row);
+      const derivedProgressFlightId = buildDvaTourDerivedProgressRowId(tourId, row);
       const legacyFlightId = buildLegacyDvaTourRowId(tourId, row);
+      // Match the current UI row ID first, then the backend-derived progress ID, so
+      // manual completions stay intact while logbook-derived completions still load.
+      const manualProgressEntry = progressById?.[flightId] || null;
+      const derivedProgressEntry = derivedProgressFlightId
+        ? progressById?.[derivedProgressFlightId] || null
+        : null;
+      const legacyProgressEntry =
+        legacyFlightId && legacyRowIdCounts.get(legacyFlightId) === 1
+          ? progressById?.[legacyFlightId] || null
+          : null;
       const progressEntry =
-        progressById?.[flightId] ||
-        (legacyFlightId && legacyRowIdCounts.get(legacyFlightId) === 1
-          ? progressById?.[legacyFlightId]
-          : null);
+        manualProgressEntry?.completed
+          ? manualProgressEntry
+          : derivedProgressEntry?.completed
+            ? derivedProgressEntry
+            : legacyProgressEntry?.completed
+              ? legacyProgressEntry
+              : null;
       const tourLeg = index + 1;
       const airline = String(row?.airline || "").trim().toUpperCase();
       const airlineName = String(
@@ -506,6 +565,7 @@ function normalizeTourRows(tour, rows, progressById = {}) {
         sourceIndex: index,
         flightId,
         linkedFlightId: flightId,
+        derivedProgressFlightId,
         flightCode,
         flightNumber,
         tourFlightNumber: flightNumber,
@@ -537,7 +597,11 @@ function normalizeTourRows(tour, rows, progressById = {}) {
         tourName: String(row?.tourName || tourLabel).trim(),
         tourSourceId,
         segment: String(row?.segment || `Leg ${tourLeg}`).trim(),
-        isCompleted: Boolean(progressEntry?.completed),
+        isCompleted: Boolean(
+          manualProgressEntry?.completed ||
+            derivedProgressEntry?.completed ||
+            legacyProgressEntry?.completed
+        ),
         completedAt: progressEntry?.completedAt || null,
         completionOrder: Number.isFinite(progressEntry?.completionOrder)
           ? progressEntry.completionOrder
@@ -578,12 +642,40 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       leg: index + 1,
       route: row?.route || ""
     });
+    const derivedProgressFlightId = buildDvaTourDerivedProgressRowId(tourId, {
+      ...row,
+      airline: parsedFlightCode.airline,
+      airlineName: parsedFlightCode.airlineName,
+      flightNumber: normalizedTourFlightNumber,
+      flightCode: normalizedTourFlightCode,
+      from: parsedRoute.from,
+      to: parsedRoute.to,
+      fromAirport: parsedRoute.fromAirport,
+      toAirport: parsedRoute.toAirport,
+      departureTime: departureTimeLabel,
+      arrivalTime: String(row?.arrivalTime || "").trim(),
+      equipment: String(row?.aircraft || row?.equipment || "").trim(),
+      leg: index + 1
+    });
     const legacyFlightId = buildLegacyDvaTourRowId(tourId, row);
+    // Match the current UI row ID first, then the backend-derived progress ID, so
+    // manual completions stay intact while logbook-derived completions still load.
+    const manualProgressEntry = progressById?.[flightId] || null;
+    const derivedProgressEntry = derivedProgressFlightId
+      ? progressById?.[derivedProgressFlightId] || null
+      : null;
+    const legacyProgressEntry =
+      legacyFlightId && legacyRowIdCounts.get(legacyFlightId) === 1
+        ? progressById?.[legacyFlightId] || null
+        : null;
     const progressEntry =
-      progressById?.[flightId] ||
-      (legacyFlightId && legacyRowIdCounts.get(legacyFlightId) === 1
-        ? progressById?.[legacyFlightId]
-        : null);
+      manualProgressEntry?.completed
+        ? manualProgressEntry
+        : derivedProgressEntry?.completed
+          ? derivedProgressEntry
+          : legacyProgressEntry?.completed
+            ? legacyProgressEntry
+            : null;
     const tourLeg = index + 1;
 
     return {
@@ -592,6 +684,7 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       ...parsedRoute,
       flightId,
       linkedFlightId: flightId,
+      derivedProgressFlightId,
       flightCode: normalizedTourFlightCode,
       flightNumber: normalizedTourFlightNumber,
       tourFlightNumber: normalizedTourFlightNumber,
@@ -611,7 +704,11 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       tourLabel,
       tourName: tourLabel,
       tourSourceId,
-      isCompleted: Boolean(progressEntry?.completed),
+      isCompleted: Boolean(
+        manualProgressEntry?.completed ||
+          derivedProgressEntry?.completed ||
+          legacyProgressEntry?.completed
+      ),
       completedAt: progressEntry?.completedAt || null,
       completionOrder: Number.isFinite(progressEntry?.completionOrder)
         ? progressEntry.completionOrder
@@ -1949,29 +2046,41 @@ export default function App() {
       return;
     }
 
-    const rowIds = Array.isArray(selectedTour.rows)
-      ? selectedTour.rows.map((row) => String(row?.tourRowId || "").trim()).filter(Boolean)
-      : [];
-    const duplicateRowIds = [];
-    const seenRowIds = new Set();
-
-    for (const rowId of rowIds) {
-      if (seenRowIds.has(rowId) && !duplicateRowIds.includes(rowId)) {
-        duplicateRowIds.push(rowId);
-        continue;
-      }
-
-      seenRowIds.add(rowId);
-    }
+    const normalizedTourKey = selectedTour.selectionId || selectedTourPath || "";
+    const visibleRows = Array.isArray(selectedTour.rows) ? selectedTour.rows : [];
+    const manualRows = tourProgress?.[normalizedTourKey]?.rows || {};
+    const derivedRows = derivedTourProgress?.tourProgress?.[normalizedTourKey]?.rows || {};
+    const mergedRows = resolvedTourProgress?.[normalizedTourKey]?.rows || {};
+    const visibleRowIds = visibleRows.map((row) => String(row?.tourRowId || "").trim()).filter(Boolean);
+    const derivedRowIds = Object.keys(derivedRows).filter(Boolean);
+    const completedRowIds = visibleRows
+      .filter((row) => Boolean(row?.isCompleted))
+      .map((row) => String(row?.tourRowId || "").trim())
+      .filter(Boolean);
 
     logAppEvent("tour-selection-updated", {
-      selectedTourPath: selectedTour.selectionId || selectedTourPath || "",
       selectedTourName: selectedTour.name || selectedTour.label || "",
-      rowCount: rowIds.length,
-      firstFiveRowIds: rowIds.slice(0, 5),
-      duplicateRowIds: duplicateRowIds.slice(0, 10)
+      selectedTourNormalizedId: String(selectedTour.id || "").trim(),
+      selectedTourRawPath: String(selectedTour.path || "").trim(),
+      selectedTourRawSourceId: String(selectedTour.sourceId || "").trim(),
+      normalizedTourKey,
+      visibleRowCount: visibleRows.length,
+      derivedRowsCount: Object.keys(derivedRows).length,
+      manualRowsCount: Object.keys(manualRows).length,
+      mergedCompletedCount: visibleRows.filter((row) => Boolean(row?.isCompleted)).length,
+      first10VisibleRowIds: visibleRowIds.slice(0, 10),
+      first10DerivedRowIds: derivedRowIds.slice(0, 10),
+      first10VisibleCompletedRowIds: completedRowIds.slice(0, 10),
+      mergedRowCount: Object.keys(mergedRows).length
     }).catch(() => {});
-  }, [isDevToolsEnabled, selectedTour, selectedTourPath]);
+  }, [
+    derivedTourProgress,
+    isDevToolsEnabled,
+    resolvedTourProgress,
+    selectedTour,
+    selectedTourPath,
+    tourProgress
+  ]);
 
   const selectedAccomplishment = useMemo(() => {
     if (!ACCOMPLISHMENTS.length) {
@@ -3282,7 +3391,35 @@ export default function App() {
         setStatusMessage(error.message || "Delta Virtual tours sync failed.");
         await logSystemError("DVA Tours Sync", "failed", error);
       }
-      setDerivedTourProgress(await readDeltaVirtualTourProgress());
+      if (isDevToolsEnabled) {
+        await logAppEvent("dva-tour-progress-reload-started", {
+          reason: "post-dva-sync"
+        });
+      }
+
+      try {
+        const reloadedTourProgress = await readDeltaVirtualTourProgress();
+        setDerivedTourProgress(reloadedTourProgress);
+
+        if (isDevToolsEnabled) {
+          const tourCount = Object.keys(reloadedTourProgress?.tourProgress || {}).length;
+          const completedRowCount = Object.values(reloadedTourProgress?.tourProgress || {}).reduce(
+            (count, tourEntry) => count + Object.keys(tourEntry?.rows || {}).length,
+            0
+          );
+
+          await logAppEvent("dva-tour-progress-reload-succeeded", {
+            totalDerivedTours: tourCount,
+            totalDerivedCompletedRows: completedRowCount,
+            lastSyncAt: reloadedTourProgress?.lastSyncAt || null
+          });
+        }
+      } catch (error) {
+        setDerivedTourProgress(DEFAULT_DERIVED_TOUR_PROGRESS);
+        if (isDevToolsEnabled) {
+          await logAppError("dva-tour-progress-reload-failed", error);
+        }
+      }
       shouldRemoveDownloadedSchedule = true;
     } catch (error) {
       if (error?.kind === "cancelled") {
