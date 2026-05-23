@@ -5520,11 +5520,11 @@ export default function App() {
           className={cn("fixed inset-0 z-50 flex items-center justify-center overflow-auto px-4 bp-1024:px-3", modalBackdropClassName)}
           role="presentation"
         >
-          <div className="w-full max-w-[32rem]">
+          <div className="w-full max-w-[26rem]">
             <Panel
               as="section"
-              padding="lg"
-              className="grid w-full gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
+              padding="none"
+              className="grid w-full gap-6 rounded-none bg-[var(--modal-shell-bg)] px-8 py-9 text-center shadow-none bp-1024:gap-5 bp-1024:px-7 bp-1024:py-8"
               role="status"
               aria-live="polite"
               aria-label="Delta Virtual sync in progress"
@@ -5533,12 +5533,14 @@ export default function App() {
                 eyebrow="Delta Virtual Sync"
                 title="Syncing data from Delta Virtual"
                 description="Refreshing your schedule and logbook data."
-                className="w-full"
+                className="!flex-col !items-center gap-2 text-center"
+                bodyClassName="grid w-full justify-items-center text-center"
+                titleClassName="text-[1.5rem] leading-[1.1] tracking-[-0.04em] bp-1024:text-[1.38rem]"
               />
-              <div className="flex w-full items-center gap-3">
+              <div className="flex w-full justify-center pt-2">
                 <svg
                   viewBox="0 0 24 24"
-                  className="h-5 w-5 shrink-0 animate-spin text-[var(--delta-red)]"
+                  className="h-11 w-11 shrink-0 animate-spin text-[var(--delta-red)]"
                   aria-hidden="true"
                 >
                   <circle
@@ -5548,14 +5550,14 @@ export default function App() {
                     fill="none"
                     stroke="currentColor"
                     strokeOpacity="0.18"
-                    strokeWidth="2.25"
+                    strokeWidth="2"
                   />
                   <path
                     d="M21 12a9 9 0 0 0-9-9"
                     fill="none"
                     stroke="currentColor"
                     strokeLinecap="round"
-                    strokeWidth="2.25"
+                    strokeWidth="2"
                   />
                 </svg>
               </div>
