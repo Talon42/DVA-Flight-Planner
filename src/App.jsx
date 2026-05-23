@@ -457,7 +457,14 @@ function buildScheduleDateInfo(flights = []) {
 
   const midpointOffsetDays = Math.floor(latest.diff(earliest, "days").days / 2);
   const effectiveScheduleDate = earliest.plus({ days: midpointOffsetDays });
-  const isCurrent = effectiveScheduleDate.hasSame(DateTime.local().startOf("day"), "day");
+  // Delta Virtual publishes the next PFPX schedule at 09:00 UTC on the following day.
+  const staleAfterUtc = DateTime.utc(
+    effectiveScheduleDate.year,
+    effectiveScheduleDate.month,
+    effectiveScheduleDate.day,
+    9
+  ).plus({ days: 1 });
+  const isCurrent = DateTime.utc() < staleAfterUtc;
   const monthLabel = effectiveScheduleDate.toFormat("MMMM");
   const dayLabel = `${effectiveScheduleDate.day}${getDayOrdinal(effectiveScheduleDate.day)}`;
   const label =
