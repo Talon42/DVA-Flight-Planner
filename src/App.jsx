@@ -1052,14 +1052,6 @@ function buildFooterDateLabel(dateIso) {
   return date.isValid ? date.toFormat("MMMM d") : "--";
 }
 
-function getScheduleSourceLabel(importSummary) {
-  const source = String(importSummary?.source || "").trim().toLowerCase();
-  if (source === "deltava-sync") {
-    return "Delta Virtual";
-  }
-  return "Delta Virtual";
-}
-
 function ThemeToggleIcon({ theme }) {
   if (theme === "dark") {
     return (
@@ -2064,7 +2056,6 @@ export default function App() {
   const logbookDateLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
   const footerMetadataItems = schedule?.importSummary
     ? [
-        { kind: "stat", label: "Source", value: getScheduleSourceLabel(schedule.importSummary) },
         {
           kind: "date",
           label: "Schedule Date",
