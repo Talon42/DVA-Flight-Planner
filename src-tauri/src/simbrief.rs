@@ -27,8 +27,6 @@ const SIMBRIEF_CALLBACK_URL_BASE: &str = "http://127.0.0.1:43123/simbrief-callba
 const SIMBRIEF_DISPATCH_URL: &str = "https://www.simbrief.com/ofp/ofp.loader.api.php";
 const SIMBRIEF_FETCH_URL: &str = "https://www.simbrief.com/api/xml.fetcher.php";
 const SIMBRIEF_INPUTS_LIST_URL: &str = "https://www.simbrief.com/api/inputs.list.json";
-const SIMBRIEF_LOG_STORAGE_DIR: &str = "flight-planner";
-const SIMBRIEF_LOG_FILE: &str = "log.txt";
 const SIMBRIEF_LOG_MAX_BYTES: u64 = 262_144;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -517,14 +515,7 @@ fn spawn_simbrief_background_fetch(
 }
 
 fn resolve_simbrief_log_path(app: &AppHandle) -> Option<PathBuf> {
-    if let Ok(base_dir) = app.path().app_data_dir() {
-        let _ = fs::create_dir_all(&base_dir);
-        return Some(base_dir.join(SIMBRIEF_LOG_FILE));
-    }
-
-    let storage_dir = std::env::temp_dir().join(SIMBRIEF_LOG_STORAGE_DIR);
-    let _ = fs::create_dir_all(&storage_dir);
-    Some(storage_dir.join(SIMBRIEF_LOG_FILE))
+    crate::resolve_app_log_path(app).ok()
 }
 
 fn simbrief_log_timestamp() -> String {

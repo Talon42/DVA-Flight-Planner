@@ -685,13 +685,9 @@ export async function writeGettingStartedState(state) {
 }
 
 async function resolveAppDataPath(relativePath) {
-  try {
-    const { appDataDir, join } = await import("@tauri-apps/api/path");
-    const basePath = await appDataDir();
-    return await join(basePath, relativePath);
-  } catch {
-    return relativePath;
-  }
+  const { appDataDir, join } = await import("@tauri-apps/api/path");
+  const basePath = await appDataDir();
+  return await join(basePath, relativePath);
 }
 
 async function appendLogFile(relativePath, storageKey, logText) {
@@ -721,11 +717,8 @@ async function appendLogFile(relativePath, storageKey, logText) {
 
       return resolveAppDataPath(relativePath);
     } catch (error) {
-      const existing = window.localStorage.getItem(storageKey) || "";
-      const nextText = buildNextLogText(existing, logText);
-      window.localStorage.setItem(storageKey, nextText);
-      const reason = error instanceof Error ? error.message : String(error);
-      return `browser-local-storage (fs write failed: ${reason})`;
+      // Tauri runtime must never fall back to browser storage for logs.
+      return null;
     }
   }
 

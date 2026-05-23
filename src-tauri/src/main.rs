@@ -1506,10 +1506,14 @@ async fn build_delta_sync_payload_from_web_result(
     })
 }
 
-fn resolve_default_log_path() -> Option<PathBuf> {
-    let storage_dir = std::env::temp_dir().join(APP_STORAGE_DIR);
-    let _ = fs::create_dir_all(&storage_dir);
-    Some(storage_dir.join(APP_LOG_FILE))
+pub(crate) fn resolve_app_log_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let base_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Unable to resolve app log path: {error}"))?;
+    fs::create_dir_all(&base_dir)
+        .map_err(|error| format!("Unable to create app log directory: {error}"))?;
+    Ok(base_dir.join(APP_LOG_FILE))
 }
 
 fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
@@ -1517,16 +1521,7 @@ fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
         return Some(existing.clone());
     }
 
-    let resolved = match app.path().app_data_dir() {
-        Ok(base_dir) => {
-            if fs::create_dir_all(&base_dir).is_ok() {
-                Some(base_dir.join(APP_LOG_FILE))
-            } else {
-                resolve_default_log_path()
-            }
-        }
-        Err(_) => resolve_default_log_path(),
-    };
+    let resolved = resolve_app_log_path(app).ok();
 
     if let Some(path) = resolved.clone() {
         let _ = DELTAVA_SYNC_LOG_PATH.set(path);
@@ -1539,26 +1534,23 @@ fn append_sync_log(message: &str) {
     let now = iso_now_utc();
     let line = format!("[{now}] [DVA Sync] {message}\n");
 
-    let log_path = DELTAVA_SYNC_LOG_PATH
-        .get()
-        .cloned()
-        .or_else(resolve_default_log_path);
+    let Some(log_path) = DELTAVA_SYNC_LOG_PATH.get().cloned() else {
+        return;
+    };
 
-    if let Some(log_path) = log_path {
-        if fs::metadata(&log_path)
-            .map(|metadata| metadata.len() > APP_LOG_MAX_BYTES)
-            .unwrap_or(false)
-        {
-            let _ = fs::remove_file(&log_path);
-        }
+    if fs::metadata(&log_path)
+        .map(|metadata| metadata.len() > APP_LOG_MAX_BYTES)
+        .unwrap_or(false)
+    {
+        let _ = fs::remove_file(&log_path);
+    }
 
-        if let Ok(mut file) = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path)
-        {
-            let _ = file.write_all(line.as_bytes());
-        }
+    if let Ok(mut file) = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+    {
+        let _ = file.write_all(line.as_bytes());
     }
 }
 

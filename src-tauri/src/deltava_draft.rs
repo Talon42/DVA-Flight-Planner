@@ -22,8 +22,7 @@ use windows::core::{Interface, PWSTR};
 use crate::{
     deltava_auth::{read_auth_context_internal, save_password_to_credential_manager, DeltaVirtualAuthContext},
     deltava_login,
-    APP_LOG_FILE,
-    APP_STORAGE_DIR,
+    resolve_app_log_path,
 };
 
 const DVA_DRAFT_LABEL: &str = "deltava-draft";
@@ -263,16 +262,8 @@ fn format_app_log_data(data: Option<&Value>) -> String {
 }
 
 fn append_app_log_line(app: &AppHandle, line: &str) -> Result<(), String> {
-    let app_data_dir = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|error| format!("submit_failed: Unable to resolve app log path: {error}"))?;
-    let log_path = app_data_dir.join(APP_STORAGE_DIR).join(APP_LOG_FILE);
-    if let Some(parent) = log_path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            format!("submit_failed: Unable to create app log directory: {error}")
-        })?;
-    }
+    let log_path = resolve_app_log_path(app)
+        .map_err(|error| format!("submit_failed: {error}"))?;
 
     let mut file = OpenOptions::new()
         .create(true)
