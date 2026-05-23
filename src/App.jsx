@@ -1708,6 +1708,22 @@ export default function App() {
 
     return availableTours.find((tour) => tour.selectionId === selectedTourPath) || availableTours[0];
   }, [availableTours, selectedTourPath]);
+
+  useEffect(() => {
+    if (!isDevToolsEnabled || !selectedTour) {
+      return;
+    }
+
+    logAppEvent("tour-selection-updated", {
+      selectedTourPath: selectedTour.selectionId || selectedTour.path || selectedTourPath || "",
+      selectedTourName: selectedTour.name || selectedTour.label || "",
+      rowCount: Array.isArray(selectedTour.rows) ? selectedTour.rows.length : 0,
+      firstFiveRowIds: Array.isArray(selectedTour.rows)
+        ? selectedTour.rows.slice(0, 5).map((row) => String(row?.flightId || row?.tourRowId || "").trim()).filter(Boolean)
+        : []
+    }).catch(() => {});
+  }, [isDevToolsEnabled, selectedTour, selectedTourPath]);
+
   const selectedAccomplishment = useMemo(() => {
     if (!ACCOMPLISHMENTS.length) {
       return null;

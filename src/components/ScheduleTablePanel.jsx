@@ -44,6 +44,7 @@ export default function ScheduleTablePanel({
   addonAirports,
   tourRows,
   selectedTourRowId,
+  onSelectTourPath,
   onShowAccomplishmentFlights,
   onSortFlights,
   onToggleTimeDisplayMode,
@@ -137,7 +138,10 @@ export default function ScheduleTablePanel({
             showSingleSelectedLabel
             options={tourOptions}
             selectedValues={selectedTourOption ? [selectedTourOption.selectionId || selectedTourOption.path] : []}
-            onChange={(values) => onSelectTourPath?.(values[0] || "")}
+            onChange={(values) => {
+              const nextValue = Array.isArray(values) ? values[0] || "" : "";
+              onSelectTourPath?.(nextValue);
+            }}
           />
         </div>
       ) : null}
@@ -181,6 +185,7 @@ export default function ScheduleTablePanel({
           hasTours ? (
             <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
               <ToursTable
+                key={`tour-table-${selectedTourPath || "none"}`}
                 rows={tourRows}
                 selectedRowId={selectedTourRowId}
                 viewportWidth={viewportWidth}
