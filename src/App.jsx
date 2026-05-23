@@ -94,11 +94,13 @@ import {
   closeSimBriefDispatchWindow,
   fetchSimBriefAircraftTypes,
   normalizeSimBriefCustomAirframe,
+  resolveSimBriefAircraftCompatibility,
   refreshSimBriefDispatch,
   startSimBriefDispatch
 } from "./lib/simbrief";
 import {
   buildDeltaVirtualDraftReportPayload,
+  resolveDraftAircraftCompatibility,
   resolveDraftSimBriefId,
   submitDeltaVirtualDraftReport
 } from "./lib/deltaVirtualDraftReport";
@@ -1886,6 +1888,24 @@ export default function App() {
             ? result.types
                 .map(normalizeSimBriefAircraftTypeOption)
                 .filter(Boolean)
+                .map((type) => {
+                  const resolution = resolveSimBriefAircraftCompatibility(type);
+                  if (isDevToolsEnabled) {
+                    logSystemEvent("SimBrief", "aircraft-type-resolved", {
+                      simbriefCode: resolution.simbriefCode,
+                      simbriefName: resolution.simbriefName,
+                      resolvedDvaEquipmentType: resolution.resolvedDvaEquipmentType,
+                      resolutionSource: resolution.resolutionSource,
+                      validForDvaDraft: resolution.validForDvaDraft
+                    }).catch(() => {});
+                  }
+
+                  return {
+                    ...type,
+                    ...resolution
+                  };
+                })
+                .filter((type) => type.validForDvaDraft)
                 .sort((left, right) => left.code.localeCompare(right.code))
             : [];
           setSimBriefAircraftTypes(normalizedTypes);
@@ -1928,7 +1948,7 @@ export default function App() {
         window.clearTimeout(timeoutHandle);
       }
     };
-  }, [isDesktopSimBriefAvailable]);
+  }, [isDesktopSimBriefAvailable, isDevToolsEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -4040,6 +4060,9 @@ export default function App() {
 
     const getDraftFailureMessage = (error) => {
       const message = error instanceof Error ? error.message : String(error || "");
+      if (message.startsWith("validation_failed:")) {
+        return message.replace(/^validation_failed:\s*/, "");
+      }
       return message.startsWith("session_required:")
         ? message.replace(/^session_required:\s*/, "")
         : "Unable to send draft flight report to ACARS.";
@@ -4066,7 +4089,8 @@ export default function App() {
       return;
     }
 
-    const draftPayload = buildDeltaVirtualDraftReportPayload(currentFlight);
+    const draftAircraftResolution = resolveDraftAircraftCompatibility(currentFlight);
+    const draftPayload = buildDeltaVirtualDraftReportPayload(currentFlight, draftAircraftResolution);
     const simBriefResolution = resolveDraftSimBriefId(currentFlight?.simbriefPlan || null);
     const hasDraftReportId = normalizePositiveDraftReportId(draftPayload.id) !== null;
     const draftLogData = {
@@ -4074,6 +4098,11 @@ export default function App() {
       flight: currentFlight.flightCode,
       airportD: currentFlight.from,
       airportA: currentFlight.to,
+      simbriefCode: draftAircraftResolution.simbriefCode,
+      simbriefName: draftAircraftResolution.simbriefName,
+      resolvedDvaEquipmentType: draftAircraftResolution.resolvedDvaEquipmentType,
+      resolutionSource: draftAircraftResolution.resolutionSource,
+      validForDvaDraft: draftAircraftResolution.validForDvaDraft,
       eqType: draftPayload.eqType,
       hasDraftReportId,
       hasOfpXmlId: Boolean(simBriefResolution.simBriefID),
