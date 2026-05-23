@@ -185,16 +185,89 @@ function normalizeDvaTourId(tourOrId) {
 }
 
 function buildDvaTourRowId(tourId, rowId) {
-  const normalizedTourId = normalizeDvaTourId(tourId);
-  const normalizedRowId = String(rowId || "").trim();
+  return buildDvaTourCanonicalRowId(tourId, rowId);
+}
 
-  if (!normalizedTourId || !normalizedRowId) {
+function normalizeDvaTourRowSegment(value) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function buildLegacyDvaTourRowId(tourId, rowOrId) {
+  const normalizedTourId = normalizeDvaTourId(tourId);
+  const rawId =
+    typeof rowOrId === "string"
+      ? rowOrId
+      : String(
+          rowOrId?.id || rowOrId?.flightId || rowOrId?.sourceId || rowOrId?.tourRowId || ""
+        ).trim();
+
+  if (!normalizedTourId || !rawId) {
     return "";
   }
 
-  return normalizedRowId.startsWith(`${normalizedTourId}:`)
-    ? normalizedRowId
-    : `${normalizedTourId}:${normalizedRowId}`;
+  return rawId.startsWith(`dva:${normalizedTourId}:`)
+    ? rawId
+    : `dva:${normalizedTourId}:${rawId}`;
+}
+
+function buildTourFlightLookupKey(tourPath, tourRowId) {
+  const normalizedTourPath = String(tourPath || "").trim();
+  const normalizedTourRowId = String(tourRowId || "").trim();
+
+  if (!normalizedTourPath || !normalizedTourRowId) {
+    return "";
+  }
+
+  return `${normalizedTourPath}::${normalizedTourRowId}`;
+}
+
+function buildDvaTourCanonicalRowId(tourId, row) {
+  const normalizedTourId = normalizeDvaTourId(tourId);
+
+  if (!normalizedTourId) {
+    return "";
+  }
+
+  const airline = normalizeDvaTourRowSegment(
+    row?.airline || row?.airlineIcao || row?.airlineName || ""
+  );
+  const flightNumber = normalizeDvaTourRowSegment(
+    row?.flightNumber || row?.tourFlightNumber || row?.flight || ""
+  );
+  const leg = Number.isFinite(Number(row?.leg)) ? `LEG-${Number(row.leg)}` : "";
+  const departure = normalizeDvaTourRowSegment(
+    row?.from || row?.departure || row?.departureIata || row?.departureName || ""
+  );
+  const destination = normalizeDvaTourRowSegment(
+    row?.to || row?.destination || row?.destinationIata || row?.destinationName || ""
+  );
+  const departureTime = normalizeDvaTourRowSegment(
+    row?.departureTime || row?.departureTimeLabel || row?.timeD?.text || ""
+  );
+  const arrivalTime = normalizeDvaTourRowSegment(
+    row?.arrivalTime || row?.arrivalTimeLabel || row?.timeA?.text || ""
+  );
+  const equipment = normalizeDvaTourRowSegment(row?.equipment || row?.aircraft || row?.eqType || "");
+  const route = normalizeDvaTourRowSegment(row?.route || "");
+
+  const segments = [
+    airline ? `airline-${airline}` : "",
+    flightNumber ? `flight-${flightNumber}` : "",
+    leg,
+    departure ? `dep-${departure}` : "",
+    destination ? `arr-${destination}` : "",
+    departureTime ? `dpt-${departureTime}` : "",
+    arrivalTime ? `arrt-${arrivalTime}` : "",
+    equipment ? `eq-${equipment}` : "",
+    route ? `route-${route}` : ""
+  ].filter(Boolean);
+
+  return segments.length ? `dva:${normalizedTourId}:${segments.join(":")}` : "";
 }
 
 function parseTourRoute(route) {
@@ -279,12 +352,24 @@ function normalizeTourRows(tour, rows, progressById = {}) {
   const tourId = normalizeDvaTourId(tour);
   const tourLabel = String(tour?.label || tour?.name || "").trim();
   const tourSourceId = String(tour?.sourceId || tour?.id || "").trim();
+  const legacyRowIdCounts = rows.reduce((counts, row) => {
+    const legacyRowId = buildLegacyDvaTourRowId(tourId, row);
+    if (legacyRowId) {
+      counts.set(legacyRowId, (counts.get(legacyRowId) || 0) + 1);
+    }
+
+    return counts;
+  }, new Map());
 
   return rows.map((row, index) => {
     if (isModernTourFlight(row)) {
-      const rawFlightId = String(row?.flightId || row?.tourRowId || row?.id || "").trim();
-      const flightId = buildDvaTourRowId(tourId, rawFlightId);
-      const progressEntry = progressById?.[flightId];
+      const flightId = buildDvaTourCanonicalRowId(tourId, row);
+      const legacyFlightId = buildLegacyDvaTourRowId(tourId, row);
+      const progressEntry =
+        progressById?.[flightId] ||
+        (legacyFlightId && legacyRowIdCounts.get(legacyFlightId) === 1
+          ? progressById?.[legacyFlightId]
+          : null);
       const tourLeg = index + 1;
       const airline = String(row?.airline || "").trim().toUpperCase();
       const airlineName = String(
@@ -390,11 +475,28 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       ? `${Number(blockMinutesMatch[1])}h ${Number(blockMinutesMatch[2])}m`
       : String(row?.schedule || "").trim();
     const departureTimeLabel = parseTourDepartureTimeLabel(row?.schedule);
-    const flightId = buildDvaTourRowId(
-      tourId,
-      String(row?.id || row?.flightId || row?.tourRowId || "").trim()
-    );
-    const progressEntry = progressById?.[flightId];
+    const flightId = buildDvaTourCanonicalRowId(tourId, {
+      ...row,
+      airline: parsedFlightCode.airline,
+      airlineName: parsedFlightCode.airlineName,
+      flightNumber: normalizedTourFlightNumber,
+      flightCode: normalizedTourFlightCode,
+      from: parsedRoute.from,
+      to: parsedRoute.to,
+      fromAirport: parsedRoute.fromAirport,
+      toAirport: parsedRoute.toAirport,
+      departureTime: departureTimeLabel,
+      arrivalTime: String(row?.arrivalTime || "").trim(),
+      equipment: String(row?.aircraft || row?.equipment || "").trim(),
+      leg: index + 1,
+      route: row?.route || ""
+    });
+    const legacyFlightId = buildLegacyDvaTourRowId(tourId, row);
+    const progressEntry =
+      progressById?.[flightId] ||
+      (legacyFlightId && legacyRowIdCounts.get(legacyFlightId) === 1
+        ? progressById?.[legacyFlightId]
+        : null);
     const tourLeg = index + 1;
 
     return {
@@ -1214,6 +1316,15 @@ function normalizeBoardEntry(entry) {
     simbriefPlan: entry.simbriefPlan || null
   };
 
+  if (baseEntry.isTourFlight && baseEntry.tourPath) {
+    const canonicalTourRowId = buildDvaTourCanonicalRowId(baseEntry.tourPath, baseEntry);
+    if (canonicalTourRowId) {
+      baseEntry.tourRowId = canonicalTourRowId;
+      baseEntry.flightId = canonicalTourRowId;
+      baseEntry.linkedFlightId = canonicalTourRowId;
+    }
+  }
+
   return baseEntry;
 }
 
@@ -1705,13 +1816,27 @@ export default function App() {
       return;
     }
 
+    const rowIds = Array.isArray(selectedTour.rows)
+      ? selectedTour.rows.map((row) => String(row?.tourRowId || "").trim()).filter(Boolean)
+      : [];
+    const duplicateRowIds = [];
+    const seenRowIds = new Set();
+
+    for (const rowId of rowIds) {
+      if (seenRowIds.has(rowId) && !duplicateRowIds.includes(rowId)) {
+        duplicateRowIds.push(rowId);
+        continue;
+      }
+
+      seenRowIds.add(rowId);
+    }
+
     logAppEvent("tour-selection-updated", {
       selectedTourPath: selectedTour.selectionId || selectedTourPath || "",
       selectedTourName: selectedTour.name || selectedTour.label || "",
-      rowCount: Array.isArray(selectedTour.rows) ? selectedTour.rows.length : 0,
-      firstFiveRowIds: Array.isArray(selectedTour.rows)
-        ? selectedTour.rows.slice(0, 5).map((row) => String(row?.tourRowId || "").trim()).filter(Boolean)
-        : []
+      rowCount: rowIds.length,
+      firstFiveRowIds: rowIds.slice(0, 5),
+      duplicateRowIds: duplicateRowIds.slice(0, 10)
     }).catch(() => {});
   }, [isDevToolsEnabled, selectedTour, selectedTourPath]);
 
@@ -1730,11 +1855,11 @@ export default function App() {
     () => buildAccomplishmentRows(selectedAccomplishment, logbookAirportProgress),
     [logbookAirportProgress, selectedAccomplishment]
   );
-  const tourFlightsById = useMemo(
+  const tourFlightsByKey = useMemo(
     () =>
       new Map(
         availableTours.flatMap((tour) =>
-          tour.rows.map((row) => [row.tourRowId, row])
+          tour.rows.map((row) => [buildTourFlightLookupKey(row.tourPath, row.tourRowId), row])
         )
       ),
     [availableTours]
@@ -2643,7 +2768,9 @@ export default function App() {
           return entry;
         }
 
-        const sourceFlight = tourFlightsById.get(entry.tourRowId);
+        const sourceFlight = tourFlightsByKey.get(
+          buildTourFlightLookupKey(entry.tourPath, entry.tourRowId)
+        );
         if (!sourceFlight) {
           return entry;
         }
@@ -2658,7 +2785,7 @@ export default function App() {
         });
       }
       ),
-    [flightBoard, tourFlightsById]
+    [flightBoard, tourFlightsByKey]
   );
   const selectedShortlistFlight =
     shortlist.find((flight) => flight.boardEntryId === expandedBoardFlightId) || null;
@@ -3321,8 +3448,7 @@ export default function App() {
     if (scheduleView === "tours") {
       const normalizedFlightId = String(flightId || "").trim();
       const matchedTourFlight =
-        clickedRow?.isTourFlight === true &&
-        String(clickedRow?.tourRowId || clickedRow?.flightId || "").trim() === normalizedFlightId
+        clickedRow?.isTourFlight === true
           ? clickedRow
           : activeTourRows.find(
               (flight) =>
@@ -3338,6 +3464,7 @@ export default function App() {
       if (isDevToolsEnabled) {
         logAppEvent("tour-row-add-requested", {
           clickedTourRowId: String(flightId || "").trim(),
+          clickedTourPath: String(clickedRow?.tourPath || "").trim(),
           clickedTourRoute: String(matchedTourFlight?.route || "").trim(),
           clickedTourFlight: String(matchedTourFlight?.flightCode || matchedTourFlight?.flightNumber || "").trim(),
           clickedTourLeg: Number.isFinite(matchedTourFlight?.tourLeg)
@@ -4661,7 +4788,12 @@ export default function App() {
 
         const sourceTourFlight =
           selectedShortlistFlight.isTourFlight && selectedShortlistFlight.tourRowId
-            ? tourFlightsById.get(selectedShortlistFlight.tourRowId) || null
+            ? tourFlightsByKey.get(
+                buildTourFlightLookupKey(
+                  selectedShortlistFlight.tourPath,
+                  selectedShortlistFlight.tourRowId
+                )
+              ) || null
             : null;
         const dispatchFlight = sourceTourFlight || currentBoardEntry || selectedShortlistFlight;
         const flightNumber = deriveFlightNumber(dispatchFlight);

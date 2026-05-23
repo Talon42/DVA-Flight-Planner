@@ -49,6 +49,7 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
 
   const normalizeText = (value) => String(value ?? '').trim();
   const normalizeId = (value) => normalizeText(value);
+  const normalizeSegment = (value) => normalizeText(value).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   const normalizeDvaEpochSeconds = (value) => {
     const normalized = normalizeText(value);
     if (!normalized || normalized === '0' || normalized === 'null' || normalized === 'undefined') {
@@ -157,29 +158,30 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
     iata: normalizeText(airport?.iata || '').toUpperCase(),
     name: normalizeText(airport?.name || airport?.airportName || airport?.description || '')
   });
-  const buildFlightId = (tourId, flight, index) => {
-    const explicitId = normalizeId(flight?.id || flight?.flightId || flight?.sourceId);
-    if (explicitId) {
-      return `dva:${tourId}:${explicitId}`;
-    }
-
-    const leg = Number(flight?.leg);
-    if (Number.isFinite(leg)) {
-      return `dva:${tourId}:leg:${leg}`;
-    }
-
-    const airline = normalizeText(flight?.airline || '').toUpperCase();
-    const flightNumber = normalizeText(flight?.flight || flight?.flightNumber || '');
-    const departure = normalizeText(flight?.airportD?.icao || flight?.departure || '').toUpperCase();
-    const destination = normalizeText(flight?.airportA?.icao || flight?.destination || '').toUpperCase();
-    const departureTime = normalizeText(flight?.timeD?.text || flight?.departureTime || '');
-    const arrivalTime = normalizeText(flight?.timeA?.text || flight?.arrivalTime || '');
-    const equipment = normalizeText(flight?.eqType || flight?.equipment || flight?.aircraft || '');
-    const segment = normalizeText(flight?.segment || '');
-    const composite = [tourId, airline, flightNumber, departure, destination, departureTime, arrivalTime, equipment, segment]
+  const buildFlightId = (tourId, flight) => {
+    const airline = normalizeSegment(flight?.airline || flight?.airlineName || '');
+    const flightNumber = normalizeSegment(flight?.flight || flight?.flightNumber || '');
+    const leg = Number.isFinite(Number(flight?.leg)) ? `leg-${Number(flight?.leg)}` : '';
+    const departure = normalizeSegment(flight?.airportD?.icao || flight?.departure || flight?.departureIcao || '');
+    const destination = normalizeSegment(flight?.airportA?.icao || flight?.destination || flight?.destinationIcao || '');
+    const departureTime = normalizeSegment(flight?.timeD?.text || flight?.departureTime || '');
+    const arrivalTime = normalizeSegment(flight?.timeA?.text || flight?.arrivalTime || '');
+    const equipment = normalizeSegment(flight?.eqType || flight?.equipment || flight?.aircraft || '');
+    const route = normalizeSegment(flight?.route || '');
+    const composite = [
+      airline ? `airline-${airline}` : '',
+      flightNumber ? `flight-${flightNumber}` : '',
+      leg,
+      departure ? `dep-${departure}` : '',
+      destination ? `arr-${destination}` : '',
+      departureTime ? `dpt-${departureTime}` : '',
+      arrivalTime ? `arrt-${arrivalTime}` : '',
+      equipment ? `eq-${equipment}` : '',
+      route ? `route-${route}` : ''
+    ]
       .filter(Boolean)
       .join(':');
-    return `dva:${composite || tourId}`;
+    return `dva:dva:${tourId}${composite ? `:${composite}` : ''}`;
   };
   const normalizeTourFlight = (tour, flight, index) => {
     const tourId = normalizeId(tour?.id || tour?.sourceId);
@@ -200,7 +202,7 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
     const route = normalizeText(flight?.route || `${departureAirport.name || departure} (${departure}) - ${destinationAirport.name || destination} (${destination})`);
     const blockMinutes = Number.isFinite(numericDurationMs) ? Math.max(0, Math.round(numericDurationMs / 60000)) : null;
     const blockTimeLabel = formatDurationLabel(numericDurationMs);
-    const flightId = buildFlightId(tourId, flight, index);
+    const flightId = buildFlightId(tourId, flight);
     const segment = normalizeText(flight?.segment || flight?.leg || `Leg ${Number.isFinite(Number(flight?.leg)) ? Number(flight?.leg) : index + 1}`);
 
     return {
