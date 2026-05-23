@@ -68,7 +68,7 @@ function AddonAirportIndicator({ airportCode, addonAirports, missingInDatabase =
   );
 }
 
-function AirlineCell({ flight }) {
+export function AirlineCell({ flight }) {
   const airlineName = flight?.airlineName || "";
   const logoSrc = getAirlineLogo({
     airlineName,

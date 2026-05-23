@@ -47,6 +47,41 @@ for (const row of airlineRows) {
   }
 }
 
+function normalizeAirlineLookupName(airlineName) {
+  return String(airlineName || "")
+    .trim()
+    .replace(/\s+(historic|historical)$/i, "")
+    .trim();
+}
+
+function resolveAirlineLogoIcao({ airlineName, airlineIata, airlineIcao }) {
+  const normalizedName = String(airlineName || "").trim().toUpperCase();
+  if (normalizedName && airlineIcaoByName.has(normalizedName)) {
+    return airlineIcaoByName.get(normalizedName) || "";
+  }
+
+  const normalizedBaseName = normalizeAirlineLookupName(airlineName).toUpperCase();
+  if (normalizedBaseName && airlineIcaoByName.has(normalizedBaseName)) {
+    return airlineIcaoByName.get(normalizedBaseName) || "";
+  }
+
+  const normalizedIata = String(airlineIata || "").trim().toUpperCase();
+  if (normalizedIata && airlineIcaoByIata.has(normalizedIata)) {
+    return airlineIcaoByIata.get(normalizedIata) || "";
+  }
+
+  const explicitIcao = String(airlineIcao || "").trim().toUpperCase();
+  if (explicitIcao && airlineLogoByIcao.has(explicitIcao)) {
+    return explicitIcao;
+  }
+
+  if (/^[A-Z]{3}$/.test(normalizedBaseName) && airlineLogoByIcao.has(normalizedBaseName)) {
+    return normalizedBaseName;
+  }
+
+  return "";
+}
+
 export function getAirlineIcao({ airlineName, airlineIata, airlineIcao }) {
   const explicitIcao = String(airlineIcao || "").trim().toUpperCase();
   if (explicitIcao) {
@@ -56,6 +91,14 @@ export function getAirlineIcao({ airlineName, airlineIata, airlineIcao }) {
   const normalizedName = String(airlineName || "").trim().toUpperCase();
   if (normalizedName && airlineIcaoByName.has(normalizedName)) {
     return airlineIcaoByName.get(normalizedName) || "";
+  }
+
+  const normalizedBaseName = normalizeAirlineLookupName(airlineName).toUpperCase();
+  if (/^[A-Z]{3}$/.test(normalizedBaseName)) {
+    return normalizedBaseName;
+  }
+  if (normalizedBaseName && airlineIcaoByName.has(normalizedBaseName)) {
+    return airlineIcaoByName.get(normalizedBaseName) || "";
   }
 
   const normalizedIata = String(airlineIata || "").trim().toUpperCase();
@@ -68,13 +111,21 @@ export function getAirlineIcao({ airlineName, airlineIata, airlineIcao }) {
 
 export function getAirlineLogo({ airlineName, airlineIata, airlineIcao }) {
   const normalizedName = String(airlineName || "").trim().toUpperCase();
+
   const overrideLogoKey = airlineLogoOverridesByName.get(normalizedName);
 
   if (overrideLogoKey) {
     return airlineLogoByIcao.get(overrideLogoKey) || "";
   }
 
-  const resolvedIcao = getAirlineIcao({ airlineName, airlineIata, airlineIcao });
+  const normalizedBaseName = normalizeAirlineLookupName(airlineName).toUpperCase();
+  const overrideBaseLogoKey = airlineLogoOverridesByName.get(normalizedBaseName);
+
+  if (overrideBaseLogoKey) {
+    return airlineLogoByIcao.get(overrideBaseLogoKey) || "";
+  }
+
+  const resolvedIcao = resolveAirlineLogoIcao({ airlineName, airlineIata, airlineIcao });
 
   return resolvedIcao ? airlineLogoByIcao.get(resolvedIcao) || "" : "";
 }

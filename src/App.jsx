@@ -311,16 +311,16 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       const flightId = String(row?.flightId || row?.tourRowId || row?.id || identity).trim() || identity;
       const airline = String(row?.airline || "").trim().toUpperCase();
       const airlineName = String(
-        row?.airlineName || getAirlineNameByIata(airline) || airline || ""
+        getAirlineNameByIata(airline) || row?.airlineName || airline || ""
       ).trim();
+      const explicitAirlineIcao = String(row?.airlineIcao || "").trim().toUpperCase();
       const airlineIcao = String(
-        row?.airlineIcao ||
+        (explicitAirlineIcao.length === 3 ? explicitAirlineIcao : "") ||
           getAirlineIcao({
             airlineName,
-            airlineIata: airline,
-            airlineIcao: airline
+            airlineIata: airline
           }) ||
-          airline
+          ""
       )
         .trim()
         .toUpperCase();
@@ -1697,8 +1697,7 @@ export default function App() {
             label: String(tour?.label || tour?.name || formatTourLabelFromPath(path)).trim(),
             rows
           };
-        })
-        .sort((left, right) => left.label.localeCompare(right.label)),
+        }),
     [deltaVirtualToursCache, tourProgress]
   );
   const selectedTour = useMemo(() => {

@@ -136,6 +136,7 @@ export default function ScheduleTablePanel({
             hideChips
             showClearAction={false}
             showSingleSelectedLabel
+            prioritizeSelectedOptions={false}
             options={tourOptions}
             selectedValues={selectedTourOption ? [selectedTourOption.selectionId || selectedTourOption.path] : []}
             onChange={(values) => {

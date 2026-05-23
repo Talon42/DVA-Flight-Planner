@@ -1,10 +1,5 @@
 import { formatDuration, formatNumber } from "../../lib/formatters";
-import { getAirlineLogo } from "../../lib/airlineBranding";
-import { cn } from "../ui/cn";
-import { bodyMdTextClassName } from "../ui/typography";
-
-const BODY_CELL_CONTENT_CLASS =
-  "flex h-full min-h-0 w-full items-center leading-none";
+import { AirlineCell } from "./flightTableDefinition";
 
 function getDurationLabel(row) {
   const blockTimeLabel = String(row?.blockTimeLabel || "").trim();
@@ -17,29 +12,6 @@ function getDurationLabel(row) {
   }
 
   return "N/A";
-}
-
-function AirlineCell({ flight }) {
-  const airlineName = flight?.airlineName || "";
-  const logoSrc = getAirlineLogo({
-    airlineName,
-    airlineIata: flight?.airline,
-    airlineIcao: flight?.airlineIcao
-  });
-
-  return (
-    <span className={cn(BODY_CELL_CONTENT_CLASS, "min-w-0 gap-2 whitespace-nowrap")}>
-      {logoSrc ? (
-        <img
-          className="h-5 w-5 shrink-0 object-contain"
-          src={logoSrc}
-          alt=""
-          aria-hidden="true"
-        />
-      ) : null}
-      <span className="min-w-0 truncate">{airlineName}</span>
-    </span>
-  );
 }
 
 export function getTourTableColumns({ viewportWidth }) {
