@@ -67,10 +67,9 @@ export default function DataTable({
   getRowClassName,
   renderRowOverlay,
   rowHeight = TABLE_ROW_HEIGHT,
-  resetKey
+  virtualized = true
 }) {
   const tableRef = useRef(null);
-  const listRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(0);
   const baseColumns = useMemo(
     () => resolveColumns(columns, viewportWidth),
@@ -85,7 +84,7 @@ export default function DataTable({
     [availableWidth, resolvedColumns]
   );
   const bodyRef = useRef(null);
-  const listOuterRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const firstRowId = rows[0] ? getRowId(rows[0]) : "";
   const lastRowId = rows[rows.length - 1] ? getRowId(rows[rows.length - 1]) : "";
   const [visibleRowCount, setVisibleRowCount] = useState(() =>
@@ -93,7 +92,6 @@ export default function DataTable({
   );
   const [listHeight, setListHeight] = useState(320);
   const [headerScrollbarOffset, setHeaderScrollbarOffset] = useState(0);
-  const previousResetKeyRef = useRef(resetKey);
 
   useEffect(() => {
     setVisibleRowCount(Math.min(rows.length, INITIAL_VISIBLE_ROWS));
@@ -125,7 +123,7 @@ export default function DataTable({
   useEffect(() => {
     const bodyNode = bodyRef.current;
 
-    if (!bodyNode) {
+    if (!bodyNode || !virtualized) {
       return undefined;
     }
 
@@ -143,24 +141,7 @@ export default function DataTable({
 
     window.addEventListener("resize", updateListHeight);
     return () => window.removeEventListener("resize", updateListHeight);
-  }, [rows.length, viewportWidth]);
-
-  useEffect(() => {
-    if (resetKey === undefined || previousResetKeyRef.current === resetKey) {
-      return;
-    }
-
-    previousResetKeyRef.current = resetKey;
-    setVisibleRowCount(Math.min(rows.length, INITIAL_VISIBLE_ROWS));
-
-    if (typeof listRef.current?.scrollTo === "function") {
-      listRef.current.scrollTo(0);
-    }
-
-    if (listOuterRef.current) {
-      listOuterRef.current.scrollTop = 0;
-    }
-  }, [resetKey, rows.length]);
+  }, [rows.length, viewportWidth, virtualized]);
 
   const visibleRows = useMemo(
     () => rows.slice(0, visibleRowCount),
@@ -168,16 +149,16 @@ export default function DataTable({
   );
 
   useEffect(() => {
-    const listOuterNode = listOuterRef.current;
+    const scrollNode = scrollContainerRef.current;
 
-    if (!listOuterNode) {
+    if (!scrollNode) {
       setHeaderScrollbarOffset(0);
       return undefined;
     }
 
     const updateHeaderScrollbarOffset = () => {
       setHeaderScrollbarOffset(
-        Math.max(0, listOuterNode.offsetWidth - listOuterNode.clientWidth)
+        Math.max(0, scrollNode.offsetWidth - scrollNode.clientWidth)
       );
     };
 
@@ -185,13 +166,13 @@ export default function DataTable({
 
     if (typeof ResizeObserver === "function") {
       const resizeObserver = new ResizeObserver(updateHeaderScrollbarOffset);
-      resizeObserver.observe(listOuterNode);
+      resizeObserver.observe(scrollNode);
       return () => resizeObserver.disconnect();
     }
 
     window.addEventListener("resize", updateHeaderScrollbarOffset);
     return () => window.removeEventListener("resize", updateHeaderScrollbarOffset);
-  }, [listHeight, visibleRows.length, viewportWidth]);
+  }, [listHeight, visibleRows.length, viewportWidth, virtualized]);
 
   function handleItemsRendered({ visibleStopIndex }) {
     if (
@@ -245,25 +226,49 @@ export default function DataTable({
         />
       </div>
 
-      <div ref={bodyRef} className="min-h-0 w-full min-w-0 flex-1">
-        <List
-          key={resetKey || "default"}
-          ref={listRef}
-          className="flight-list"
-          height={listHeight}
-          itemCount={visibleRows.length}
-          itemData={itemData}
-          itemKey={(index, data) => data.getRowId(data.rows[index]) || index}
-          itemSize={rowHeight}
-          onItemsRendered={handleItemsRendered}
-          outerElementType={TableListOuter}
-          outerRef={listOuterRef}
-          overscanCount={8}
-          width="100%"
+      {virtualized ? (
+        <div ref={bodyRef} className="min-h-0 w-full min-w-0 flex-1">
+          <List
+            className="flight-list"
+            height={listHeight}
+            itemCount={visibleRows.length}
+            itemData={itemData}
+            itemKey={(index, data) => data.getRowId(data.rows[index]) || index}
+            itemSize={rowHeight}
+            onItemsRendered={handleItemsRendered}
+            outerElementType={TableListOuter}
+            outerRef={scrollContainerRef}
+            overscanCount={8}
+            width="100%"
+          >
+            {RowRenderer}
+          </List>
+        </div>
+      ) : (
+        <div
+          ref={scrollContainerRef}
+          className="app-scrollbar relative z-0 min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--surface-table-row)]"
         >
-          {RowRenderer}
-        </List>
-      </div>
+          {rows.map((row) => {
+            const rowId = getRowId(row);
+            return (
+              <TableRow
+                key={rowId}
+                row={row}
+                rowId={rowId}
+                style={{ height: rowHeight }}
+                columns={resolvedColumns}
+                columnTemplate={columnTemplate}
+                isSelected={selectedRowId === rowId}
+                onSelectRow={onSelectRow}
+                onActivateRow={onActivateRow}
+                getRowClassName={getRowClassName}
+                renderRowOverlay={renderRowOverlay}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

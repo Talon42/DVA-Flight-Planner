@@ -161,20 +161,7 @@ const SETTINGS_TABS = [
   { id: "advanced", label: "Advanced" },
   { id: "about", label: "About" }
 ];
-function formatTourLabelFromPath(path) {
-  const normalizedPath = String(path || "").trim();
-  const pathSegment = normalizedPath.includes(":")
-    ? normalizedPath.split(":").pop() || ""
-    : normalizedPath;
-  const fileName = pathSegment.split("/").pop() || "";
-  const stem = fileName.replace(/\.json$/i, "");
-  return stem
-    .replace(/[_-]+/g, " ")
-    .trim()
-    .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
-}
-
-function resolveTourSelectionId(tourOrId) {
+function normalizeDvaTourId(tourOrId) {
   if (typeof tourOrId === "string") {
     const normalizedId = String(tourOrId || "").trim();
     if (!normalizedId) {
@@ -194,43 +181,20 @@ function resolveTourSelectionId(tourOrId) {
     return sourceId.startsWith("dva:") ? sourceId : `dva:${sourceId}`;
   }
 
-  const path = String(tourOrId?.path || tourOrId?.tourPath || "").trim();
-  if (!path) {
-    return "";
-  }
-
-  return path.startsWith("dva:") ? path : `dva:${path}`;
+  return "";
 }
 
-function buildTourRowIdentity(path, row, index) {
-  const explicitId = String(row?.id || row?.flightId || "").trim();
-  if (explicitId) {
-    return `${path}:${explicitId}`;
-  }
-
-  if (Number.isFinite(row?.leg)) {
-    return `${path}:leg:${row.leg}`;
-  }
-
-  const segment = String(row?.segment || "").trim();
-  if (segment) {
-    return `${path}:segment:${segment}`;
-  }
-
-  return `${path}:fallback:${String(row?.flight || "").trim()}:${String(row?.route || "").trim()}:${index}`;
-}
-
-function scopeTourRowId(path, rowId) {
+function buildDvaTourRowId(tourId, rowId) {
+  const normalizedTourId = normalizeDvaTourId(tourId);
   const normalizedRowId = String(rowId || "").trim();
-  if (!normalizedRowId) {
+
+  if (!normalizedTourId || !normalizedRowId) {
     return "";
   }
 
-  if (!path) {
-    return normalizedRowId;
-  }
-
-  return normalizedRowId.startsWith(`${path}:`) ? normalizedRowId : `${path}:${normalizedRowId}`;
+  return normalizedRowId.startsWith(`${normalizedTourId}:`)
+    ? normalizedRowId
+    : `${normalizedTourId}:${normalizedRowId}`;
 }
 
 function parseTourRoute(route) {
@@ -312,18 +276,15 @@ function normalizeTourRows(tour, rows, progressById = {}) {
     return [];
   }
 
-  const rawTourPath = String(tour?.path || tour?.tourPath || tour?.id || tour?.sourceId || "").trim();
-  const tourLabel = String(tour?.label || tour?.name || formatTourLabelFromPath(rawTourPath)).trim();
-  const tourSourceId = String(tour?.sourceId || tour?.id || rawTourPath).trim();
+  const tourId = normalizeDvaTourId(tour);
+  const tourLabel = String(tour?.label || tour?.name || "").trim();
+  const tourSourceId = String(tour?.sourceId || tour?.id || "").trim();
 
   return rows.map((row, index) => {
-    const identity = buildTourRowIdentity(rawTourPath, row, index);
-
     if (isModernTourFlight(row)) {
-      const rawFlightId = String(row?.flightId || row?.tourRowId || row?.id || identity).trim() || identity;
-      const flightId = scopeTourRowId(rawTourPath, rawFlightId);
-      const progressEntry =
-        progressById?.[identity] || progressById?.[rawFlightId] || progressById?.[flightId];
+      const rawFlightId = String(row?.flightId || row?.tourRowId || row?.id || "").trim();
+      const flightId = buildDvaTourRowId(tourId, rawFlightId);
+      const progressEntry = progressById?.[flightId];
       const airline = String(row?.airline || "").trim().toUpperCase();
       const airlineName = String(
         getAirlineNameByIata(airline) || row?.airlineName || airline || ""
@@ -396,7 +357,7 @@ function normalizeTourRows(tour, rows, progressById = {}) {
             ? row.distance
             : null,
         isTourFlight: true,
-        tourPath: rawTourPath,
+        tourPath: tourId,
         tourRowId: flightId,
         tourLabel,
         tourName: String(row?.tourName || tourLabel).trim(),
@@ -427,15 +388,18 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       ? `${Number(blockMinutesMatch[1])}h ${Number(blockMinutesMatch[2])}m`
       : String(row?.schedule || "").trim();
     const departureTimeLabel = parseTourDepartureTimeLabel(row?.schedule);
-    const progressEntry =
-      progressById?.[identity] || progressById?.[String(row?.flightId || "").trim()];
+    const flightId = buildDvaTourRowId(
+      tourId,
+      String(row?.id || row?.flightId || row?.tourRowId || "").trim()
+    );
+    const progressEntry = progressById?.[flightId];
 
     return {
       ...row,
       sourceIndex: index,
       ...parsedRoute,
-      flightId: identity,
-      linkedFlightId: identity,
+      flightId,
+      linkedFlightId: flightId,
       flightCode: normalizedTourFlightCode,
       flightNumber: normalizedTourFlightNumber,
       tourFlightNumber: normalizedTourFlightNumber,
@@ -449,8 +413,8 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       distanceNm: null,
       distanceMi: Number.isFinite(row?.distance_mi) ? row.distance_mi : null,
       isTourFlight: true,
-      tourPath: rawTourPath,
-      tourRowId: identity,
+      tourPath: tourId,
+      tourRowId: flightId,
       tourLabel,
       tourName: tourLabel,
       tourSourceId,
@@ -1704,14 +1668,13 @@ export default function App() {
     () =>
       (Array.isArray(deltaVirtualToursCache?.tours) ? deltaVirtualToursCache.tours : [])
         .map((tour) => {
-          const path = String(tour?.path || tour?.id || tour?.sourceId || "").trim();
-          const selectionId = resolveTourSelectionId(tour);
-          const rows = normalizeTourRows(tour, tour?.rows || tour?.flights || [], tourProgress?.[path]?.rows);
+          const selectionId = normalizeDvaTourId(tour);
+          const rows = normalizeTourRows(tour, tour?.rows || tour?.flights || [], tourProgress?.[selectionId]?.rows);
           return {
             ...tour,
-            path,
+            id: selectionId,
             selectionId,
-            label: String(tour?.label || tour?.name || formatTourLabelFromPath(path)).trim(),
+            label: String(tour?.label || tour?.name || "").trim(),
             rows
           };
         }),
@@ -1731,11 +1694,11 @@ export default function App() {
     }
 
     logAppEvent("tour-selection-updated", {
-      selectedTourPath: selectedTour.selectionId || selectedTour.path || selectedTourPath || "",
+      selectedTourPath: selectedTour.selectionId || selectedTourPath || "",
       selectedTourName: selectedTour.name || selectedTour.label || "",
       rowCount: Array.isArray(selectedTour.rows) ? selectedTour.rows.length : 0,
       firstFiveRowIds: Array.isArray(selectedTour.rows)
-        ? selectedTour.rows.slice(0, 5).map((row) => String(row?.flightId || row?.tourRowId || "").trim()).filter(Boolean)
+        ? selectedTour.rows.slice(0, 5).map((row) => String(row?.tourRowId || "").trim()).filter(Boolean)
         : []
     }).catch(() => {});
   }, [isDevToolsEnabled, selectedTour, selectedTourPath]);
@@ -1759,7 +1722,7 @@ export default function App() {
     () =>
       new Map(
         availableTours.flatMap((tour) =>
-          tour.rows.map((row) => [row.tourRowId || row.flightId, row])
+          tour.rows.map((row) => [row.tourRowId, row])
         )
       ),
     [availableTours]
@@ -1796,7 +1759,7 @@ export default function App() {
   }, [availableTours, scheduleView, selectedTourPath]);
 
   function handleSelectTourPath(nextTourSelectionId) {
-    const nextSelectionId = resolveTourSelectionId(nextTourSelectionId);
+    const nextSelectionId = normalizeDvaTourId(nextTourSelectionId);
     const clickedTour = availableTours.find((tour) => tour.selectionId === nextSelectionId) || null;
 
     if (isDevToolsEnabled) {
@@ -1838,9 +1801,9 @@ export default function App() {
     }
 
     setSelectedTourRowId((current) =>
-      selectedTour?.rows.some((row) => row.flightId === current)
+      selectedTour?.rows.some((row) => row.tourRowId === current)
       ? current
-      : selectedTour?.rows[0]?.flightId || null
+      : selectedTour?.rows[0]?.tourRowId || null
     );
   }, [scheduleView, selectedTour]);
 
@@ -2336,7 +2299,7 @@ export default function App() {
         setSort(savedUiState.sort || DEFAULT_SORT);
         // Always reopen on Flights after a full app restart.
         setScheduleView("flights");
-        setSelectedTourPath(resolveTourSelectionId(savedUiState.selectedTourPath || ""));
+        setSelectedTourPath(normalizeDvaTourId(savedUiState.selectedTourPath || ""));
         setSelectedAccomplishmentName(
           String(savedUiState.selectedAccomplishmentName || "").trim()
         );
@@ -3337,9 +3300,7 @@ export default function App() {
         if (
           current.some(
             (entry) =>
-              entry.isTourFlight &&
-              String(entry.tourPath || "").trim() === matchedTourFlight.tourPath &&
-              String(entry.tourRowId || "").trim() === matchedTourFlight.tourRowId
+              entry.isTourFlight && String(entry.tourRowId || "").trim() === matchedTourFlight.tourRowId
           )
         ) {
           return current;

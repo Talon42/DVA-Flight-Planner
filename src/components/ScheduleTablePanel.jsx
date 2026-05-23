@@ -76,7 +76,7 @@ export default function ScheduleTablePanel({
     ? availableTours.find((tour) => tour.selectionId === selectedTourPath)
     : availableTours[0] || null;
   const tourOptions = availableTours.map((tour) => ({
-    value: tour.selectionId || tour.path,
+    value: tour.selectionId,
     label: tour.label,
     selectedLabel: tour.label,
     keywords: `${tour.label} ${tour.name || ""} ${tour.sourceId || ""}`
@@ -138,7 +138,7 @@ export default function ScheduleTablePanel({
             showSingleSelectedLabel
             prioritizeSelectedOptions={false}
             options={tourOptions}
-            selectedValues={selectedTourOption ? [selectedTourOption.selectionId || selectedTourOption.path] : []}
+            selectedValues={selectedTourOption ? [selectedTourOption.selectionId] : []}
             onChange={(values) => {
               const nextValue = Array.isArray(values) ? values[0] || "" : "";
               onSelectTourPath?.(nextValue);
@@ -187,7 +187,6 @@ export default function ScheduleTablePanel({
             <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
               <ToursTable
                 key={`tour-table-${selectedTourPath || "none"}`}
-                resetKey={selectedTourPath || "none"}
                 rows={tourRows}
                 selectedRowId={selectedTourRowId}
                 viewportWidth={viewportWidth}
