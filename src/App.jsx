@@ -285,6 +285,7 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       const rawFlightId = String(row?.flightId || row?.tourRowId || row?.id || "").trim();
       const flightId = buildDvaTourRowId(tourId, rawFlightId);
       const progressEntry = progressById?.[flightId];
+      const tourLeg = index + 1;
       const airline = String(row?.airline || "").trim().toUpperCase();
       const airlineName = String(
         getAirlineNameByIata(airline) || row?.airlineName || airline || ""
@@ -359,10 +360,11 @@ function normalizeTourRows(tour, rows, progressById = {}) {
         isTourFlight: true,
         tourPath: tourId,
         tourRowId: flightId,
+        tourLeg,
         tourLabel,
         tourName: String(row?.tourName || tourLabel).trim(),
         tourSourceId,
-        segment: String(row?.segment || `Leg ${Number.isFinite(Number(row?.leg)) ? Number(row.leg) : index + 1}`).trim(),
+        segment: String(row?.segment || `Leg ${tourLeg}`).trim(),
         isCompleted: Boolean(progressEntry?.completed),
         completedAt: progressEntry?.completedAt || null,
         completionOrder: Number.isFinite(progressEntry?.completionOrder)
@@ -393,6 +395,7 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       String(row?.id || row?.flightId || row?.tourRowId || "").trim()
     );
     const progressEntry = progressById?.[flightId];
+    const tourLeg = index + 1;
 
     return {
       ...row,
@@ -415,6 +418,7 @@ function normalizeTourRows(tour, rows, progressById = {}) {
       isTourFlight: true,
       tourPath: tourId,
       tourRowId: flightId,
+      tourLeg,
       tourLabel,
       tourName: tourLabel,
       tourSourceId,

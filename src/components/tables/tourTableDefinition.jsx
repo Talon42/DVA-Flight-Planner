@@ -18,6 +18,7 @@ export function getTourTableColumns({ viewportWidth }) {
   const useTabletCompactWidths = viewportWidth <= 1024;
   const compactColumnSizing = useTabletCompactWidths
     ? {
+        tourLeg: { minWidth: 72, flexWeight: 0.65 },
         segment: { minWidth: 66, flexWeight: 0.55 },
         airlineName: { minWidth: 208, flexWeight: 3.75 },
         tourFlightNumber: { minWidth: 106, flexWeight: 1.1 },
@@ -32,6 +33,7 @@ export function getTourTableColumns({ viewportWidth }) {
   const expandedColumnSizing =
     viewportWidth >= 1920
       ? {
+          tourLeg: { minWidth: 86, flexWeight: 0.8 },
           airlineName: { minWidth: 286, flexWeight: 3.4 },
           segment: { minWidth: 82, flexWeight: 1 },
           tourFlightNumber: { minWidth: 116, flexWeight: 1 },
@@ -47,14 +49,16 @@ export function getTourTableColumns({ viewportWidth }) {
 
   return [
     {
-      key: "segment",
-      label: "Leg",
-      compactLabel: "Leg",
+      key: "tourLeg",
+      label: "Tour Leg",
+      compactLabel: "Tour Leg",
       role: "compact",
-      ...compactColumnSizing.segment,
-      ...expandedColumnSizing.segment,
+      minWidth: 72,
+      flexWeight: 0.75,
+      ...compactColumnSizing.tourLeg,
+      ...expandedColumnSizing.tourLeg,
       truncate: true,
-      renderCell: (row) => row.segment
+      renderCell: (row) => row.tourLeg
     },
     {
       key: "airlineName",
@@ -69,7 +73,7 @@ export function getTourTableColumns({ viewportWidth }) {
     },
     {
       key: "tourFlightNumber",
-      label: "Flight",
+      label: "Flight #",
       compactLabel: "FL",
       role: "code",
       minWidth: 104,
@@ -78,6 +82,16 @@ export function getTourTableColumns({ viewportWidth }) {
       ...expandedColumnSizing.tourFlightNumber,
       truncate: true,
       renderCell: (row) => row.tourFlightNumber
+    },
+    {
+      key: "segment",
+      label: "Leg",
+      compactLabel: "Leg",
+      role: "compact",
+      ...compactColumnSizing.segment,
+      ...expandedColumnSizing.segment,
+      truncate: true,
+      renderCell: (row) => row.segment
     },
     {
       key: "aircraft",
