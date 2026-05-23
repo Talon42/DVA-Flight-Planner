@@ -2213,6 +2213,22 @@ export default function App() {
       ) || ACCOMPLISHMENTS[0]
     );
   }, [selectedAccomplishmentName]);
+  const accomplishmentOptions = useMemo(
+    () =>
+      ACCOMPLISHMENTS.map((accomplishment) => {
+        const rows = buildAccomplishmentRows(accomplishment, logbookAirportProgress);
+        const totalCount = rows.length;
+        const completedCount = rows.reduce((count, row) => count + (row.isCompleted ? 1 : 0), 0);
+
+        return {
+          ...accomplishment,
+          totalCount,
+          completedCount,
+          isCompleted: totalCount > 0 && completedCount === totalCount
+        };
+      }),
+    [logbookAirportProgress]
+  );
   const accomplishmentRows = useMemo(
     () => buildAccomplishmentRows(selectedAccomplishment, logbookAirportProgress),
     [logbookAirportProgress, selectedAccomplishment]
@@ -6029,7 +6045,7 @@ export default function App() {
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="grid min-h-0 flex-1 gap-4 [grid-template-columns:minmax(0,1.42fr)_minmax(224px,0.9fr)] bp-1024:gap-3 bp-1024:[grid-template-columns:minmax(0,1.48fr)_minmax(248px,0.9fr)] bp-1400:[grid-template-columns:minmax(0,1.55fr)_minmax(260px,0.92fr)]">
-          <ScheduleWorkspacePanel
+            <ScheduleWorkspacePanel
             scheduleExists={Boolean(schedule)}
             scheduleView={scheduleView}
             theme={theme}
@@ -6050,7 +6066,7 @@ export default function App() {
                   }
                 : null
             }
-            accomplishmentOptions={ACCOMPLISHMENTS}
+            accomplishmentOptions={accomplishmentOptions}
             selectedAccomplishmentName={selectedAccomplishment?.name || ""}
             onPrimaryViewChange={handlePrimaryViewChange}
             onSelectTourPath={handleSelectTourPath}

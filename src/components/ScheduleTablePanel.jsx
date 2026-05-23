@@ -59,6 +59,15 @@ function renderTourOptionContent(option) {
   );
 }
 
+function renderAccomplishmentOptionContent(option) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="min-w-0 truncate">{String(option?.selectedLabel || option?.label || "").trim()}</span>
+      {option?.isCompleted ? <TourStatusBadge label="Completed" tone="completed" /> : null}
+    </span>
+  );
+}
+
 function formatTourDateLabel(epochSeconds) {
   const normalizedEpochSeconds = Number(epochSeconds);
   if (!Number.isFinite(normalizedEpochSeconds) || normalizedEpochSeconds <= 0) {
@@ -98,6 +107,7 @@ export default function ScheduleTablePanel({
   tourRows,
   selectedTourRowId,
   onSelectTourPath,
+  onSelectAccomplishmentName,
   onShowAccomplishmentFlights,
   onSortFlights,
   onToggleTimeDisplayMode,
@@ -184,7 +194,10 @@ export default function ScheduleTablePanel({
     value: accomplishment.name,
     label: accomplishment.name,
     selectedLabel: accomplishment.name,
-    keywords: `${accomplishment.name} ${accomplishment.requirement} ${accomplishment.airports.join(" ")}`
+    isCompleted: Boolean(accomplishment.isCompleted),
+    keywords: `${accomplishment.name} ${accomplishment.requirement} ${accomplishment.airports.join(" ")} ${
+      accomplishment.isCompleted ? "completed" : ""
+    }`
   }));
 
   if (isDutyMode) {
@@ -297,6 +310,7 @@ export default function ScheduleTablePanel({
             hideChips
             showClearAction={false}
             showSingleSelectedLabel
+            renderOptionContent={renderAccomplishmentOptionContent}
             options={accomplishmentSelectOptions}
             selectedValues={selectedAccomplishmentName ? [selectedAccomplishmentName] : []}
             onChange={(values) => onSelectAccomplishmentName?.(values[0] || "")}
