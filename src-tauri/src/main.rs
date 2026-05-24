@@ -1766,6 +1766,18 @@ fn clear_user_data(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_main_devtools(app: AppHandle) -> Result<(), String> {
+    // The frontend context menu uses this command so dev mode can open the
+    // main webview inspector without exposing a separate debug window.
+    let Some(window) = app.get_webview_window("main") else {
+        return Err("Main window is not available.".to_string());
+    };
+
+    window.open_devtools();
+    Ok(())
+}
+
+#[tauri::command]
 fn read_addon_airport_cache(app: AppHandle) -> Result<AddonAirportCache, String> {
     read_addon_airport_cache_from_disk(&app)
 }
@@ -2408,6 +2420,7 @@ fn main() {
             submit_deltava_draft_flight_report,
             fetch_delta_virtual_tour_briefing,
             clear_user_data,
+            open_main_devtools,
             start_simbrief_dispatch,
             refresh_simbrief_dispatch,
             fetch_simbrief_aircraft_types,
