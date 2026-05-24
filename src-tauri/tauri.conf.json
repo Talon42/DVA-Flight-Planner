@@ -1,37 +1,33 @@
 {
-    "$schema":  "https://schema.tauri.app/config/2",
-    "productName":  "DVA Flight Planner",
-    "version":  "0.6.5-beta",
-    "identifier":  "dvaflightplanner",
-    "build":  {
-                  "beforeDevCommand":  "npm run dev",
-                  "devUrl":  "http://localhost:1420",
-                  "beforeBuildCommand":  "npm run build",
-                  "frontendDist":  "../dist"
-              },
-    "app":  {
-                "windows":  [
-                                {
-                                    "label":  "main",
-                                    "title":  "DVA Flight Planner",
-                                    "width":  1680,
-                                    "height":  1020,
-                                    "backgroundColor":  "#DBE4EF",
-                                    "minWidth":  1024,
-                                    "minHeight":  768,
-                                    "resizable":  true,
-                                    "fullscreen":  false
-                                }
-                            ],
-                "security":  {
-                                 "csp":  "default-src \u0027self\u0027; script-src \u0027self\u0027; style-src \u0027self\u0027 \u0027unsafe-inline\u0027; img-src \u0027self\u0027 data: blob: asset: https:; font-src \u0027self\u0027 data:; connect-src \u0027self\u0027 https://api.github.com https://api.protomaps.com https://api.rainviewer.com https://www.deltava.org https://www.simbrief.com https://simbrief.com https://*.simbrief.com https://navigraph.com https://*.navigraph.com https://dva-simbrief-signer.foxtwomodels.workers.dev http://127.0.0.1:* http://localhost:*; worker-src \u0027self\u0027 blob:; child-src \u0027self\u0027 blob:; object-src \u0027none\u0027; base-uri \u0027none\u0027; frame-ancestors \u0027none\u0027"
-                             }
-            },
-    "bundle":  {
-                   "active":  true,
-                   "targets":  [
-                                   "nsis",
-                                   "msi"
-                               ]
-               }
+  "productName": "DVA Flight Planner",
+  "version": "0.6.5-beta",
+  "identifier": "dvaflightplanner",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DVA Flight Planner",
+        "width": 1680,
+        "height": 1020,
+        "backgroundColor": "#DBE4EF",
+        "minWidth": 1024,
+        "minHeight": 768,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: https:; font-src 'self' data:; connect-src 'self' https://api.github.com https://api.protomaps.com https://api.rainviewer.com https://www.deltava.org https://www.simbrief.com https://simbrief.com https://*.simbrief.com https://navigraph.com https://*.navigraph.com https://dva-simbrief-signer.foxtwomodels.workers.dev http://127.0.0.1:* http://localhost:*; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' blob: asset:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"]
+  }
 }
