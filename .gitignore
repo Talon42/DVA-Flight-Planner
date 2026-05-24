@@ -6,7 +6,7 @@ src-tauri/target-temp/
 test-data/pfpxsched.xml
 deltava-pfpxsched-*.xml
 src-tauri/deltava-pfpxsched-*.xml
-/simbrief/
+simbrief/
 AGENTS.md
 git_workflow.md
 release.ps1
@@ -15,3 +15,4 @@ Flight Planner App.code-workspace
 skills-lock.json
 .agents
 .npm-cache
+docs/instructions
