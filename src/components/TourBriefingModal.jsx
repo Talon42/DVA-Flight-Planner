@@ -25,6 +25,85 @@ function decodeBase64ToBlobUrl(base64, contentType) {
   return URL.createObjectURL(blob);
 }
 
+const PDF_EMBED_SIZING_MAX_ATTEMPTS = 8;
+
+function applyEmbeddedPdfSizing(iframe, attempt = 0) {
+  if (!iframe || !iframe.isConnected) {
+    return;
+  }
+
+  const scheduleRetry = () => {
+    if (attempt >= PDF_EMBED_SIZING_MAX_ATTEMPTS) {
+      return;
+    }
+
+    const nextAttempt = attempt + 1;
+    const retry = () => applyEmbeddedPdfSizing(iframe, nextAttempt);
+    if (attempt < 3 && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(retry);
+    } else {
+      window.setTimeout(retry, 50);
+    }
+  };
+
+  let embeddedDocument = null;
+  try {
+    embeddedDocument = iframe.contentDocument || iframe.contentWindow?.document || null;
+  } catch {
+    scheduleRetry();
+    return;
+  }
+
+  if (!embeddedDocument) {
+    scheduleRetry();
+    return;
+  }
+
+  const pdfEmbed = embeddedDocument.querySelector('embed[type="application/pdf"]');
+  if (!pdfEmbed) {
+    scheduleRetry();
+    return;
+  }
+
+  // Packaged Tauri/Chromium creates a same-origin internal PDF wrapper that can default to a tiny height,
+  // so we normalize the generated PDF document after the iframe loads.
+  const { documentElement, body } = embeddedDocument;
+  if (documentElement) {
+    Object.assign(documentElement.style, {
+      width: "100%",
+      height: "100%",
+      minHeight: "100%",
+      margin: "0",
+      padding: "0",
+      overflow: "hidden"
+    });
+  }
+
+  if (body) {
+    Object.assign(body.style, {
+      width: "100%",
+      height: "100%",
+      minHeight: "100%",
+      margin: "0",
+      padding: "0",
+      overflow: "hidden",
+      backgroundColor: "rgb(51, 51, 51)"
+    });
+  }
+
+  Object.assign(pdfEmbed.style, {
+    position: "fixed",
+    inset: "0",
+    display: "block",
+    width: "100vw",
+    height: "100vh",
+    minHeight: "100vh",
+    border: "0"
+  });
+  pdfEmbed.setAttribute("width", "100%");
+  pdfEmbed.setAttribute("height", "100%");
+}
+
 export function isAllowedDvaTourBriefingUrl(value) {
   const normalized = String(value || "").trim();
   if (!normalized) {
@@ -152,6 +231,10 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
 
   const briefingTitle = `${String(tourName || "").trim() || "Tour"} Briefing`;
 
+  function handlePdfLoad(event) {
+    applyEmbeddedPdfSizing(event.currentTarget);
+  }
+
   return (
     <div
       className={cn(
@@ -240,41 +323,12 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
             </div>
           ) : (
             <div className="h-full w-full">
-              <object
-                data={pdfUrl}
-                type="application/pdf"
+              <iframe
+                src={pdfUrl}
                 title={briefingTitle}
-                className="h-full w-full"
-              >
-                <iframe
-                  src={pdfUrl}
-                  title={briefingTitle}
-                  className="h-full w-full border-0"
-                />
-                <div className="grid h-full place-items-center px-6 py-10 text-center">
-                  <div className="grid max-w-lg justify-items-center gap-4">
-                    <h3 className="m-0 text-[1.1rem] font-semibold text-[var(--text-heading)]">
-                      Your PDF viewer could not render the briefing
-                    </h3>
-                    <p className={cn("m-0", bodySmTextClassName, "text-[var(--text-muted)]")}>
-                      {pdfFilename ? `File: ${pdfFilename}` : "Open the briefing in your browser instead."}
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-none"
-                        onClick={() => openBriefingInBrowser(briefingUrl)}
-                      >
-                        Open in Browser
-                      </Button>
-                      <Button variant="ghost" size="sm" className="rounded-none" onClick={onClose}>
-                        Close
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </object>
+                className="h-full w-full border-0"
+                onLoad={handlePdfLoad}
+              />
             </div>
           )}
         </div>

@@ -7,6 +7,7 @@ import {
   useRef,
   useState
 } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { DateTime } from "luxon";
 import FilterBar from "./components/FilterBar";
 import { AddonAirportPanel } from "./components/FilterBar";
@@ -35,6 +36,8 @@ import {
 import {
   fieldInputClassName,
   fieldLabelClassName,
+  dropdownOptionRowClassName,
+  dropdownPanelClassName,
   gridClassNames,
   getPlannerTabStateClassName,
   plannerTabClassName,
@@ -1954,6 +1957,8 @@ export default function App() {
   const [isDevToolsEnabled, setIsDevToolsEnabled] = useState(readSavedDevToolsEnabled);
   const [devWindowWidth, setDevWindowWidth] = useState(readSavedDevWindowWidth);
   const [isDevWindowMenuOpen, setIsDevWindowMenuOpen] = useState(false);
+  const [isDevContextMenuOpen, setIsDevContextMenuOpen] = useState(false);
+  const [devContextMenuPosition, setDevContextMenuPosition] = useState({ x: 0, y: 0 });
   const [viewportSize, setViewportSize] = useState(initialViewportSize);
   const [plannerControlsCollapsed, setPlannerControlsCollapsed] = useState(
     getDefaultPlannerControlsCollapsed()
@@ -2047,6 +2052,7 @@ export default function App() {
   const dutyBoardOverwriteConfirmResolverRef = useRef(null);
   const hasPerformedStartupUpdateCheckRef = useRef(false);
   const devWindowMenuRef = useRef(null);
+  const devContextMenuRef = useRef(null);
   const deferredFilters = useDeferredValue(filters);
   const deferredDutyFilters = useDeferredValue(dutyFilters);
   const isDesktopAddonScanAvailable = isTauriRuntime();
@@ -2464,19 +2470,24 @@ export default function App() {
   }, [devWindowWidth]);
 
   useEffect(() => {
-    if (!isDevWindowMenuOpen) {
+    if (!isDevWindowMenuOpen && !isDevContextMenuOpen) {
       return undefined;
     }
 
     function handlePointerDown(event) {
-      if (!devWindowMenuRef.current?.contains(event.target)) {
+      if (
+        !devWindowMenuRef.current?.contains(event.target) &&
+        !devContextMenuRef.current?.contains(event.target)
+      ) {
         setIsDevWindowMenuOpen(false);
+        setIsDevContextMenuOpen(false);
       }
     }
 
     function handleKeyDown(event) {
       if (event.key === "Escape") {
         setIsDevWindowMenuOpen(false);
+        setIsDevContextMenuOpen(false);
       }
     }
 
@@ -2486,26 +2497,37 @@ export default function App() {
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isDevWindowMenuOpen]);
+  }, [isDevContextMenuOpen, isDevWindowMenuOpen]);
 
   useEffect(() => {
+    // Dev mode swaps the browser's default right-click menu for a menu that can open Dev Tools.
     function handleContextMenu(event) {
-      if (isDevToolsEnabled) {
+      event.preventDefault();
+
+      if (!isDevToolsEnabled || !isDesktopAddonScanAvailable) {
+        setIsDevWindowMenuOpen(false);
+        setIsDevContextMenuOpen(false);
         return;
       }
 
-      event.preventDefault();
+      setIsDevWindowMenuOpen(false);
+      setIsDevContextMenuOpen(true);
+      setDevContextMenuPosition({
+        x: Math.max(12, Math.min(event.clientX, Math.max(12, window.innerWidth - 236))),
+        y: Math.max(12, Math.min(event.clientY, Math.max(12, window.innerHeight - 72)))
+      });
     }
 
     window.addEventListener("contextmenu", handleContextMenu);
     return () => {
       window.removeEventListener("contextmenu", handleContextMenu);
     };
-  }, [isDevToolsEnabled]);
+  }, [isDesktopAddonScanAvailable, isDevToolsEnabled]);
 
   useEffect(() => {
     if (!isDevToolsEnabled) {
       setIsDevWindowMenuOpen(false);
+      setIsDevContextMenuOpen(false);
     }
   }, [isDevToolsEnabled]);
 
@@ -5467,10 +5489,27 @@ export default function App() {
     setIsDevToolsEnabled(nextValue);
     if (!nextValue) {
       setIsDevWindowMenuOpen(false);
+      setIsDevContextMenuOpen(false);
     }
     logAppEvent(nextValue ? "dev-tools-enabled" : "dev-tools-disabled", {
       selectedWidth: devWindowWidth
     }).catch(() => {});
+  }
+
+  async function handleOpenMainDevtools() {
+    if (!isDesktopAddonScanAvailable || !isDevToolsEnabled) {
+      return;
+    }
+
+    setIsDevWindowMenuOpen(false);
+    setIsDevContextMenuOpen(false);
+
+    try {
+      await invoke("open_main_devtools");
+    } catch (error) {
+      setStatusMessage(error.message || "Unable to open Dev Tools.");
+      await logAppError("open-devtools-failed", error);
+    }
   }
 
   async function handleSelectDevWindowWidth(width) {
@@ -6119,6 +6158,32 @@ export default function App() {
           onOpenReleasePage={handleOpenReleasePage}
         />
       </main>
+
+      {isDevContextMenuOpen ? (
+        <div
+          ref={devContextMenuRef}
+          className={cn("fixed z-50 min-w-[236px]", dropdownPanelClassName)}
+          style={{
+            left: `${devContextMenuPosition.x}px`,
+            top: `${devContextMenuPosition.y}px`
+          }}
+          role="menu"
+          aria-label="Developer tools context menu"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <Button
+            variant="ghost"
+            className={cn("justify-start rounded-none", dropdownOptionRowClassName)}
+            onClick={handleOpenMainDevtools}
+            role="menuitem"
+          >
+            Open Dev Tools
+          </Button>
+        </div>
+      ) : null}
 
       {isSettingsOpen ? (
         <ModalBackdrop onClick={handleCloseSettings}>
