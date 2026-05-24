@@ -240,41 +240,11 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
             </div>
           ) : (
             <div className="h-full w-full">
-              <object
-                data={pdfUrl}
-                type="application/pdf"
+              <iframe
+                src={pdfUrl}
                 title={briefingTitle}
-                className="h-full w-full"
-              >
-                <iframe
-                  src={pdfUrl}
-                  title={briefingTitle}
-                  className="h-full w-full border-0"
-                />
-                <div className="grid h-full place-items-center px-6 py-10 text-center">
-                  <div className="grid max-w-lg justify-items-center gap-4">
-                    <h3 className="m-0 text-[1.1rem] font-semibold text-[var(--text-heading)]">
-                      Your PDF viewer could not render the briefing
-                    </h3>
-                    <p className={cn("m-0", bodySmTextClassName, "text-[var(--text-muted)]")}>
-                      {pdfFilename ? `File: ${pdfFilename}` : "Open the briefing in your browser instead."}
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-none"
-                        onClick={() => openBriefingInBrowser(briefingUrl)}
-                      >
-                        Open in Browser
-                      </Button>
-                      <Button variant="ghost" size="sm" className="rounded-none" onClick={onClose}>
-                        Close
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </object>
+                className="h-full w-full border-0"
+              />
             </div>
           )}
         </div>
