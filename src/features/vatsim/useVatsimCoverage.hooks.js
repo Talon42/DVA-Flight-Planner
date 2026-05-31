@@ -3,8 +3,8 @@ import { buildVatsimCoverageIndexFromRenderedFeatures } from "../../domain/vatsi
 import { useVatsimNetwork } from "./useVatsimNetwork.hooks.js";
 
 // Builds airport-level VATSIM coverage from the shared live ATC network snapshot.
-export function useVatsimCoverage({ enabled, airportCatalog } = {}) {
-  const vatsimNetwork = useVatsimNetwork(Boolean(enabled));
+export function useVatsimCoverage({ enabled, airportCatalog, refreshVersion } = {}) {
+  const vatsimNetwork = useVatsimNetwork(Boolean(enabled), refreshVersion);
   const vatsimCoverageIndex = useMemo(
     () =>
       buildVatsimCoverageIndexFromRenderedFeatures({

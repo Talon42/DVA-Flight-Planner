@@ -228,7 +228,7 @@ function buildVatsimDebugSnapshot(snapshot = {}) {
 }
 
 // Owns the VATSIM fetch lifecycle, keeps the last successful snapshot in memory, and polls while enabled.
-export function useVatsimNetwork(enabled) {
+export function useVatsimNetwork(enabled, refreshVersion = 0) {
   const [networkSnapshot, setNetworkSnapshot] = useState(EMPTY_VATSIM_NETWORK);
   const [networkState, setNetworkState] = useState("idle");
   const [networkError, setNetworkError] = useState(null);
@@ -337,7 +337,7 @@ export function useVatsimNetwork(enabled) {
 
       isFetchingRef.current = false;
     };
-  }, [enabled]);
+  }, [enabled, refreshVersion]);
 
   return {
     ...networkSnapshot,

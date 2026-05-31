@@ -2,6 +2,7 @@ import {
   startTransition,
   useDeferredValue,
   useEffect,
+  useCallback,
   useMemo,
   useRef,
   useState
@@ -120,6 +121,7 @@ export default function App() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [dutyFilters, setDutyFilters] = useState(DEFAULT_DUTY_FILTERS);
   const [filterUiVersion, setFilterUiVersion] = useState(0);
+  const [vatsimRefreshVersion, setVatsimRefreshVersion] = useState(0);
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [selectedTourPath, setSelectedTourPath] = useState("");
   const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
@@ -733,11 +735,12 @@ export default function App() {
     () => normalizeFilters(deferredFilters, filterBounds),
     [deferredFilters, filterBounds]
   );
-  const shouldLoadVatsimCoverage =
-    normalizedDeferredFilters.vatsimFilterEnabled || scheduleView === "map";
+  // VATSIM starts once the app shell is ready so schedule indicators are available immediately.
+  const shouldLoadVatsimCoverage = isStartupReady;
   const vatsimCoverage = useVatsimCoverage({
     enabled: shouldLoadVatsimCoverage,
-    airportCatalog: airportOptions
+    airportCatalog: airportOptions,
+    refreshVersion: vatsimRefreshVersion
   });
   // Treat non-ready snapshots as unknown coverage so VATSIM filters fail closed.
   const activeVatsimCoverageIndex =
@@ -820,6 +823,9 @@ export default function App() {
     sort,
     tourProgress
   });
+  const handleVatsimScheduleSyncComplete = useCallback(() => {
+    setVatsimRefreshVersion((current) => current + 1);
+  }, []);
   const {
     handleCloseDvaSyncWarning,
     handleDeltaVirtualSync,
@@ -831,6 +837,7 @@ export default function App() {
     dvaLastName,
     isDevToolsEnabled,
     processImportedSchedule,
+    onScheduleSyncComplete: handleVatsimScheduleSyncComplete,
     setDerivedTourProgress,
     setDeltaVirtualToursCache,
     setDvaHasPassword,

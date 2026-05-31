@@ -32,6 +32,7 @@ export function useDeltaVirtualSync({
   dvaLastName = "",
   isDevToolsEnabled = false,
   processImportedSchedule,
+  onScheduleSyncComplete,
   setDerivedTourProgress,
   setDeltaVirtualToursCache,
   setDvaHasPassword,
@@ -138,6 +139,7 @@ export function useDeltaVirtualSync({
       });
       setStatusMessage?.("Processing Delta Virtual schedule...");
       await processImportedSchedule?.(syncedFile, "deltava-sync");
+      onScheduleSyncComplete?.();
       setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());
       await refreshSavedCredentials();
       if (syncedFile.warnings?.length) {
@@ -262,6 +264,7 @@ export function useDeltaVirtualSync({
     dvaHasPassword,
     dvaLastName,
     processImportedSchedule,
+    onScheduleSyncComplete,
     refreshSavedCredentials,
     reloadTourProgress,
     setDeltaVirtualToursCache,
