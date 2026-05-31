@@ -41,6 +41,39 @@ function isLikelyLabelLayer(layer) {
   return Boolean(textField) || !iconImage;
 }
 
+function isLikelyRoadShieldLayer(layer) {
+  if (!layer || layer.type !== "symbol") {
+    return false;
+  }
+
+  const layerId = String(layer.id || "").toLowerCase();
+  const sourceLayer = String(layer["source-layer"] || "").toLowerCase();
+  const layout = layer.layout || {};
+  const iconImage = String(layout["icon-image"] || "").toLowerCase();
+  const textField = layout["text-field"];
+  const combined = `${layerId} ${sourceLayer} ${iconImage}`;
+
+  return (
+    combined.includes("shield") ||
+    combined.includes("road-shield") ||
+    combined.includes("road shield") ||
+    combined.includes("highway-shield") ||
+    combined.includes("highway shield") ||
+    combined.includes("motorway-shield") ||
+    combined.includes("motorway shield") ||
+    combined.includes("route-shield") ||
+    combined.includes("route shield") ||
+    combined.includes("road_number") ||
+    combined.includes("road-number") ||
+    combined.includes("road number") ||
+    (
+      combined.includes("road") &&
+      combined.includes("number") &&
+      (Boolean(iconImage) || Boolean(textField))
+    )
+  );
+}
+
 function buildEnglishLabelExpression() {
   return [
     "coalesce",
@@ -109,6 +142,27 @@ export function setLabelLayerVisibility(map, labelsEnabled) {
     try {
       if (map.getLayoutProperty(layer.id, "visibility") !== nextVisibility) {
         map.setLayoutProperty(layer.id, "visibility", nextVisibility);
+      }
+    } catch {
+      // Some styles expose transient or non-standard layers; ignore those safely.
+    }
+  }
+}
+
+export function suppressRoadShieldLayers(map) {
+  const style = map?.getStyle?.();
+  if (!style?.layers?.length) {
+    return;
+  }
+
+  for (const layer of style.layers) {
+    if (!isLikelyRoadShieldLayer(layer)) {
+      continue;
+    }
+
+    try {
+      if (map.getLayoutProperty(layer.id, "visibility") !== "none") {
+        map.setLayoutProperty(layer.id, "visibility", "none");
       }
     } catch {
       // Some styles expose transient or non-standard layers; ignore those safely.

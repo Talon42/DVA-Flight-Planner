@@ -1,0 +1,22 @@
+export const DEFAULT_DUTY_FILTERS = {
+  buildMode: "airline",
+  selectedAirline: "",
+  locationKind: "country",
+  selectedCountry: "",
+  selectedRegion: "",
+  selectedOriginAirport: "",
+  flightLengthMin: null,
+  flightLengthMax: null,
+  distanceMin: null,
+  distanceMax: null,
+  selectedEquipment: "",
+  addonMatchMode: "either",
+  addonFilterEnabled: false,
+  addonPriorityEnabled: false,
+  uniqueDestinationsEnabled: false,
+  timeOrderEnabled: false,
+  minTurnMinutes: 60,
+  dutyTargetMode: "strict",
+  dutyLength: 2,
+  resolvedAirline: ""
+};

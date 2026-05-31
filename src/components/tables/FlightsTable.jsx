@@ -9,14 +9,15 @@ export default function FlightsTable({
   timeDisplayMode,
   viewportWidth,
   addonAirports,
+  vatsimCoverageIndex,
   onSort,
   onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow
 }) {
   const columns = useMemo(
-    () => getFlightTableColumns({ addonAirports, timeDisplayMode, viewportWidth }),
-    [addonAirports, timeDisplayMode, viewportWidth]
+    () => getFlightTableColumns({ addonAirports, timeDisplayMode, viewportWidth, vatsimCoverageIndex }),
+    [addonAirports, timeDisplayMode, viewportWidth, vatsimCoverageIndex]
   );
 
   return (

@@ -1,6 +1,6 @@
 // Shared filter field controls used by Basic Filters and Duty Schedule.
 import { Children, isValidElement, useEffect, useMemo, useRef, useState } from "react";
-import { getAirlineLogo } from "../../lib/airlineBranding";
+import { getAirlineLogo } from "../../domain/airlines/airlineBranding.js";
 import { SearchableMultiSelect } from "./SearchableSelect";
 import {
   fieldBodyClassName,

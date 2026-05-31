@@ -9,7 +9,7 @@ export function Eyebrow({ className = "", children, ...props }) {
   return (
     <p
       className={cn(
-        "mb-2.5 mt-0 text-[var(--delta-red)] dark:text-white",
+        "mb-2.5 mt-0 text-[var(--eyebrow)]",
         labelTextClassName,
         className
       )}

@@ -14,6 +14,8 @@ export default function ScheduleWorkspacePanel({
   pendingMapFlightPathViewMode,
   pendingMapFitToRoute,
   onConsumePendingMapFitToRoute,
+  mapOptions,
+  setMapOptions,
   availableTours = [],
   selectedTourPath,
   selectedTourCompletionSummary = null,
@@ -30,6 +32,7 @@ export default function ScheduleWorkspacePanel({
   flightSort,
   timeDisplayMode,
   addonAirports,
+  vatsimNetwork,
   tourRows,
   selectedTourRowId,
   tourSyncMessage,
@@ -48,8 +51,6 @@ export default function ScheduleWorkspacePanel({
   filterBounds,
   onDutyFilterChange,
   onBuildDutySchedule,
-  onRerollDutySchedule,
-  canRerollDutySchedule,
   onReset,
   dutyBuildWarning,
   onClearDutyBuildWarning
@@ -79,6 +80,8 @@ export default function ScheduleWorkspacePanel({
               pendingMapFlightPathViewMode={pendingMapFlightPathViewMode}
               pendingMapFitToRoute={pendingMapFitToRoute}
               onConsumePendingMapFitToRoute={onConsumePendingMapFitToRoute}
+              mapOptions={mapOptions}
+              setMapOptions={setMapOptions}
               availableTours={availableTours}
               selectedTourPath={selectedTourPath}
               selectedTourCompletionSummary={selectedTourCompletionSummary}
@@ -94,6 +97,7 @@ export default function ScheduleWorkspacePanel({
               flightSort={flightSort}
               timeDisplayMode={timeDisplayMode}
               addonAirports={addonAirports}
+              vatsimNetwork={vatsimNetwork}
               tourRows={tourRows}
               selectedTourRowId={selectedTourRowId}
               tourSyncMessage={tourSyncMessage}
@@ -111,8 +115,6 @@ export default function ScheduleWorkspacePanel({
               filterBounds={filterBounds}
               onDutyFilterChange={onDutyFilterChange}
               onBuildDutySchedule={onBuildDutySchedule}
-              onRerollDutySchedule={onRerollDutySchedule}
-              canRerollDutySchedule={canRerollDutySchedule}
               onReset={onReset}
               dutyBuildWarning={dutyBuildWarning}
               onClearDutyBuildWarning={onClearDutyBuildWarning}

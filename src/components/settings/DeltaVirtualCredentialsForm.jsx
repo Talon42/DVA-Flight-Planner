@@ -25,6 +25,7 @@ export function DeltaVirtualCredentialsForm({
   onPasswordBlur,
   onSaveCredentials,
   onClearCredentials,
+  onResetSyncSession,
   onSaved
 }) {
   const isOnboardingMode = mode === "onboarding";
@@ -110,9 +111,14 @@ export function DeltaVirtualCredentialsForm({
           {isSaving ? "Saving..." : saveButtonLabel}
         </Button>
         {!isOnboardingMode ? (
-          <Button variant="danger" onClick={onClearCredentials} disabled={isSaving || isClearDisabled}>
-            Clear Saved Credentials
-          </Button>
+          <>
+            <Button variant="danger" onClick={onClearCredentials} disabled={isSaving || isClearDisabled}>
+              Clear Saved Credentials
+            </Button>
+            <Button variant="ghost" onClick={onResetSyncSession} disabled={isSaving || isClearDisabled}>
+              Reset DVA Sync Session
+            </Button>
+          </>
         ) : null}
       </div>
 

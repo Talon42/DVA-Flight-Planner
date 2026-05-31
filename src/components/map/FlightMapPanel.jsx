@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../ui/Button";
 import { cn } from "../ui/cn";
-import { getAirportByIcao } from "../../lib/airportCatalog";
-import { logAppError, logAppEvent } from "../../lib/appLog";
+import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
+import { logAppError, logAppEvent } from "../../services/logging/appLog.client.js";
 import { MAP_MODE_OPTIONS, resolveMapModeConfig } from "./mapModes";
 import FlightMapView from "./FlightMapView";
 
 const EMPTY_ROUTE_FEATURE_COLLECTION = {
+  type: "FeatureCollection",
+  features: []
+};
+const EMPTY_VATSIM_FEATURE_COLLECTION = {
   type: "FeatureCollection",
   features: []
 };
@@ -203,24 +207,35 @@ function buildRouteFeatures(entry, routeCoordinates = null) {
   return features;
 }
 
+// Owns the map feature toggles and assembles route plus live ATC data for the view.
 export default function FlightMapPanel({
   theme,
   activeFlightBoardEntries = [],
   expandedBoardFlightId = null,
+  vatsimNetwork = null,
   initialFlightPathViewMode = "all",
   initialFitToRoute = false,
-  onConsumeInitialFitToRoute
+  onConsumeInitialFitToRoute,
+  mapOptions,
+  setMapOptions
 }) {
   const [mapMode, setMapMode] = useState("standard");
   const [flightPathViewMode, setFlightPathViewMode] = useState(
     initialFlightPathViewMode === "selected" ? "selected" : "all"
   );
   const [shouldFitToRoute, setShouldFitToRoute] = useState(Boolean(initialFitToRoute));
-  const [satelliteOverlay, setSatelliteOverlay] = useState(false);
-  const [radarEnabled, setRadarEnabled] = useState(false);
-  const [labelsEnabled, setLabelsEnabled] = useState(true);
   const lastRouteLogSignatureRef = useRef("");
   const isDarkTheme = theme === "dark";
+  const satelliteOverlay = Boolean(mapOptions?.satelliteOverlay);
+  const radarEnabled = Boolean(mapOptions?.radarEnabled);
+  const labelsEnabled = mapOptions?.labelsEnabled !== false;
+  const liveAtcEnabled = Boolean(mapOptions?.liveAtcEnabled);
+  const vatsimAirportGeoJson =
+    vatsimNetwork?.airportCoverageFeatureCollection || EMPTY_VATSIM_FEATURE_COLLECTION;
+  const vatsimRegionalGeoJson =
+    vatsimNetwork?.regionalCoverageFeatureCollection || EMPTY_VATSIM_FEATURE_COLLECTION;
+  const vatsimRegionalOutlineGeoJson =
+    vatsimNetwork?.regionalCoverageOutlineFeatureCollection || EMPTY_VATSIM_FEATURE_COLLECTION;
 
   useEffect(() => {
     if (initialFlightPathViewMode !== "selected") {
@@ -238,6 +253,20 @@ export default function FlightMapPanel({
     setShouldFitToRoute(true);
     onConsumeInitialFitToRoute?.();
   }, [initialFitToRoute, onConsumeInitialFitToRoute]);
+
+  // Toggles one persisted map option while preserving any future option fields.
+  function handleToggleMapOption(key) {
+    if (!setMapOptions) {
+      return;
+    }
+
+    setMapOptions((current) => {
+      return {
+        ...(current || {}),
+        [key]: !current?.[key]
+      };
+    });
+  }
 
   const mapConfig = useMemo(
     () => resolveMapModeConfig(mapMode, theme),
@@ -409,11 +438,16 @@ export default function FlightMapPanel({
         endpointPopupMode={flightPathViewMode === "selected" ? "persistent" : "hover"}
         fitToRoute={flightPathViewMode === "selected" || shouldFitToRoute}
         labelsEnabled={labelsEnabled}
+        liveAtcEnabled={liveAtcEnabled}
+        vatsimAirportGeoJson={vatsimAirportGeoJson}
+        vatsimRegionalGeoJson={vatsimRegionalGeoJson}
+        vatsimRegionalOutlineGeoJson={vatsimRegionalOutlineGeoJson}
         satelliteOverlay={satelliteOverlay}
         radarEnabled={radarEnabled}
-        onToggleSatellite={() => setSatelliteOverlay((current) => !current)}
-        onToggleRadar={() => setRadarEnabled((current) => !current)}
-        onToggleLabels={() => setLabelsEnabled((current) => !current)}
+        onToggleLiveAtc={() => handleToggleMapOption("liveAtcEnabled")}
+        onToggleSatellite={() => handleToggleMapOption("satelliteOverlay")}
+        onToggleRadar={() => handleToggleMapOption("radarEnabled")}
+        onToggleLabels={() => handleToggleMapOption("labelsEnabled")}
         theme={theme}
       />
     </div>

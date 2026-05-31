@@ -1,5 +1,5 @@
-import { formatDuration, formatNumber } from "../../lib/formatters";
-import { AirlineCell } from "./flightTableDefinition";
+import { formatDuration, formatNumber } from "../../domain/formatting/formatters.js";
+import { AirlineCell, AirportIndicatorContent } from "./flightTableDefinition";
 
 function getDurationLabel(row) {
   if (Number.isFinite(row?.blockMinutes)) {
@@ -13,7 +13,7 @@ function getDurationLabel(row) {
   return "N/A";
 }
 
-export function getTourTableColumns({ viewportWidth }) {
+export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCoverageIndex }) {
   const useTabletCompactWidths = viewportWidth <= 1024;
   const useAbbreviatedTourTimingLabels = viewportWidth < 1400;
   const compactColumnSizing = useTabletCompactWidths
@@ -111,7 +111,17 @@ export function getTourTableColumns({ viewportWidth }) {
       role: "compact",
       ...compactColumnSizing.from,
       ...expandedColumnSizing.from,
-      renderCell: (row) => row.from
+      renderCell: (row) => (
+        <AirportIndicatorContent
+          airportCode={row.from}
+          addonAirports={addonAirports}
+          vatsimCoverageIndex={vatsimCoverageIndex}
+          missingInDatabase={
+            Array.isArray(row?.missingAirportIcaos) &&
+            row.missingAirportIcaos.includes(row.from)
+          }
+        />
+      )
     },
     {
       key: "to",
@@ -119,7 +129,17 @@ export function getTourTableColumns({ viewportWidth }) {
       role: "compact",
       ...compactColumnSizing.to,
       ...expandedColumnSizing.to,
-      renderCell: (row) => row.to
+      renderCell: (row) => (
+        <AirportIndicatorContent
+          airportCode={row.to}
+          addonAirports={addonAirports}
+          vatsimCoverageIndex={vatsimCoverageIndex}
+          missingInDatabase={
+            Array.isArray(row?.missingAirportIcaos) &&
+            row.missingAirportIcaos.includes(row.to)
+          }
+        />
+      )
     },
     {
       key: "departureTime",

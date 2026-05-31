@@ -1,4 +1,4 @@
-import { parseScheduleImport } from "../lib/import/parseSchedule";
+import { parseScheduleImport } from "../services/workers/parseSchedule.js";
 
 self.onmessage = (event) => {
   try {

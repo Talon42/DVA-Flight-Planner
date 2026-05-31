@@ -8,7 +8,7 @@ import { bodySmTextClassName, sectionTitleTextClassName, supportCopyTextClassNam
 import { DeltaVirtualCredentialsForm } from "./settings/DeltaVirtualCredentialsForm";
 import { SimBriefSettingsForm } from "./settings/SimBriefSettingsForm";
 import { AddonManagementSetup } from "./settings/AddonManagementSetup";
-import { logAppError } from "../lib/appLog";
+import { logAppError } from "../services/logging/appLog.client.js";
 
 class GettingStartedModalErrorBoundary extends Component {
   constructor(props) {

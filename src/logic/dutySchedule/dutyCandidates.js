@@ -32,7 +32,7 @@ function matchesAddonAirport(flight, addonAirports, matchMode) {
   }
 }
 
-// Falls back to the imported compatibility hint when runway limits are unavailable.
+// Falls back to the imported compatibility hint when range limits are unavailable.
 function supportsEquipmentHint(flight, selectedEquipment) {
   const compatibleEquipment = Array.isArray(flight?.compatibleEquipment)
     ? flight.compatibleEquipment

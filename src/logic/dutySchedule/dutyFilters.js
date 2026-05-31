@@ -1,5 +1,5 @@
 // Duty filter normalization keeps App.jsx from owning Duty Schedule defaulting rules.
-import { DEFAULT_DUTY_FILTERS } from "../../lib/constants";
+import { DEFAULT_DUTY_FILTERS } from "./dutySchedule.constants.js";
 import { buildDutyOriginAirportOptions } from "./dutyLocation";
 import { resolveDutyAirlineForLocation } from "./dutyAirlines";
 

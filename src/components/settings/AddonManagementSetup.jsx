@@ -4,7 +4,7 @@ import { cn } from "../ui/cn";
 import { bodySmTextClassName } from "../ui/typography";
 import { mutedTextClassName, mutedTextStackClassName, insetPanelClassName } from "../ui/patterns";
 import SectionHeader from "../ui/SectionHeader";
-import { formatNumber } from "../../lib/formatters";
+import { formatNumber } from "../../domain/formatting/formatters.js";
 
 // Renders the addon folder picker and saved folder list for onboarding.
 export function AddonManagementSetup({

@@ -91,6 +91,8 @@ export default function ScheduleTablePanel({
   pendingMapFlightPathViewMode,
   pendingMapFitToRoute,
   onConsumePendingMapFitToRoute,
+  mapOptions,
+  setMapOptions,
   availableTours = [],
   selectedTourPath,
   selectedTourCompletionSummary = null,
@@ -104,6 +106,7 @@ export default function ScheduleTablePanel({
   flightSort,
   timeDisplayMode,
   addonAirports,
+  vatsimNetwork,
   tourRows,
   selectedTourRowId,
   onSelectTourPath,
@@ -123,8 +126,6 @@ export default function ScheduleTablePanel({
   filterBounds,
   onDutyFilterChange,
   onBuildDutySchedule,
-  onRerollDutySchedule,
-  canRerollDutySchedule,
   onReset,
   dutyBuildWarning,
   onClearDutyBuildWarning
@@ -212,8 +213,6 @@ export default function ScheduleTablePanel({
         filterBounds={filterBounds}
         onDutyFilterChange={onDutyFilterChange}
         onBuildDutySchedule={onBuildDutySchedule}
-        onRerollDutySchedule={onRerollDutySchedule}
-        canRerollDutySchedule={canRerollDutySchedule}
         onReset={onReset}
         dutyBuildWarning={dutyBuildWarning}
         onClearDutyBuildWarning={onClearDutyBuildWarning}
@@ -342,15 +341,17 @@ export default function ScheduleTablePanel({
                 rows={tourRows}
                 selectedRowId={selectedTourRowId}
                 viewportWidth={viewportWidth}
+                addonAirports={addonAirports}
+                vatsimCoverageIndex={vatsimNetwork?.vatsimCoverageIndex || null}
                 onSelectRow={onSelectRow}
                 onActivateRow={onActivateRow}
               />
 
               {showCompletedTourOverlay ? (
                 <div
-                  className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[var(--surface)] p-4 dark:bg-[var(--surface-elevated)]"
+                  className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[var(--surface)] p-4 dark:bg-[#0A182B]"
                 >
-                  <div className="pointer-events-auto grid w-full max-w-md gap-4 border border-[color:var(--line)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(10,24,43,0.2)] dark:bg-[var(--surface-elevated)] dark:shadow-[0_18px_48px_rgba(0,0,0,0.36)]">
+                  <div className="pointer-events-auto grid w-full max-w-md gap-4 border border-[color:var(--line)] bg-[var(--surface)] p-5 shadow-[0_18px_48px_rgba(10,24,43,0.2)] dark:bg-[#10243B] dark:shadow-[0_18px_48px_rgba(0,0,0,0.36)]">
                     <div className="grid gap-2">
                       <p className="m-0 text-[0.78rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                         Congratulations!
@@ -389,9 +390,12 @@ export default function ScheduleTablePanel({
               theme={theme}
               activeFlightBoardEntries={activeFlightBoardEntries}
               expandedBoardFlightId={expandedBoardFlightId}
+              vatsimNetwork={vatsimNetwork}
               initialFlightPathViewMode={pendingMapFlightPathViewMode || "all"}
               initialFitToRoute={pendingMapFitToRoute}
               onConsumeInitialFitToRoute={onConsumePendingMapFitToRoute}
+              mapOptions={mapOptions}
+              setMapOptions={setMapOptions}
             />
           </div>
         ) : (
@@ -403,6 +407,7 @@ export default function ScheduleTablePanel({
               timeDisplayMode={timeDisplayMode}
               viewportWidth={viewportWidth}
               addonAirports={addonAirports}
+              vatsimCoverageIndex={vatsimNetwork?.vatsimCoverageIndex || null}
               onSort={onSortFlights}
               onToggleTimeDisplayMode={onToggleTimeDisplayMode}
               onSelectRow={onSelectRow}

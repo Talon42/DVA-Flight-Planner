@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
 import Button from "../ui/Button";
 import { cn } from "../ui/cn";
-import { setLabelLayerTextLanguage, setLabelLayerVisibility } from "./mapTheme";
+import {
+  setLabelLayerTextLanguage,
+  setLabelLayerVisibility,
+  suppressRoadShieldLayers
+} from "./mapTheme";
+import VatsimAirportPopup from "../../features/vatsim/VatsimAirportPopup.jsx";
+import VatsimRegionPopup from "../../features/vatsim/VatsimRegionPopup.jsx";
 
 const INITIAL_VIEW_STATE = {
   longitude: -96,
@@ -31,6 +37,24 @@ const ROUTE_ENDPOINT_DOT_RADIUS = 3;
 const ROUTE_ENDPOINT_HOVER_RADIUS = 14;
 const SATELLITE_TILE_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const VATSIM_AIRPORT_SOURCE_ID = "vatsim-live-atc-airports";
+const VATSIM_AIRPORT_LAYER_ID = "vatsim-live-atc-airport-markers";
+const VATSIM_AIRPORT_HALO_LAYER_ID = "vatsim-live-atc-airport-halo";
+const VATSIM_REGION_SOURCE_ID = "vatsim-live-atc-regions";
+const VATSIM_REGION_OUTLINE_SOURCE_ID = "vatsim-live-atc-region-outlines";
+const VATSIM_REGION_CENTER_FILL_LAYER_ID = "vatsim-live-atc-center-fill";
+const VATSIM_REGION_CENTER_OUTLINE_LAYER_ID = "vatsim-live-atc-center-outline";
+const VATSIM_REGION_TERMINAL_FILL_LAYER_ID = "vatsim-live-atc-terminal-fill";
+const VATSIM_REGION_TERMINAL_OUTLINE_LAYER_ID = "vatsim-live-atc-terminal-outline";
+// Sector layers are reserved for a future advanced sector-detail mode.
+// Default Live ATC regional display does not emit sector features.
+const VATSIM_REGION_SECTOR_FILL_LAYER_ID = "vatsim-live-atc-sector-fill";
+const VATSIM_REGION_SECTOR_OUTLINE_LAYER_ID = "vatsim-live-atc-sector-outline";
+const VATSIM_CALLOUT_WIDTH = 320;
+const VATSIM_CALLOUT_HEIGHT = 240;
+const VATSIM_CALLOUT_GAP = 12;
+const VATSIM_CALLOUT_EDGE_PADDING = 10;
+const EMPTY_VATSIM_REGION_FEATURES = [];
 
 const ROUTE_LINE_LAYER = {
   id: ROUTE_LAYER_ID,
@@ -81,6 +105,99 @@ const ROUTE_ENDPOINT_HOVER_LAYER = {
     "circle-radius": ROUTE_ENDPOINT_HOVER_RADIUS,
     "circle-color": "#ffffff",
     "circle-opacity": 0
+  }
+};
+
+const VATSIM_REGION_CENTER_FILL_LAYER = {
+  id: VATSIM_REGION_CENTER_FILL_LAYER_ID,
+  type: "fill",
+  source: VATSIM_REGION_SOURCE_ID,
+  filter: [
+    "all",
+    ["==", ["get", "role"], "active-region"],
+    ["==", ["get", "kind"], "center"]
+  ],
+  paint: {
+    "fill-color": "rgba(200,16,46,0.10)",
+    "fill-outline-color": "rgba(200,16,46,0.28)"
+  }
+};
+
+const VATSIM_REGION_CENTER_OUTLINE_LAYER = {
+  id: VATSIM_REGION_CENTER_OUTLINE_LAYER_ID,
+  type: "line",
+  source: VATSIM_REGION_OUTLINE_SOURCE_ID,
+  filter: [
+    "all",
+    ["==", ["get", "role"], "active-region"],
+    ["==", ["get", "kind"], "center"]
+  ],
+  paint: {
+    "line-color": "rgba(200,16,46,0.45)",
+    "line-width": 1.25,
+    "line-opacity": 0.85
+  }
+};
+
+const VATSIM_REGION_TERMINAL_FILL_LAYER = {
+  id: VATSIM_REGION_TERMINAL_FILL_LAYER_ID,
+  type: "fill",
+  source: VATSIM_REGION_SOURCE_ID,
+  filter: [
+    "all",
+    ["==", ["get", "role"], "active-region"],
+    ["==", ["get", "kind"], "terminal"]
+  ],
+  paint: {
+    "fill-color": "rgba(245,158,11,0.12)",
+    "fill-outline-color": "rgba(245,158,11,0.32)"
+  }
+};
+
+const VATSIM_REGION_TERMINAL_OUTLINE_LAYER = {
+  id: VATSIM_REGION_TERMINAL_OUTLINE_LAYER_ID,
+  type: "line",
+  source: VATSIM_REGION_OUTLINE_SOURCE_ID,
+  filter: [
+    "all",
+    ["==", ["get", "role"], "active-region"],
+    ["==", ["get", "kind"], "terminal"]
+  ],
+  paint: {
+    "line-color": "rgba(245,158,11,0.45)",
+    "line-width": 1.25,
+    "line-opacity": 0.85
+  }
+};
+
+const VATSIM_REGION_SECTOR_FILL_LAYER = {
+  id: VATSIM_REGION_SECTOR_FILL_LAYER_ID,
+  type: "fill",
+  source: VATSIM_REGION_SOURCE_ID,
+  filter: [
+    "all",
+    ["==", ["get", "role"], "active-region"],
+    ["==", ["get", "kind"], "sector"]
+  ],
+  paint: {
+    "fill-color": "rgba(59,130,246,0.10)",
+    "fill-outline-color": "rgba(59,130,246,0.30)"
+  }
+};
+
+const VATSIM_REGION_SECTOR_OUTLINE_LAYER = {
+  id: VATSIM_REGION_SECTOR_OUTLINE_LAYER_ID,
+  type: "line",
+  source: VATSIM_REGION_OUTLINE_SOURCE_ID,
+  filter: [
+    "all",
+    ["==", ["get", "role"], "active-region"],
+    ["==", ["get", "kind"], "sector"]
+  ],
+  paint: {
+    "line-color": "rgba(59,130,246,0.45)",
+    "line-width": 1.25,
+    "line-opacity": 0.85
   }
 };
 
@@ -252,6 +369,155 @@ function rectsOverlap(a, b) {
     a.bottom <= b.top ||
     a.top >= b.bottom
   );
+}
+
+function clampValue(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function chooseVatsimAirportCalloutPlacement(point, viewportWidth, viewportHeight) {
+  if (!point || !Number.isFinite(viewportWidth) || !Number.isFinite(viewportHeight)) {
+    return null;
+  }
+
+  const maxLeft = Math.max(
+    VATSIM_CALLOUT_EDGE_PADDING,
+    viewportWidth - VATSIM_CALLOUT_EDGE_PADDING - VATSIM_CALLOUT_WIDTH
+  );
+  const maxTop = Math.max(
+    VATSIM_CALLOUT_EDGE_PADDING,
+    viewportHeight - VATSIM_CALLOUT_EDGE_PADDING - VATSIM_CALLOUT_HEIGHT
+  );
+  const candidates = [
+    {
+      left: point.x - VATSIM_CALLOUT_WIDTH / 2,
+      top: point.y - VATSIM_CALLOUT_HEIGHT - VATSIM_CALLOUT_GAP
+    },
+    {
+      left: point.x + VATSIM_CALLOUT_GAP,
+      top: point.y - VATSIM_CALLOUT_HEIGHT / 2
+    },
+    {
+      left: point.x - VATSIM_CALLOUT_WIDTH / 2,
+      top: point.y + VATSIM_CALLOUT_GAP
+    },
+    {
+      left: point.x - VATSIM_CALLOUT_WIDTH - VATSIM_CALLOUT_GAP,
+      top: point.y - VATSIM_CALLOUT_HEIGHT / 2
+    }
+  ];
+
+  let bestCandidate = null;
+
+  for (const candidate of candidates) {
+    const left = clampValue(candidate.left, VATSIM_CALLOUT_EDGE_PADDING, maxLeft);
+    const top = clampValue(candidate.top, VATSIM_CALLOUT_EDGE_PADDING, maxTop);
+    const rect = {
+      left,
+      top,
+      right: left + VATSIM_CALLOUT_WIDTH,
+      bottom: top + VATSIM_CALLOUT_HEIGHT
+    };
+    const edgeMargin = Math.min(
+      rect.left - VATSIM_CALLOUT_EDGE_PADDING,
+      rect.top - VATSIM_CALLOUT_EDGE_PADDING,
+      viewportWidth - VATSIM_CALLOUT_EDGE_PADDING - rect.right,
+      viewportHeight - VATSIM_CALLOUT_EDGE_PADDING - rect.bottom
+    );
+    const pointDistance = Math.hypot(
+      point.x - clampValue(point.x, rect.left, rect.right),
+      point.y - clampValue(point.y, rect.top, rect.bottom)
+    );
+    const score = edgeMargin * 100 + pointDistance;
+
+    if (!bestCandidate || score > bestCandidate.score) {
+      bestCandidate = {
+        left,
+        top,
+        score
+      };
+    }
+  }
+
+  return bestCandidate;
+}
+
+function normalizePropertyList(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // fall through
+    }
+
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getVatsimRegionFeatureKey(properties) {
+  const displayFeatureKey = String(properties?.displayFeatureKey || "").trim();
+  if (displayFeatureKey) {
+    return `display:${displayFeatureKey}`;
+  }
+
+  const boundarySourceId = String(properties?.boundarySourceId || "").trim();
+  if (boundarySourceId) {
+    return `boundary:${boundarySourceId}`;
+  }
+
+  const sourceId = String(properties?.sourceId || "").trim();
+  if (sourceId) {
+    return `source:${sourceId}`;
+  }
+
+  const regionId = String(properties?.regionId || properties?.id || "").trim();
+  const kind = String(properties?.kind || "").trim();
+  const source = String(properties?.source || "").trim();
+  const callsigns = normalizePropertyList(properties?.callsigns);
+  const callsignKey = callsigns.join("|");
+  if (kind || source || regionId || callsignKey) {
+    return [kind, source, regionId, callsignKey].filter(Boolean).join("::");
+  }
+
+  const name = String(properties?.name || "").trim();
+  if (name) {
+    return name;
+  }
+
+  return callsignKey;
+}
+
+function getUniqueVatsimRegionFeatures(features) {
+  const uniqueFeatures = [];
+  const seenKeys = new Set();
+
+  for (const feature of features || []) {
+    if (feature?.properties?.role !== "active-region") {
+      continue;
+    }
+
+    const key = getVatsimRegionFeatureKey(feature.properties);
+    if (!key || seenKeys.has(key)) {
+      continue;
+    }
+
+    seenKeys.add(key);
+    uniqueFeatures.push(feature);
+  }
+
+  return uniqueFeatures;
 }
 
 function buildProjectedRouteSegments(map, featureCollection) {
@@ -509,6 +775,7 @@ function LayerToggleRow({ label, enabled, isDarkTheme, onClick }) {
   );
 }
 
+// Renders the MapLibre scene, route overlays, and live airport/regional ATC layers.
 export default function FlightMapView({
   mapStyle,
   projection,
@@ -517,8 +784,13 @@ export default function FlightMapView({
   endpointPopupMode = "hover",
   fitToRoute = false,
   labelsEnabled,
+  liveAtcEnabled,
+  vatsimAirportGeoJson,
+  vatsimRegionalGeoJson,
+  vatsimRegionalOutlineGeoJson,
   satelliteOverlay,
   radarEnabled,
+  onToggleLiveAtc,
   onToggleSatellite,
   onToggleRadar,
   onToggleLabels,
@@ -534,13 +806,65 @@ export default function FlightMapView({
   const pendingStyleSyncRef = useRef(false);
   const lastRouteFitSignatureRef = useRef("");
   const calloutAnimationFrameRef = useRef(0);
+  const vatsimCalloutAnimationFrameRef = useRef(0);
+  const vatsimRegionCalloutAnimationFrameRef = useRef(0);
   const [hoveredEndpointKey, setHoveredEndpointKey] = useState(null);
   const [hoveredEndpointCallout, setHoveredEndpointCallout] = useState(null);
   const [persistentEndpointCallouts, setPersistentEndpointCallouts] = useState([]);
+  const [selectedVatsimAirportIcao, setSelectedVatsimAirportIcao] = useState(null);
+  const [selectedVatsimAirportCallout, setSelectedVatsimAirportCallout] = useState(null);
+  const [selectedVatsimRegionKeys, setSelectedVatsimRegionKeys] = useState([]);
+  const [selectedVatsimRegionClickCoordinate, setSelectedVatsimRegionClickCoordinate] = useState(null);
+  const [selectedVatsimRegionCallout, setSelectedVatsimRegionCallout] = useState(null);
   const isDarkTheme = theme === "dark";
   const hasFlightPathFeatures = Boolean(flightPathGeoJson?.features?.length);
+  const hasVatsimAirportFeatures = Boolean(vatsimAirportGeoJson?.features?.length);
+  const hasVatsimRegionalFeatures = Boolean(vatsimRegionalGeoJson?.features?.length);
+  const hasVatsimRegionalOutlineFeatures = Boolean(vatsimRegionalOutlineGeoJson?.features?.length);
   const routeBounds = useMemo(() => getFeatureCollectionBounds(flightPathGeoJson), [flightPathGeoJson]);
   const isPersistentEndpointPopupMode = endpointPopupMode === "persistent";
+  const selectedVatsimAirportFeature = useMemo(() => {
+    if (!selectedVatsimAirportIcao) {
+      return null;
+    }
+
+    return (
+      vatsimAirportGeoJson?.features?.find(
+        (feature) =>
+          feature?.properties?.airportIcao === selectedVatsimAirportIcao &&
+          feature?.properties?.role === "active-airport"
+      ) || null
+    );
+  }, [selectedVatsimAirportIcao, vatsimAirportGeoJson]);
+
+  // Clears selected airport popup state without forcing redundant rerenders.
+  const clearSelectedVatsimAirport = useCallback(() => {
+    setSelectedVatsimAirportIcao((current) => (current ? null : current));
+    setSelectedVatsimAirportCallout((current) => (current ? null : current));
+  }, []);
+
+  // Clears selected regional popup stack state without forcing redundant rerenders.
+  const clearSelectedVatsimRegions = useCallback(() => {
+    setSelectedVatsimRegionKeys((current) => (current.length ? [] : current));
+    setSelectedVatsimRegionClickCoordinate((current) => (current ? null : current));
+    setSelectedVatsimRegionCallout((current) => (current ? null : current));
+  }, []);
+
+  const selectedVatsimRegionFeatures = useMemo(() => {
+    if (!selectedVatsimRegionKeys.length) {
+      return EMPTY_VATSIM_REGION_FEATURES;
+    }
+
+    const selectedKeySet = new Set(selectedVatsimRegionKeys);
+    return (vatsimRegionalGeoJson?.features || []).filter((feature) => {
+        if (feature?.properties?.role !== "active-region") {
+          return false;
+        }
+
+        return selectedKeySet.has(getVatsimRegionFeatureKey(feature.properties));
+      });
+  }, [selectedVatsimRegionKeys, vatsimRegionalGeoJson]);
+  const selectedVatsimRegionFeature = selectedVatsimRegionFeatures[0] || null;
   const hoveredEndpointLabel = useMemo(() => {
     if (isPersistentEndpointPopupMode || !hoveredEndpointKey) {
       return null;
@@ -700,6 +1024,134 @@ export default function FlightMapView({
     });
   }, [updatePersistentEndpointCallouts]);
 
+  const updateSelectedVatsimAirportCallout = useCallback(() => {
+    const map = mapRef.current?.getMap?.();
+    const container = containerRef.current;
+    const feature = selectedVatsimAirportFeature;
+    if (!map || !container || !map.isStyleLoaded?.() || !feature) {
+      setSelectedVatsimAirportCallout(null);
+      return;
+    }
+
+    const coordinates = feature?.geometry?.coordinates;
+    const longitude = Array.isArray(coordinates) ? coordinates[0] : null;
+    const latitude = Array.isArray(coordinates) ? coordinates[1] : null;
+    const point = toScreenPoint(map, longitude, latitude);
+    if (!point) {
+      setSelectedVatsimAirportCallout(null);
+      return;
+    }
+
+    const canvas = map.getCanvas?.();
+    const viewportWidth = canvas?.clientWidth || container.clientWidth;
+    const viewportHeight = canvas?.clientHeight || container.clientHeight;
+    if (
+      !Number.isFinite(viewportWidth) ||
+      !Number.isFinite(viewportHeight) ||
+      viewportWidth <= 0 ||
+      viewportHeight <= 0
+    ) {
+      setSelectedVatsimAirportCallout(null);
+      return;
+    }
+
+    const placement = chooseVatsimAirportCalloutPlacement(point, viewportWidth, viewportHeight);
+    if (!placement) {
+      setSelectedVatsimAirportCallout(null);
+      return;
+    }
+
+    setSelectedVatsimAirportCallout({
+      ...feature.properties,
+      longitude,
+      latitude,
+      left: placement.left,
+      top: placement.top
+    });
+  }, [selectedVatsimAirportFeature]);
+
+  const scheduleSelectedVatsimAirportCalloutUpdate = useCallback(() => {
+    if (typeof window === "undefined") {
+      updateSelectedVatsimAirportCallout();
+      return;
+    }
+
+    if (vatsimCalloutAnimationFrameRef.current) {
+      return;
+    }
+
+    vatsimCalloutAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      vatsimCalloutAnimationFrameRef.current = 0;
+      updateSelectedVatsimAirportCallout();
+    });
+  }, [updateSelectedVatsimAirportCallout]);
+
+  const updateSelectedVatsimRegionCallout = useCallback(() => {
+    const map = mapRef.current?.getMap?.();
+    const container = containerRef.current;
+    const feature = selectedVatsimRegionFeature;
+
+    if (!map || !container || !map.isStyleLoaded?.() || !feature || !selectedVatsimRegionClickCoordinate) {
+      setSelectedVatsimRegionCallout(null);
+      return;
+    }
+
+    const point = toScreenPoint(
+      map,
+      selectedVatsimRegionClickCoordinate.longitude,
+      selectedVatsimRegionClickCoordinate.latitude
+    );
+    if (!point) {
+      setSelectedVatsimRegionCallout(null);
+      return;
+    }
+
+    const canvas = map.getCanvas?.();
+    const viewportWidth = canvas?.clientWidth || container.clientWidth;
+    const viewportHeight = canvas?.clientHeight || container.clientHeight;
+    if (
+      !Number.isFinite(viewportWidth) ||
+      !Number.isFinite(viewportHeight) ||
+      viewportWidth <= 0 ||
+      viewportHeight <= 0
+    ) {
+      setSelectedVatsimRegionCallout(null);
+      return;
+    }
+
+    const placement = chooseVatsimAirportCalloutPlacement(point, viewportWidth, viewportHeight);
+    if (!placement) {
+      setSelectedVatsimRegionCallout(null);
+      return;
+    }
+
+    setSelectedVatsimRegionCallout({
+      ...feature.properties,
+      regions: selectedVatsimRegionFeatures.map((selectedFeature) => selectedFeature.properties),
+      regionCount: selectedVatsimRegionFeatures.length,
+      longitude: selectedVatsimRegionClickCoordinate.longitude,
+      latitude: selectedVatsimRegionClickCoordinate.latitude,
+      left: placement.left,
+      top: placement.top
+    });
+  }, [selectedVatsimRegionClickCoordinate, selectedVatsimRegionFeature, selectedVatsimRegionFeatures]);
+
+  const scheduleSelectedVatsimRegionCalloutUpdate = useCallback(() => {
+    if (typeof window === "undefined") {
+      updateSelectedVatsimRegionCallout();
+      return;
+    }
+
+    if (vatsimRegionCalloutAnimationFrameRef.current) {
+      return;
+    }
+
+    vatsimRegionCalloutAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      vatsimRegionCalloutAnimationFrameRef.current = 0;
+      updateSelectedVatsimRegionCallout();
+    });
+  }, [updateSelectedVatsimRegionCallout]);
+
   const syncMapLayers = useCallback(
     async () => {
       const syncGeneration = syncGenerationRef.current + 1;
@@ -733,6 +1185,7 @@ export default function FlightMapView({
 
       setLabelLayerTextLanguage(map, theme);
       setLabelLayerVisibility(map, labelsEnabled);
+      suppressRoadShieldLayers(map);
 
       if (satelliteOverlay) {
         map.addSource(SATELLITE_SOURCE_ID, {
@@ -792,7 +1245,7 @@ export default function FlightMapView({
         }
       }
     },
-    [labelsEnabled, radarEnabled, satelliteOverlay]
+    [labelsEnabled, radarEnabled, satelliteOverlay, theme]
   );
 
   const flushPendingStyleLayers = useCallback(() => {
@@ -848,6 +1301,8 @@ export default function FlightMapView({
     if (!mapReady) {
       setHoveredEndpointCallout(null);
       setPersistentEndpointCallouts([]);
+      setSelectedVatsimAirportCallout(null);
+      setSelectedVatsimRegionCallout(null);
       return undefined;
     }
 
@@ -880,6 +1335,53 @@ export default function FlightMapView({
   ]);
 
   useEffect(() => {
+    if (!liveAtcEnabled) {
+      clearSelectedVatsimAirport();
+      clearSelectedVatsimRegions();
+      return undefined;
+    }
+
+    if (selectedVatsimAirportFeature) {
+      scheduleSelectedVatsimAirportCalloutUpdate();
+    } else {
+      clearSelectedVatsimAirport();
+    }
+
+    if (selectedVatsimRegionFeatures.length > 0 && selectedVatsimRegionClickCoordinate) {
+      scheduleSelectedVatsimRegionCalloutUpdate();
+    } else if (
+      selectedVatsimRegionKeys.length > 0 ||
+      selectedVatsimRegionClickCoordinate ||
+      selectedVatsimRegionCallout
+    ) {
+      clearSelectedVatsimRegions();
+    }
+
+    return () => {
+      if (vatsimCalloutAnimationFrameRef.current && typeof window !== "undefined") {
+        window.cancelAnimationFrame(vatsimCalloutAnimationFrameRef.current);
+        vatsimCalloutAnimationFrameRef.current = 0;
+      }
+
+      if (vatsimRegionCalloutAnimationFrameRef.current && typeof window !== "undefined") {
+        window.cancelAnimationFrame(vatsimRegionCalloutAnimationFrameRef.current);
+        vatsimRegionCalloutAnimationFrameRef.current = 0;
+      }
+    };
+  }, [
+    clearSelectedVatsimAirport,
+    clearSelectedVatsimRegions,
+    liveAtcEnabled,
+    selectedVatsimRegionCallout,
+    selectedVatsimRegionClickCoordinate,
+    selectedVatsimRegionFeatures,
+    selectedVatsimRegionKeys.length,
+    scheduleSelectedVatsimAirportCalloutUpdate,
+    scheduleSelectedVatsimRegionCalloutUpdate,
+    selectedVatsimAirportFeature
+  ]);
+
+  useEffect(() => {
     const map = mapRef.current?.getMap?.();
     if (!map || !mapReady) {
       return undefined;
@@ -890,6 +1392,14 @@ export default function FlightMapView({
         schedulePersistentEndpointCalloutUpdate();
       } else {
         scheduleHoveredEndpointCalloutUpdate();
+      }
+
+      if (liveAtcEnabled && selectedVatsimAirportFeature) {
+        scheduleSelectedVatsimAirportCalloutUpdate();
+      }
+
+      if (liveAtcEnabled && selectedVatsimRegionFeature && selectedVatsimRegionClickCoordinate) {
+        scheduleSelectedVatsimRegionCalloutUpdate();
       }
     };
 
@@ -912,8 +1422,14 @@ export default function FlightMapView({
     };
   }, [
     isPersistentEndpointPopupMode,
+    liveAtcEnabled,
     mapReady,
+    selectedVatsimRegionClickCoordinate,
+    selectedVatsimRegionFeature,
+    selectedVatsimAirportFeature,
     scheduleHoveredEndpointCalloutUpdate,
+    scheduleSelectedVatsimAirportCalloutUpdate,
+    scheduleSelectedVatsimRegionCalloutUpdate,
     schedulePersistentEndpointCalloutUpdate
   ]);
 
@@ -992,7 +1508,28 @@ export default function FlightMapView({
         initialViewState={INITIAL_VIEW_STATE}
         mapStyle={mapStyle}
         projection={projection}
-        interactiveLayerIds={isPersistentEndpointPopupMode ? undefined : [ROUTE_ENDPOINT_HOVER_LAYER_ID]}
+        interactiveLayerIds={
+          liveAtcEnabled
+            ? isPersistentEndpointPopupMode
+              ? [
+                  VATSIM_AIRPORT_HALO_LAYER_ID,
+                  VATSIM_AIRPORT_LAYER_ID,
+                  VATSIM_REGION_CENTER_FILL_LAYER_ID,
+                  VATSIM_REGION_TERMINAL_FILL_LAYER_ID,
+                  VATSIM_REGION_SECTOR_FILL_LAYER_ID
+                ]
+              : [
+                  VATSIM_AIRPORT_HALO_LAYER_ID,
+                  VATSIM_AIRPORT_LAYER_ID,
+                  VATSIM_REGION_CENTER_FILL_LAYER_ID,
+                  VATSIM_REGION_TERMINAL_FILL_LAYER_ID,
+                  VATSIM_REGION_SECTOR_FILL_LAYER_ID,
+                  ROUTE_ENDPOINT_HOVER_LAYER_ID
+                ]
+            : isPersistentEndpointPopupMode
+              ? undefined
+              : [ROUTE_ENDPOINT_HOVER_LAYER_ID]
+        }
         dragRotate={false}
         touchPitch={false}
         style={{ width: "100%", height: "100%" }}
@@ -1001,26 +1538,88 @@ export default function FlightMapView({
           lockNorthUp();
           setMapReady(true);
         }}
-        onMouseMove={
-          isPersistentEndpointPopupMode
-            ? undefined
-            : (event) => {
-                const feature = event?.features?.find(
-                  (item) => item?.properties?.role === "endpoint" && item?.properties?.endpointKey
-                );
-                setHoveredEndpointKey(feature?.properties?.endpointKey || null);
-              }
-        }
-        onMouseLeave={
-          isPersistentEndpointPopupMode
-            ? undefined
-            : () => {
-                setHoveredEndpointKey(null);
-              }
-        }
+        onMouseMove={(event) => {
+          const map = mapRef.current?.getMap?.();
+          const hoveredLiveAtcFeature = event?.features?.find(
+            (item) => item?.properties?.role === "active-airport" && item?.properties?.airportIcao
+          );
+          const hoveredLiveAtcRegionFeature = event?.features?.find(
+            (item) => item?.properties?.role === "active-region"
+          );
+          const hoveredEndpointFeature = isPersistentEndpointPopupMode
+            ? null
+            : event?.features?.find(
+                (item) => item?.properties?.role === "endpoint" && item?.properties?.endpointKey
+              );
+
+          if (map) {
+            map.getCanvas().style.cursor =
+              hoveredLiveAtcFeature || hoveredLiveAtcRegionFeature || hoveredEndpointFeature
+                ? "pointer"
+                : "";
+          }
+
+          if (!isPersistentEndpointPopupMode) {
+            setHoveredEndpointKey(hoveredEndpointFeature?.properties?.endpointKey || null);
+          }
+        }}
+        onMouseLeave={() => {
+          const map = mapRef.current?.getMap?.();
+          if (map) {
+            map.getCanvas().style.cursor = "";
+          }
+
+          setHoveredEndpointKey(null);
+        }}
+        onClick={(event) => {
+          const clickedLiveAtcFeature = event?.features?.find(
+            (item) => item?.properties?.role === "active-airport" && item?.properties?.airportIcao
+          );
+
+          if (clickedLiveAtcFeature) {
+            setSelectedVatsimAirportIcao(clickedLiveAtcFeature.properties.airportIcao);
+            clearSelectedVatsimRegions();
+            return;
+          }
+          const clickedVatsimRegionFeatures = getUniqueVatsimRegionFeatures(event?.features);
+          if (clickedVatsimRegionFeatures.length > 0) {
+            setSelectedVatsimRegionKeys(
+              clickedVatsimRegionFeatures
+                .map((feature) => getVatsimRegionFeatureKey(feature.properties))
+                .filter(Boolean)
+            );
+            setSelectedVatsimRegionClickCoordinate({
+              longitude: event?.lngLat?.lng,
+              latitude: event?.lngLat?.lat
+            });
+            setSelectedVatsimAirportIcao(null);
+            setSelectedVatsimAirportCallout(null);
+            return;
+          }
+          clearSelectedVatsimAirport();
+          clearSelectedVatsimRegions();
+        }}
         onIdle={flushPendingStyleLayers}
       >
         <NavigationControl position="top-right" showCompass={false} />
+        {liveAtcEnabled && hasVatsimRegionalFeatures ? (
+          <Source id={VATSIM_REGION_SOURCE_ID} type="geojson" data={vatsimRegionalGeoJson}>
+            <Layer {...VATSIM_REGION_CENTER_FILL_LAYER} />
+            <Layer {...VATSIM_REGION_TERMINAL_FILL_LAYER} />
+            <Layer {...VATSIM_REGION_SECTOR_FILL_LAYER} />
+          </Source>
+        ) : null}
+        {liveAtcEnabled && hasVatsimRegionalOutlineFeatures ? (
+          <Source
+            id={VATSIM_REGION_OUTLINE_SOURCE_ID}
+            type="geojson"
+            data={vatsimRegionalOutlineGeoJson}
+          >
+            <Layer {...VATSIM_REGION_CENTER_OUTLINE_LAYER} />
+            <Layer {...VATSIM_REGION_TERMINAL_OUTLINE_LAYER} />
+            <Layer {...VATSIM_REGION_SECTOR_OUTLINE_LAYER} />
+          </Source>
+        ) : null}
         {hasFlightPathFeatures ? (
           <Source id={ROUTE_SOURCE_ID} type="geojson" data={flightPathGeoJson}>
             <Layer {...ROUTE_ENDPOINT_HOVER_LAYER} />
@@ -1029,7 +1628,68 @@ export default function FlightMapView({
             <Layer {...ROUTE_ENDPOINT_DOT_LAYER} />
           </Source>
         ) : null}
+        {liveAtcEnabled && hasVatsimAirportFeatures ? (
+          <Source id={VATSIM_AIRPORT_SOURCE_ID} type="geojson" data={vatsimAirportGeoJson}>
+            <Layer
+              id={VATSIM_AIRPORT_HALO_LAYER_ID}
+              type="circle"
+              source={VATSIM_AIRPORT_SOURCE_ID}
+              filter={["==", ["get", "role"], "active-airport"]}
+              paint={{
+                "circle-radius": 9.5,
+                "circle-color": "rgba(200,16,46,0.26)"
+              }}
+            />
+            <Layer
+              id={VATSIM_AIRPORT_LAYER_ID}
+              type="circle"
+              source={VATSIM_AIRPORT_SOURCE_ID}
+              filter={["==", ["get", "role"], "active-airport"]}
+              paint={{
+                "circle-radius": 5.5,
+                "circle-color": "#c8102e",
+                "circle-stroke-color": "rgba(255,255,255,0.96)",
+                "circle-stroke-width": 1.5
+              }}
+            />
+          </Source>
+        ) : null}
       </Map>
+
+      {liveAtcEnabled && selectedVatsimAirportCallout ? (
+        <div className="pointer-events-none absolute inset-0 z-[1]">
+          <div
+            className="pointer-events-auto absolute"
+            style={{
+              left: `${selectedVatsimAirportCallout.left}px`,
+              top: `${selectedVatsimAirportCallout.top}px`
+            }}
+          >
+            <VatsimAirportPopup
+              airport={selectedVatsimAirportCallout}
+              isDarkTheme={isDarkTheme}
+              onClose={clearSelectedVatsimAirport}
+            />
+          </div>
+        </div>
+      ) : null}
+      {liveAtcEnabled && selectedVatsimRegionCallout ? (
+        <div className="pointer-events-none absolute inset-0 z-[1]">
+          <div
+            className="pointer-events-auto absolute"
+            style={{
+              left: `${selectedVatsimRegionCallout.left}px`,
+              top: `${selectedVatsimRegionCallout.top}px`
+            }}
+          >
+            <VatsimRegionPopup
+              region={selectedVatsimRegionCallout}
+              isDarkTheme={isDarkTheme}
+              onClose={clearSelectedVatsimRegions}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {isPersistentEndpointPopupMode
         ? persistentEndpointCallouts.map((label) => (
@@ -1134,6 +1794,7 @@ export default function FlightMapView({
               <LayerToggleRow label="Satellite" enabled={satelliteOverlay} isDarkTheme={isDarkTheme} onClick={onToggleSatellite} />
               <LayerToggleRow label="Wx" enabled={radarEnabled} isDarkTheme={isDarkTheme} onClick={onToggleRadar} />
               <LayerToggleRow label="Labels" enabled={labelsEnabled} isDarkTheme={isDarkTheme} onClick={onToggleLabels} />
+              <LayerToggleRow label="Live ATC" enabled={liveAtcEnabled} isDarkTheme={isDarkTheme} onClick={onToggleLiveAtc} />
             </div>
           </div>
         ) : null}

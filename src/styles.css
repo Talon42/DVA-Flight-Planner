@@ -46,6 +46,7 @@
   --delta-blue: #003a70;
   --delta-blue-deep: #0b1f36;
   --delta-red: #c8102e;
+  --eyebrow: var(--delta-red);
   --app-bg:
     radial-gradient(circle at top left, rgba(11, 31, 54, 0.34), transparent 22%),
     radial-gradient(circle at top right, rgba(0, 58, 112, 0.24), transparent 24%),
@@ -151,6 +152,7 @@
   --status-resolved-bg: rgba(60, 173, 111, 0.18);
   --status-resolved-text: #9de4bc;
   --status-ambiguous-bg: rgba(200, 16, 46, 0.2);
+  --eyebrow: #8FA8C7;
   --theme-toggle-bg: rgba(10, 24, 43, 0.88);
   --theme-toggle-border: rgba(186, 209, 234, 0.18);
   --theme-toggle-text: #ffffff;

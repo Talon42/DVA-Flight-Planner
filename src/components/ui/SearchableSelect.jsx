@@ -210,6 +210,9 @@ export function SearchableSelect({
         rootRef.current?.closest(".filter-bar") ||
         null
       : null;
+  // Fall back to document.body so opening the select never tries to portal into a null container.
+  const portalTarget =
+    overlayLayout.portalTarget || overlayHost || (typeof document !== "undefined" ? document.body : null);
 
   useEffect(() => {
     if (disabled) {
@@ -659,18 +662,18 @@ export function SearchableSelect({
           </div>
         ) : null}
       </div>
-      {isOpen && overlayHost
+      {isOpen && portalTarget
         ? createPortal(
             <CenteredFilterOverlay compact={overlayLayout.compact} onClick={() => setIsOpen(false)}>
               <Panel
                 ref={panelRef}
                 className={cn(
-                  "relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full",
-                  dropdownPanelClassName,
-                  "bp-1024:w-[min(560px,calc(100%-1.5rem))]"
+                  overlayHost
+                    ? `relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full ${dropdownPanelClassName} bp-1024:w-[min(560px,calc(100%-1.5rem))]`
+                    : `${modalPanelClassName} relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full overflow-hidden border-2 border-[rgba(160,180,202,0.52)] p-5 dark:border-[color:var(--surface-border)] bp-1024:w-[min(560px,calc(100%-1.5rem))] bp-1024:p-4`
                 )}
                 role="dialog"
-                aria-modal="false"
+                aria-modal={overlayHost ? "false" : "true"}
                 aria-label={`Select ${label}`}
                 onClick={(event) => event.stopPropagation()}
                 style={
@@ -682,32 +685,7 @@ export function SearchableSelect({
                 {menuContent}
               </Panel>
             </CenteredFilterOverlay>,
-            overlayLayout.portalTarget || overlayHost
-          )
-        : null}
-      {isOpen && !overlayHost
-        ? createPortal(
-            <CenteredFilterOverlay compact={overlayLayout.compact} onClick={() => setIsOpen(false)}>
-              <Panel
-                ref={panelRef}
-                className={cn(
-                  modalPanelClassName,
-                  "relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full overflow-hidden border-2 border-[rgba(160,180,202,0.52)] p-5 dark:border-[color:var(--surface-border)] bp-1024:w-[min(560px,calc(100%-1.5rem))] bp-1024:p-4"
-                )}
-                role="dialog"
-                aria-modal="true"
-                aria-label={`Select ${label}`}
-                onClick={(event) => event.stopPropagation()}
-                style={
-                  overlayLayout.panelMaxHeight != null
-                    ? { maxHeight: `${overlayLayout.panelMaxHeight}px` }
-                    : undefined
-                }
-              >
-                {menuContent}
-              </Panel>
-            </CenteredFilterOverlay>,
-            overlayHost
+            portalTarget
           )
         : null}
     </div>

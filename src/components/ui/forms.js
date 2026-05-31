@@ -108,7 +108,7 @@ export const gridClassNames = {
   boardActions:
     "grid gap-2 bp-1024:grid-cols-3",
   boardActionsDual:
-    "grid gap-2 min-[1025px]:grid-cols-2",
+    "grid gap-2 bp-1400:grid-cols-2",
   boardActionsQuad:
-    "grid gap-2 min-[1025px]:grid-cols-2"
+    "grid gap-2 bp-1400:grid-cols-2"
 };

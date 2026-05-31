@@ -264,7 +264,7 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
                 className="rounded-none"
                 onClick={() => openBriefingInBrowser(briefingUrl)}
               >
-                Open in Browser
+                Download PDF
               </Button>
               <Button variant="ghost" size="sm" className="rounded-none" onClick={onClose}>
                 Close
@@ -316,7 +316,7 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
                     className="rounded-none"
                     onClick={() => openBriefingInBrowser(briefingUrl)}
                   >
-                    Open in Browser
+                    Download PDF
                   </Button>
                 </div>
               </div>

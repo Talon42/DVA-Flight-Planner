@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: https:; font-src 'self' data:; connect-src 'self' blob: https://api.github.com https://api.protomaps.com https://api.rainviewer.com https://www.deltava.org https://www.simbrief.com https://simbrief.com https://*.simbrief.com https://navigraph.com https://*.navigraph.com https://dva-simbrief-signer.foxtwomodels.workers.dev http://127.0.0.1:* http://localhost:* http://ipc.localhost; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' blob: data: asset:; object-src 'self' blob: data:; base-uri 'none'; frame-ancestors 'none'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: https:; font-src 'self' data:; connect-src 'self' blob: https://api.github.com https://api.protomaps.com https://protomaps.github.io https://*.github.io https://api.rainviewer.com https://tilecache.rainviewer.com https://*.rainviewer.com https://data.vatsim.net https://status.vatsim.net https://*.vatsim.net https://www.deltava.org https://www.simbrief.com https://simbrief.com https://*.simbrief.com https://navigraph.com https://*.navigraph.com https://dva-simbrief-signer.foxtwomodels.workers.dev http://127.0.0.1:* http://localhost:* http://ipc.localhost; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' blob: data: asset:; object-src 'self' blob: data:; base-uri 'none'; frame-ancestors 'none'"
     }
   },
   "bundle": {

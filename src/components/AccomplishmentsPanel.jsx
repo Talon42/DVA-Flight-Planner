@@ -6,7 +6,7 @@ import {
   bodySmTextClassName,
   sectionTitleTextClassName
 } from "./ui/typography";
-import { getAccomplishmentCompletedCount } from "../lib/accomplishments";
+import { getAccomplishmentCompletedCount } from "../features/accomplishments/accomplishments.model.js";
 
 function getAccomplishmentColumnCount(viewportWidth = 0) {
   void viewportWidth;

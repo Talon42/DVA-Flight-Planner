@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "../ui/Button";
 import Panel from "../ui/Panel";
 import { cn } from "../ui/cn";
-import { groupSimBriefAircraftTypesByManufacturer } from "../../lib/simbrief";
 import { fieldInputClassName, gridClassNames, toggleButtonClassName } from "../ui/forms";
 import { insetPanelClassName, mutedTextClassName } from "../ui/patterns";
 import SectionHeader from "../ui/SectionHeader";
 import { bodySmTextClassName, supportCopyTextClassName } from "../ui/typography";
 import { Field } from "../ui/filterFields";
 import { SearchableMultiSelect } from "../ui/SearchableSelect";
+import { buildCustomAirframeMatchOptions } from "../../domain/aircraft/aircraftIdentity.js";
 
 // Renders the SimBrief settings form in settings or onboarding mode.
 export function SimBriefSettingsForm({
@@ -16,18 +16,15 @@ export function SimBriefSettingsForm({
   compact = false,
   username,
   pilotId,
+  useCurrentUtcForDispatchTime,
   dispatchUnits,
   customAirframes,
   customAirframeDraftId,
   customAirframeDraftName,
   customAirframeDraftMatchType,
-  simBriefAircraftTypes,
-  isSimBriefAircraftTypesLoading,
-  simBriefAircraftTypesError,
   isSaving,
-  onUsernameChange,
-  onPilotIdChange,
   onDispatchUnitsChange,
+  onDispatchTimeModeChange,
   onCustomAirframeDraftIdChange,
   onCustomAirframeDraftNameChange,
   onCustomAirframeDraftMatchTypeChange,
@@ -37,20 +34,9 @@ export function SimBriefSettingsForm({
   onSaved
 }) {
   const isOnboardingMode = mode === "onboarding";
-  const aircraftTypeGroups = groupSimBriefAircraftTypesByManufacturer(simBriefAircraftTypes);
-  const customAirframeMatchOptions = useMemo(
-    () =>
-      aircraftTypeGroups.flatMap((group) =>
-        group.items.map((type) => ({
-          value: type.code,
-          label: type.name,
-          selectedLabel: type.name,
-          keywords: `${group.manufacturer} ${type.name} ${type.code}`.trim(),
-          groupLabel: group.manufacturer
-        }))
-      ),
-    [aircraftTypeGroups]
-  );
+  const customAirframeMatchOptions = buildCustomAirframeMatchOptions();
+  const simBriefOptionButtonClassName = (active) =>
+    cn(toggleButtonClassName(active), "h-8 min-h-0 px-3 py-2 text-[0.9rem] leading-none");
   const [usernameValue, setUsernameValue] = useState(username);
   const [pilotIdValue, setPilotIdValue] = useState(pilotId);
 
@@ -131,24 +117,45 @@ export function SimBriefSettingsForm({
       </div>
 
       {!isOnboardingMode ? (
-        <Field label="Dispatch Units" className="simbrief-units-toggle">
-          <div className="toggle-row flex flex-wrap gap-2">
-            <button
-              className={toggleButtonClassName(dispatchUnits === "LBS")}
-              type="button"
-              onClick={() => onDispatchUnitsChange?.("LBS")}
-            >
-              LBS
-            </button>
-            <button
-              className={toggleButtonClassName(dispatchUnits === "KGS")}
-              type="button"
-              onClick={() => onDispatchUnitsChange?.("KGS")}
-            >
-              KGS
-            </button>
-          </div>
-        </Field>
+        <div className={gridClassNames.twoColumn}>
+          <Field label="Dispatch Units" className="simbrief-units-toggle">
+            <div className="toggle-row flex flex-wrap gap-2">
+              <button
+                className={simBriefOptionButtonClassName(dispatchUnits === "LBS")}
+                type="button"
+                onClick={() => onDispatchUnitsChange?.("LBS")}
+              >
+                LBS
+              </button>
+              <button
+                className={simBriefOptionButtonClassName(dispatchUnits === "KGS")}
+                type="button"
+                onClick={() => onDispatchUnitsChange?.("KGS")}
+              >
+                KGS
+              </button>
+            </div>
+          </Field>
+
+          <Field label="Dispatch Time">
+            <div className="toggle-row flex flex-wrap gap-2">
+              <button
+                className={simBriefOptionButtonClassName(!useCurrentUtcForDispatchTime)}
+                type="button"
+                onClick={() => onDispatchTimeModeChange?.("schedule-utc")}
+              >
+                Schedule UTC
+              </button>
+              <button
+                className={simBriefOptionButtonClassName(useCurrentUtcForDispatchTime)}
+                type="button"
+                onClick={() => onDispatchTimeModeChange?.("current-utc")}
+              >
+                Current UTC
+              </button>
+            </div>
+          </Field>
+        </div>
       ) : null}
 
       {isOnboardingMode ? (
@@ -160,11 +167,10 @@ export function SimBriefSettingsForm({
       ) : null}
 
       {isOnboardingMode ? null : (
-        <div className={cn("grid gap-4 rounded-none border border-[color:transparent] bg-[var(--surface)] p-4", compact && "gap-3 p-3.5")}>
+        <div className={cn("grid gap-4", compact && "gap-3")}>
           <SectionHeader
             title="Saved custom airframes"
-            titleClassName="text-[1rem]"
-            description="Add a SimBrief internal ID and match it to the aircraft shown on the flight board."
+            description="Add a SimBrief internal ID and match it to a DVA aircraft from the identity table."
           />
 
           <div className={gridClassNames.routing}>
@@ -190,24 +196,20 @@ export function SimBriefSettingsForm({
 
             <SearchableMultiSelect
               label="Matching Aircraft"
-              placeholder={isSimBriefAircraftTypesLoading ? "Loading aircraft..." : "Search aircraft"}
+              placeholder="Search aircraft"
               emptyLabel="No matching aircraft"
-              allLabel="Select aircraft"
+              allLabel="Select one aircraft"
               allowMultiple={false}
-              allowSingleDeselect={false}
               hideChips
               showClearAction={false}
               showOptionMark={false}
-              showPinnedSelectedBlock={false}
               showSingleSelectedLabel
-              disabled={!simBriefAircraftTypes.length}
+              disabled={false}
               options={customAirframeMatchOptions}
               selectedValues={customAirframeDraftMatchType ? [customAirframeDraftMatchType] : []}
               onChange={(values) => onCustomAirframeDraftMatchTypeChange?.(values[0] || "")}
             />
           </div>
-
-          {simBriefAircraftTypesError ? <p className={mutedTextClassName}>{simBriefAircraftTypesError}</p> : null}
 
           <div className="flex flex-wrap gap-2">
             <Button
@@ -223,8 +225,11 @@ export function SimBriefSettingsForm({
             {customAirframes.length ? (
               customAirframes.map((entry) => {
                 const matchedType =
-                  simBriefAircraftTypes.find((type) => type.code === entry.matchType)?.name ||
-                  entry.matchType;
+                  entry.matchName ||
+                  entry.matchAircraft ||
+                  entry.matchDva ||
+                  entry.baseType ||
+                  "Relink required";
 
                 return (
                   <div

@@ -16,8 +16,6 @@ export default function DutySchedulePanel({
   filterBounds,
   onDutyFilterChange,
   onBuildDutySchedule,
-  onRerollDutySchedule,
-  canRerollDutySchedule,
   onReset,
   dutyBuildWarning,
   onClearDutyBuildWarning
@@ -34,8 +32,6 @@ export default function DutySchedulePanel({
       <div className="px-2.5 pt-2 bp-1024:px-3 bp-1024:pt-2">
         <DutyScheduleControls
           onBuildDutySchedule={onBuildDutySchedule}
-          onRerollDutySchedule={onRerollDutySchedule}
-          canRerollDutySchedule={canRerollDutySchedule}
           onReset={onReset}
         />
       </div>
