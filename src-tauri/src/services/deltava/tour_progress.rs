@@ -14,6 +14,7 @@ use crate::append_sync_log;
 const DELTAVA_TOUR_PROGRESS_FILE: &str = "dva-tour-progress.json";
 const DELTAVA_TOURS_CACHE_FILE: &str = "dva-tours-cache.json";
 const DELTAVA_TOUR_PROGRESS_SOURCE: &str = "deltava-logbook";
+const DVA_TOUR_PROGRESS_VERBOSE_LOGGING: bool = false;
 const AIRPORT_CATALOG_JSON: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../src/data/airports.json"
@@ -945,11 +946,17 @@ fn build_tour_progress_rows_with_debug(
 
 #[cfg(debug_assertions)]
 fn log_tour_progress_debug(message: &str) {
-    append_sync_log(message);
+    if DVA_TOUR_PROGRESS_VERBOSE_LOGGING {
+        append_sync_log(message);
+    }
 }
 
 #[cfg(not(debug_assertions))]
 fn log_tour_progress_debug(_: &str) {}
+
+fn log_tour_progress_summary(message: &str) {
+    append_sync_log(message);
+}
 
 #[cfg(debug_assertions)]
 fn log_tour_progress_candidate_debug(
@@ -960,6 +967,10 @@ fn log_tour_progress_candidate_debug(
     tour_start_seconds: Option<i64>,
     tour_end_seconds: Option<i64>,
 ) {
+    if !DVA_TOUR_PROGRESS_VERBOSE_LOGGING {
+        return;
+    }
+
     let candidate_rows = tour_rows
         .iter()
         .enumerate()
@@ -1027,6 +1038,10 @@ fn log_tour_progress_credit_skip_debug(
     reject_reason: &str,
     matched_tour_candidate: Option<(String, String)>,
 ) {
+    if !DVA_TOUR_PROGRESS_VERBOSE_LOGGING {
+        return;
+    }
+
     append_sync_log(&format!(
         "tour-progress:credit-skip {}",
         serde_json::json!({
@@ -1161,7 +1176,7 @@ fn build_tour_progress_from_values(
         tour_progress.insert(tour_path, DeltaTourProgressTour { rows });
     }
 
-    log_tour_progress_debug(&format!(
+    log_tour_progress_summary(&format!(
         "tour-progress:summary {}",
         serde_json::json!({
             "totalSyncedTours": total_current_tours + total_upcoming_tours + total_expired_tours,
