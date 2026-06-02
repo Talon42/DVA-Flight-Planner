@@ -1,3 +1,5 @@
+import { invokeAppCommand } from "./invoke.client.js";
+
 const DVA_AUTH_STORAGE_KEY = "flight-planner.deltava-auth";
 
 function isTauriRuntime() {
@@ -22,8 +24,7 @@ export function getDefaultDeltaVirtualCredentials() {
 
 export async function readDeltaVirtualCredentials() {
   if (isTauriRuntime()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const result = await invoke("read_deltava_auth_settings");
+    const result = await invokeAppCommand("read_deltava_auth_settings");
     return normalizeSettings(result);
   }
 
@@ -46,7 +47,6 @@ export async function saveDeltaVirtualCredentials({
   });
 
   if (isTauriRuntime()) {
-    const { invoke } = await import("@tauri-apps/api/core");
     const payload = {
       firstName: normalized.firstName,
       lastName: normalized.lastName
@@ -57,7 +57,17 @@ export async function saveDeltaVirtualCredentials({
       payload.password = nextPassword;
     }
 
-    const result = await invoke("save_deltava_auth_settings", payload);
+    const result = await invokeAppCommand(
+      "save_deltava_auth_settings",
+      payload,
+      {
+        metadata: {
+          hasFirstName: Boolean(normalized.firstName),
+          hasLastName: Boolean(normalized.lastName),
+          hasPassword: Boolean(nextPassword)
+        }
+      }
+    );
     return normalizeSettings(result);
   }
 
@@ -67,8 +77,7 @@ export async function saveDeltaVirtualCredentials({
 
 export async function clearDeltaVirtualCredentials() {
   if (isTauriRuntime()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("clear_deltava_auth_settings");
+    await invokeAppCommand("clear_deltava_auth_settings");
   }
 
   window.localStorage.removeItem(DVA_AUTH_STORAGE_KEY);

@@ -1,3 +1,5 @@
+import { invokeAppCommand } from "./invoke.client.js";
+
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -52,8 +54,7 @@ export async function readAddonAirportCache() {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const payload = await invoke("read_addon_airport_cache");
+    const payload = await invokeAppCommand("read_addon_airport_cache");
     return normalizeAddonScanPayload(payload);
   } catch (error) {
     if (error instanceof Error) {
@@ -70,8 +71,15 @@ export async function saveAddonAirportRoots(roots) {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const payload = await invoke("save_addon_airport_roots", { roots });
+    const payload = await invokeAppCommand(
+      "save_addon_airport_roots",
+      { roots },
+      {
+        metadata: {
+          rootCount: Array.isArray(roots) ? roots.length : 0
+        }
+      }
+    );
     return normalizeAddonScanPayload(payload);
   } catch (error) {
     if (error instanceof Error) {
@@ -88,10 +96,17 @@ export async function scanAddonAirports(roots) {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const payload = await invoke("scan_addon_airports", {
-      roots: Array.isArray(roots) ? roots : null
-    });
+    const payload = await invokeAppCommand(
+      "scan_addon_airports",
+      {
+        roots: Array.isArray(roots) ? roots : null
+      },
+      {
+        metadata: {
+          rootCount: Array.isArray(roots) ? roots.length : 0
+        }
+      }
+    );
     return normalizeAddonScanPayload(payload);
   } catch (error) {
     if (error instanceof Error) {

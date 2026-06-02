@@ -9,6 +9,7 @@ import { DEFAULT_SORT } from "../features/schedule/schedule.constants.js";
 import { buildFilterBounds, normalizeFilters } from "../features/schedule/scheduleFilters.model.js";
 import { buildRangeDefaults, normalizeDutyFilters } from "../logic/dutySchedule/dutyFilters";
 import { logAppError, logAppEvent, logSystemError, logSystemEvent } from "../services/logging/appLog.client.js";
+import { installGlobalErrorLogging } from "../services/logging/globalError.client.js";
 import {
   readAddonAirportCache
 } from "../services/tauri/addonAirportScan.client.js";
@@ -201,6 +202,10 @@ export function useAppBootstrap({
   const [scheduleUiHydrated, setScheduleUiHydrated] = useState(false);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [cacheHydrated, setCacheHydrated] = useState(false);
+
+  useEffect(() => {
+    installGlobalErrorLogging();
+  }, []);
 
   const hasRestoredScheduleStartupSettled =
     Boolean(schedule?.flights?.length) &&

@@ -1,3 +1,5 @@
+import { invokeAppCommand } from "./invoke.client.js";
+
 import {
   buildDvaAircraftOptions,
   getAircraftByDva,
@@ -74,8 +76,7 @@ export async function startSimBriefDispatch(payload) {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke("start_simbrief_dispatch", { payload });
+    return await invokeAppCommand("start_simbrief_dispatch", { payload });
   } catch (error) {
     if (error instanceof Error) {
       throw normalizeSimBriefError(error.message);
@@ -91,8 +92,7 @@ export async function refreshSimBriefDispatch(payload) {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke("refresh_simbrief_dispatch", { payload });
+    return await invokeAppCommand("refresh_simbrief_dispatch", { payload });
   } catch (error) {
     if (error instanceof Error) {
       throw normalizeSimBriefError(error.message);
@@ -112,8 +112,7 @@ export async function fetchSimBriefAircraftTypes() {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return await invoke("fetch_simbrief_aircraft_types");
+    return await invokeAppCommand("fetch_simbrief_aircraft_types");
   } catch (error) {
     if (error instanceof Error) {
       throw normalizeSimBriefError(error.message);
@@ -129,8 +128,7 @@ export async function closeSimBriefDispatchWindow() {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("close_simbrief_dispatch_window");
+    await invokeAppCommand("close_simbrief_dispatch_window");
   } catch {
     // Window may already be closed; ignore.
   }

@@ -1,3 +1,5 @@
+import { invokeAppCommand } from "./invoke.client.js";
+
 import {
   buildDeltaVirtualDraftReportPayload,
   resolveDraftAircraftCompatibility,
@@ -111,8 +113,15 @@ export async function submitDeltaVirtualDraftReport(flight, options = {}) {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const result = await invoke(DRAFT_COMMAND_NAME, { payload, debugEnabled });
+    const result = await invokeAppCommand(
+      DRAFT_COMMAND_NAME,
+      { payload, debugEnabled },
+      {
+        metadata: {
+          debugEnabled
+        }
+      }
+    );
     return normalizeDraftSubmitResult(result);
   } catch (error) {
     if (error instanceof Error) {

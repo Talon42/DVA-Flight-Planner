@@ -1,3 +1,5 @@
+import { invokeAppCommand } from "./invoke.client.js";
+
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -20,8 +22,7 @@ export async function syncScheduleFromDeltaVirtual() {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const result = await invoke("start_deltava_sync");
+    const result = await invokeAppCommand("start_deltava_sync");
     const fileName = result?.fileName ?? result?.file_name;
     const xmlText = result?.xmlText ?? result?.xml_text;
     const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
@@ -56,8 +57,7 @@ export async function resetDeltaVirtualSyncSession() {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("reset_deltava_sync_session");
+    await invokeAppCommand("reset_deltava_sync_session");
   } catch (error) {
     if (error instanceof Error) {
       throw normalizeSyncError(error.message);
@@ -73,8 +73,7 @@ export async function syncDeltaVirtualTours() {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const result = await invoke("sync_delta_virtual_tours");
+    const result = await invokeAppCommand("sync_delta_virtual_tours");
     return {
       ok: Boolean(result?.ok),
       source: String(result?.source || "dva").trim().toLowerCase() || "dva",
@@ -105,8 +104,7 @@ export async function closeDeltaVirtualSyncWindow() {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("close_deltava_sync_window");
+    await invokeAppCommand("close_deltava_sync_window");
   } catch {
     // Window may already be closed; ignore.
   }
@@ -118,8 +116,7 @@ export async function readDeltaVirtualLogbookMetadata() {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const result = await invoke("read_deltava_logbook_metadata");
+    const result = await invokeAppCommand("read_deltava_logbook_metadata");
     return {
       dateIso: result?.dateIso ?? result?.date_iso ?? null
     };
@@ -134,8 +131,7 @@ export async function readDeltaVirtualLogbookProgress() {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const result = await invoke("read_deltava_logbook_progress");
+    const result = await invokeAppCommand("read_deltava_logbook_progress");
     return {
       dateIso: result?.dateIso ?? result?.date_iso ?? null,
       visitedAirports: Array.isArray(result?.visitedAirports ?? result?.visited_airports)
@@ -156,8 +152,15 @@ export async function pruneDeltaVirtualStorage(removeDownloadedSchedule = false)
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("prune_deltava_storage", { removeDownloadedSchedule });
+    await invokeAppCommand(
+      "prune_deltava_storage",
+      { removeDownloadedSchedule },
+      {
+        metadata: {
+          removeDownloadedSchedule: Boolean(removeDownloadedSchedule)
+        }
+      }
+    );
   } catch {
     // Cleanup is best-effort; do not surface this to the user.
   }
