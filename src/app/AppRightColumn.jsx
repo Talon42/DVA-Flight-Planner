@@ -1,6 +1,7 @@
 import FilterBar from "../components/FilterBar";
 import DetailsPanel from "../components/DetailsPanel";
 import { cn } from "../components/ui/cn";
+import LogbookFiltersPanel from "../features/logbook/LogbookFiltersPanel.jsx";
 import { normalizeFilters } from "../features/schedule/scheduleFilters.model";
 
 // Renders the right-hand workspace column without owning any planner state.
@@ -11,13 +12,18 @@ export default function AppRightColumn({
   filterUiVersion,
   filters,
   filterBounds,
+  logbookFilterBounds,
+  logbookFilterOptions,
+  logbookFilters,
   airlines,
   airportOptions,
   geoOptions,
   equipmentOptions,
   viewportSize,
   onFilterChange,
+  onLogbookFilterChange,
   onTogglePlannerControls,
+  onResetLogbookFilters,
   onResetFilters,
   onScheduleViewChange,
   shortlist,
@@ -82,6 +88,18 @@ export default function AppRightColumn({
       showFlightBoard
     />
   );
+
+  if (scheduleView === "logbook") {
+    return (
+      <LogbookFiltersPanel
+        filters={logbookFilters}
+        filterBounds={logbookFilterBounds}
+        filterOptions={logbookFilterOptions}
+        onFilterChange={onLogbookFilterChange}
+        onReset={onResetLogbookFilters}
+      />
+    );
+  }
 
   if (plannerMode === "duty" || scheduleView !== "flights") {
     return detailsPanel;

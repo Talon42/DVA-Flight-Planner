@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager};
 pub(crate) const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
 pub(crate) const MAIN_WINDOW_STATE_FILE: &str = "main-window-state.json";
 pub(crate) const DELTAVA_SYNC_DOWNLOAD_FILE: &str = "deltava-pfpxsched.xml";
+pub(crate) const DELTAVA_LOGBOOK_FILE: &str = "logbook.json";
 pub(crate) const DELTAVA_LOGBOOK_FALLBACK_FILE: &str = "dva-logbook.json";
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -94,6 +95,11 @@ pub(crate) fn build_logbook_dir(app: &AppHandle) -> Result<PathBuf, String> {
 
 pub(crate) fn resolve_existing_logbook_json_path(app: &AppHandle) -> Option<PathBuf> {
     let logbook_dir = build_logbook_dir(app).ok()?;
+    let canonical_path = logbook_dir.join(DELTAVA_LOGBOOK_FILE);
+    if canonical_path.is_file() {
+        return Some(canonical_path);
+    }
+
     let fallback_path = logbook_dir.join(DELTAVA_LOGBOOK_FALLBACK_FILE);
     if fallback_path.is_file() {
         return Some(fallback_path);

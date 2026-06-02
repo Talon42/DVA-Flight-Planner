@@ -3,12 +3,15 @@ mod commands;
 mod models;
 mod services;
 
-pub(crate) use app::paths::{DELTAVA_LOGBOOK_FALLBACK_FILE, DELTAVA_SYNC_DOWNLOAD_FILE};
+pub(crate) use app::paths::{
+    DELTAVA_LOGBOOK_FILE, DELTAVA_SYNC_DOWNLOAD_FILE,
+};
 pub(crate) use app::{
     append_sync_log, build_webview_data_directory, initialize_sync_log_path, iso_now_utc,
     DeltaSyncManager,
 };
 pub(crate) use models::{AddonAirportCache, AddonAirportScanDetail};
+pub(crate) use models::DeltaLogbookCachePayload;
 pub(crate) use services::deltava::constants::{
     DELTAVA_AUTH_MESSAGE_PREFIX, DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
     DELTAVA_XML_MESSAGE_PREFIX,

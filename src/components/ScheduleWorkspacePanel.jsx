@@ -7,6 +7,7 @@ import ScheduleTablePanel from "./ScheduleTablePanel";
 export default function ScheduleWorkspacePanel({
   scheduleExists,
   scheduleView,
+  logbookProps,
   theme,
   activeFlightBoardEntries,
   selectedFlightId,
@@ -62,7 +63,7 @@ export default function ScheduleWorkspacePanel({
       padding="none"
       className={cn("relative flex h-full min-h-0 flex-col overflow-hidden rounded-none", cardFrameClassName)}
     >
-      {scheduleExists ? (
+      {scheduleExists || scheduleView === "logbook" ? (
         <>
           <ScheduleWorkspaceHeader
             plannerMode={plannerMode}
@@ -71,6 +72,7 @@ export default function ScheduleWorkspacePanel({
           />
           <div className="flex min-h-0 flex-1 p-0">
             <ScheduleTablePanel
+              logbookProps={logbookProps}
               plannerMode={plannerMode}
               scheduleView={scheduleView}
               theme={theme}

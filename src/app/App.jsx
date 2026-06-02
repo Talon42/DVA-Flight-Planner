@@ -43,6 +43,7 @@ import {
 import { useTourSelection } from "../features/tours/useTourSelection.hooks.js";
 import { useDutyScheduleBuilder } from "../features/dutySchedule/useDutyScheduleBuilder.hooks.js";
 import { useVatsimCoverage } from "../features/vatsim/useVatsimCoverage.hooks.js";
+import { useLogbook } from "../features/logbook/useLogbook.hooks.js";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "../features/schedule/schedule.constants.js";
 import { DEFAULT_DUTY_FILTERS } from "../logic/dutySchedule/dutySchedule.constants.js";
 import { buildDefaultDutyFilters } from "../logic/dutySchedule/dutyFilters";
@@ -123,6 +124,7 @@ export default function App() {
   const [filterUiVersion, setFilterUiVersion] = useState(0);
   const [vatsimRefreshVersion, setVatsimRefreshVersion] = useState(0);
   const [sort, setSort] = useState(DEFAULT_SORT);
+  const [logbookReloadVersion, setLogbookReloadVersion] = useState(0);
   const [selectedTourPath, setSelectedTourPath] = useState("");
   const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
   const [tourProgress, setTourProgress] = useState({});
@@ -332,7 +334,7 @@ export default function App() {
   } = appSettingsPersistence;
   const deferredFilters = useDeferredValue(filters);
   const deferredDutyFilters = useDeferredValue(dutyFilters);
-  const { isHydrating, isStartupReady } = useAppBootstrap({
+  const { isHydrating, isStartupReady, restoredUiState } = useAppBootstrap({
     activeFlightBoardId,
     deferredDutyFilters,
     deferredFilters,
@@ -382,6 +384,10 @@ export default function App() {
     setTourProgress
   });
   const isDesktopSimBriefAvailable = isDesktopAddonScanAvailable;
+  const logbook = useLogbook({
+    persistedUiState: restoredUiState,
+    reloadVersion: logbookReloadVersion
+  });
   // Keep the derived flight list stable so downstream hooks can read it safely.
   const scheduleFlights = useMemo(() => schedule?.flights || [], [schedule]);
   const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
@@ -689,6 +695,9 @@ export default function App() {
         selectedTourPath,
         selectedAccomplishmentName,
         mapOptions,
+        logbookSubTab: logbook.selectedTab,
+        logbookFilters: logbook.filters,
+        logbookSort: logbook.sort,
         tourProgress
       }).catch((error) => {
         setStatusMessage(error.message || "Unable to persist the current planner state.");
@@ -713,6 +722,9 @@ export default function App() {
       selectedTourPath,
       selectedAccomplishmentName,
       mapOptions,
+      logbook.selectedTab,
+      logbook.filters,
+      logbook.sort,
       tourProgress,
       isHydrating
     ],
@@ -836,6 +848,7 @@ export default function App() {
     dvaHasPassword,
     dvaLastName,
     isDevToolsEnabled,
+    onLogbookSyncComplete: () => setLogbookReloadVersion((current) => current + 1),
     processImportedSchedule,
     onScheduleSyncComplete: handleVatsimScheduleSyncComplete,
     setDerivedTourProgress,
@@ -1058,6 +1071,8 @@ export default function App() {
 
     if (nextView === "map") {
       nextScheduleView = "map";
+    } else if (nextView === "logbook") {
+      nextScheduleView = "logbook";
     } else if (nextView === "tours") {
       nextScheduleView = "tours";
     } else if (nextView === "accomplishments" && accomplishmentOptions.length) {
@@ -1589,13 +1604,18 @@ export default function App() {
       filterUiVersion={filterUiVersion}
       filters={filters}
       filterBounds={filterBounds}
+      logbookFilters={logbook.filters}
+      logbookFilterBounds={logbook.filterBounds}
+      logbookFilterOptions={logbook.filterOptions}
       airlines={airlines}
       airportOptions={airportOptions}
       geoOptions={geoOptions}
       equipmentOptions={equipmentOptions}
       viewportSize={viewportSize}
       onFilterChange={handleFilterChange}
+      onLogbookFilterChange={logbook.handleFilterChange}
       onTogglePlannerControls={() => setPlannerControlsCollapsed((current) => !current)}
+      onResetLogbookFilters={logbook.handleResetFilters}
       onResetFilters={handleResetFilters}
       onScheduleViewChange={setScheduleView}
       shortlist={shortlist}
@@ -1636,6 +1656,19 @@ export default function App() {
   const appShellProps = {
     schedule,
     scheduleView,
+    logbookProps: {
+      allRows: logbook.allRows,
+      filteredRows: logbook.filteredRows,
+      visibleRows: logbook.visibleRows,
+      selectedTab: logbook.selectedTab,
+      sort: logbook.sort,
+      expandedRowId: logbook.expandedRowId,
+      pilotStats: logbook.pilotStats,
+      onSelectTab: logbook.setSelectedTab,
+      onSort: logbook.handleSort,
+      onToggleExpandedRow: logbook.handleToggleExpandedRow,
+      onLoadMoreRows: logbook.handleLoadMoreRows
+    },
     theme,
     flightBoard,
     activeFlightBoard,

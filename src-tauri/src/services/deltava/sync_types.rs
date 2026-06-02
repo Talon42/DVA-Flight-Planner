@@ -71,7 +71,6 @@ pub(crate) struct DeltaWebXmlResult {
 pub(crate) struct DeltaWebLogbookResult {
     pub ok: bool,
     pub json_text: Option<String>,
-    pub filename: Option<String>,
     pub content_type: Option<String>,
     pub error: Option<String>,
 }

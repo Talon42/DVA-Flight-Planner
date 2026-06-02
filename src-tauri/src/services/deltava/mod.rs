@@ -1,6 +1,7 @@
 pub(crate) mod auth;
 pub(crate) mod constants;
 pub(crate) mod draft;
+pub(crate) mod logbook;
 pub(crate) mod login;
 pub(crate) mod sync;
 pub(crate) mod sync_types;

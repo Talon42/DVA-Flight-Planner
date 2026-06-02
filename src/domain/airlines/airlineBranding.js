@@ -10,6 +10,7 @@ const airlineIcaoByName = new Map();
 const airlineIcaoByIata = new Map();
 const airlineLogoByIcao = new Map();
 const airlineNameByIata = new Map();
+const airlineNameByCode = new Map();
 const airlineLogoOverridesByName = new Map([
   ["DELTA HISTORIC", "DAL-H"],
   ["NORTH CENTRAL AIRLINES", "NCA"],
@@ -44,6 +45,14 @@ for (const row of airlineRows) {
 
   if (iata && normalizedName && !airlineNameByIata.has(iata)) {
     airlineNameByIata.set(iata, airlineName);
+  }
+
+  if (iata && normalizedName && !airlineNameByCode.has(iata)) {
+    airlineNameByCode.set(iata, airlineName);
+  }
+
+  if (icao && normalizedName && !airlineNameByCode.has(icao)) {
+    airlineNameByCode.set(icao, airlineName);
   }
 }
 
@@ -133,4 +142,9 @@ export function getAirlineLogo({ airlineName, airlineIata, airlineIcao }) {
 export function getAirlineNameByIata(airlineIata) {
   const normalizedIata = String(airlineIata || "").trim().toUpperCase();
   return normalizedIata ? airlineNameByIata.get(normalizedIata) || "" : "";
+}
+
+export function getAirlineNameByCode(code) {
+  const normalizedCode = String(code || "").trim().toUpperCase();
+  return normalizedCode ? airlineNameByCode.get(normalizedCode) || normalizedCode : "";
 }

@@ -197,6 +197,7 @@ export function useAppBootstrap({
   schedule
 } = {}) {
   const [isHydrating, setIsHydrating] = useState(true);
+  const [restoredUiState, setRestoredUiState] = useState(null);
   const [shouldAwaitRestoredScheduleStartup, setShouldAwaitRestoredScheduleStartup] =
     useState(false);
   const [scheduleUiHydrated, setScheduleUiHydrated] = useState(false);
@@ -226,12 +227,19 @@ export function useAppBootstrap({
         readSavedSchedule(),
         readSavedUiState()
       ]);
+      const restoredSavedUiState =
+        uiStateResult.status === "fulfilled" && uiStateResult.value ? uiStateResult.value : null;
+
+      setRestoredUiState(restoredSavedUiState);
 
       if (cancelled) {
         return;
       }
 
       if (scheduleResult.status !== "fulfilled" || !scheduleResult.value?.flights?.length) {
+        if (restoredSavedUiState?.scheduleView === "logbook") {
+          setScheduleView("logbook");
+        }
         if (scheduleResult.status === "rejected") {
           setStatusMessage(scheduleResult.reason?.message || "Unable to load saved schedule.");
           await logAppError("hydrate-failed", scheduleResult.reason);
@@ -244,10 +252,7 @@ export function useAppBootstrap({
 
       const savedSchedule = scheduleResult.value;
       const savedBounds = buildFilterBounds(savedSchedule.flights);
-      const savedUiState =
-        uiStateResult.status === "fulfilled" && uiStateResult.value
-          ? uiStateResult.value
-          : savedSchedule.uiState || {};
+      const savedUiState = restoredSavedUiState || savedSchedule.uiState || {};
       const defaultBasicFilterSections = getDefaultBasicFilterSectionState(readViewportSize());
       setShouldAwaitRestoredScheduleStartup(true);
       setSchedule({
@@ -284,7 +289,7 @@ export function useAppBootstrap({
         savedUiState.scheduleTableTimeDisplayMode === "utc" ? "utc" : "local"
       );
       setSort(savedUiState.sort || DEFAULT_SORT);
-      setScheduleView("flights");
+      setScheduleView(savedUiState.scheduleView === "logbook" ? "logbook" : "flights");
       setSelectedTourPath(String(savedUiState.selectedTourPath || "").trim());
       setSelectedAccomplishmentName(String(savedUiState.selectedAccomplishmentName || "").trim());
       setSelectedTourRowId(null);
@@ -577,6 +582,7 @@ export function useAppBootstrap({
     hasRestoredScheduleStartupSettled,
     isHydrating,
     isStartupReady,
+    restoredUiState,
     shouldAwaitRestoredScheduleStartup
   };
 }

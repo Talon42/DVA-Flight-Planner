@@ -5,6 +5,7 @@ import AppFooter from "../components/layout/AppFooter";
 export default function AppMainWorkspace({
   schedule,
   scheduleView,
+  logbookProps,
   theme,
   flightBoard,
   selectedFlightId,
@@ -72,6 +73,7 @@ export default function AppMainWorkspace({
         <ScheduleWorkspacePanel
           scheduleExists={Boolean(schedule)}
           scheduleView={scheduleView}
+          logbookProps={logbookProps}
           theme={theme}
           activeFlightBoardEntries={flightBoard}
           selectedFlightId={selectedFlightId}

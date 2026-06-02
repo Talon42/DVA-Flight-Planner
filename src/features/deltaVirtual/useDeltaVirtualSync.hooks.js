@@ -32,6 +32,7 @@ export function useDeltaVirtualSync({
   dvaLastName = "",
   isDevToolsEnabled = false,
   processImportedSchedule,
+  onLogbookSyncComplete,
   onScheduleSyncComplete,
   setDerivedTourProgress,
   setDeltaVirtualToursCache,
@@ -141,6 +142,7 @@ export function useDeltaVirtualSync({
       await processImportedSchedule?.(syncedFile, "deltava-sync");
       onScheduleSyncComplete?.();
       setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());
+      onLogbookSyncComplete?.();
       await refreshSavedCredentials();
       if (syncedFile.warnings?.length) {
         setStatusMessage?.(`Delta Virtual schedule synced with warning: ${syncedFile.warnings[0]}`);
@@ -210,6 +212,7 @@ export function useDeltaVirtualSync({
         });
       } else if (error?.kind === "partial_success") {
         setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());
+        onLogbookSyncComplete?.();
         await refreshSavedCredentials();
         setStatusMessage?.(error.message || "Delta Virtual sync partially completed.");
         await logSystemEvent("DVA Sync", "succeeded", {
@@ -265,6 +268,7 @@ export function useDeltaVirtualSync({
     dvaLastName,
     processImportedSchedule,
     onScheduleSyncComplete,
+    onLogbookSyncComplete,
     refreshSavedCredentials,
     reloadTourProgress,
     setDeltaVirtualToursCache,

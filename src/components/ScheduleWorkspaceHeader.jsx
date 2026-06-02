@@ -82,6 +82,18 @@ export default function ScheduleWorkspaceHeader({
         >
           Map
         </button>
+        <button
+          type="button"
+          className={cn(
+            plannerTabClassName,
+            getPlannerTabStateClassName(!isDutyActive && scheduleView === "logbook")
+          )}
+          role="tab"
+          aria-selected={!isDutyActive && scheduleView === "logbook"}
+          onClick={() => onPrimaryViewChange?.("logbook")}
+        >
+          Logbook
+        </button>
         </div>
       </div>
     </div>

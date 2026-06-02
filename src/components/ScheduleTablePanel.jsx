@@ -15,12 +15,14 @@ import FlightMapPanel from "./map/FlightMapPanel";
 import FlightsTable from "./tables/FlightsTable";
 import ToursTable from "./tables/ToursTable";
 import TourBriefingModal, { isAllowedDvaTourBriefingUrl } from "./TourBriefingModal";
+import LogbookPanel from "../features/logbook/LogbookPanel.jsx";
 
 const WORKSPACE_META = {
   flights: { eyebrow: "SCHEDULE" },
   tours: { eyebrow: "TOURS" },
   accomplishments: { eyebrow: "ACCOMPLISHMENTS" },
-  map: { eyebrow: "MAP" }
+  map: { eyebrow: "MAP" },
+  logbook: { eyebrow: "LOGBOOK" }
 };
 
 function TourStatusBadge({ label, tone }) {
@@ -82,6 +84,7 @@ function formatTourDateLabel(epochSeconds) {
 }
 
 export default function ScheduleTablePanel({
+  logbookProps,
   plannerMode,
   scheduleView,
   theme,
@@ -397,6 +400,10 @@ export default function ScheduleTablePanel({
               mapOptions={mapOptions}
               setMapOptions={setMapOptions}
             />
+          </div>
+        ) : scheduleView === "logbook" ? (
+          <div className="flex h-full min-h-0 px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
+            <LogbookPanel {...logbookProps} />
           </div>
         ) : (
           <div className="flex h-full min-h-0 px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">

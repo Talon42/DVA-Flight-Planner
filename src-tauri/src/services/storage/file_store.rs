@@ -1,9 +1,9 @@
-use crate::app::paths::{build_logbook_dir, resolve_existing_logbook_json_path};
+use crate::app::paths::resolve_existing_logbook_json_path;
 use crate::services::deltava::draft::DVA_DRAFT_WEBVIEW_DIR;
 use crate::services::deltava::{
-    auth::clear_auth_settings_internal, sync_types::DeltaWebSyncResult,
+    auth::clear_auth_settings_internal, logbook::store_logbook_json, sync_types::DeltaWebSyncResult,
 };
-use crate::{append_sync_log, DELTAVA_LOGBOOK_FALLBACK_FILE, DELTAVA_SYNC_DOWNLOAD_FILE};
+use crate::{append_sync_log, DELTAVA_SYNC_DOWNLOAD_FILE};
 use chrono::NaiveDate;
 use serde_json::Value;
 use std::{collections::BTreeSet, fs, path::Path};
@@ -272,39 +272,6 @@ fn summarize_warnings(warnings: &[String]) -> Option<String> {
     Some(format!("{preview}{suffix}"))
 }
 
-fn sanitize_logbook_filename(filename_hint: Option<&str>) -> String {
-    let raw_name = filename_hint
-        .and_then(|value| Path::new(value).file_name())
-        .and_then(|value| value.to_str())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or(DELTAVA_LOGBOOK_FALLBACK_FILE);
-
-    let sanitized = raw_name
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_') {
-                character
-            } else {
-                '-'
-            }
-        })
-        .collect::<String>();
-
-    let sanitized = sanitized.trim_matches(&['.', '-', '_'][..]).to_string();
-    let final_name = if sanitized.is_empty() {
-        DELTAVA_LOGBOOK_FALLBACK_FILE.to_string()
-    } else {
-        sanitized
-    };
-
-    if final_name.to_ascii_lowercase().ends_with(".json") {
-        final_name
-    } else {
-        format!("{final_name}.json")
-    }
-}
-
 fn is_expected_cleanup_skip(error: &std::io::Error) -> bool {
     match error.raw_os_error() {
         // ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION.
@@ -455,48 +422,6 @@ pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogb
     }
 }
 
-/// Stores a Delta Virtual logbook JSON export on disk with a stable filename.
-pub(crate) async fn store_logbook_json(
-    app: &AppHandle,
-    json_text: &str,
-    filename_hint: Option<&str>,
-    content_type: Option<String>,
-) -> Result<crate::DeltaLogbookArtifact, String> {
-    let trimmed = json_text.trim();
-    if trimmed.is_empty() {
-        return Err("download_failed: Delta Virtual logbook JSON export was empty.".into());
-    }
-
-    serde_json::from_str::<Value>(trimmed).map_err(|error| {
-        format!("invalid_json: Delta Virtual logbook JSON was invalid: {error}")
-    })?;
-    append_sync_log("logbook:json-valid");
-
-    let logbook_dir = build_logbook_dir(app)?;
-    let file_name = sanitize_logbook_filename(filename_hint);
-    let final_path = logbook_dir.join(&file_name);
-    let temp_path = logbook_dir.join(format!("{file_name}.tmp"));
-
-    tokio::fs::write(&temp_path, trimmed.as_bytes())
-        .await
-        .map_err(|error| format!("download_failed: Unable to write logbook JSON: {error}"))?;
-    if final_path.exists() {
-        let _ = tokio::fs::remove_file(&final_path).await;
-    }
-    tokio::fs::rename(&temp_path, &final_path)
-        .await
-        .map_err(|error| format!("download_failed: Unable to store logbook JSON: {error}"))?;
-
-    append_sync_log(&format!("logbook:write {}", final_path.display()));
-
-    Ok(crate::DeltaLogbookArtifact {
-        file_name,
-        path: final_path.to_string_lossy().into_owned(),
-        bytes: trimmed.as_bytes().len(),
-        content_type,
-    })
-}
-
 /// Builds the final Delta sync payload once the webview has downloaded both artifacts.
 pub(crate) async fn build_delta_sync_payload_from_web_result(
     app: &AppHandle,
@@ -529,7 +454,6 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         match store_logbook_json(
             app,
             &json_text,
-            result.logbook.filename.as_deref(),
             result.logbook.content_type,
         )
         .await
