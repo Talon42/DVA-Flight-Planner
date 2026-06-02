@@ -131,12 +131,12 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
       const toAirport = airportMap.get(rawFlight.to);
       const missingIcaos = [rawFlight.from, rawFlight.to].filter((icao) => !airportMap.has(icao));
 
-      const stdLocal = DateTime.fromFormat(rawFlight.std, DATE_FORMAT, {
-        zone: fromAirport?.timezone || "UTC"
-      });
-      const rawStaLocal = DateTime.fromFormat(rawFlight.sta, DATE_FORMAT, {
-        zone: toAirport?.timezone || "UTC"
-      });
+      const stdZone = fromAirport?.timezone || "UTC";
+      const staZone = toAirport?.timezone || "UTC";
+      const stdResult = parseScheduleTimestampOrDefault(rawFlight.std, stdZone, rawFlight.sta);
+      const staResult = parseScheduleTimestampOrDefault(rawFlight.sta, staZone, rawFlight.std);
+      const stdLocal = stdResult.value;
+      const rawStaLocal = staResult.value;
       const distanceNm =
         fromAirport && toAirport
           ? calculateGreatCircleNm(
@@ -161,16 +161,21 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         });
       }
 
-      if (!stdLocal.isValid || !rawStaLocal.isValid) {
+      if (stdResult.defaulted || staResult.defaulted) {
         importIssues.push({
-          severity: "error",
-          kind: "invalid-time",
+          severity: "warning",
+          kind: "invalid-time-defaulted",
           flightId: buildFlightId(rawFlight, index),
           sourceFileName: fileName,
-          details: `${issuePrefix} omitted because one or more schedule timestamps were invalid.`,
-          loggedAt: importedAt
+          details: `${issuePrefix} imported with invalid schedule timestamp defaulted to 00:00.`,
+          loggedAt: importedAt,
+          defaultedScheduleTimes: {
+            std: stdResult.defaulted,
+            sta: staResult.defaulted,
+            rawStd: stdResult.originalValue,
+            rawSta: staResult.originalValue
+          }
         });
-        continue;
       }
 
       const staLocal = normalizeArrivalDate(stdLocal, rawStaLocal, distanceNm);
@@ -575,7 +580,7 @@ function buildImportLog(importedAt, fileName, importIssues) {
       continue;
     }
 
-    if (issue.kind === "invalid-time") {
+    if (issue.kind === "invalid-time" || issue.kind === "invalid-time-defaulted") {
       lines.push(`${issue.severity.toUpperCase()} | ${issue.kind} | ${issue.details}`);
       continue;
     }
@@ -586,4 +591,50 @@ function buildImportLog(importedAt, fileName, importIssues) {
   }
 
   return lines.join("\n");
+}
+
+// Falls back to midnight on a best-effort source date so bad timestamps stay importable.
+function parseScheduleTimestampOrDefault(rawValue, zone, fallbackDateText = "") {
+  const normalized = normalizeText(rawValue);
+  const parsed = DateTime.fromFormat(normalized, DATE_FORMAT, { zone });
+
+  if (parsed.isValid) {
+    return {
+      value: parsed,
+      defaulted: false,
+      originalValue: normalized
+    };
+  }
+
+  const dateText = extractScheduleDateText(normalized) || extractScheduleDateText(fallbackDateText);
+  const fallback = dateText
+    ? DateTime.fromFormat(`${dateText} 00:00`, DATE_FORMAT, { zone })
+    : buildStartOfDayFallback(zone);
+
+  return {
+    value: fallback.isValid ? fallback : buildStartOfDayFallback(zone),
+    defaulted: true,
+    originalValue: normalized
+  };
+}
+
+function extractScheduleDateText(value) {
+  const normalized = normalizeText(value);
+  const match = normalized.match(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/);
+
+  return match ? match[0] : "";
+}
+
+function buildStartOfDayFallback(zone) {
+  const zonedNow = DateTime.now().setZone(zone);
+  if (zonedNow.isValid) {
+    return zonedNow.startOf("day");
+  }
+
+  const utcNow = DateTime.now().setZone("UTC");
+  if (utcNow.isValid) {
+    return utcNow.startOf("day");
+  }
+
+  return DateTime.now().startOf("day");
 }
