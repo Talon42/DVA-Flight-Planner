@@ -32,8 +32,8 @@ export default function LogbookPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-3">
-      <div className="border-b-2 border-[color:var(--panel-border)] px-0 pb-0">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
+      <div className="w-full min-w-0 border-b-2 border-[color:var(--panel-border)] px-0 pb-0">
         <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
           <button
             type="button"
@@ -56,7 +56,7 @@ export default function LogbookPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 w-full min-w-0 flex-1">
         {selectedTab === "pilot-stats" ? (
           <LogbookPilotStats rows={filteredRows} stats={pilotStats} />
         ) : (

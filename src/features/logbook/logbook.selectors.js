@@ -6,16 +6,10 @@ import {
 import {
   buildLogbookFilterBounds,
   normalizeLogbookFilters,
+  shouldIncludeLogbookDateRow,
+  shouldIncludeLogbookDurationRow,
   shouldIncludeLogbookDistanceRow
 } from "./logbookFilters.model.js";
-
-function matchesSearch(row, query) {
-  if (!query) {
-    return true;
-  }
-
-  return String(row.searchText || "").includes(query.toUpperCase());
-}
 
 // Filters the normalized logbook rows without touching the lazy-reveal slice.
 export function selectFilteredLogbookRows({ rows, filters }) {
@@ -28,6 +22,14 @@ export function selectFilteredLogbookRows({ rows, filters }) {
   const normalizedFilters = normalizeLogbookFilters(filters, filterBounds);
 
   return activeRows.filter((row) => {
+    if (!shouldIncludeLogbookDateRow(row.dateSortKey, normalizedFilters, filterBounds)) {
+      return false;
+    }
+
+    if (!shouldIncludeLogbookDurationRow(row.durationMinutes, normalizedFilters, filterBounds)) {
+      return false;
+    }
+
     if (normalizedFilters.airline.length && !normalizedFilters.airline.includes(row.airlineDisplayName)) {
       return false;
     }
@@ -44,15 +46,11 @@ export function selectFilteredLogbookRows({ rows, filters }) {
       return false;
     }
 
-    if (normalizedFilters.status.length && !normalizedFilters.status.includes(row.statusDisplay)) {
-      return false;
-    }
-
     if (!shouldIncludeLogbookDistanceRow(row.distanceNm, filters, filterBounds)) {
       return false;
     }
 
-    return matchesSearch(row, normalizedFilters.search);
+    return true;
   });
 }
 
@@ -100,8 +98,7 @@ export function selectLogbookFilterOptions(rows) {
     airlines: toSortedValues(activeRows.map((row) => row.airlineDisplayName).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
     equipment: toSortedValues(activeRows.map((row) => row.equipment).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
     origins: toSortedValues(activeRows.map((row) => row.origin).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
-    destinations: toSortedValues(activeRows.map((row) => row.destination).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
-    statuses: toSortedValues(activeRows.map((row) => row.statusDisplay).filter((value) => value !== LOGBOOK_EMPTY_VALUE))
+    destinations: toSortedValues(activeRows.map((row) => row.destination).filter((value) => value !== LOGBOOK_EMPTY_VALUE))
   };
 }
 

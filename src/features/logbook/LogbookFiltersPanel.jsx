@@ -6,7 +6,10 @@ import { fieldInputClassName } from "../../components/ui/forms";
 import { Eyebrow } from "../../components/ui/SectionHeader";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
-import { getEffectiveLogbookDistanceRange } from "./logbookFilters.model.js";
+import {
+  getEffectiveLogbookDistanceRange,
+  getEffectiveLogbookDurationRange
+} from "./logbookFilters.model.js";
 
 function buildStringOptions(values, keywordsPrefix = "") {
   return values.map((value) => ({
@@ -15,6 +18,25 @@ function buildStringOptions(values, keywordsPrefix = "") {
     selectedLabel: value,
     keywords: `${keywordsPrefix} ${value}`.trim()
   }));
+}
+
+function formatHoursOnly(minutes) {
+  return `${Math.round(Number(minutes || 0) / 60)}h`;
+}
+
+function LogbookDateField({ label, value, min, max, onChange }) {
+  return (
+    <Field label={label} className="min-w-0">
+      <input
+        type="date"
+        className={fieldInputClassName}
+        value={value}
+        min={min || undefined}
+        max={max || undefined}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </Field>
+  );
 }
 
 // Renders the logbook-specific filter rail using the existing planner filter language.
@@ -26,12 +48,21 @@ export default function LogbookFiltersPanel({
   onReset
 }) {
   const effectiveDistanceRange = getEffectiveLogbookDistanceRange(filters, filterBounds);
+  const effectiveDurationRange = getEffectiveLogbookDurationRange(filters, filterBounds);
   const distanceSlider = useTransientRangeSlider(
     effectiveDistanceRange.min,
     effectiveDistanceRange.max,
     ([minValue, maxValue]) => {
       onFilterChange("distanceMin", minValue <= 0 ? 0 : minValue);
       onFilterChange("distanceMax", maxValue >= filterBounds.maxDistanceNm ? null : maxValue);
+    }
+  );
+  const durationSlider = useTransientRangeSlider(
+    effectiveDurationRange.min,
+    effectiveDurationRange.max,
+    ([minValue, maxValue]) => {
+      onFilterChange("durationMin", minValue <= 0 ? 0 : minValue);
+      onFilterChange("durationMax", maxValue >= filterBounds.maxDurationMinutes ? null : maxValue);
     }
   );
 
@@ -56,15 +87,22 @@ export default function LogbookFiltersPanel({
         </Button>
       </div>
 
-      <Field label="Search" className="min-w-0">
-        <input
-          type="text"
-          className={fieldInputClassName}
-          value={filters.search}
-          onChange={(event) => onFilterChange("search", event.target.value)}
-          placeholder="Flight, airline, airport, equipment, status"
+      <div className="grid gap-3 bp-1024:grid-cols-2">
+        <LogbookDateField
+          label="Start Date"
+          value={filters.dateStart}
+          min={filterBounds.minDateIso}
+          max={filterBounds.maxDateIso}
+          onChange={(value) => onFilterChange("dateStart", value)}
         />
-      </Field>
+        <LogbookDateField
+          label="End Date"
+          value={filters.dateEnd}
+          min={filterBounds.minDateIso}
+          max={filterBounds.maxDateIso}
+          onChange={(value) => onFilterChange("dateEnd", value)}
+        />
+      </div>
 
       <div className="grid gap-3 bp-1024:grid-cols-2">
         <SearchableMultiSelect
@@ -124,34 +162,30 @@ export default function LogbookFiltersPanel({
         />
       </div>
 
-      <div className="grid gap-3">
-        <div className="grid gap-3 bp-1024:grid-cols-2">
-          <SearchableMultiSelect
-            label="Status"
-            placeholder="Search statuses"
-            emptyLabel="No matching statuses"
-            allLabel="All"
-            hideChips
-            showAddActionText
-            showPinnedSelectedBlockForMultiple
-            pinnedSelectedActionLabel="Remove"
-            options={buildStringOptions(filterOptions.statuses, "status")}
-            selectedValues={filters.status}
-            onChange={(value) => onFilterChange("status", value)}
-          />
+      <div className="grid gap-3 bp-1400:grid-cols-2">
+        <RangeSlider
+          label="Distance"
+          min={0}
+          max={filterBounds.maxDistanceNm}
+          step={100}
+          lowValue={distanceSlider.lowValue}
+          highValue={distanceSlider.highValue}
+          onChange={distanceSlider.onChange}
+          onCommit={distanceSlider.onCommit}
+          formatValue={(value) => `${new Intl.NumberFormat("en-US").format(value)} nm`}
+        />
 
-          <RangeSlider
-            label="Distance"
-            min={0}
-            max={filterBounds.maxDistanceNm}
-            step={100}
-            lowValue={distanceSlider.lowValue}
-            highValue={distanceSlider.highValue}
-            onChange={distanceSlider.onChange}
-            onCommit={distanceSlider.onCommit}
-            formatValue={(value) => `${new Intl.NumberFormat("en-US").format(value)} nm`}
-          />
-        </div>
+        <RangeSlider
+          label="Duration"
+          min={0}
+          max={filterBounds.maxDurationMinutes}
+          step={60}
+          lowValue={durationSlider.lowValue}
+          highValue={durationSlider.highValue}
+          onChange={durationSlider.onChange}
+          onCommit={durationSlider.onCommit}
+          formatValue={formatHoursOnly}
+        />
       </div>
 
       <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>

@@ -545,7 +545,7 @@ export default function BasicScheduleFilters({
 
           <div className="grid gap-3 bp-1024:col-span-2 bp-1024:grid-cols-2">
             <RangeSlider
-              label="Flight Length"
+              label="Duration"
               min={0}
               max={filterBounds.maxBlockMinutes}
               step={60}

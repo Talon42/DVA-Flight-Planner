@@ -402,7 +402,7 @@ export default function ScheduleTablePanel({
             />
           </div>
         ) : scheduleView === "logbook" ? (
-          <div className="flex h-full min-h-0 px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
+          <div className="flex h-full min-h-0 w-full min-w-0 px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
             <LogbookPanel {...logbookProps} />
           </div>
         ) : (
