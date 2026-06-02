@@ -1,24 +1,38 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../../components/ui/cn";
 import { labelTextClassName, bodyMdTextClassName } from "../../components/ui/typography";
+import { buildColumnTemplate, fitColumnsToWidth } from "../../components/data-table/tableUtils.js";
 import LogbookFlightDetails from "./LogbookFlightDetails.jsx";
 
 const TABLE_COLUMNS = [
-  { key: "dateSortKey", label: "Date", renderCell: (row) => row.dateDisplay },
-  { key: "compactFlightLabel", label: "Flight", renderCell: (row) => row.compactFlightLabel },
-  { key: "origin", label: "Departure", renderCell: (row) => row.origin },
-  { key: "destination", label: "Arrival", renderCell: (row) => row.destination },
-  { key: "equipment", label: "Equipment", renderCell: (row) => row.equipment },
-  { key: "durationMinutes", label: "Duration", renderCell: (row) => row.durationDisplay },
-  { key: "distanceNm", label: "Dist", renderCell: (row) => row.distanceDisplay },
-  { key: "landingRate", label: "Landing Rate", renderCell: (row) => row.landingRateDisplay }
+  { key: "dateSortKey", label: "Date", minWidth: 108, flexWeight: 0.92, renderCell: (row) => row.dateDisplay },
+  {
+    key: "compactFlightLabel",
+    label: "Flight",
+    minWidth: 118,
+    flexWeight: 1,
+    renderCell: (row) => row.compactFlightLabel
+  },
+  { key: "origin", label: "Departure", minWidth: 92, flexWeight: 0.8, renderCell: (row) => row.origin },
+  { key: "destination", label: "Arrival", minWidth: 92, flexWeight: 0.8, renderCell: (row) => row.destination },
+  { key: "equipment", label: "Equipment", minWidth: 132, flexWeight: 1, renderCell: (row) => row.equipment },
+  {
+    key: "durationMinutes",
+    label: "Duration",
+    minWidth: 94,
+    flexWeight: 0.84,
+    renderCell: (row) => row.durationDisplay
+  },
+  { key: "distanceNm", label: "Dist", minWidth: 88, flexWeight: 0.8, renderCell: (row) => row.distanceDisplay },
+  {
+    key: "landingRate",
+    label: "Landing Rate",
+    minWidth: 112,
+    flexWeight: 0.9,
+    renderCell: (row) => row.landingRateDisplay
+  }
 ];
-
-const TABLE_GRID_CLASS_NAME_BASE = "grid";
-const TABLE_GRID_COLUMNS_WIDE =
-  "[grid-template-columns:minmax(108px,0.92fr)_minmax(118px,1fr)_minmax(92px,0.8fr)_minmax(92px,0.8fr)_minmax(132px,1fr)_minmax(94px,0.84fr)_minmax(88px,0.8fr)_minmax(112px,0.9fr)]";
-const TABLE_GRID_COLUMNS_COMPACT =
-  "[grid-template-columns:minmax(108px,0.92fr)_minmax(118px,1fr)_minmax(92px,0.8fr)_minmax(92px,0.8fr)_minmax(132px,1fr)_minmax(112px,0.9fr)]";
+const COMPACT_LAYOUT_MAX_WIDTH = 900;
 
 function ResponsiveOriginLabel() {
   return (
@@ -65,18 +79,6 @@ function LogbookDateCell({ row }) {
       <span className="hidden bp-1400:inline">{row.dateDisplay}</span>
     </>
   );
-}
-
-// Drops the duration and distance columns from the compact layout only.
-function getVisibleColumns(viewportWidth = 0) {
-  const useWideLayout = viewportWidth >= 1400;
-  return TABLE_COLUMNS.filter((column) => {
-    if (useWideLayout) {
-      return true;
-    }
-
-    return column.key !== "durationMinutes" && column.key !== "distanceNm";
-  });
 }
 
 function LogbookFlightCell({ row }) {
@@ -150,7 +152,7 @@ function HeaderButton({ column, sort, onSort }) {
   );
 }
 
-function LogbookRow({ row, columns, expanded, onToggleExpanded, tableGridClassName }) {
+function LogbookRow({ row, columns, expanded, onToggleExpanded, columnTemplate }) {
   const detailsId = `logbook-details-${row.id}`;
 
   return (
@@ -165,7 +167,7 @@ function LogbookRow({ row, columns, expanded, onToggleExpanded, tableGridClassNa
         aria-expanded={expanded}
         aria-controls={detailsId}
       >
-        <span className={cn("min-w-0", tableGridClassName)}>
+        <span className="grid min-w-0" style={{ gridTemplateColumns: columnTemplate }}>
           {columns.map((column) => (
             <span
               key={column.key}
@@ -206,11 +208,28 @@ export default function LogbookFlightsTable({
   onLoadMoreRows
 }) {
   const scrollContainerRef = useRef(null);
-  const visibleColumns = getVisibleColumns(viewportWidth);
-  const useWideLayout = viewportWidth >= 1400;
-  const tableGridClassName = cn(
-    TABLE_GRID_CLASS_NAME_BASE,
-    useWideLayout ? TABLE_GRID_COLUMNS_WIDE : TABLE_GRID_COLUMNS_COMPACT
+  const tableRef = useRef(null);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const effectiveWidth = availableWidth || viewportWidth || 0;
+  const useWideLayout = effectiveWidth >= COMPACT_LAYOUT_MAX_WIDTH;
+  const visibleColumns = useMemo(
+    () =>
+      TABLE_COLUMNS.filter((column) => {
+        if (useWideLayout) {
+          return true;
+        }
+
+        return column.key !== "durationMinutes" && column.key !== "distanceNm";
+      }),
+    [useWideLayout]
+  );
+  const fittedColumns = useMemo(
+    () => fitColumnsToWidth(visibleColumns, effectiveWidth),
+    [effectiveWidth, visibleColumns]
+  );
+  const columnTemplate = useMemo(
+    () => buildColumnTemplate(fittedColumns, effectiveWidth),
+    [effectiveWidth, fittedColumns]
   );
 
   useEffect(() => {
@@ -234,6 +253,29 @@ export default function LogbookFlightsTable({
     return () => container.removeEventListener("scroll", handleScroll);
   }, [hasMoreRows, onLoadMoreRows, rows.length]);
 
+  useEffect(() => {
+    const tableNode = tableRef.current;
+
+    if (!tableNode) {
+      return undefined;
+    }
+
+    const updateAvailableWidth = () => {
+      setAvailableWidth(Math.max(0, Math.floor(tableNode.clientWidth)));
+    };
+
+    updateAvailableWidth();
+
+    if (typeof ResizeObserver === "function") {
+      const resizeObserver = new ResizeObserver(updateAvailableWidth);
+      resizeObserver.observe(tableNode);
+      return () => resizeObserver.disconnect();
+    }
+
+    window.addEventListener("resize", updateAvailableWidth);
+    return () => window.removeEventListener("resize", updateAvailableWidth);
+  }, [viewportWidth]);
+
   if (!rows.length) {
     return (
       <div className="flex h-full min-h-0 items-center justify-center border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)] px-6 py-8 text-center text-[var(--text-muted)]">
@@ -243,14 +285,18 @@ export default function LogbookFlightsTable({
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)]">
+    <div
+      ref={tableRef}
+      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)]"
+    >
       <div
         className={cn(
           "relative z-20 w-full min-w-0 border-b border-[color:var(--line)] bg-[var(--surface-raised)]",
-          tableGridClassName
+          "grid"
         )}
+        style={{ gridTemplateColumns: columnTemplate }}
       >
-        {visibleColumns.map((column) => (
+        {fittedColumns.map((column) => (
           <div key={column.key} className="min-w-0">
             <HeaderButton column={column} sort={sort} onSort={onSort} />
           </div>
@@ -265,10 +311,10 @@ export default function LogbookFlightsTable({
             <LogbookRow
               key={row.id}
               row={row}
-              columns={visibleColumns}
+              columns={fittedColumns}
               expanded={expandedRowId === row.id}
               onToggleExpanded={onToggleExpandedRow}
-              tableGridClassName={tableGridClassName}
+              columnTemplate={columnTemplate}
             />
           ))}
         </ul>
