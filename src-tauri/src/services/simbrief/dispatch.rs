@@ -622,19 +622,16 @@ fn append_simbrief_log(app: &AppHandle, message: &str) {
         return;
     };
 
-    if fs::metadata(&log_path)
-        .map(|metadata| metadata.len() > SIMBRIEF_LOG_MAX_BYTES)
-        .unwrap_or(false)
+    if let Err(_error) =
+        crate::app::logging::append_bounded_log_line(&log_path, &line, SIMBRIEF_LOG_MAX_BYTES)
     {
-        let _ = fs::remove_file(&log_path);
-    }
-
-    if let Ok(mut file) = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path)
-    {
-        let _ = file.write_all(line.as_bytes());
+        if let Ok(mut file) = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)
+        {
+            let _ = file.write_all(line.as_bytes());
+        }
     }
 }
 
