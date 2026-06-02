@@ -26,14 +26,48 @@ function normalizeSimBriefAircraftTypeOption(value) {
   return { code, name };
 }
 
-function buildAircraftTypeLogPayload(resolution) {
-  return {
-    simbriefCode: resolution.simbriefCode,
-    simbriefName: resolution.simbriefName,
-    resolvedDvaEquipmentType: resolution.resolvedDvaEquipmentType,
-    resolutionSource: resolution.resolutionSource,
-    validForDvaDraft: resolution.validForDvaDraft
+function buildSimBriefAircraftTypeSummary({
+  rawTypes,
+  normalizedTypes,
+  resolvedTypes,
+  warning,
+  isDevToolsEnabled
+}) {
+  const duplicateCodeCounts = normalizedTypes.reduce((accumulator, type) => {
+    const nextCount = (accumulator.get(type.code) || 0) + 1;
+    accumulator.set(type.code, nextCount);
+    return accumulator;
+  }, new Map());
+
+  const duplicateCodeSample = Array.from(duplicateCodeCounts.entries())
+    .filter(([, count]) => count > 1)
+    .map(([code]) => code)
+    .slice(0, 8);
+
+  const unsupportedTypes = resolvedTypes.filter((type) => !type.validForDvaDraft);
+  const summary = {
+    source: "live",
+    rawTypes: rawTypes.length,
+    normalizedTypes: normalizedTypes.length,
+    returnedTypes: resolvedTypes.filter((type) => type.validForDvaDraft).length,
+    unsupportedTypes: unsupportedTypes.length,
+    duplicateCodeCount: Array.from(duplicateCodeCounts.values()).reduce(
+      (total, count) => total + Math.max(0, count - 1),
+      0
+    ),
+    duplicateCodeSample
   };
+
+  if (isDevToolsEnabled) {
+    summary.unsupportedCodeSample = unsupportedTypes.map((type) => type.code).slice(0, 8);
+  }
+
+  const normalizedWarning = String(warning || "").trim();
+  if (normalizedWarning) {
+    summary.warning = normalizedWarning;
+  }
+
+  return summary;
 }
 
 // Returns the dispatch timestamp and SimBrief departure date in UTC.
@@ -144,31 +178,29 @@ export function useSimBriefDispatch({
         return result;
       }
 
-      const normalizedTypes = Array.isArray(result?.types)
-        ? result.types
-            .map(normalizeSimBriefAircraftTypeOption)
-            .filter(Boolean)
-            .map((type) => {
-              const resolution = resolveSimBriefAircraftCompatibility(type);
-              if (isDevToolsEnabled) {
-                logSystemEvent("SimBrief", "aircraft-type-resolved", buildAircraftTypeLogPayload(resolution)).catch(() => {});
-              }
+      const rawTypes = Array.isArray(result?.types) ? result.types : [];
+      const normalizedTypes = rawTypes.map(normalizeSimBriefAircraftTypeOption).filter(Boolean);
+      const resolvedTypes = normalizedTypes.map((type) => ({
+        ...type,
+        ...resolveSimBriefAircraftCompatibility(type)
+      }));
+      const validTypes = resolvedTypes
+        .filter((type) => type.validForDvaDraft)
+        .sort((left, right) => left.code.localeCompare(right.code));
 
-              return {
-                ...type,
-                ...resolution
-              };
-            })
-            .filter((type) => type.validForDvaDraft)
-            .sort((left, right) => left.code.localeCompare(right.code))
-        : [];
-
-      setSimBriefAircraftTypes(normalizedTypes);
+      setSimBriefAircraftTypes(validTypes);
       setSimBriefAircraftTypesError(String(result?.warning || "").trim());
-      logSystemEvent("SimBrief", "aircraft-types-loaded", {
-        source: "live",
-        returnedTypes: normalizedTypes.length
-      }).catch(() => {});
+      logSystemEvent(
+        "SimBrief",
+        "aircraft-types-loaded",
+        buildSimBriefAircraftTypeSummary({
+          rawTypes,
+          normalizedTypes,
+          resolvedTypes,
+          warning: result?.warning,
+          isDevToolsEnabled
+        })
+      ).catch(() => {});
       return result;
     } catch (error) {
       if (loadRequestIdRef.current !== requestId) {

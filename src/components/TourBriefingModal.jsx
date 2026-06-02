@@ -5,6 +5,7 @@ import { cn } from "./ui/cn";
 import { modalBackdropClassName } from "./ui/patterns";
 import SectionHeader from "./ui/SectionHeader";
 import { bodySmTextClassName, supportCopyTextClassName } from "./ui/typography";
+import { fetchDeltaVirtualTourBriefing } from "../services/tauri/deltaVirtual.client.js";
 
 function decodeBase64ToBlobUrl(base64, contentType) {
   const normalizedBase64 = String(base64 || "").trim();
@@ -182,12 +183,7 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
       }
 
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const result = await invoke("fetch_delta_virtual_tour_briefing", {
-          request: {
-            briefingUrl: normalizedBriefingUrl
-          }
-        });
+        const result = await fetchDeltaVirtualTourBriefing(normalizedBriefingUrl);
 
         if (cancelled) {
           return;

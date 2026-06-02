@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import {
   DEV_TOOLS_STORAGE_KEY,
   DEV_WINDOW_WIDTH_STORAGE_KEY
 } from "./appRuntime.js";
 import { logAppError, logAppEvent } from "../services/logging/appLog.client.js";
+import { invokeAppCommand } from "../services/tauri/invoke.client.js";
 
 export const DEV_WINDOW_WIDTH_PRESETS = [
   { width: 1920, height: 900, label: "1920x900" },
@@ -89,7 +89,7 @@ export function useAppDevTools({ isDesktopAddonScanAvailable, setStatusMessage }
     setIsDevContextMenuOpen(false);
 
     try {
-      await invoke("open_main_devtools");
+      await invokeAppCommand("open_main_devtools", {}, { subsystem: "DevTools" });
     } catch (error) {
       setStatusMessage(error.message || "Unable to open Dev Tools.");
       await logAppError("open-devtools-failed", error);

@@ -4,6 +4,31 @@ function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+// Loads a Delta Virtual tour briefing PDF through the Rust-backed capture flow.
+export async function fetchDeltaVirtualTourBriefing(briefingUrl) {
+  if (!isTauriRuntime()) {
+    throw new Error("Delta Virtual briefing downloads are only available in the desktop app.");
+  }
+
+  const normalizedBriefingUrl = String(briefingUrl || "").trim();
+
+  return invokeAppCommand(
+    "fetch_delta_virtual_tour_briefing",
+    {
+      request: {
+        briefingUrl: normalizedBriefingUrl
+      }
+    },
+    {
+      subsystem: "DVA Tours",
+      event: "briefing-fetch-failed",
+      metadata: {
+        hasBriefingUrl: Boolean(normalizedBriefingUrl)
+      }
+    }
+  );
+}
+
 function normalizeSyncError(message) {
   if (!message) {
     return new Error("Delta Virtual sync failed.");
