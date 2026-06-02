@@ -65,18 +65,61 @@ export function normalizeLogbookFilters(savedFilters, bounds = DEFAULT_DISTANCE_
     ...(savedFilters || {})
   };
 
+  const maxDistance = Number(bounds?.maxDistanceNm);
+  const hasPositiveBounds = Number.isFinite(maxDistance) && maxDistance > 0;
+
   nextFilters.search = String(nextFilters.search || "").trim();
   nextFilters.airline = toSelectionArray(nextFilters.airline);
   nextFilters.equipment = toSelectionArray(nextFilters.equipment);
   nextFilters.origin = toSelectionArray(nextFilters.origin).map((value) => value.toUpperCase());
   nextFilters.destination = toSelectionArray(nextFilters.destination).map((value) => value.toUpperCase());
   nextFilters.status = toSelectionArray(nextFilters.status);
-  nextFilters.distanceMin = clampRange(nextFilters.distanceMin, 0, bounds.maxDistanceNm, 0);
-  nextFilters.distanceMax = Number.isFinite(Number(nextFilters.distanceMax))
-    ? clampRange(nextFilters.distanceMax, nextFilters.distanceMin, bounds.maxDistanceNm, bounds.maxDistanceNm)
-    : null;
+
+  nextFilters.distanceMin = hasPositiveBounds
+    ? clampRange(nextFilters.distanceMin, 0, maxDistance, 0)
+    : 0;
+
+  const rawDistanceMax = Number(nextFilters.distanceMax);
+  if (!Number.isFinite(rawDistanceMax)) {
+    nextFilters.distanceMax = null;
+  } else if (!hasPositiveBounds) {
+    nextFilters.distanceMax = rawDistanceMax > 0 ? rawDistanceMax : null;
+  } else if (rawDistanceMax <= 0 && nextFilters.distanceMin <= 0) {
+    nextFilters.distanceMax = null;
+  } else {
+    nextFilters.distanceMax = clampRange(rawDistanceMax, nextFilters.distanceMin, maxDistance, null);
+  }
 
   return nextFilters;
+}
+
+// Determines whether the user has an actual distance constraint instead of only the default slider display.
+export function hasActiveLogbookDistanceConstraint(filters, bounds = DEFAULT_DISTANCE_BOUNDS) {
+  const normalizedFilters = normalizeLogbookFilters(filters, bounds);
+
+  return (
+    Number.isFinite(normalizedFilters.distanceMin) && normalizedFilters.distanceMin > 0
+  ) || Number.isFinite(normalizedFilters.distanceMax);
+}
+
+// Evaluates whether a single logbook row distance should pass the active distance filter state.
+export function shouldIncludeLogbookDistanceRow(distanceNm, filters, bounds = DEFAULT_DISTANCE_BOUNDS) {
+  const normalizedFilters = normalizeLogbookFilters(filters, bounds);
+  const hasDistanceConstraint = hasActiveLogbookDistanceConstraint(normalizedFilters, bounds);
+
+  if (Number.isFinite(distanceNm)) {
+    if (distanceNm < normalizedFilters.distanceMin) {
+      return false;
+    }
+
+    if (Number.isFinite(normalizedFilters.distanceMax) && distanceNm > normalizedFilters.distanceMax) {
+      return false;
+    }
+
+    return true;
+  }
+
+  return !hasDistanceConstraint;
 }
 
 // Maps the persisted distance sentinel to the active min/max values used by selectors and slider UI.

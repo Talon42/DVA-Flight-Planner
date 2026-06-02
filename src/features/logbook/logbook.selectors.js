@@ -5,7 +5,8 @@ import {
 } from "../../domain/logbook/logbook.model.js";
 import {
   buildLogbookFilterBounds,
-  getEffectiveLogbookDistanceRange
+  normalizeLogbookFilters,
+  shouldIncludeLogbookDistanceRow
 } from "./logbookFilters.model.js";
 
 function matchesSearch(row, query) {
@@ -24,42 +25,34 @@ export function selectFilteredLogbookRows({ rows, filters }) {
   }
 
   const filterBounds = buildLogbookFilterBounds(activeRows);
-  const distanceRange = getEffectiveLogbookDistanceRange(filters, filterBounds);
+  const normalizedFilters = normalizeLogbookFilters(filters, filterBounds);
 
   return activeRows.filter((row) => {
-    if (filters.airline.length && !filters.airline.includes(row.airlineDisplayName)) {
+    if (normalizedFilters.airline.length && !normalizedFilters.airline.includes(row.airlineDisplayName)) {
       return false;
     }
 
-    if (filters.equipment.length && !filters.equipment.includes(row.equipment)) {
+    if (normalizedFilters.equipment.length && !normalizedFilters.equipment.includes(row.equipment)) {
       return false;
     }
 
-    if (filters.origin.length && !filters.origin.includes(row.origin)) {
+    if (normalizedFilters.origin.length && !normalizedFilters.origin.includes(row.origin)) {
       return false;
     }
 
-    if (filters.destination.length && !filters.destination.includes(row.destination)) {
+    if (normalizedFilters.destination.length && !normalizedFilters.destination.includes(row.destination)) {
       return false;
     }
 
-    if (filters.status.length && !filters.status.includes(row.statusDisplay)) {
+    if (normalizedFilters.status.length && !normalizedFilters.status.includes(row.statusDisplay)) {
       return false;
     }
 
-    if (Number.isFinite(row.distanceNm)) {
-      if (row.distanceNm < distanceRange.min) {
-        return false;
-      }
-
-      if (Number.isFinite(distanceRange.max) && distanceRange.max > 0 && row.distanceNm > distanceRange.max) {
-        return false;
-      }
-    } else if (distanceRange.min > 0 || distanceRange.max > 0) {
+    if (!shouldIncludeLogbookDistanceRow(row.distanceNm, filters, filterBounds)) {
       return false;
     }
 
-    return matchesSearch(row, filters.search);
+    return matchesSearch(row, normalizedFilters.search);
   });
 }
 
