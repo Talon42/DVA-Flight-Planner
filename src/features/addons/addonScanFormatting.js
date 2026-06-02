@@ -29,12 +29,10 @@ export function formatAddonScanSummary(addonScan) {
   }
 
   const scanStamp = formatScanTimestamp(addonScan.lastScannedAt);
-  const manifestSummary = addonScan.manifestFilesScanned
-    ? ` and ${formatNumber(addonScan.manifestFilesScanned)} manifest files`
-    : "";
-  const baseSummary = `${formatNumber(addonScan.airports.length)} airports cached from ${formatNumber(
-    addonScan.contentHistoryFilesScanned
-  )} ContentHistory files${manifestSummary}${scanStamp ? `, last scanned ${scanStamp}` : ""}.`;
+  const airportsCached = Number(addonScan?.airports?.length || 0);
+  const baseSummary = `${
+    airportsCached > 0 ? `${formatNumber(airportsCached)} addon airports cached` : "No addon airports cached"
+  }${scanStamp ? ` · Last scanned ${scanStamp}` : ""}`;
 
   if (addonScan.lastError) {
     return `${baseSummary} ${addonScan.lastError}`;

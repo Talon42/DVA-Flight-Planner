@@ -87,16 +87,16 @@ export function useAddonAirports({
       setStatusMessage?.("Scanning addon folders for ContentHistory.json and manifest.json...");
       await logSystemEvent("AddonScan", "scan-start", {
         rootCount: roots.length,
-        airportsCached: options.resetCache ? 0 : addonScan.airports.length,
-        contentHistoryFilesScanned: addonScan.contentHistoryFilesScanned,
-        manifestFilesScanned: addonScan.manifestFilesScanned
+        previousAirportsCached: options.resetCache ? 0 : addonScan.airports.length,
+        previousContentHistoryFilesScanned: options.resetCache ? 0 : addonScan.contentHistoryFilesScanned,
+        previousManifestFilesScanned: options.resetCache ? 0 : addonScan.manifestFilesScanned
       });
 
       try {
         const nextScan = await scanAddonAirports(roots);
         setAddonScan(nextScan);
         setStatusMessage?.(
-          `Scanned ${formatNumber(nextScan.contentHistoryFilesScanned)} ContentHistory files and ${formatNumber(nextScan.manifestFilesScanned)} manifest files, then cached ${formatNumber(nextScan.airports.length)} addon airports.`
+          `Scan complete. Cached ${formatNumber(nextScan.airports.length)} addon airports.`
         );
         await logSystemEvent("AddonScan", "scan-succeeded", buildAddonScanSummary(nextScan));
         if (isDevToolsEnabled && Array.isArray(nextScan.scanDetails) && nextScan.scanDetails.length) {
