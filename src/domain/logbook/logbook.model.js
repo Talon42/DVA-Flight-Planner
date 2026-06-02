@@ -92,6 +92,19 @@ function formatDvaDate(entry) {
   }).toFormat("MM/dd/yyyy");
 }
 
+function formatDvaDateCompact(entry) {
+  const parts = extractDateParts(entry);
+  if (!parts) {
+    return LOGBOOK_EMPTY_VALUE;
+  }
+
+  return DateTime.fromObject({
+    year: parts.year,
+    month: parts.month,
+    day: parts.day
+  }).toFormat("MMddyy");
+}
+
 function buildDateSortKey(entry) {
   const parts = extractDateParts(entry);
   if (!parts) {
@@ -365,6 +378,7 @@ export function normalizeLogbookRows(entries) {
       sourceIndex,
       rawEntry: entry,
       dateDisplay: formatDvaDate(entry),
+      dateDisplayCompact: formatDvaDateCompact(entry),
       dateSortKey: buildDateSortKey(entry),
       compactFlightLabel,
       airlineCode: airlineCode || LOGBOOK_EMPTY_VALUE,

@@ -1671,6 +1671,7 @@ export default function App() {
       filteredRows: logbook.filteredRows,
       visibleRows: logbook.visibleRows,
       hasMoreRows: logbook.hasMoreRows,
+      viewportWidth: viewportSize.width,
       selectedTab: logbook.selectedTab,
       sort: logbook.sort,
       expandedRowId: logbook.expandedRowId,

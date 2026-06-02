@@ -14,8 +14,11 @@ const TABLE_COLUMNS = [
   { key: "landingRate", label: "Landing Rate", renderCell: (row) => row.landingRateDisplay }
 ];
 
-const TABLE_GRID_CLASS_NAME =
-  "grid [grid-template-columns:minmax(108px,0.92fr)_minmax(118px,1fr)_minmax(92px,0.8fr)_minmax(92px,0.8fr)_minmax(132px,1fr)_minmax(94px,0.84fr)_minmax(88px,0.8fr)_minmax(112px,0.9fr)]";
+const TABLE_GRID_CLASS_NAME_BASE = "grid";
+const TABLE_GRID_COLUMNS_WIDE =
+  "[grid-template-columns:minmax(108px,0.92fr)_minmax(118px,1fr)_minmax(92px,0.8fr)_minmax(92px,0.8fr)_minmax(132px,1fr)_minmax(94px,0.84fr)_minmax(88px,0.8fr)_minmax(112px,0.9fr)]";
+const TABLE_GRID_COLUMNS_COMPACT =
+  "[grid-template-columns:minmax(108px,0.92fr)_minmax(118px,1fr)_minmax(92px,0.8fr)_minmax(92px,0.8fr)_minmax(132px,1fr)_minmax(112px,0.9fr)]";
 
 function ResponsiveOriginLabel() {
   return (
@@ -46,6 +49,36 @@ function ResponsiveLandingRateLabel() {
   );
 }
 
+function ResponsiveEquipmentLabel() {
+  return (
+    <>
+      <span className="bp-1400:hidden">EQP</span>
+      <span className="hidden bp-1400:inline">Equipment</span>
+    </>
+  );
+}
+
+function LogbookDateCell({ row }) {
+  return (
+    <>
+      <span className="bp-1400:hidden">{row.dateDisplayCompact}</span>
+      <span className="hidden bp-1400:inline">{row.dateDisplay}</span>
+    </>
+  );
+}
+
+// Drops the duration and distance columns from the compact layout only.
+function getVisibleColumns(viewportWidth = 0) {
+  const useWideLayout = viewportWidth >= 1400;
+  return TABLE_COLUMNS.filter((column) => {
+    if (useWideLayout) {
+      return true;
+    }
+
+    return column.key !== "durationMinutes" && column.key !== "distanceNm";
+  });
+}
+
 function LogbookFlightCell({ row }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
@@ -66,6 +99,7 @@ function HeaderButton({ column, sort, onSort }) {
   const isActive = sort?.key === column.key;
   const isOriginColumn = column.key === "origin";
   const isDestinationColumn = column.key === "destination";
+  const isEquipmentColumn = column.key === "equipment";
   const isLandingRateColumn = column.key === "landingRate";
 
   return (
@@ -84,6 +118,8 @@ function HeaderButton({ column, sort, onSort }) {
             <ResponsiveOriginLabel />
           ) : isDestinationColumn ? (
             <ResponsiveDestinationLabel />
+          ) : isEquipmentColumn ? (
+            <ResponsiveEquipmentLabel />
           ) : isLandingRateColumn ? (
             <ResponsiveLandingRateLabel />
           ) : (
@@ -114,7 +150,7 @@ function HeaderButton({ column, sort, onSort }) {
   );
 }
 
-function LogbookRow({ row, columns, expanded, onToggleExpanded }) {
+function LogbookRow({ row, columns, expanded, onToggleExpanded, tableGridClassName }) {
   const detailsId = `logbook-details-${row.id}`;
 
   return (
@@ -129,7 +165,7 @@ function LogbookRow({ row, columns, expanded, onToggleExpanded }) {
         aria-expanded={expanded}
         aria-controls={detailsId}
       >
-        <span className={cn("min-w-0", TABLE_GRID_CLASS_NAME)}>
+        <span className={cn("min-w-0", tableGridClassName)}>
           {columns.map((column) => (
             <span
               key={column.key}
@@ -140,6 +176,8 @@ function LogbookRow({ row, columns, expanded, onToggleExpanded }) {
             >
               {column.key === "compactFlightLabel" ? (
                 <LogbookFlightCell row={row} />
+              ) : column.key === "dateSortKey" ? (
+                <LogbookDateCell row={row} />
               ) : (
                 <span className="block min-w-0 truncate leading-none">{column.renderCell(row)}</span>
               )}
@@ -160,6 +198,7 @@ function LogbookRow({ row, columns, expanded, onToggleExpanded }) {
 export default function LogbookFlightsTable({
   rows,
   hasMoreRows,
+  viewportWidth = 0,
   sort,
   expandedRowId,
   onSort,
@@ -167,6 +206,12 @@ export default function LogbookFlightsTable({
   onLoadMoreRows
 }) {
   const scrollContainerRef = useRef(null);
+  const visibleColumns = getVisibleColumns(viewportWidth);
+  const useWideLayout = viewportWidth >= 1400;
+  const tableGridClassName = cn(
+    TABLE_GRID_CLASS_NAME_BASE,
+    useWideLayout ? TABLE_GRID_COLUMNS_WIDE : TABLE_GRID_COLUMNS_COMPACT
+  );
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -199,8 +244,13 @@ export default function LogbookFlightsTable({
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)]">
-      <div className={cn("relative z-20 w-full min-w-0 border-b border-[color:var(--line)] bg-[var(--surface-raised)]", TABLE_GRID_CLASS_NAME)}>
-        {TABLE_COLUMNS.map((column) => (
+      <div
+        className={cn(
+          "relative z-20 w-full min-w-0 border-b border-[color:var(--line)] bg-[var(--surface-raised)]",
+          tableGridClassName
+        )}
+      >
+        {visibleColumns.map((column) => (
           <div key={column.key} className="min-w-0">
             <HeaderButton column={column} sort={sort} onSort={onSort} />
           </div>
@@ -215,9 +265,10 @@ export default function LogbookFlightsTable({
             <LogbookRow
               key={row.id}
               row={row}
-              columns={TABLE_COLUMNS}
+              columns={visibleColumns}
               expanded={expandedRowId === row.id}
               onToggleExpanded={onToggleExpandedRow}
+              tableGridClassName={tableGridClassName}
             />
           ))}
         </ul>
