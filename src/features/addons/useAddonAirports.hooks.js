@@ -22,8 +22,7 @@ function buildAddonScanSummary(addonScan) {
     manifestAirportEntriesFound: addonScan?.manifestAirportEntriesFound || 0,
     duplicateAirportEntries: addonScan?.duplicateAirportEntries || 0,
     status: addonScan?.status || "idle",
-    warningCount: Array.isArray(addonScan?.warnings) ? addonScan.warnings.length : 0,
-    airportPreview: Array.isArray(addonScan?.airports) ? addonScan.airports.slice(0, 12) : []
+    warningCount: Array.isArray(addonScan?.warnings) ? addonScan.warnings.length : 0
   };
 }
 
