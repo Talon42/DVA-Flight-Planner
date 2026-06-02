@@ -4,7 +4,7 @@ pub(crate) mod state;
 pub(crate) mod window_state;
 
 pub(crate) use logging::{
-    append_sync_log, initialize_sync_log_path, iso_now_utc, resolve_app_log_path,
+    append_sync_log, initialize_sync_log_path, iso_now_utc,
 };
 pub(crate) use paths::build_webview_data_directory;
 pub(crate) use state::DeltaSyncManager;

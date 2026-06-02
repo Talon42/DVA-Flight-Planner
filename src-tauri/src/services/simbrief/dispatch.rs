@@ -5,8 +5,6 @@ use serde_json::Value;
 use std::{
     collections::HashSet,
     fs,
-    io::Write,
-    path::PathBuf,
     sync::Mutex,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -26,7 +24,6 @@ const SIMBRIEF_CALLBACK_URL_BASE: &str = "http://127.0.0.1:43123/simbrief-callba
 const SIMBRIEF_SIGNING_SERVICE_URL: &str =
     "https://dva-simbrief-signer.foxtwomodels.workers.dev/simbrief/dispatch-url";
 const SIMBRIEF_FETCH_URL: &str = "https://www.simbrief.com/api/xml.fetcher.php";
-const SIMBRIEF_LOG_MAX_BYTES: u64 = 262_144;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -607,32 +604,8 @@ fn spawn_simbrief_background_fetch(
     });
 }
 
-fn resolve_simbrief_log_path(app: &AppHandle) -> Option<PathBuf> {
-    crate::resolve_app_log_path(app).ok()
-}
-
-fn simbrief_log_timestamp() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
-}
-
 fn append_simbrief_log(app: &AppHandle, message: &str) {
-    let line = format!("[{}] [SimBrief] {}\n", simbrief_log_timestamp(), message);
-
-    let Some(log_path) = resolve_simbrief_log_path(app) else {
-        return;
-    };
-
-    if let Err(_error) =
-        crate::app::logging::append_bounded_log_line(&log_path, &line, SIMBRIEF_LOG_MAX_BYTES)
-    {
-        if let Ok(mut file) = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path)
-        {
-            let _ = file.write_all(line.as_bytes());
-        }
-    }
+    crate::app::logging::append_app_log(app, "SimBrief", message);
 }
 
 fn simbrief_callback_success_html() -> &'static str {

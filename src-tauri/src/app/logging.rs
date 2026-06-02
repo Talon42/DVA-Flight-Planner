@@ -9,7 +9,7 @@ use chrono::{SecondsFormat, Utc};
 use tauri::{AppHandle, Manager};
 
 const APP_LOG_FILE: &str = "log.txt";
-const APP_LOG_MAX_BYTES: u64 = 262_144;
+const APP_LOG_MAX_BYTES: u64 = 1024 * 1024;
 static DELTAVA_SYNC_LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 fn normalize_log_line(line: &str) -> String {
@@ -39,6 +39,22 @@ fn trim_log_bytes_to_limit(combined: &[u8], max_bytes: usize) -> Vec<u8> {
     }
 
     slice.to_vec()
+}
+
+fn build_app_log_line(category: &str, message: &str) -> Option<String> {
+    let normalized_category = category.trim();
+    let normalized_message = message.trim_end_matches(['\r', '\n']);
+
+    if normalized_category.is_empty() || normalized_message.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "[{}] [{}] {}\n",
+        iso_now_utc(),
+        normalized_category,
+        normalized_message
+    ))
 }
 
 pub(crate) fn append_bounded_log_line(
@@ -78,6 +94,43 @@ pub(crate) fn append_bounded_log_line(
     fs::write(log_path, trimmed_text)
 }
 
+fn append_bounded_log_line_with_fallback(
+    log_path: &Path,
+    line: &str,
+    max_bytes: u64,
+) -> Result<(), io::Error> {
+    if let Err(error) = append_bounded_log_line(log_path, line, max_bytes) {
+        if let Ok(mut file) = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)
+        {
+            let _ = file.write_all(line.as_bytes());
+            return Ok(());
+        }
+
+        return Err(error);
+    }
+
+    Ok(())
+}
+
+fn append_app_log_to_path(log_path: &Path, category: &str, message: &str) -> Result<(), io::Error> {
+    let Some(line) = build_app_log_line(category, message) else {
+        return Ok(());
+    };
+
+    append_bounded_log_line_with_fallback(log_path, &line, APP_LOG_MAX_BYTES)
+}
+
+pub(crate) fn append_app_log(app: &AppHandle, category: &str, message: &str) {
+    let Ok(log_path) = resolve_app_log_path(app) else {
+        return;
+    };
+
+    let _ = append_app_log_to_path(&log_path, category, message);
+}
+
 pub(crate) fn resolve_app_log_path(app: &AppHandle) -> Result<PathBuf, String> {
     let base_dir = app
         .path()
@@ -103,22 +156,11 @@ pub(crate) fn initialize_sync_log_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 pub(crate) fn append_sync_log(message: &str) {
-    let now = iso_now_utc();
-    let line = format!("[{now}] [DVA Sync] {message}\n");
-
     let Some(log_path) = DELTAVA_SYNC_LOG_PATH.get().cloned() else {
         return;
     };
 
-    if let Err(_error) = append_bounded_log_line(&log_path, &line, APP_LOG_MAX_BYTES) {
-        if let Ok(mut file) = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path)
-        {
-            let _ = file.write_all(line.as_bytes());
-        }
-    }
+    let _ = append_app_log_to_path(&log_path, "DVA Sync", message);
 }
 
 pub(crate) fn iso_now_utc() -> String {
@@ -210,5 +252,36 @@ mod tests {
         assert_eq!(contents, "beta\ngamma\n");
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn append_app_log_to_path_writes_category_formatted_lines() {
+        let path = temp_log_path("category-log");
+
+        append_app_log_to_path(&path, "AddonScan", "scan-start").expect("append");
+
+        let contents = read_log_text(&path);
+        assert!(contents.starts_with('['));
+        assert!(contents.contains("] [AddonScan] scan-start\n"));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn append_app_log_to_path_ignores_empty_category() {
+        let path = temp_log_path("empty-category");
+
+        append_app_log_to_path(&path, "   ", "scan-start").expect("append");
+
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn append_app_log_to_path_ignores_empty_message() {
+        let path = temp_log_path("empty-message");
+
+        append_app_log_to_path(&path, "AddonScan", "").expect("append");
+
+        assert!(!path.exists());
     }
 }

@@ -6,7 +6,7 @@ mod services;
 pub(crate) use app::paths::{DELTAVA_LOGBOOK_FALLBACK_FILE, DELTAVA_SYNC_DOWNLOAD_FILE};
 pub(crate) use app::{
     append_sync_log, build_webview_data_directory, initialize_sync_log_path, iso_now_utc,
-    resolve_app_log_path, DeltaSyncManager,
+    DeltaSyncManager,
 };
 pub(crate) use models::{AddonAirportCache, AddonAirportScanDetail};
 pub(crate) use services::deltava::constants::{

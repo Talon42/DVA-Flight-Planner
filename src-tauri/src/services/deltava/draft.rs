@@ -1,9 +1,7 @@
-use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    fs::{self, OpenOptions},
-    io::Write,
+    fs,
     path::PathBuf,
     sync::{Arc, Mutex},
     time::Duration,
@@ -19,7 +17,6 @@ use webview2_com::{
 #[cfg(windows)]
 use windows::core::{Interface, PWSTR};
 
-use crate::resolve_app_log_path;
 use crate::services::deltava::auth::{
     read_auth_context_internal, save_password_to_credential_manager, DeltaVirtualAuthContext,
 };
@@ -134,10 +131,6 @@ impl DraftSubmitManager {
             let _ = sender.send(result);
         }
     }
-}
-
-fn append_draft_log(message: &str) {
-    eprintln!("[DVA Draft] {message}");
 }
 
 pub fn close_deltava_draft_window(app: &AppHandle) {
@@ -279,28 +272,9 @@ fn format_app_log_data(data: Option<&Value>) -> String {
     }
 }
 
-fn append_app_log_line(app: &AppHandle, line: &str) -> Result<(), String> {
-    let log_path = resolve_app_log_path(app).map_err(|error| format!("submit_failed: {error}"))?;
-
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .map_err(|error| format!("submit_failed: Unable to open app log file: {error}"))?;
-    writeln!(file, "{line}")
-        .map_err(|error| format!("submit_failed: Unable to write app log line: {error}"))?;
-    Ok(())
-}
-
 fn append_draft_app_log_event(app: &AppHandle, event: &str, data: Option<&Value>) {
-    let timestamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
-    let line = format!(
-        "[{timestamp}] [DVA Draft] {event}{}",
-        format_app_log_data(data)
-    );
-    if let Err(error) = append_app_log_line(app, &line) {
-        append_draft_log(&format!("app-log-write-failed {error}"));
-    }
+    let message = format!("{event}{}", format_app_log_data(data));
+    crate::app::logging::append_app_log(app, "DVA Draft", &message);
 }
 
 fn append_draft_submit_failed_stage(app: &AppHandle, stage: &str, error: &str) {
