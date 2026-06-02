@@ -194,36 +194,127 @@ fn collect_airports_from_json(value: &Value, airports: &mut Vec<String>) {
     }
 }
 
-// Extracts unique ICAO tokens from a manifest title in the order they appear.
-fn extract_icao_tokens_from_manifest_title(title: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut seen = BTreeSet::new();
-
-    for token in title
-        .to_ascii_uppercase()
+fn extract_leading_icao_token(text: &str) -> Option<String> {
+    let upper = text.trim().to_ascii_uppercase();
+    let token = upper
         .split(|character: char| !character.is_ascii_alphabetic())
+        .next()
+        .unwrap_or("");
+
+    const FALSE_POSITIVE_TOKENS: &[&str] = &["BUSH", "CITY", "FORT", "HARE", "HERN", "INTL"];
+
+    if token.len() == 4
+        && token.chars().all(|character| character.is_ascii_uppercase())
+        && !FALSE_POSITIVE_TOKENS.contains(&token)
     {
-        if token.len() == 4
-            && token
-                .chars()
-                .all(|character| character.is_ascii_uppercase())
-        {
-            let token = token.to_string();
-            if seen.insert(token.clone()) {
-                tokens.push(token);
+        Some(token.to_string())
+    } else {
+        None
+    }
+}
+
+fn extract_icao_from_package_folder_name(package_root: &Path) -> Option<String> {
+    package_root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(extract_leading_icao_token)
+}
+
+fn extract_icao_from_manifest_title(title: &str) -> Option<String> {
+    extract_leading_icao_token(title)
+}
+
+// Extracts the package ICAO from the folder name first, then falls back to a leading manifest title token.
+fn collect_airports_from_manifest_json(package_root: &Path, value: &Value) -> Vec<String> {
+    if let Some(code) = extract_icao_from_package_folder_name(package_root) {
+        return vec![code];
+    }
+
+    value
+        .get("title")
+        .and_then(Value::as_str)
+        .and_then(extract_icao_from_manifest_title)
+        .into_iter()
+        .collect()
+}
+
+fn read_directory_entries_sorted(path: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut entries = Vec::new();
+    let read_dir = fs::read_dir(path)
+        .map_err(|error| format!("Unable to read folder {} ({error})", path.display()))?;
+
+    for entry in read_dir {
+        match entry {
+            Ok(entry) => entries.push(entry.path()),
+            Err(error) => {
+                return Err(format!(
+                    "Skipped directory entry in {} ({error})",
+                    path.display()
+                ));
             }
         }
     }
 
-    tokens
+    entries.sort_by_key(|entry| entry.to_string_lossy().to_ascii_lowercase());
+    Ok(entries)
 }
 
-fn collect_airports_from_manifest_json(value: &Value) -> Vec<String> {
-    value
-        .get("title")
-        .and_then(Value::as_str)
-        .map(extract_icao_tokens_from_manifest_title)
-        .unwrap_or_default()
+fn find_content_history_files(package_root: &Path, summary: &mut AddonAirportScanSummary) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+
+    fn visit_directory(
+        directory: &Path,
+        files: &mut Vec<PathBuf>,
+        summary: &mut AddonAirportScanSummary,
+    ) {
+        let entries = match read_directory_entries_sorted(directory) {
+            Ok(entries) => entries,
+            Err(error) => {
+                summary.warnings.push(error);
+                return;
+            }
+        };
+
+        for path in entries {
+            if path.is_dir() {
+                visit_directory(&path, files, summary);
+                continue;
+            }
+
+            let is_content_history = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.eq_ignore_ascii_case("ContentHistory.json"))
+                .unwrap_or(false);
+
+            if is_content_history {
+                files.push(path);
+            }
+        }
+    }
+
+    visit_directory(package_root, &mut files, summary);
+    files.sort_by_key(|path| path.to_string_lossy().to_ascii_lowercase());
+    files
+}
+
+fn find_direct_manifest_file(package_root: &Path, summary: &mut AddonAirportScanSummary) -> Option<PathBuf> {
+    let entries = match read_directory_entries_sorted(package_root) {
+        Ok(entries) => entries,
+        Err(error) => {
+            summary.warnings.push(error);
+            return None;
+        }
+    };
+
+    entries.into_iter().find(|path| {
+        path.is_file()
+            && path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.eq_ignore_ascii_case("manifest.json"))
+                .unwrap_or(false)
+    })
 }
 
 fn apply_file_scan_result(
@@ -330,6 +421,7 @@ fn scan_content_history_file(
 }
 
 fn scan_manifest_file(
+    package_root: &Path,
     path: &Path,
     airports: &mut BTreeSet<String>,
     summary: &mut AddonAirportScanSummary,
@@ -339,7 +431,7 @@ fn scan_manifest_file(
     match fs::read_to_string(path) {
         Ok(text) => match serde_json::from_str::<Value>(&text) {
             Ok(json) => {
-                let file_airports = collect_airports_from_manifest_json(&json);
+                let file_airports = collect_airports_from_manifest_json(package_root, &json);
                 apply_file_scan_result(
                     AddonAirportScanSource::Manifest,
                     path,
@@ -381,61 +473,42 @@ fn scan_addon_package_directory(
     airports: &mut BTreeSet<String>,
     summary: &mut AddonAirportScanSummary,
 ) {
-    let entries = match fs::read_dir(root) {
-        Ok(entries) => entries,
+    let content_history_files = find_content_history_files(root, summary);
+    let mut content_history_airport_entries_found = 0;
+
+    for content_history_file in content_history_files {
+        content_history_airport_entries_found +=
+            scan_content_history_file(&content_history_file, airports, summary)
+                .airport_entries_found;
+    }
+
+    if content_history_airport_entries_found == 0 {
+        if let Some(manifest_path) = find_direct_manifest_file(root, summary) {
+            summary.manifest_fallbacks_used += 1;
+            scan_manifest_file(root, &manifest_path, airports, summary);
+        }
+    }
+}
+
+fn scan_addon_root_directory(
+    root: &Path,
+    airports: &mut BTreeSet<String>,
+    summary: &mut AddonAirportScanSummary,
+) {
+    let child_directories = match read_directory_entries_sorted(root) {
+        Ok(entries) => entries
+            .into_iter()
+            .filter(|path| path.is_dir())
+            .collect::<Vec<_>>(),
         Err(error) => {
-            summary.warnings.push(format!(
-                "Unable to read folder {} ({error})",
-                root.display()
-            ));
+            summary.warnings.push(error);
             return;
         }
     };
 
-    let mut content_history_file = None;
-    let mut manifest_file = None;
-    let mut child_directories = Vec::new();
-
-    for entry in entries {
-        match entry {
-            Ok(entry) => {
-                let path = entry.path();
-                if path.is_dir() {
-                    child_directories.push(path);
-                    continue;
-                }
-
-                let file_name = path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .unwrap_or("");
-
-                if file_name.eq_ignore_ascii_case("ContentHistory.json")
-                    && content_history_file.is_none()
-                {
-                    content_history_file = Some(path);
-                } else if file_name.eq_ignore_ascii_case("manifest.json") && manifest_file.is_none()
-                {
-                    manifest_file = Some(path);
-                }
-            }
-            Err(error) => summary.warnings.push(format!(
-                "Skipped directory entry in {} ({error})",
-                root.display()
-            )),
-        }
-    }
-
-    let content_history_entries_found = content_history_file
-        .as_deref()
-        .map(|path| scan_content_history_file(path, airports, summary).airport_entries_found)
-        .unwrap_or(0);
-
-    if content_history_entries_found == 0 {
-        if let Some(manifest_path) = manifest_file.as_deref() {
-            summary.manifest_fallbacks_used += 1;
-            scan_manifest_file(manifest_path, airports, summary);
-        }
+    if child_directories.is_empty() {
+        scan_addon_package_directory(root, airports, summary);
+        return;
     }
 
     for child_directory in child_directories {
@@ -453,7 +526,7 @@ pub(crate) fn scan_addon_airports_for_roots(roots: Vec<String>) -> crate::AddonA
     let mut summary = AddonAirportScanSummary::default();
 
     for root in &roots {
-        scan_addon_package_directory(Path::new(root), &mut airports, &mut summary);
+        scan_addon_root_directory(Path::new(root), &mut airports, &mut summary);
     }
 
     crate::AddonAirportCache {
@@ -527,20 +600,50 @@ mod tests {
     }
 
     #[test]
-    fn extract_icao_tokens_from_manifest_title_keeps_unique_four_letter_tokens() {
-        let tokens = extract_icao_tokens_from_manifest_title(
-            "TUPJ Terrance B Lettsome International Airport TUPJ TEST",
+    fn extract_icao_from_manifest_title_only_accepts_the_first_token() {
+        assert_eq!(
+            extract_icao_from_manifest_title("MMCE - Ciudad del Carmen International Airport"),
+            Some("MMCE".to_string())
         );
-
-        assert_eq!(tokens, vec!["TUPJ".to_string(), "TEST".to_string()]);
+        assert_eq!(
+            extract_icao_from_manifest_title("TUPJ Terrance B Lettsome International Airport"),
+            Some("TUPJ".to_string())
+        );
+        assert_eq!(
+            extract_icao_from_manifest_title("City Fort Bush HARE HERN INTL"),
+            None
+        );
     }
 
     #[test]
-    fn scan_addon_airports_still_reads_content_history_files() {
+    fn extract_icao_from_package_folder_name_prefers_the_folder_name() {
+        assert_eq!(
+            extract_icao_from_package_folder_name(Path::new("CYEG_fsimstudios-airport-cyeg-edmonton")),
+            Some("CYEG".to_string())
+        );
+        assert_eq!(
+            extract_icao_from_package_folder_name(Path::new("KMCI_tropicalsim-airport-kmci-kansas-city-jetways")),
+            Some("KMCI".to_string())
+        );
+        assert_eq!(
+            extract_icao_from_package_folder_name(Path::new("TUPJ-some-package-name")),
+            Some("TUPJ".to_string())
+        );
+    }
+
+    #[test]
+    fn scan_addon_airports_reads_nested_content_history_and_skips_manifest_fallback() {
         let root = temp_scan_dir("addon-scan");
+        let package = create_package_dir(&root, "package");
+        let content_info = create_package_dir(&package, "ContentInfo");
+        let nested = create_package_dir(&content_info, "aircraft");
         write_text(
-            &root.join("ContentHistory.json"),
+            &nested.join("ContentHistory.json"),
             r#"[{"type":"Airport","Content":"katl"},{"type":"Airport","Content":"KATL"}]"#,
+        );
+        write_text(
+            &package.join("manifest.json"),
+            r#"{"content_type":"SCENERY","title":"MMCE - Ciudad del Carmen International Airport"}"#,
         );
 
         let cache = scan_addon_airports_for_roots(vec![root.to_string_lossy().into_owned()]);
@@ -558,14 +661,44 @@ mod tests {
             .any(|detail| detail.status == "partial-duplicate"
                 && detail.airports == vec!["KATL".to_string()]
                 && detail.duplicate_airports == vec!["KATL".to_string()]));
+        assert!(!cache
+            .scan_details
+            .iter()
+            .any(|detail| detail.status.starts_with("manifest-")));
 
         let _ = fs::remove_dir_all(root);
     }
 
     #[test]
-    fn scan_addon_airports_detects_mmce_manifest_title() {
+    fn scan_addon_airports_uses_package_folder_code_for_manifest_fallback() {
         let root = temp_scan_dir("addon-manifest-mmce");
-        let package = create_package_dir(&root, "mmce");
+        let package = create_package_dir(&root, "CYEG_fsimstudios-airport-cyeg-edmonton");
+        write_text(
+            &package.join("manifest.json"),
+            r#"{"content_type":"SCENERY","title":"Scenery Package"}"#,
+        );
+
+        let cache = scan_addon_airports_for_roots(vec![root.to_string_lossy().into_owned()]);
+
+        assert_eq!(cache.airports, vec!["CYEG".to_string()]);
+        assert_eq!(cache.manifest_files_scanned, 1);
+        assert_eq!(cache.manifest_fallbacks_used, 1);
+        assert_eq!(cache.manifest_airport_entries_found, 1);
+        assert_eq!(cache.status, "ready");
+        assert!(cache.warnings.is_empty());
+        assert!(cache
+            .scan_details
+            .iter()
+            .any(|detail| detail.status == "manifest-cached"
+                && detail.airports == vec!["CYEG".to_string()]));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn scan_addon_airports_uses_manifest_title_prefix_when_folder_name_is_invalid() {
+        let root = temp_scan_dir("addon-manifest-mmce-title");
+        let package = create_package_dir(&root, "package");
         write_text(
             &package.join("manifest.json"),
             r#"{"content_type":"SCENERY","title":"MMCE - Ciudad del Carmen International Airport"}"#,
@@ -589,27 +722,25 @@ mod tests {
     }
 
     #[test]
-    fn scan_addon_airports_detects_tupj_manifest_title() {
-        let root = temp_scan_dir("addon-manifest-tupj");
-        let package = create_package_dir(&root, "tupj");
+    fn scan_addon_airports_does_not_cache_later_manifest_words() {
+        let root = temp_scan_dir("addon-manifest-noise");
+        let package = create_package_dir(&root, "package");
         write_text(
             &package.join("manifest.json"),
-            r#"{"content_type":"SCENERY","title":"TUPJ Terrance B Lettsome International Airport"}"#,
+            r#"{"content_type":"SCENERY","title":"Scenery City Fort Bush HARE HERN INTL"}"#,
         );
 
         let cache = scan_addon_airports_for_roots(vec![root.to_string_lossy().into_owned()]);
 
-        assert_eq!(cache.airports, vec!["TUPJ".to_string()]);
+        assert!(cache.airports.is_empty());
         assert_eq!(cache.manifest_files_scanned, 1);
         assert_eq!(cache.manifest_fallbacks_used, 1);
-        assert_eq!(cache.manifest_airport_entries_found, 1);
         assert_eq!(cache.status, "ready");
         assert!(cache.warnings.is_empty());
         assert!(cache
             .scan_details
             .iter()
-            .any(|detail| detail.status == "manifest-cached"
-                && detail.airports == vec!["TUPJ".to_string()]));
+            .any(|detail| detail.status == "manifest-no-icao"));
 
         let _ = fs::remove_dir_all(root);
     }
@@ -620,7 +751,7 @@ mod tests {
         let package = create_package_dir(&root, "package");
         write_text(
             &package.join("ContentHistory.json"),
-            r#"[{"type":"Airport","Content":"ksea"}]"#,
+            r#"{"entries":[{"type":"Airport","Content":"ksea"}]}"#,
         );
         write_text(
             &package.join("manifest.json"),
