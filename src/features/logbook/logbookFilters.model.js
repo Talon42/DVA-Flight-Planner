@@ -7,7 +7,7 @@ export const DEFAULT_LOGBOOK_FILTERS = {
   origin: [],
   destination: [],
   status: [],
-  distanceMin: null,
+  distanceMin: 0,
   distanceMax: null
 };
 
@@ -24,7 +24,7 @@ function toSelectionArray(value) {
 }
 
 function clampRange(value, min, max, fallback) {
-  if (!Number.isFinite(max) || max <= min) {
+  if (!Number.isFinite(max) || max < min) {
     return fallback;
   }
 
@@ -72,14 +72,25 @@ export function normalizeLogbookFilters(savedFilters, bounds = DEFAULT_DISTANCE_
   nextFilters.destination = toSelectionArray(nextFilters.destination).map((value) => value.toUpperCase());
   nextFilters.status = toSelectionArray(nextFilters.status);
   nextFilters.distanceMin = clampRange(nextFilters.distanceMin, 0, bounds.maxDistanceNm, 0);
-  nextFilters.distanceMax = clampRange(
-    nextFilters.distanceMax,
-    nextFilters.distanceMin,
-    bounds.maxDistanceNm,
-    bounds.maxDistanceNm
-  );
+  nextFilters.distanceMax = Number.isFinite(Number(nextFilters.distanceMax))
+    ? clampRange(nextFilters.distanceMax, nextFilters.distanceMin, bounds.maxDistanceNm, bounds.maxDistanceNm)
+    : null;
 
   return nextFilters;
+}
+
+// Maps the persisted distance sentinel to the active min/max values used by selectors and slider UI.
+export function getEffectiveLogbookDistanceRange(filters, bounds = DEFAULT_DISTANCE_BOUNDS) {
+  const normalizedFilters = normalizeLogbookFilters(filters, bounds);
+  const effectiveMin = Number.isFinite(normalizedFilters.distanceMin) ? normalizedFilters.distanceMin : 0;
+  const effectiveMax = Number.isFinite(normalizedFilters.distanceMax)
+    ? normalizedFilters.distanceMax
+    : Math.max(bounds.maxDistanceNm, effectiveMin);
+
+  return {
+    min: effectiveMin,
+    max: effectiveMax
+  };
 }
 
 // Applies a single logbook filter change while preserving the current distance bounds.

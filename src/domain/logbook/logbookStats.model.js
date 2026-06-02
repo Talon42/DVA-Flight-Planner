@@ -1,3 +1,5 @@
+import { LOGBOOK_EMPTY_VALUE } from "./logbook.model.js";
+
 function formatNumber(value, options = {}) {
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: options.minimumFractionDigits ?? 0,
@@ -7,7 +9,7 @@ function formatNumber(value, options = {}) {
 
 function formatMinutes(value) {
   if (!Number.isFinite(value) || value <= 0) {
-    return "—";
+    return LOGBOOK_EMPTY_VALUE;
   }
 
   const hours = Math.floor(value / 60);
@@ -17,7 +19,7 @@ function formatMinutes(value) {
 
 function formatUnit(value, unit, options = {}) {
   if (!Number.isFinite(value)) {
-    return "—";
+    return LOGBOOK_EMPTY_VALUE;
   }
 
   return `${formatNumber(value, options)} ${unit}`;
@@ -38,7 +40,7 @@ function buildCountList(counterMap) {
 }
 
 function incrementCount(counterMap, key) {
-  if (!key || key === "—") {
+  if (!key || key === LOGBOOK_EMPTY_VALUE) {
     return;
   }
 
@@ -103,11 +105,12 @@ export function buildLogbookPilotStats(rows) {
       : null;
   const worstLandingRate =
     landingRows.length > 0
-      ? [...landingRows].sort((left, right) => left.landingRate - right.landingRate || right.dateSortKey - left.dateSortKey)[0]
+      ? [...landingRows].sort(
+          (left, right) => left.landingRate - right.landingRate || right.dateSortKey - left.dateSortKey
+        )[0]
       : null;
-  const topAirline = sortByCount(
-    Array.from(airlineCounts.entries()).map(([label, count]) => ({ label, count }))
-  )[0] || null;
+  const topAirline =
+    sortByCount(Array.from(airlineCounts.entries()).map(([label, count]) => ({ label, count })))[0] || null;
 
   return {
     totalFlights: activeRows.length,
@@ -120,19 +123,19 @@ export function buildLogbookPilotStats(rows) {
       { label: "Average Landing Rate", value: formatUnit(averageLandingRate, "fpm", { maximumFractionDigits: 0 }) },
       {
         label: "Top Airline",
-        value: topAirline ? topAirline.label : "—",
+        value: topAirline ? topAirline.label : LOGBOOK_EMPTY_VALUE,
         meta: topAirline ? `${formatNumber(topAirline.count)} flights` : ""
       }
     ],
     landingRates: [
       {
         label: "Best",
-        value: bestLandingRate ? formatUnit(bestLandingRate.landingRate, "fpm") : "—",
+        value: bestLandingRate ? formatUnit(bestLandingRate.landingRate, "fpm") : LOGBOOK_EMPTY_VALUE,
         meta: bestLandingRate ? `${bestLandingRate.compactFlightLabel} • ${bestLandingRate.dateDisplay}` : ""
       },
       {
         label: "Worst",
-        value: worstLandingRate ? formatUnit(worstLandingRate.landingRate, "fpm") : "—",
+        value: worstLandingRate ? formatUnit(worstLandingRate.landingRate, "fpm") : LOGBOOK_EMPTY_VALUE,
         meta: worstLandingRate ? `${worstLandingRate.compactFlightLabel} • ${worstLandingRate.dateDisplay}` : ""
       },
       {
@@ -147,7 +150,7 @@ export function buildLogbookPilotStats(rows) {
       .map((row) => ({
         label: `${row.compactFlightLabel} • ${row.dateDisplay}`,
         value: formatUnit(row.landingRate, "fpm"),
-        meta: `${row.origin} → ${row.destination}`
+        meta: `${row.origin} -> ${row.destination}`
       })),
     flightsByEquipment: buildCountList(equipmentCounts),
     flightsBySimulator: buildCountList(simulatorCounts),

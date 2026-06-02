@@ -1,6 +1,12 @@
 import { buildLogbookPilotStats } from "../../domain/logbook/logbookStats.model.js";
-import { getLogbookSortValue } from "../../domain/logbook/logbook.model.js";
-import { buildLogbookFilterBounds } from "./logbookFilters.model.js";
+import {
+  getLogbookSortValue,
+  LOGBOOK_EMPTY_VALUE
+} from "../../domain/logbook/logbook.model.js";
+import {
+  buildLogbookFilterBounds,
+  getEffectiveLogbookDistanceRange
+} from "./logbookFilters.model.js";
 
 function matchesSearch(row, query) {
   if (!query) {
@@ -16,6 +22,9 @@ export function selectFilteredLogbookRows({ rows, filters }) {
   if (!activeRows.length) {
     return [];
   }
+
+  const filterBounds = buildLogbookFilterBounds(activeRows);
+  const distanceRange = getEffectiveLogbookDistanceRange(filters, filterBounds);
 
   return activeRows.filter((row) => {
     if (filters.airline.length && !filters.airline.includes(row.airlineDisplayName)) {
@@ -39,10 +48,14 @@ export function selectFilteredLogbookRows({ rows, filters }) {
     }
 
     if (Number.isFinite(row.distanceNm)) {
-      if (row.distanceNm < filters.distanceMin || row.distanceNm > filters.distanceMax) {
+      if (row.distanceNm < distanceRange.min) {
         return false;
       }
-    } else if (filters.distanceMin > 0 || filters.distanceMax > 0) {
+
+      if (Number.isFinite(distanceRange.max) && distanceRange.max > 0 && row.distanceNm > distanceRange.max) {
+        return false;
+      }
+    } else if (distanceRange.min > 0 || distanceRange.max > 0) {
       return false;
     }
 
@@ -91,11 +104,11 @@ export function selectLogbookFilterOptions(rows) {
     [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
 
   return {
-    airlines: toSortedValues(activeRows.map((row) => row.airlineDisplayName).filter((value) => value !== "—")),
-    equipment: toSortedValues(activeRows.map((row) => row.equipment).filter((value) => value !== "—")),
-    origins: toSortedValues(activeRows.map((row) => row.origin).filter((value) => value !== "—")),
-    destinations: toSortedValues(activeRows.map((row) => row.destination).filter((value) => value !== "—")),
-    statuses: toSortedValues(activeRows.map((row) => row.statusDisplay).filter((value) => value !== "—"))
+    airlines: toSortedValues(activeRows.map((row) => row.airlineDisplayName).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
+    equipment: toSortedValues(activeRows.map((row) => row.equipment).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
+    origins: toSortedValues(activeRows.map((row) => row.origin).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
+    destinations: toSortedValues(activeRows.map((row) => row.destination).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
+    statuses: toSortedValues(activeRows.map((row) => row.statusDisplay).filter((value) => value !== LOGBOOK_EMPTY_VALUE))
   };
 }
 

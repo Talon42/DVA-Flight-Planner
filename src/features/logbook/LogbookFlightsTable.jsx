@@ -97,6 +97,7 @@ function LogbookRow({ row, columns, expanded, onToggleExpanded }) {
 // Renders the dense logbook flights table with single-row expansion and incremental reveal.
 export default function LogbookFlightsTable({
   rows,
+  hasMoreRows,
   sort,
   expandedRowId,
   onSort,
@@ -112,6 +113,10 @@ export default function LogbookFlightsTable({
     }
 
     const handleScroll = () => {
+      if (!hasMoreRows) {
+        return;
+      }
+
       const remaining = container.scrollHeight - container.scrollTop - container.clientHeight;
       if (remaining < 160) {
         onLoadMoreRows?.();
@@ -120,7 +125,7 @@ export default function LogbookFlightsTable({
 
     container.addEventListener("scroll", handleScroll);
     return () => container.removeEventListener("scroll", handleScroll);
-  }, [onLoadMoreRows, rows.length]);
+  }, [hasMoreRows, onLoadMoreRows, rows.length]);
 
   if (!rows.length) {
     return (

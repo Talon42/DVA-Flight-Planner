@@ -246,6 +246,10 @@ export function useTransientRangeSlider(lowValue, highValue, onCommit) {
     const nextValues = [lowValue, highValue];
     latestDraftValuesRef.current = nextValues;
     lastCommittedValuesRef.current = nextValues;
+    if (commitTimeoutRef.current) {
+      clearTimeout(commitTimeoutRef.current);
+      commitTimeoutRef.current = null;
+    }
     setDraftValues((current) =>
       current[0] === nextValues[0] && current[1] === nextValues[1] ? current : nextValues
     );

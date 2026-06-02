@@ -10,6 +10,7 @@ export default function LogbookPanel({
   allRows,
   filteredRows,
   visibleRows,
+  hasMoreRows,
   selectedTab,
   sort,
   expandedRowId,
@@ -60,6 +61,7 @@ export default function LogbookPanel({
         ) : (
           <LogbookFlightsTable
             rows={visibleRows}
+            hasMoreRows={hasMoreRows}
             sort={sort}
             expandedRowId={expandedRowId}
             onSort={onSort}

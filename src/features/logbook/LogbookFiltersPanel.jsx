@@ -6,6 +6,7 @@ import { fieldInputClassName } from "../../components/ui/forms";
 import { Eyebrow } from "../../components/ui/SectionHeader";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
+import { getEffectiveLogbookDistanceRange } from "./logbookFilters.model.js";
 
 function buildStringOptions(values, keywordsPrefix = "") {
   return values.map((value) => ({
@@ -24,12 +25,13 @@ export default function LogbookFiltersPanel({
   onFilterChange,
   onReset
 }) {
+  const effectiveDistanceRange = getEffectiveLogbookDistanceRange(filters, filterBounds);
   const distanceSlider = useTransientRangeSlider(
-    filters.distanceMin,
-    filters.distanceMax,
+    effectiveDistanceRange.min,
+    effectiveDistanceRange.max,
     ([minValue, maxValue]) => {
-      onFilterChange("distanceMin", minValue);
-      onFilterChange("distanceMax", maxValue);
+      onFilterChange("distanceMin", minValue <= 0 ? 0 : minValue);
+      onFilterChange("distanceMax", maxValue >= filterBounds.maxDistanceNm ? null : maxValue);
     }
   );
 

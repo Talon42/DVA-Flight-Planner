@@ -38,7 +38,8 @@ fn normalize_dva_logbook_month(raw_month: u32) -> Option<u32> {
     None
 }
 
-fn normalize_logbook_entries(value: &Value) -> Vec<Value> {
+// Normalizes supported Delta Virtual cache shapes into a flat list of entry objects for every reader.
+pub(crate) fn normalize_logbook_entries(value: &Value) -> Vec<Value> {
     if let Some(entries) = value.as_array() {
         return entries.to_vec();
     }
@@ -63,13 +64,17 @@ fn normalize_logbook_entries(value: &Value) -> Vec<Value> {
     Vec::new()
 }
 
-fn extract_latest_logbook_date_iso(json: &Value) -> Option<String> {
-    let entries = normalize_logbook_entries(json);
-    let latest_entry = entries.last()?;
-    let (year, raw_month, day) = extract_logbook_date_parts(latest_entry)?;
-    let month = normalize_dva_logbook_month(raw_month)?;
-
-    NaiveDate::from_ymd_opt(year, month, day).map(|date| date.format("%Y-%m-%d").to_string())
+// Derives the true latest DVA logbook date by scanning every supported entry shape instead of trusting array order.
+pub(crate) fn extract_latest_logbook_date_iso(json: &Value) -> Option<String> {
+    normalize_logbook_entries(json)
+        .into_iter()
+        .filter_map(|entry| {
+            let (year, raw_month, day) = extract_logbook_date_parts(&entry)?;
+            let month = normalize_dva_logbook_month(raw_month)?;
+            NaiveDate::from_ymd_opt(year, month, day)
+        })
+        .max()
+        .map(|date| date.format("%Y-%m-%d").to_string())
 }
 
 fn system_time_to_iso(value: SystemTime) -> Option<String> {
@@ -227,5 +232,37 @@ mod tests {
         assert_eq!(normalize_logbook_entries(&logbook).len(), 1);
         assert_eq!(normalize_logbook_entries(&data).len(), 1);
         assert_eq!(normalize_logbook_entries(&single).len(), 1);
+    }
+
+    #[test]
+    fn extract_latest_logbook_date_iso_uses_max_date_for_mixed_order_rows() {
+        let json = json!({
+            "entries": [
+                { "date": { "y": 2026, "m": 3, "d": 11 } },
+                { "date": { "y": 2026, "m": 0, "d": 2 } },
+                { "date": { "y": 2026, "m": 5, "d": 1 } }
+            ]
+        });
+
+        assert_eq!(
+            extract_latest_logbook_date_iso(&json),
+            Some("2026-06-01".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_latest_logbook_date_iso_does_not_trust_last_entry() {
+        let json = json!({
+            "flights": [
+                { "date": { "y": 2026, "m": 5, "d": 1 } },
+                { "date": { "y": 2026, "m": 3, "d": 11 } },
+                { "date": { "y": 2026, "m": 0, "d": 2 } }
+            ]
+        });
+
+        assert_eq!(
+            extract_latest_logbook_date_iso(&json),
+            Some("2026-06-01".to_string())
+        );
     }
 }

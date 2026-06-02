@@ -41,6 +41,16 @@ function normalizeSyncError(message) {
   return error;
 }
 
+function buildSafeLogbookResult(error = "") {
+  return {
+    dateIso: null,
+    lastSyncAt: null,
+    entries: [],
+    entryCount: 0,
+    error: String(error || "").trim()
+  };
+}
+
 export async function syncScheduleFromDeltaVirtual() {
   if (!isTauriRuntime()) {
     throw new Error("Delta Virtual sync is only available in the desktop app.");
@@ -173,7 +183,7 @@ export async function readDeltaVirtualLogbookProgress() {
 
 export async function readDeltaVirtualLogbook() {
   if (!isTauriRuntime()) {
-    return { dateIso: null, lastSyncAt: null, entries: [], entryCount: 0 };
+    return buildSafeLogbookResult();
   }
 
   try {
@@ -184,10 +194,11 @@ export async function readDeltaVirtualLogbook() {
       dateIso: result?.dateIso ?? result?.date_iso ?? null,
       lastSyncAt: result?.lastSyncAt ?? result?.last_sync_at ?? null,
       entries,
-      entryCount: Number(result?.entryCount ?? result?.entry_count ?? entries.length) || 0
+      entryCount: Number(result?.entryCount ?? result?.entry_count ?? entries.length) || 0,
+      error: ""
     };
-  } catch {
-    return { dateIso: null, lastSyncAt: null, entries: [], entryCount: 0 };
+  } catch (error) {
+    return buildSafeLogbookResult(error instanceof Error ? error.message : String(error));
   }
 }
 

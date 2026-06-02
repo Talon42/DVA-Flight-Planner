@@ -10,6 +10,7 @@ use std::{
 use tauri::{AppHandle, Manager};
 
 use crate::append_sync_log;
+use crate::services::deltava::logbook::normalize_logbook_entries;
 
 const DELTAVA_TOUR_PROGRESS_FILE: &str = "dva-tour-progress.json";
 const DELTAVA_TOURS_CACHE_FILE: &str = "dva-tours-cache.json";
@@ -122,17 +123,16 @@ fn read_json_value(path: &Path) -> Option<Value> {
     serde_json::from_str::<Value>(&text).ok()
 }
 
-fn find_logbook_entries(json: &Value) -> Option<&Vec<Value>> {
-    json.as_array()
-        .or_else(|| json.get("flights").and_then(Value::as_array))
-}
-
 fn normalize_logbook_month(raw_month: u32) -> Option<u32> {
     if raw_month <= 11 {
-        Some(raw_month + 1)
-    } else {
-        None
+        return Some(raw_month + 1);
     }
+
+    if raw_month == 12 {
+        return Some(12);
+    }
+
+    None
 }
 
 fn extract_logbook_date_parts(entry: &Value) -> Option<(i32, u32, u32)> {
@@ -603,12 +603,8 @@ fn build_logbook_tour_credit_scan_from_values(
     let mut seen_serializations = HashSet::new();
 
     for json in logbook_jsons {
-        let Some(raw_entries) = find_logbook_entries(json) else {
-            continue;
-        };
-
-        for entry in raw_entries {
-            let Ok(serialized) = serde_json::to_string(entry) else {
+        for entry in normalize_logbook_entries(json) {
+            let Ok(serialized) = serde_json::to_string(&entry) else {
                 continue;
             };
 
@@ -618,12 +614,12 @@ fn build_logbook_tour_credit_scan_from_values(
 
             result.total_logbook_entries_considered += 1;
 
-            let epoch_seconds = extract_logbook_entry_epoch_seconds(entry);
-            let completed_at = build_logbook_entry_completed_at(entry);
-            let logbook_status = extract_logbook_status(entry);
-            let logbook_departure = extract_logbook_airport_code(entry, "airportD");
-            let logbook_arrival = extract_logbook_airport_code(entry, "airportA");
-            let logbook_entry_id = extract_logbook_entry_id(entry);
+            let epoch_seconds = extract_logbook_entry_epoch_seconds(&entry);
+            let completed_at = build_logbook_entry_completed_at(&entry);
+            let logbook_status = extract_logbook_status(&entry);
+            let logbook_departure = extract_logbook_airport_code(&entry, "airportD");
+            let logbook_arrival = extract_logbook_airport_code(&entry, "airportA");
+            let logbook_entry_id = extract_logbook_entry_id(&entry);
             let entry_index = result.total_logbook_entries_considered.saturating_sub(1);
             let mut entry_has_system_update = false;
 

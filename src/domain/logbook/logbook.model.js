@@ -1,7 +1,7 @@
 import { DateTime } from "luxon";
 import { getAirlineNameByCode } from "../airlines/airlineBranding.js";
 
-const EMPTY_VALUE = "—";
+export const LOGBOOK_EMPTY_VALUE = "\u2014";
 
 function normalizeText(value) {
   return String(value ?? "").trim();
@@ -40,7 +40,7 @@ function normalizeEpochMilliseconds(value) {
 function formatTimestamp(value) {
   const epochMilliseconds = normalizeEpochMilliseconds(value);
   if (!epochMilliseconds) {
-    return EMPTY_VALUE;
+    return LOGBOOK_EMPTY_VALUE;
   }
 
   return DateTime.fromMillis(epochMilliseconds).toFormat("MM/dd/yyyy HH:mm");
@@ -82,7 +82,7 @@ function extractDateParts(entry) {
 function formatDvaDate(entry) {
   const parts = extractDateParts(entry);
   if (!parts) {
-    return EMPTY_VALUE;
+    return LOGBOOK_EMPTY_VALUE;
   }
 
   return DateTime.fromObject({
@@ -136,7 +136,7 @@ function parseDurationMinutes(value) {
 
 function formatMinutes(value) {
   if (!Number.isFinite(value) || value <= 0) {
-    return EMPTY_VALUE;
+    return LOGBOOK_EMPTY_VALUE;
   }
 
   const hours = Math.floor(value / 60);
@@ -146,7 +146,7 @@ function formatMinutes(value) {
 
 function formatAviationNumber(value, unit, options = {}) {
   if (!Number.isFinite(value)) {
-    return EMPTY_VALUE;
+    return LOGBOOK_EMPTY_VALUE;
   }
 
   const formatter = new Intl.NumberFormat("en-US", {
@@ -158,7 +158,7 @@ function formatAviationNumber(value, unit, options = {}) {
 
 function formatSignedAviationNumber(value, unit, options = {}) {
   if (!Number.isFinite(value)) {
-    return EMPTY_VALUE;
+    return LOGBOOK_EMPTY_VALUE;
   }
 
   const formatter = new Intl.NumberFormat("en-US", {
@@ -179,13 +179,13 @@ function readAirportCode(airport) {
 
 function readAirportDisplay(airport) {
   if (!airport || typeof airport !== "object") {
-    return EMPTY_VALUE;
+    return LOGBOOK_EMPTY_VALUE;
   }
 
   const icao = normalizeUpperText(airport.icao);
   const iata = normalizeUpperText(airport.iata);
   const name = normalizeText(airport.name);
-  return [icao || null, iata || null, name || null].filter(Boolean).join(" / ") || EMPTY_VALUE;
+  return [icao || null, iata || null, name || null].filter(Boolean).join(" / ") || LOGBOOK_EMPTY_VALUE;
 }
 
 function normalizeStatus(value) {
@@ -202,7 +202,7 @@ function normalizeStatus(value) {
     return "Pending";
   }
 
-  return normalizeText(value) || EMPTY_VALUE;
+  return normalizeText(value) || LOGBOOK_EMPTY_VALUE;
 }
 
 function buildCompactFlightLabel(entry) {
@@ -217,46 +217,66 @@ function buildCompactFlightLabel(entry) {
     return flightNumber;
   }
 
-  return normalizeText(entry?.flightCode) || EMPTY_VALUE;
+  return normalizeText(entry?.flightCode) || LOGBOOK_EMPTY_VALUE;
+}
+
+function readNestedValue(preferredValue, nestedValue) {
+  return preferredValue ?? nestedValue;
+}
+
+function readSimulator(entry) {
+  return normalizeText(entry?.simulator || entry?.sim) || LOGBOOK_EMPTY_VALUE;
+}
+
+function readFdrSource(entry) {
+  const fdrValue = entry?.fdr;
+  if (fdrValue && typeof fdrValue === "object" && !Array.isArray(fdrValue)) {
+    return normalizeText(entry?.fdrSource || fdrValue.source) || LOGBOOK_EMPTY_VALUE;
+  }
+
+  return normalizeText(entry?.fdrSource || fdrValue) || LOGBOOK_EMPTY_VALUE;
 }
 
 function buildDetailItem(label, value, options = {}) {
   const normalizedValue = typeof value === "string" ? value.trim() : value;
-  if (!options.showEmpty && (normalizedValue === EMPTY_VALUE || normalizedValue === "" || normalizedValue === null)) {
+  if (
+    !options.showEmpty &&
+    (normalizedValue === LOGBOOK_EMPTY_VALUE || normalizedValue === "" || normalizedValue === null)
+  ) {
     return null;
   }
 
-  return { label, value: normalizedValue || EMPTY_VALUE };
+  return { label, value: normalizedValue || LOGBOOK_EMPTY_VALUE };
 }
 
 function buildDetailGroups(entry, normalizedRow) {
   return {
     flightSummary: [
-      buildDetailItem("Logbook ID", normalizedRow.rawLogbookId || EMPTY_VALUE, { showEmpty: true }),
+      buildDetailItem("Logbook ID", normalizedRow.rawLogbookId || LOGBOOK_EMPTY_VALUE, { showEmpty: true }),
       buildDetailItem("Airline + Flight", normalizedRow.compactFlightLabel, { showEmpty: true }),
       buildDetailItem("Airline", normalizedRow.airlineDisplayName, { showEmpty: true }),
-      buildDetailItem("Leg", normalizeText(entry.leg) || EMPTY_VALUE, { showEmpty: true }),
+      buildDetailItem("Leg", normalizeText(entry.leg) || LOGBOOK_EMPTY_VALUE, { showEmpty: true }),
       buildDetailItem("Status", normalizedRow.statusDisplay, { showEmpty: true }),
-      buildDetailItem("Raw Status", normalizeText(entry.status) || EMPTY_VALUE),
+      buildDetailItem("Raw Status", normalizeText(entry.status) || LOGBOOK_EMPTY_VALUE),
       buildDetailItem("Submitted On", formatTimestamp(entry.submittedOn)),
       buildDetailItem("Approved / Disposed On", formatTimestamp(entry.disposedOn)),
       buildDetailItem("Simulator", normalizedRow.simulator, { showEmpty: true }),
-      buildDetailItem("FDR Source", normalizeText(entry.fdrSource || entry.fdr) || EMPTY_VALUE),
-      buildDetailItem("On-time Result", normalizeText(entry.onTimeResult || entry.onTime) || EMPTY_VALUE)
+      buildDetailItem("FDR Source", readFdrSource(entry)),
+      buildDetailItem("On-time Result", normalizeText(entry.onTimeResult || entry.onTime) || LOGBOOK_EMPTY_VALUE)
     ].filter(Boolean),
     aircraft: [
       buildDetailItem("Equipment", normalizedRow.equipment, { showEmpty: true }),
-      buildDetailItem("Aircraft Name", normalizeText(entry?.aircraft?.name) || EMPTY_VALUE),
-      buildDetailItem("Aircraft ICAO", normalizeUpperText(entry?.aircraft?.icao) || EMPTY_VALUE),
-      buildDetailItem("Tail Code", normalizeUpperText(entry.tailCode || entry.tailNumber) || EMPTY_VALUE),
-      buildDetailItem("AC Code", normalizeUpperText(entry.acCode || entry.aircraftCode) || EMPTY_VALUE)
+      buildDetailItem("Aircraft Name", normalizeText(entry?.aircraft?.name) || LOGBOOK_EMPTY_VALUE),
+      buildDetailItem("Aircraft ICAO", normalizeUpperText(entry?.aircraft?.icao) || LOGBOOK_EMPTY_VALUE),
+      buildDetailItem("Tail Code", normalizeUpperText(entry.tailCode || entry.tailNumber) || LOGBOOK_EMPTY_VALUE),
+      buildDetailItem("AC Code", normalizeUpperText(entry.acCode || entry.aircraftCode) || LOGBOOK_EMPTY_VALUE)
     ].filter(Boolean),
     times: [
       buildDetailItem("Start Time", formatTimestamp(entry.startTime)),
       buildDetailItem("Taxi Time", formatTimestamp(entry.taxiTime)),
-      buildDetailItem("Takeoff Time", formatTimestamp(entry?.takeoff?.time || entry.takeoffTime)),
-      buildDetailItem("Landing Time", formatTimestamp(entry?.landing?.time || entry.landingTime)),
-      buildDetailItem("End Time", formatTimestamp(entry?.end?.time || entry.endTime)),
+      buildDetailItem("Takeoff Time", formatTimestamp(readNestedValue(entry.takeoffTime, entry?.takeoff?.time))),
+      buildDetailItem("Landing Time", formatTimestamp(readNestedValue(entry.landingTime, entry?.landing?.time))),
+      buildDetailItem("End Time", formatTimestamp(readNestedValue(entry.endTime, entry?.end?.time))),
       buildDetailItem("Duration", normalizedRow.durationDisplay, { showEmpty: true }),
       buildDetailItem("Block Time", formatMinutes(parseDurationMinutes(entry.blockTime))),
       buildDetailItem("Airborne Time", formatMinutes(parseDurationMinutes(entry.airborneTime)))
@@ -264,15 +284,41 @@ function buildDetailGroups(entry, normalizedRow) {
     performance: [
       buildDetailItem("Distance", normalizedRow.distanceDisplay, { showEmpty: true }),
       buildDetailItem("Total Fuel", formatAviationNumber(toNumber(entry.totalFuel), "lb")),
-      buildDetailItem("Takeoff Fuel", formatAviationNumber(toNumber(entry.takeoffFuel), "lb")),
-      buildDetailItem("Takeoff Weight", formatAviationNumber(toNumber(entry.takeoffWeight), "lb")),
-      buildDetailItem("Takeoff Speed", formatAviationNumber(toNumber(entry.takeoffSpeed), "kt")),
-      buildDetailItem("Landing Fuel", formatAviationNumber(toNumber(entry.landingFuel), "lb")),
-      buildDetailItem("Landing Weight", formatAviationNumber(toNumber(entry.landingWeight), "lb")),
-      buildDetailItem("Landing Speed", formatAviationNumber(toNumber(entry.landingSpeed), "kt")),
+      buildDetailItem(
+        "Takeoff Fuel",
+        formatAviationNumber(toNumber(readNestedValue(entry.takeoffFuel, entry?.takeoff?.fuel)), "lb")
+      ),
+      buildDetailItem(
+        "Takeoff Weight",
+        formatAviationNumber(toNumber(readNestedValue(entry.takeoffWeight, entry?.takeoff?.weight)), "lb")
+      ),
+      buildDetailItem(
+        "Takeoff Speed",
+        formatAviationNumber(toNumber(readNestedValue(entry.takeoffSpeed, entry?.takeoff?.speed)), "kt")
+      ),
+      buildDetailItem(
+        "Landing Fuel",
+        formatAviationNumber(toNumber(readNestedValue(entry.landingFuel, entry?.landing?.fuel)), "lb")
+      ),
+      buildDetailItem(
+        "Landing Weight",
+        formatAviationNumber(toNumber(readNestedValue(entry.landingWeight, entry?.landing?.weight)), "lb")
+      ),
+      buildDetailItem(
+        "Landing Speed",
+        formatAviationNumber(toNumber(readNestedValue(entry.landingSpeed, entry?.landing?.speed)), "kt")
+      ),
       buildDetailItem("Landing Vertical Speed", formatSignedAviationNumber(toNumber(entry?.landing?.vSpeed), "fpm")),
-      buildDetailItem("Landing G-force", formatAviationNumber(toNumber(entry?.landing?.gForce), "g", { maximumFractionDigits: 3 })),
-      buildDetailItem("Average Frame Rate", formatAviationNumber(toNumber(entry.avgFrameRate), "FPS", { maximumFractionDigits: 1 }))
+      buildDetailItem(
+        "Landing G-force",
+        formatAviationNumber(toNumber(readNestedValue(entry?.landing?.gForce, entry?.landing?.g)), "g", {
+          maximumFractionDigits: 3
+        })
+      ),
+      buildDetailItem(
+        "Average Frame Rate",
+        formatAviationNumber(toNumber(entry.avgFrameRate), "FPS", { maximumFractionDigits: 1 })
+      )
     ].filter(Boolean),
     airports: [
       buildDetailItem("Departure", readAirportDisplay(entry.airportD), { showEmpty: true }),
@@ -303,7 +349,7 @@ export function normalizeLogbookRows(entries) {
     const rawLogbookId = normalizeText(entry.logbookId ?? entry.id);
     const compactFlightLabel = buildCompactFlightLabel(entry);
     const airlineCode = normalizeUpperText(entry.airline || entry.airlineCode || entry.airlineIata);
-    const airlineDisplayName = getAirlineNameByCode(airlineCode) || airlineCode || EMPTY_VALUE;
+    const airlineDisplayName = getAirlineNameByCode(airlineCode) || airlineCode || LOGBOOK_EMPTY_VALUE;
     const durationMinutes = parseDurationMinutes(entry.duration) ?? parseDurationMinutes(entry.blockTime);
     const airborneMinutes = parseDurationMinutes(entry.airborneTime);
     const distanceNm = toNumber(entry.distance);
@@ -316,21 +362,21 @@ export function normalizeLogbookRows(entries) {
       dateDisplay: formatDvaDate(entry),
       dateSortKey: buildDateSortKey(entry),
       compactFlightLabel,
-      airlineCode: airlineCode || EMPTY_VALUE,
+      airlineCode: airlineCode || LOGBOOK_EMPTY_VALUE,
       airlineDisplayName,
-      origin: readAirportCode(entry.airportD) || EMPTY_VALUE,
-      destination: readAirportCode(entry.airportA) || EMPTY_VALUE,
+      origin: readAirportCode(entry.airportD) || LOGBOOK_EMPTY_VALUE,
+      destination: readAirportCode(entry.airportA) || LOGBOOK_EMPTY_VALUE,
       equipment:
-        normalizeText(entry.eqType || entry?.aircraft?.icao || entry?.aircraft?.name) || EMPTY_VALUE,
+        normalizeText(entry.eqType || entry?.aircraft?.icao || entry?.aircraft?.name) || LOGBOOK_EMPTY_VALUE,
       durationMinutes,
       durationDisplay: formatMinutes(durationMinutes),
       airborneMinutes,
       airborneDisplay: formatMinutes(airborneMinutes),
       distanceNm,
       distanceDisplay: formatAviationNumber(distanceNm, "nm"),
-      statusRaw: normalizeText(entry.status) || EMPTY_VALUE,
+      statusRaw: normalizeText(entry.status) || LOGBOOK_EMPTY_VALUE,
       statusDisplay: normalizeStatus(entry.status),
-      simulator: normalizeText(entry.simulator) || EMPTY_VALUE,
+      simulator: readSimulator(entry),
       landingRate,
       landingRateDisplay: formatSignedAviationNumber(landingRate, "fpm"),
       submittedOnDisplay: formatTimestamp(entry.submittedOn),
@@ -342,7 +388,8 @@ export function normalizeLogbookRows(entries) {
         readAirportCode(entry.airportD),
         readAirportCode(entry.airportA),
         normalizeText(entry.eqType),
-        normalizeStatus(entry.status)
+        normalizeStatus(entry.status),
+        normalizeText(entry.simulator || entry.sim)
       ]
         .join(" ")
         .toUpperCase(),

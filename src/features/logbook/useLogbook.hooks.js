@@ -67,21 +67,24 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
 
   const loadLogbook = useCallback(async () => {
     setIsLoading(true);
+    const nextResult = await readDeltaVirtualLogbook();
+    const nextEntries = Array.isArray(nextResult?.entries) ? nextResult.entries : [];
+    const nextError = String(nextResult?.error || "").trim();
 
-    try {
-      const nextResult = await readDeltaVirtualLogbook();
-      setCacheResult({
+    setCacheResult((current) => {
+      if (nextError && current.entries.length > 0 && nextEntries.length === 0) {
+        return current;
+      }
+
+      return {
         dateIso: nextResult?.dateIso ?? null,
         lastSyncAt: nextResult?.lastSyncAt ?? null,
-        entries: Array.isArray(nextResult?.entries) ? nextResult.entries : [],
-        entryCount: Number(nextResult?.entryCount ?? 0) || 0
-      });
-      setLoadError("");
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Unable to load the cached logbook.");
-    } finally {
-      setIsLoading(false);
-    }
+        entries: nextEntries,
+        entryCount: Number(nextResult?.entryCount ?? nextEntries.length) || 0
+      };
+    });
+    setLoadError(nextError);
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -101,6 +104,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     () => selectVisibleLogbookRows({ rows: sortedFilteredRows, visibleRowCount }),
     [sortedFilteredRows, visibleRowCount]
   );
+  const hasMoreRows = visibleRows.length < sortedFilteredRows.length;
   const filterOptions = useMemo(() => selectLogbookFilterOptions(allRows), [allRows]);
 
   useEffect(() => {
@@ -140,8 +144,12 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   }, []);
 
   const handleLoadMoreRows = useCallback(() => {
+    if (sortedFilteredRows.length <= visibleRowCount) {
+      return;
+    }
+
     setVisibleRowCount((current) => Math.min(sortedFilteredRows.length, current + VISIBLE_ROW_PAGE));
-  }, [sortedFilteredRows.length]);
+  }, [sortedFilteredRows.length, visibleRowCount]);
 
   return {
     cacheResult,
@@ -152,6 +160,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     sortedFilteredRows,
     visibleRows,
     visibleRowCount,
+    hasMoreRows,
     selectedTab,
     setSelectedTab,
     filters,

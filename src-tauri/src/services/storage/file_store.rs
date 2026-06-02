@@ -1,10 +1,13 @@
 use crate::app::paths::resolve_existing_logbook_json_path;
 use crate::services::deltava::draft::DVA_DRAFT_WEBVIEW_DIR;
 use crate::services::deltava::{
-    auth::clear_auth_settings_internal, logbook::store_logbook_json, sync_types::DeltaWebSyncResult,
+    auth::clear_auth_settings_internal,
+    logbook::{
+        extract_latest_logbook_date_iso, normalize_logbook_entries, store_logbook_json,
+    },
+    sync_types::DeltaWebSyncResult,
 };
 use crate::{append_sync_log, DELTAVA_SYNC_DOWNLOAD_FILE};
-use chrono::NaiveDate;
 use serde_json::Value;
 use std::{collections::BTreeSet, fs, path::Path};
 use tauri::{AppHandle, Manager};
@@ -83,49 +86,6 @@ const WEBVIEW_PROFILE_PRUNE_FILES: &[&str] = &[
     "Vpn Tokens",
     "Vpn Tokens-journal",
 ];
-
-fn get_json_field_i32(value: &Value, key: &str) -> Option<i32> {
-    value
-        .get(key)
-        .and_then(Value::as_i64)
-        .and_then(|number| i32::try_from(number).ok())
-}
-
-fn extract_logbook_date_parts(entry: &Value) -> Option<(i32, u32, u32)> {
-    let date = entry.get("date")?;
-    let year = get_json_field_i32(date, "y")?;
-    let month = get_json_field_i32(date, "m")?;
-    let day = get_json_field_i32(date, "d")?;
-    let month = u32::try_from(month).ok()?;
-    let day = u32::try_from(day).ok()?;
-    Some((year, month, day))
-}
-
-fn find_logbook_entries(json: &Value) -> Option<&Vec<Value>> {
-    json.as_array()
-        .or_else(|| json.get("flights").and_then(Value::as_array))
-}
-
-fn normalize_dva_logbook_month(raw_month: u32) -> Option<u32> {
-    if raw_month <= 11 {
-        return raw_month.checked_add(1);
-    }
-
-    if raw_month == 12 {
-        return Some(12);
-    }
-
-    None
-}
-
-fn extract_latest_logbook_date_iso(json: &Value) -> Option<String> {
-    let entries = find_logbook_entries(json)?;
-    let latest_entry = entries.last()?;
-    let (year, raw_month, day) = extract_logbook_date_parts(latest_entry)?;
-    let month = normalize_dva_logbook_month(raw_month)?;
-
-    NaiveDate::from_ymd_opt(year, month, day).map(|date| date.format("%Y-%m-%d").to_string())
-}
 
 fn normalize_logbook_airport_code(value: &str) -> Option<String> {
     value
@@ -409,10 +369,8 @@ pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogb
 
     let mut visited_airports = BTreeSet::new();
     let mut arrival_airports = BTreeSet::new();
-    if let Some(entries) = find_logbook_entries(&json) {
-        for entry in entries {
-            collect_logbook_airport_progress(entry, &mut visited_airports, &mut arrival_airports);
-        }
+    for entry in normalize_logbook_entries(&json) {
+        collect_logbook_airport_progress(&entry, &mut visited_airports, &mut arrival_airports);
     }
 
     crate::DeltaLogbookProgress {
@@ -622,8 +580,8 @@ mod tests {
         let mut visited_airports = BTreeSet::new();
         let mut arrival_airports = BTreeSet::new();
 
-        for entry in find_logbook_entries(&json).expect("entries") {
-            collect_logbook_airport_progress(entry, &mut visited_airports, &mut arrival_airports);
+        for entry in normalize_logbook_entries(&json) {
+            collect_logbook_airport_progress(&entry, &mut visited_airports, &mut arrival_airports);
         }
 
         assert_eq!(
@@ -638,6 +596,31 @@ mod tests {
         assert_eq!(
             arrival_airports.into_iter().collect::<Vec<_>>(),
             vec!["KJFK".to_string(), "KSFO".to_string()]
+        );
+    }
+
+    #[test]
+    fn collect_logbook_airport_progress_accepts_entries_shape() {
+        let json: Value = serde_json::from_str(
+            r#"{"entries": [
+                {"airportD":{"icao":"KATL"},"airportA":{"icao":"KJFK"}}
+            ]}"#,
+        )
+        .expect("json");
+        let mut visited_airports = BTreeSet::new();
+        let mut arrival_airports = BTreeSet::new();
+
+        for entry in normalize_logbook_entries(&json) {
+            collect_logbook_airport_progress(&entry, &mut visited_airports, &mut arrival_airports);
+        }
+
+        assert_eq!(
+            visited_airports.into_iter().collect::<Vec<_>>(),
+            vec!["KATL".to_string(), "KJFK".to_string()]
+        );
+        assert_eq!(
+            arrival_airports.into_iter().collect::<Vec<_>>(),
+            vec!["KJFK".to_string()]
         );
     }
 }

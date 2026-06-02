@@ -674,7 +674,16 @@ export default function App() {
 
   useDebouncedEffect(
     () => {
-      if (!schedule || isHydrating) {
+      if (isHydrating) {
+        return;
+      }
+
+      const shouldPersistUiState =
+        Boolean(schedule) ||
+        scheduleView === "logbook" ||
+        logbook.allRows.length > 0;
+
+      if (!shouldPersistUiState) {
         return;
       }
 
@@ -706,6 +715,8 @@ export default function App() {
     },
     [
       schedule,
+      scheduleView,
+      logbook.allRows.length,
       plannerMode,
       filters,
       dutyFilters,
@@ -718,7 +729,6 @@ export default function App() {
       scheduleTableTimeDisplayMode,
       sort,
       selectedFlightId,
-      scheduleView,
       selectedTourPath,
       selectedAccomplishmentName,
       mapOptions,
@@ -1660,6 +1670,7 @@ export default function App() {
       allRows: logbook.allRows,
       filteredRows: logbook.filteredRows,
       visibleRows: logbook.visibleRows,
+      hasMoreRows: logbook.hasMoreRows,
       selectedTab: logbook.selectedTab,
       sort: logbook.sort,
       expandedRowId: logbook.expandedRowId,
