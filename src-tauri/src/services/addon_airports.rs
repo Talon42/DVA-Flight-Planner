@@ -259,7 +259,73 @@ fn read_directory_entries_sorted(path: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(entries)
 }
 
-fn find_content_history_files(package_root: &Path, summary: &mut AddonAirportScanSummary) -> Vec<PathBuf> {
+fn is_content_history_file(path: &Path) -> bool {
+    path.is_file()
+        && path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.eq_ignore_ascii_case("ContentHistory.json"))
+            .unwrap_or(false)
+}
+
+fn push_existing_content_history_file(files: &mut Vec<PathBuf>, path: PathBuf) {
+    if !is_content_history_file(&path) {
+        return;
+    }
+
+    let dedupe_key = path.to_string_lossy().to_ascii_lowercase();
+    if files
+        .iter()
+        .all(|existing| existing.to_string_lossy().to_ascii_lowercase() != dedupe_key)
+    {
+        files.push(path);
+    }
+}
+
+fn find_common_content_history_files(
+    package_root: &Path,
+    summary: &mut AddonAirportScanSummary,
+) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+
+    for candidate in [
+        package_root.join("ContentHistory.json"),
+        package_root.join("ContentInfo").join("ContentHistory.json"),
+        package_root.join("contentinfo").join("ContentHistory.json"),
+    ] {
+        push_existing_content_history_file(&mut files, candidate);
+    }
+
+    for content_info_folder in [package_root.join("ContentInfo"), package_root.join("contentinfo")] {
+        if !content_info_folder.is_dir() {
+            continue;
+        }
+
+        let entries = match read_directory_entries_sorted(&content_info_folder) {
+            Ok(entries) => entries,
+            Err(error) => {
+                summary.warnings.push(error);
+                continue;
+            }
+        };
+
+        for entry in entries {
+            if is_content_history_file(&entry) {
+                push_existing_content_history_file(&mut files, entry);
+            } else if entry.is_dir() {
+                push_existing_content_history_file(&mut files, entry.join("ContentHistory.json"));
+            }
+        }
+    }
+
+    files.sort_by_key(|path| path.to_string_lossy().to_ascii_lowercase());
+    files
+}
+
+fn find_content_history_files_recursive(
+    package_root: &Path,
+    summary: &mut AddonAirportScanSummary,
+) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
     fn visit_directory(
@@ -278,17 +344,8 @@ fn find_content_history_files(package_root: &Path, summary: &mut AddonAirportSca
         for path in entries {
             if path.is_dir() {
                 visit_directory(&path, files, summary);
-                continue;
-            }
-
-            let is_content_history = path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .map(|name| name.eq_ignore_ascii_case("ContentHistory.json"))
-                .unwrap_or(false);
-
-            if is_content_history {
-                files.push(path);
+            } else {
+                push_existing_content_history_file(files, path);
             }
         }
     }
@@ -296,6 +353,18 @@ fn find_content_history_files(package_root: &Path, summary: &mut AddonAirportSca
     visit_directory(package_root, &mut files, summary);
     files.sort_by_key(|path| path.to_string_lossy().to_ascii_lowercase());
     files
+}
+
+fn find_content_history_files(
+    package_root: &Path,
+    summary: &mut AddonAirportScanSummary,
+) -> Vec<PathBuf> {
+    let common_files = find_common_content_history_files(package_root, summary);
+    if !common_files.is_empty() {
+        return common_files;
+    }
+
+    find_content_history_files_recursive(package_root, summary)
 }
 
 fn find_direct_manifest_file(package_root: &Path, summary: &mut AddonAirportScanSummary) -> Option<PathBuf> {
@@ -529,9 +598,18 @@ pub(crate) fn scan_addon_airports_for_roots(roots: Vec<String>) -> crate::AddonA
         scan_addon_root_directory(Path::new(root), &mut airports, &mut summary);
     }
 
+    let airports = airports.into_iter().collect::<Vec<_>>();
+    let status = if summary.warnings.is_empty() {
+        "ready"
+    } else if !airports.is_empty() {
+        "partial"
+    } else {
+        "error"
+    };
+
     crate::AddonAirportCache {
         roots,
-        airports: airports.into_iter().collect(),
+        airports,
         last_scanned_at: Some(iso_now_utc()),
         content_history_files_scanned: summary.content_history_files_scanned,
         manifest_files_scanned: summary.manifest_files_scanned,
@@ -539,11 +617,7 @@ pub(crate) fn scan_addon_airports_for_roots(roots: Vec<String>) -> crate::AddonA
         manifest_airport_entries_found: summary.manifest_airport_entries_found,
         airport_entries_found: summary.airport_entries_found,
         duplicate_airport_entries: summary.duplicate_airport_entries,
-        status: if summary.warnings.is_empty() {
-            "ready".into()
-        } else {
-            "error".into()
-        },
+        status: status.into(),
         last_error: summarize_warnings(&summary.warnings),
         warnings: summary.warnings,
         scan_details: summary.scan_details,
@@ -665,6 +739,111 @@ mod tests {
             .scan_details
             .iter()
             .any(|detail| detail.status.starts_with("manifest-")));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn scan_addon_airports_uses_common_content_history_paths_before_recursive_fallback() {
+        let root = temp_scan_dir("addon-common-path");
+        let package = create_package_dir(&root, "package");
+        let content_info = create_package_dir(&package, "ContentInfo");
+        let deep = create_package_dir(&package, "deep");
+        let nested = create_package_dir(&deep, "nested");
+
+        write_text(
+            &content_info.join("ContentHistory.json"),
+            r#"[{"type":"Airport","Content":"ksea"}]"#,
+        );
+        write_text(
+            &nested.join("ContentHistory.json"),
+            r#"[{"type":"Airport","Content":"kden"}]"#,
+        );
+
+        let cache = scan_addon_airports_for_roots(vec![root.to_string_lossy().into_owned()]);
+
+        assert_eq!(cache.airports, vec!["KSEA".to_string()]);
+        assert_eq!(cache.content_history_files_scanned, 1);
+        assert_eq!(cache.manifest_files_scanned, 0);
+        assert_eq!(cache.status, "ready");
+        assert!(cache.last_error.is_none());
+        assert_eq!(cache.scan_details.len(), 1);
+        assert!(cache
+            .scan_details
+            .iter()
+            .any(|detail| detail.path.contains("ContentInfo")
+                && detail.airports == vec!["KSEA".to_string()]));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn scan_addon_airports_falls_back_to_recursive_search_when_common_paths_are_missing() {
+        let root = temp_scan_dir("addon-recursive-fallback");
+        let package = create_package_dir(&root, "package");
+        let deep = create_package_dir(&package, "deep");
+        let nested = create_package_dir(&deep, "nested");
+
+        write_text(
+            &nested.join("ContentHistory.json"),
+            r#"[{"type":"Airport","Content":"kden"}]"#,
+        );
+
+        let cache = scan_addon_airports_for_roots(vec![root.to_string_lossy().into_owned()]);
+
+        assert_eq!(cache.airports, vec!["KDEN".to_string()]);
+        assert_eq!(cache.content_history_files_scanned, 1);
+        assert_eq!(cache.manifest_files_scanned, 0);
+        assert_eq!(cache.status, "ready");
+        assert!(cache.last_error.is_none());
+        assert_eq!(cache.scan_details.len(), 1);
+        assert!(cache
+            .scan_details
+            .iter()
+            .any(|detail| detail.path.ends_with("ContentHistory.json")
+                && detail.airports == vec!["KDEN".to_string()]));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn scan_addon_airports_reports_partial_status_when_warnings_and_results_exist() {
+        let root = temp_scan_dir("addon-partial-status");
+        let valid_package = create_package_dir(&root, "valid-package");
+        let valid_content_info = create_package_dir(&valid_package, "ContentInfo");
+        let bad_package = create_package_dir(&root, "bad-package");
+        let bad_content_info = create_package_dir(&bad_package, "ContentInfo");
+
+        write_text(
+            &valid_content_info.join("ContentHistory.json"),
+            r#"[{"type":"Airport","Content":"ksea"}]"#,
+        );
+        write_text(&bad_content_info.join("ContentHistory.json"), "{");
+
+        let cache = scan_addon_airports_for_roots(vec![root.to_string_lossy().into_owned()]);
+
+        assert_eq!(cache.airports, vec!["KSEA".to_string()]);
+        assert!(!cache.warnings.is_empty());
+        assert_eq!(cache.status, "partial");
+        assert!(cache.last_error.is_some());
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn scan_addon_airports_reports_error_status_when_warnings_exist_without_results() {
+        let root = temp_scan_dir("addon-error-status");
+        let package = create_package_dir(&root, "package");
+        let content_info = create_package_dir(&package, "ContentInfo");
+
+        write_text(&content_info.join("ContentHistory.json"), "{");
+
+        let cache = scan_addon_airports_for_roots(vec![root.to_string_lossy().into_owned()]);
+
+        assert!(cache.airports.is_empty());
+        assert!(!cache.warnings.is_empty());
+        assert_eq!(cache.status, "error");
+        assert!(cache.last_error.is_some());
 
         let _ = fs::remove_dir_all(root);
     }
@@ -864,8 +1043,9 @@ mod tests {
         assert_eq!(cache.airports, vec!["KSEA".to_string()]);
         assert_eq!(cache.manifest_files_scanned, 1);
         assert_eq!(cache.manifest_fallbacks_used, 1);
-        assert_eq!(cache.status, "error");
+        assert_eq!(cache.status, "partial");
         assert_eq!(cache.warnings.len(), 1);
+        assert!(cache.last_error.is_some());
         assert!(cache
             .scan_details
             .iter()
