@@ -1,5 +1,5 @@
 import { DateTime } from "luxon";
-import { getAirlineNameByCode } from "../airlines/airlineBranding.js";
+import { getAirlineLogo, getAirlineNameByCode } from "../airlines/airlineBranding.js";
 
 export const LOGBOOK_EMPTY_VALUE = "\u2014";
 
@@ -350,6 +350,11 @@ export function normalizeLogbookRows(entries) {
     const compactFlightLabel = buildCompactFlightLabel(entry);
     const airlineCode = normalizeUpperText(entry.airline || entry.airlineCode || entry.airlineIata);
     const airlineDisplayName = getAirlineNameByCode(airlineCode) || airlineCode || LOGBOOK_EMPTY_VALUE;
+    const airlineLogoSrc = getAirlineLogo({
+      airlineName: airlineDisplayName,
+      airlineIata: airlineCode,
+      airlineIcao: airlineCode
+    });
     const durationMinutes = parseDurationMinutes(entry.duration) ?? parseDurationMinutes(entry.blockTime);
     const airborneMinutes = parseDurationMinutes(entry.airborneTime);
     const distanceNm = toNumber(entry.distance);
@@ -364,6 +369,7 @@ export function normalizeLogbookRows(entries) {
       compactFlightLabel,
       airlineCode: airlineCode || LOGBOOK_EMPTY_VALUE,
       airlineDisplayName,
+      airlineLogoSrc,
       origin: readAirportCode(entry.airportD) || LOGBOOK_EMPTY_VALUE,
       destination: readAirportCode(entry.airportA) || LOGBOOK_EMPTY_VALUE,
       equipment:

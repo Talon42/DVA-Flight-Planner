@@ -17,6 +17,22 @@ const TABLE_COLUMNS = [
 const TABLE_GRID_CLASS_NAME =
   "grid [grid-template-columns:minmax(108px,0.92fr)_minmax(118px,1fr)_minmax(84px,0.74fr)_minmax(84px,0.74fr)_minmax(132px,1fr)_minmax(94px,0.84fr)_minmax(88px,0.8fr)_minmax(98px,0.86fr)]";
 
+function LogbookFlightCell({ row }) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      {row.airlineLogoSrc ? (
+        <img
+          src={row.airlineLogoSrc}
+          alt=""
+          loading="lazy"
+          className="h-4 w-4 shrink-0 object-contain"
+        />
+      ) : null}
+      <span className="min-w-0 truncate leading-none">{row.compactFlightLabel}</span>
+    </span>
+  );
+}
+
 function HeaderButton({ column, sort, onSort }) {
   const isActive = sort?.key === column.key;
 
@@ -80,7 +96,11 @@ function LogbookRow({ row, columns, expanded, onToggleExpanded }) {
                 bodyMdTextClassName
               )}
             >
-              <span className="block min-w-0 truncate leading-none">{column.renderCell(row)}</span>
+              {column.key === "compactFlightLabel" ? (
+                <LogbookFlightCell row={row} />
+              ) : (
+                <span className="block min-w-0 truncate leading-none">{column.renderCell(row)}</span>
+              )}
             </span>
           ))}
         </span>
