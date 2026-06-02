@@ -153,6 +153,7 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
           kind: "missing-airport",
           flightId: buildFlightId(rawFlight, index),
           sourceFileName: fileName,
+          missingAirportIcaos: missingIcaos,
           details: `${issuePrefix} imported with missing airport data for ${missingIcaos.join(
             ", "
           )}. Airport does not exist in database.`,
@@ -553,13 +554,36 @@ function buildImportLog(importedAt, fileName, importIssues) {
     return "";
   }
 
+  const missingAirportIcaos = new Set();
   const lines = [
     `[${importedAt}] Import file: ${fileName}`,
-    ...importIssues.map(
-      (issue) =>
-        `${issue.severity.toUpperCase()} | ${issue.kind} | ${issue.flightId} | ${issue.details}`
-    )
   ];
+
+  for (const issue of importIssues) {
+    if (issue.kind === "missing-airport") {
+      for (const icao of Array.isArray(issue.missingAirportIcaos) ? issue.missingAirportIcaos : []) {
+        const normalizedIcao = normalizeText(icao).toUpperCase();
+        if (!normalizedIcao || missingAirportIcaos.has(normalizedIcao)) {
+          continue;
+        }
+
+        missingAirportIcaos.add(normalizedIcao);
+        lines.push(
+          `${issue.severity.toUpperCase()} | ${issue.kind} | ${normalizedIcao} missing from airport database.`
+        );
+      }
+      continue;
+    }
+
+    if (issue.kind === "invalid-time") {
+      lines.push(`${issue.severity.toUpperCase()} | ${issue.kind} | ${issue.details}`);
+      continue;
+    }
+
+    lines.push(
+      `${issue.severity.toUpperCase()} | ${issue.kind} | ${issue.flightId} | ${issue.details}`
+    );
+  }
 
   return lines.join("\n");
 }

@@ -38,7 +38,6 @@ pub(crate) async fn start_deltava_sync(
 ) -> Result<DeltaSyncPayload, String> {
     let _ = initialize_sync_log_path(&app);
     let sync_nonce = new_dva_nonce();
-    append_sync_log("start-requested");
     close_deltava_sync_window(app.clone());
 
     let download_path = crate::app::paths::build_download_path(&app)?;
@@ -77,7 +76,6 @@ pub(crate) async fn start_deltava_sync(
         append_sync_log(&format!("start-rejected error={error}"));
         return Err(error);
     }
-    append_sync_log("started");
 
     let _window = match window_factory::build_deltava_sync_window(
         app.clone(),

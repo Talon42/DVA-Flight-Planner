@@ -489,11 +489,19 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
     rows: Array.isArray(tour.rows) ? tour.rows.map((row) => ({ ...row })) : [],
     flights: Array.isArray(tour.flights) ? tour.flights.map((row) => ({ ...row })) : []
   });
+  const filterSummary = {
+    total: 0,
+    included: 0,
+    excluded: 0,
+    current: 0,
+    expired: 0,
+    upcoming: 0,
+    invalidId: 0,
+    inactive: 0
+  };
   const evaluateCandidateTour = (tour, nowSeconds) => {
     const tourId = normalizeId(tour?.id || tour?.sourceId);
-    const tourName = normalizeText(tour?.name || '');
     const active = tour?.active === true;
-    const status = normalizeText(tour?.status || '');
     const rawStartDate = tour?.startDate ?? tour?.start_date ?? null;
     const rawEndDate = tour?.endDate ?? tour?.end_date ?? null;
     const startDate = normalizeDvaEpochSeconds(rawStartDate);
@@ -508,25 +516,22 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
     const visibilityStatus = isExpired ? 'expired' : isUpcoming ? 'upcoming' : 'current';
     let reason = 'include';
 
+    filterSummary.total += 1;
+    filterSummary[visibilityStatus] += 1;
+
     if (!isValidId(tourId)) {
       reason = 'exclude:invalid-id';
+      filterSummary.invalidId += 1;
     } else if (!active) {
       reason = 'exclude:inactive';
+      filterSummary.inactive += 1;
     }
 
-    emitDebug(
-      `tours:filter:${JSON.stringify({
-        tourId: tourId || null,
-        name: tourName,
-        active,
-        status,
-        startDate: startDate,
-        endDate: endDate,
-        visibilityStatus,
-        nowSeconds,
-        reason
-      })}`
-    );
+    if (reason === 'include') {
+      filterSummary.included += 1;
+    } else {
+      filterSummary.excluded += 1;
+    }
 
     return {
       include: reason === 'include',
@@ -569,6 +574,19 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
         candidateTours.push(tour);
       }
     }
+    emitDebug(
+      `tours:filter-summary:${JSON.stringify({
+        totalListTours,
+        included: filterSummary.included,
+        excluded: filterSummary.excluded,
+        current: filterSummary.current,
+        expired: filterSummary.expired,
+        upcoming: filterSummary.upcoming,
+        invalidId: filterSummary.invalidId,
+        inactive: filterSummary.inactive,
+        candidateTours: candidateTours.length
+      })}`
+    );
     const tours = [];
     const detailFailures = [];
     const failedTourIds = [];

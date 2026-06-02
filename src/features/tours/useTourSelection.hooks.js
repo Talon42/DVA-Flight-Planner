@@ -64,12 +64,6 @@ export function useTourSelection({
     const manualRows = tourProgress?.[normalizedTourKey]?.rows || {};
     const derivedRows = derivedTourProgress?.tourProgress?.[normalizedTourKey]?.rows || {};
     const mergedRows = resolvedTourProgress?.[normalizedTourKey]?.rows || {};
-    const visibleRowIds = visibleRows.map((row) => String(row?.tourRowId || "").trim()).filter(Boolean);
-    const derivedRowIds = Object.keys(derivedRows).filter(Boolean);
-    const completedRowIds = visibleRows
-      .filter((row) => Boolean(row?.isCompleted))
-      .map((row) => String(row?.tourRowId || "").trim())
-      .filter(Boolean);
 
     logAppEvent("tour-selection-updated", {
       selectedTourName: selectedTour.name || selectedTour.label || "",
@@ -81,9 +75,6 @@ export function useTourSelection({
       derivedRowsCount: Object.keys(derivedRows).length,
       manualRowsCount: Object.keys(manualRows).length,
       mergedCompletedCount: visibleRows.filter((row) => Boolean(row?.isCompleted)).length,
-      first10VisibleRowIds: visibleRowIds.slice(0, 10),
-      first10DerivedRowIds: derivedRowIds.slice(0, 10),
-      first10VisibleCompletedRowIds: completedRowIds.slice(0, 10),
       mergedRowCount: Object.keys(mergedRows).length
     }).catch(() => {});
   }, [
