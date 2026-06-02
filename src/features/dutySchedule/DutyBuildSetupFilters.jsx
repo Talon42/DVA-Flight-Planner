@@ -193,14 +193,14 @@ export default function DutyBuildSetupFilters({
           />
         </DutyCompactInlineRow>
 
-        <DutyCompactInlineRow label="Origin Airport - Optional">
+        <DutyCompactInlineRow label="Departure Airport - Optional">
           <div className="grid w-full grid-cols-[minmax(0,1fr)_5rem] gap-2">
             <SearchableMultiSelect
-              label="Origin Airport"
+              label="Departure Airport"
               hideLabel
               className="w-full"
-              placeholder="Search origin airports"
-              emptyLabel="No matching origin airports"
+              placeholder="Search departure airports"
+              emptyLabel="No matching departure airports"
               allLabel="All"
               allowMultiple={false}
               hideChips
@@ -377,14 +377,14 @@ export default function DutyBuildSetupFilters({
                 onChange={(value) => onDutyFilterChange("selectedEquipment", value[0] || "")}
               />
 
-        <Field label="Origin Airport - Optional" className={DUTY_DESKTOP_FIELD_CLASS_NAME}>
+        <Field label="Departure Airport - Optional" className={DUTY_DESKTOP_FIELD_CLASS_NAME}>
           <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
             <SearchableMultiSelect
-              label="Origin Airport"
+              label="Departure Airport"
               hideLabel
               className={DUTY_DESKTOP_FIELD_CLASS_NAME}
-              placeholder="Search origin airports"
-              emptyLabel="No matching origin airports"
+              placeholder="Search departure airports"
+              emptyLabel="No matching departure airports"
               allLabel="All"
               allowMultiple={false}
               hideChips

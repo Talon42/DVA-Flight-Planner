@@ -97,9 +97,9 @@ export default function LogbookFiltersPanel({
 
       <div className="grid gap-3 bp-1024:grid-cols-2">
         <SearchableMultiSelect
-          label="Origin"
-          placeholder="Search origin airports"
-          emptyLabel="No matching origin airports"
+          label="Departure"
+          placeholder="Search departure airports"
+          emptyLabel="No matching departure airports"
           allLabel="All"
           hideChips
           showAddActionText
@@ -110,9 +110,9 @@ export default function LogbookFiltersPanel({
           onChange={(value) => onFilterChange("origin", value)}
         />
         <SearchableMultiSelect
-          label="Destination"
-          placeholder="Search destination airports"
-          emptyLabel="No matching destination airports"
+          label="Arrival"
+          placeholder="Search arrival airports"
+          emptyLabel="No matching arrival airports"
           allLabel="All"
           hideChips
           showAddActionText

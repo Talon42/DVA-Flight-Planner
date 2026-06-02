@@ -149,19 +149,19 @@ export default function BasicScheduleFilters({
   );
   const addonMatchOptions = useMemo(
     () => [
-      { value: "either", label: "Origin or destination", keywords: "either origin destination" },
-      { value: "origin", label: "Origin only", keywords: "origin only" },
-      { value: "destination", label: "Destination only", keywords: "destination only" },
-      { value: "both", label: "Origin and destination", keywords: "both origin destination" }
+      { value: "either", label: "Departure or arrival", keywords: "either departure arrival" },
+      { value: "origin", label: "Departure only", keywords: "departure only" },
+      { value: "destination", label: "Arrival only", keywords: "arrival only" },
+      { value: "both", label: "Departure and arrival", keywords: "both departure arrival" }
     ],
     []
   );
   const vatsimCoverageOptions = useMemo(
     () => [
-      { value: "origin", label: "Origin", keywords: "origin" },
-      { value: "destination", label: "Destination", keywords: "destination" },
-      { value: "either", label: "Origin or destination", keywords: "either origin destination" },
-      { value: "both", label: "Origin and destination", keywords: "both origin destination" }
+      { value: "origin", label: "Departure", keywords: "departure" },
+      { value: "destination", label: "Arrival", keywords: "arrival" },
+      { value: "either", label: "Departure or arrival", keywords: "either departure arrival" },
+      { value: "both", label: "Departure and arrival", keywords: "both departure arrival" }
     ],
     []
   );
@@ -294,7 +294,7 @@ export default function BasicScheduleFilters({
             hideLabel
             placeholder="Search VATSIM coverage"
             emptyLabel="No matching VATSIM coverage modes"
-            allLabel="Origin or destination"
+            allLabel="Departure or Arrival"
             allowMultiple={false}
             hideChips
             searchable={false}
@@ -327,7 +327,7 @@ export default function BasicScheduleFilters({
             hideLabel
             placeholder="Search addon match"
             emptyLabel="No matching addon match modes"
-            allLabel="Origin or destination"
+            allLabel="Departure or Arrival"
             allowMultiple={false}
             hideChips
             searchable={false}
@@ -391,9 +391,9 @@ export default function BasicScheduleFilters({
 
       <div className={gridClassNames.routeFields}>
         <SearchableMultiSelect
-          label="Origin"
-          placeholder="Search origin airports"
-          emptyLabel="No matching origin airports"
+          label="Departure"
+          placeholder="Search departure airports"
+          emptyLabel="No matching departure airports"
           allLabel="All"
           allowMultiple={false}
           hideChips
@@ -431,9 +431,9 @@ export default function BasicScheduleFilters({
         </Field>
 
         <SearchableMultiSelect
-          label="Destination"
-          placeholder="Search destination airports"
-          emptyLabel="No matching destination airports"
+          label="Arrival"
+          placeholder="Search arrival airports"
+          emptyLabel="No matching arrival airports"
           allLabel="All"
           allowMultiple={false}
           hideChips
@@ -478,7 +478,7 @@ export default function BasicScheduleFilters({
         </Field>
 
         <SearchableMultiSelect
-          label="Orgin or Destination"
+          label="Departure or Arrival"
           placeholder="Search airports"
           emptyLabel="No matching airports"
           allLabel="All"
@@ -623,7 +623,7 @@ export default function BasicScheduleFilters({
                 hideLabel
                 placeholder="Search VATSIM coverage"
                 emptyLabel="No matching VATSIM coverage modes"
-                allLabel="Origin or destination"
+                allLabel="Departure or Arrival"
                 allowMultiple={false}
                 hideChips
                 searchable={false}
@@ -644,7 +644,7 @@ export default function BasicScheduleFilters({
                 hideLabel
                 placeholder="Search addon match"
                 emptyLabel="No matching addon match modes"
-                allLabel="Origin or destination"
+                allLabel="Departure or Arrival"
                 allowMultiple={false}
                 hideChips
                 searchable={false}

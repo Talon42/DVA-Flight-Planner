@@ -181,7 +181,7 @@ export function getFlightTableColumns({ addonAirports, timeDisplayMode, viewport
     },
     {
       key: "departureTime",
-      label: "DEP",
+      label: "DEP Time",
       role: "time",
       sortable: true,
       sortKey: "stdUtcMillis",
@@ -191,7 +191,7 @@ export function getFlightTableColumns({ addonAirports, timeDisplayMode, viewport
     },
     {
       key: "arrivalTime",
-      label: "ARR",
+      label: "ARR Time",
       role: "time",
       sortable: true,
       sortKey: "staUtcMillis",

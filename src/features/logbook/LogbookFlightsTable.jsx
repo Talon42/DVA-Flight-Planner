@@ -6,8 +6,8 @@ import LogbookFlightDetails from "./LogbookFlightDetails.jsx";
 const TABLE_COLUMNS = [
   { key: "dateSortKey", label: "Date", renderCell: (row) => row.dateDisplay },
   { key: "compactFlightLabel", label: "Flight", renderCell: (row) => row.compactFlightLabel },
-  { key: "origin", label: "Origin", renderCell: (row) => row.origin },
-  { key: "destination", label: "Dest", renderCell: (row) => row.destination },
+  { key: "origin", label: "Departure", renderCell: (row) => row.origin },
+  { key: "destination", label: "Arrival", renderCell: (row) => row.destination },
   { key: "equipment", label: "Equipment", renderCell: (row) => row.equipment },
   { key: "durationMinutes", label: "Duration", renderCell: (row) => row.durationDisplay },
   { key: "distanceNm", label: "Dist", renderCell: (row) => row.distanceDisplay },
