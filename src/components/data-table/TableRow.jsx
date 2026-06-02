@@ -33,8 +33,8 @@ export default function TableRow({
   return (
     <div
       className={cn(
-        "relative grid h-full w-full min-w-0 items-stretch border-b border-[color:var(--line)] bg-[var(--surface-table-row)] even:bg-[var(--surface-table-row-alt)]",
-        isSelected && "bg-[var(--surface-table-row-selected)]",
+        "relative grid h-full w-full min-w-0 items-stretch border-b border-[color:var(--line)] bg-[var(--surface-table-row)] transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[rgba(255,255,255,0.18)]",
+        isSelected && "bg-[var(--surface-table-row-selected)] hover:bg-[var(--surface-table-row-selected)]",
         getRowClassName?.(row)
       )}
       style={{
@@ -52,7 +52,7 @@ export default function TableRow({
             <button
               type="button"
               className={cn(
-                "block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[var(--text-primary)] outline-none transition-colors duration-150 hover:bg-[rgba(255,255,255,0.18)] dark:text-[rgb(255,255,255)]",
+                "block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[var(--text-primary)] outline-none dark:text-[rgb(255,255,255)]",
                 bodyMdTextClassName
               )}
               onClick={() => onSelectRow?.(rowId, row)}
