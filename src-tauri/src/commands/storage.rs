@@ -1,6 +1,11 @@
 use tauri::AppHandle;
 
 #[tauri::command]
+pub(crate) fn append_app_log_text(app: AppHandle, text: String) -> Result<(), String> {
+    crate::app::logging::append_app_log_text(&app, &text)
+}
+
+#[tauri::command]
 pub(crate) fn prune_deltava_storage(app: AppHandle, remove_downloaded_schedule: bool) {
     crate::services::storage::file_store::prune_deltava_storage(
         &app,

@@ -123,6 +123,24 @@ fn append_app_log_to_path(log_path: &Path, category: &str, message: &str) -> Res
     append_bounded_log_line_with_fallback(log_path, &line, APP_LOG_MAX_BYTES)
 }
 
+fn append_app_log_text_to_path_with_limit(
+    log_path: &Path,
+    text: &str,
+    max_bytes: u64,
+) -> Result<(), io::Error> {
+    let normalized = text.trim_end_matches(['\r', '\n']);
+    if normalized.trim().is_empty() {
+        return Ok(());
+    }
+
+    let block = format!("{normalized}\n");
+    append_bounded_log_line_with_fallback(log_path, &block, max_bytes)
+}
+
+fn append_app_log_text_to_path(log_path: &Path, text: &str) -> Result<(), io::Error> {
+    append_app_log_text_to_path_with_limit(log_path, text, APP_LOG_MAX_BYTES)
+}
+
 pub(crate) fn append_app_log(app: &AppHandle, category: &str, message: &str) {
     let Ok(log_path) = resolve_app_log_path(app) else {
         return;
@@ -161,6 +179,12 @@ pub(crate) fn append_sync_log(message: &str) {
     };
 
     let _ = append_app_log_to_path(&log_path, "DVA Sync", message);
+}
+
+pub(crate) fn append_app_log_text(app: &AppHandle, text: &str) -> Result<(), String> {
+    let log_path = resolve_app_log_path(app)?;
+    append_app_log_text_to_path(&log_path, text)
+        .map_err(|error| format!("Unable to append app log: {error}"))
 }
 
 pub(crate) fn iso_now_utc() -> String {
@@ -283,5 +307,39 @@ mod tests {
         append_app_log_to_path(&path, "AddonScan", "").expect("append");
 
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn append_app_log_text_to_path_writes_multiline_blocks() {
+        let path = temp_log_path("multiline-text");
+
+        append_app_log_text_to_path(&path, "first line\nsecond line").expect("append");
+
+        assert_eq!(read_log_text(&path), "first line\nsecond line\n");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn append_app_log_text_to_path_ignores_empty_text() {
+        let path = temp_log_path("empty-text");
+
+        append_app_log_text_to_path(&path, "   \n").expect("append");
+
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn append_app_log_text_to_path_trims_oldest_content_over_limit() {
+        let path = temp_log_path("text-trim");
+
+        append_app_log_text_to_path_with_limit(&path, "A", 4).expect("append 1");
+        append_app_log_text_to_path_with_limit(&path, "B", 4).expect("append 2");
+        append_app_log_text_to_path_with_limit(&path, "C", 4).expect("append 3");
+
+        let contents = read_log_text(&path);
+        assert_eq!(contents, "B\nC\n");
+
+        let _ = fs::remove_file(path);
     }
 }

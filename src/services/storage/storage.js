@@ -19,7 +19,7 @@ const LEGACY_PERSISTED_SCHEDULE_VERSION = 2;
 const PERSISTED_SCHEDULE_VERSION = 4;
 const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
 const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
-const LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
+const BROWSER_LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
 const DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
 const DELTAVA_TOURS_CACHE_STORAGE_KEY = "flight-planner.deltava-tours-cache";
 const DELTAVA_TOUR_PROGRESS_STORAGE_KEY = "flight-planner.deltava-tour-progress";
@@ -369,7 +369,7 @@ function buildNextLogText(existingText, incomingText) {
 
   const separator = existing && !existing.endsWith("\n") ? "\n" : "";
   const combined = `${existing}${separator}${incoming}\n`;
-  return trimLogTextToLimit(combined, LOG_SIZE_LIMIT_BYTES);
+  return trimLogTextToLimit(combined, BROWSER_LOG_SIZE_LIMIT_BYTES);
 }
 
 function uint8ArrayToBase64(bytes) {
@@ -1026,27 +1026,20 @@ async function appendLogFile(relativePath, storageKey, logText) {
   }
 
   if (isTauriRuntime()) {
+    if (relativePath !== IMPORT_LOG_FILE) {
+      return null;
+    }
+
     try {
-      const { exists, readTextFile, writeTextFile, BaseDirectory } =
-        await loadFsModule();
-      await ensureAppDataRoot();
+      const { invoke } = await import("@tauri-apps/api/core");
+      const normalized = normalizeLogEntryText(logText);
+      if (!normalized) {
+        return null;
+      }
 
-      const hasFile = await exists(relativePath, {
-        baseDir: BaseDirectory.AppData
-      });
-      const existing = hasFile
-        ? await readTextFile(relativePath, {
-            baseDir: BaseDirectory.AppData
-          })
-        : "";
-      const nextText = buildNextLogText(existing, logText);
-
-      await writeTextFile(relativePath, nextText, {
-        baseDir: BaseDirectory.AppData
-      });
-
+      await invoke("append_app_log_text", { text: normalized });
       return resolveAppDataPath(relativePath);
-    } catch (error) {
+    } catch {
       // Tauri runtime must never fall back to browser storage for logs.
       return null;
     }
