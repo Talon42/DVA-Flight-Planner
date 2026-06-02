@@ -134,6 +134,12 @@ function buildAddonScanSummary(addonScan) {
     airportsCached: addonScan?.airports?.length || 0,
     filesScanned: addonScan?.contentHistoryFilesScanned || 0,
     entriesFound: addonScan?.airportEntriesFound || 0,
+    contentHistoryFilesScanned: addonScan?.contentHistoryFilesScanned || 0,
+    manifestFilesScanned: addonScan?.manifestFilesScanned || 0,
+    manifestFallbacksUsed: addonScan?.manifestFallbacksUsed || 0,
+    airportEntriesFound: addonScan?.airportEntriesFound || 0,
+    manifestAirportEntriesFound: addonScan?.manifestAirportEntriesFound || 0,
+    duplicateAirportEntries: addonScan?.duplicateAirportEntries || 0,
     status: addonScan?.status || "idle",
     warningCount: Array.isArray(addonScan?.warnings) ? addonScan.warnings.length : 0,
     airportPreview: (addonScan?.airports || []).slice(0, 12)

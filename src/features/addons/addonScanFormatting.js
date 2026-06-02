@@ -29,9 +29,12 @@ export function formatAddonScanSummary(addonScan) {
   }
 
   const scanStamp = formatScanTimestamp(addonScan.lastScannedAt);
+  const manifestSummary = addonScan.manifestFilesScanned
+    ? ` and ${formatNumber(addonScan.manifestFilesScanned)} manifest files`
+    : "";
   const baseSummary = `${formatNumber(addonScan.airports.length)} airports cached from ${formatNumber(
     addonScan.contentHistoryFilesScanned
-  )} ContentHistory files${scanStamp ? `, last scanned ${scanStamp}` : ""}.`;
+  )} ContentHistory files${manifestSummary}${scanStamp ? `, last scanned ${scanStamp}` : ""}.`;
 
   if (addonScan.lastError) {
     return `${baseSummary} ${addonScan.lastError}`;

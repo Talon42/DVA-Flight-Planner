@@ -15,6 +15,12 @@ function buildAddonScanSummary(addonScan) {
     airportsCached: addonScan?.airports?.length || 0,
     filesScanned: addonScan?.contentHistoryFilesScanned || 0,
     entriesFound: addonScan?.airportEntriesFound || 0,
+    contentHistoryFilesScanned: addonScan?.contentHistoryFilesScanned || 0,
+    manifestFilesScanned: addonScan?.manifestFilesScanned || 0,
+    manifestFallbacksUsed: addonScan?.manifestFallbacksUsed || 0,
+    airportEntriesFound: addonScan?.airportEntriesFound || 0,
+    manifestAirportEntriesFound: addonScan?.manifestAirportEntriesFound || 0,
+    duplicateAirportEntries: addonScan?.duplicateAirportEntries || 0,
     status: addonScan?.status || "idle",
     warningCount: Array.isArray(addonScan?.warnings) ? addonScan.warnings.length : 0,
     airportPreview: Array.isArray(addonScan?.airports) ? addonScan.airports.slice(0, 12) : []
@@ -78,18 +84,19 @@ export function useAddonAirports({
       }
 
       setIsAddonScanBusy(true);
-      setStatusMessage?.("Scanning addon folders for ContentHistory.json...");
+      setStatusMessage?.("Scanning addon folders for ContentHistory.json and manifest.json...");
       await logSystemEvent("AddonScan", "scan-start", {
         rootCount: roots.length,
         airportsCached: options.resetCache ? 0 : addonScan.airports.length,
-        filesScanned: addonScan.contentHistoryFilesScanned
+        contentHistoryFilesScanned: addonScan.contentHistoryFilesScanned,
+        manifestFilesScanned: addonScan.manifestFilesScanned
       });
 
       try {
         const nextScan = await scanAddonAirports(roots);
         setAddonScan(nextScan);
         setStatusMessage?.(
-          `Scanned ${formatNumber(nextScan.contentHistoryFilesScanned)} ContentHistory files and cached ${formatNumber(nextScan.airports.length)} addon airports.`
+          `Scanned ${formatNumber(nextScan.contentHistoryFilesScanned)} ContentHistory files and ${formatNumber(nextScan.manifestFilesScanned)} manifest files, then cached ${formatNumber(nextScan.airports.length)} addon airports.`
         );
         await logSystemEvent("AddonScan", "scan-succeeded", buildAddonScanSummary(nextScan));
         if (isDevToolsEnabled && Array.isArray(nextScan.scanDetails) && nextScan.scanDetails.length) {
@@ -109,7 +116,15 @@ export function useAddonAirports({
         setIsAddonAutoScanning(false);
       }
     },
-    [addonScan.airports.length, addonScan.contentHistoryFilesScanned, addonScan.roots, isDevToolsEnabled, persistAddonRoots, setStatusMessage]
+    [
+      addonScan.airports.length,
+      addonScan.contentHistoryFilesScanned,
+      addonScan.manifestFilesScanned,
+      addonScan.roots,
+      isDevToolsEnabled,
+      persistAddonRoots,
+      setStatusMessage
+    ]
   );
 
   const handleResetAddonAirportScan = useCallback(() => {
