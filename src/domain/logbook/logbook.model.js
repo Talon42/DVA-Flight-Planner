@@ -427,6 +427,8 @@ export function getLogbookSortValue(row, sortKey) {
       return row.durationMinutes ?? -1;
     case "distanceNm":
       return row.distanceNm ?? -1;
+    case "landingRate":
+      return row.landingRate ?? -99999;
     case "statusDisplay":
       return normalizeUpperText(row.statusDisplay);
     default:

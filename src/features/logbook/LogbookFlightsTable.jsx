@@ -11,11 +11,40 @@ const TABLE_COLUMNS = [
   { key: "equipment", label: "Equipment", renderCell: (row) => row.equipment },
   { key: "durationMinutes", label: "Duration", renderCell: (row) => row.durationDisplay },
   { key: "distanceNm", label: "Dist", renderCell: (row) => row.distanceDisplay },
-  { key: "statusDisplay", label: "Status", renderCell: (row) => row.statusDisplay }
+  { key: "landingRate", label: "Landing Rate", renderCell: (row) => row.landingRateDisplay }
 ];
 
 const TABLE_GRID_CLASS_NAME =
-  "grid [grid-template-columns:minmax(108px,0.92fr)_minmax(118px,1fr)_minmax(84px,0.74fr)_minmax(84px,0.74fr)_minmax(132px,1fr)_minmax(94px,0.84fr)_minmax(88px,0.8fr)_minmax(98px,0.86fr)]";
+  "grid [grid-template-columns:minmax(108px,0.92fr)_minmax(118px,1fr)_minmax(92px,0.8fr)_minmax(92px,0.8fr)_minmax(132px,1fr)_minmax(94px,0.84fr)_minmax(88px,0.8fr)_minmax(112px,0.9fr)]";
+
+function ResponsiveOriginLabel() {
+  return (
+    <>
+      <span className="bp-1400:hidden">DEP</span>
+      <span className="hidden bp-1400:inline bp-1920:hidden">DEPARTURE</span>
+      <span className="hidden bp-1920:inline">Departure</span>
+    </>
+  );
+}
+
+function ResponsiveDestinationLabel() {
+  return (
+    <>
+      <span className="bp-1400:hidden">ARR</span>
+      <span className="hidden bp-1400:inline bp-1920:hidden">ARRIVAL</span>
+      <span className="hidden bp-1920:inline">Arrival</span>
+    </>
+  );
+}
+
+function ResponsiveLandingRateLabel() {
+  return (
+    <>
+      <span className="bp-1400:hidden">LDG RATE</span>
+      <span className="hidden bp-1400:inline">Landing Rate</span>
+    </>
+  );
+}
 
 function LogbookFlightCell({ row }) {
   return (
@@ -35,6 +64,9 @@ function LogbookFlightCell({ row }) {
 
 function HeaderButton({ column, sort, onSort }) {
   const isActive = sort?.key === column.key;
+  const isOriginColumn = column.key === "origin";
+  const isDestinationColumn = column.key === "destination";
+  const isLandingRateColumn = column.key === "landingRate";
 
   return (
     <button
@@ -47,7 +79,17 @@ function HeaderButton({ column, sort, onSort }) {
       onClick={() => onSort?.(column.key)}
     >
       <span className="flex h-full min-h-0 w-full items-center overflow-hidden px-3 py-2 leading-none bp-1024:px-2">
-        <span className="min-w-0 truncate whitespace-nowrap">{column.label}</span>
+        <span className="min-w-0 truncate whitespace-nowrap">
+          {isOriginColumn ? (
+            <ResponsiveOriginLabel />
+          ) : isDestinationColumn ? (
+            <ResponsiveDestinationLabel />
+          ) : isLandingRateColumn ? (
+            <ResponsiveLandingRateLabel />
+          ) : (
+            column.label
+          )}
+        </span>
       </span>
       <span
         className={cn(
