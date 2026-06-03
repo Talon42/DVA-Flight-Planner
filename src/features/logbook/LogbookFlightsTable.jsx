@@ -167,8 +167,9 @@ function LogbookRow({
       <button
         type="button"
         className={cn(
-          "relative w-full bg-[var(--surface-table-row)] text-left transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[rgba(255,255,255,0.18)]",
-          selected && "bg-[#27547F] hover:bg-[#27547F]"
+          "relative w-full bg-[var(--surface-table-row)] text-left text-[var(--text-primary)] transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[rgba(255,255,255,0.18)] dark:text-white",
+          selected &&
+            "bg-[var(--delta-blue)] text-white hover:bg-[var(--delta-blue)] dark:bg-[#1F466E] dark:text-white dark:hover:bg-[#27547F]"
         )}
         onClick={() => {
           onSelectRow?.(row.id, row);
@@ -180,7 +181,7 @@ function LogbookRow({
             <span
               key={column.key}
               className={cn(
-                "flex min-h-11 min-w-0 items-center overflow-hidden px-3 py-2 text-[var(--text-primary)] dark:text-white bp-1024:px-2",
+                "flex min-h-11 min-w-0 items-center overflow-hidden px-3 py-2 text-inherit bp-1024:px-2",
                 bodyMdTextClassName
               )}
               title={column.key === "landingRate" ? row.landingRateDisplay : undefined}
