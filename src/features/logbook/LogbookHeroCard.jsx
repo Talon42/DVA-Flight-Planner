@@ -116,16 +116,7 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
                 <>
                   <p
                     className={cn(
-                      "m-0 min-w-0 truncate text-[var(--text-muted)] bp-1920:hidden",
-                      bodySmTextClassName
-                    )}
-                    title={departureName}
-                  >
-                    {departureDisplayName || departureName}
-                  </p>
-                  <p
-                    className={cn(
-                      "m-0 hidden min-w-0 truncate text-[var(--text-muted)] bp-1920:hidden",
+                      "m-0 hidden min-w-0 max-w-full truncate text-[var(--text-muted)] bp-1400:block bp-1920:hidden",
                       bodySmTextClassName
                     )}
                     title={departureName}
@@ -165,16 +156,7 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
                 <>
                   <p
                     className={cn(
-                      "m-0 min-w-0 truncate text-right text-[var(--text-muted)] bp-1920:hidden",
-                      bodySmTextClassName
-                    )}
-                    title={arrivalName}
-                  >
-                    {arrivalDisplayName || arrivalName}
-                  </p>
-                  <p
-                    className={cn(
-                      "m-0 hidden min-w-0 truncate text-right text-[var(--text-muted)] bp-1920:hidden",
+                      "m-0 hidden min-w-0 max-w-full truncate text-right text-[var(--text-muted)] bp-1400:block bp-1920:hidden",
                       bodySmTextClassName
                     )}
                     title={arrivalName}
