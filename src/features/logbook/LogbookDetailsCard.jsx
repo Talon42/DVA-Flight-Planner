@@ -3,24 +3,10 @@ import { cn } from "../../components/ui/cn";
 import { Eyebrow } from "../../components/ui/SectionHeader";
 import {
   bodyMdTextClassName,
-  bodySmTextClassName,
-  labelTextClassName
+  bodySmTextClassName
 } from "../../components/ui/typography";
 import LogbookFlightDetails from "./LogbookFlightDetails.jsx";
-
-function LogbookDetailRow({ label, value, title = "" }) {
-  return (
-    <div className="grid gap-1 rounded-none border border-[color:var(--line)] bg-[var(--surface-raised)] px-3 py-2">
-      <span className={cn("text-[var(--text-muted)]", labelTextClassName)}>{label}</span>
-      <span
-        className={cn("min-w-0 truncate text-[var(--text-heading)]", bodyMdTextClassName, "font-semibold")}
-        title={title || undefined}
-      >
-        {value || "N/A"}
-      </span>
-    </div>
-  );
-}
+import LogbookSummaryTile from "./LogbookSummaryTile.jsx";
 
 // Renders the selected logbook flight summary card in the right column.
 export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
@@ -50,24 +36,29 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
                 </div>
               </div>
 
-              <div className="grid gap-3">
-                <LogbookDetailRow label="Route" value={routeLabel || "N/A"} title={routeLabel} />
-                <LogbookDetailRow
+              <div className="grid gap-3 bp-1024:grid-cols-2">
+                <LogbookSummaryTile
+                  label="Route"
+                  value={routeLabel || "N/A"}
+                  title={routeLabel}
+                  className="bp-1024:col-span-2"
+                />
+                <LogbookSummaryTile
                   label="Equipment"
                   value={selectedLogbookFlight.equipment}
                   title={selectedLogbookFlight.equipment}
                 />
-                <LogbookDetailRow
+                <LogbookSummaryTile
                   label="Duration"
                   value={selectedLogbookFlight.durationDisplay}
                   title={selectedLogbookFlight.durationDisplay}
                 />
-                <LogbookDetailRow
+                <LogbookSummaryTile
                   label="Distance"
                   value={selectedLogbookFlight.distanceDisplay}
                   title={selectedLogbookFlight.distanceDisplay}
                 />
-                <LogbookDetailRow
+                <LogbookSummaryTile
                   label="Landing Rate"
                   value={selectedLogbookFlight.landingRateDisplay}
                   title={selectedLogbookFlight.landingRateDisplay}
