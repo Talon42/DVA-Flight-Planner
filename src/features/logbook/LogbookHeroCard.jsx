@@ -55,11 +55,12 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
 
   return (
     <Panel className="relative isolate rounded-none border border-[rgba(160,180,202,0.52)] bg-[var(--surface)] p-3 dark:border-[color:var(--surface-border)] dark:bg-[var(--surface-raised)] bp-1920:p-4">
-      <div className="grid min-w-0 gap-3 bp-1920:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
-        <div className="flex min-w-0 items-start gap-3 border-b border-[color:var(--line)] pb-3 bp-1920:border-b-0 bp-1920:border-r bp-1920:pr-3 bp-1920:pb-0">
-          <HeroAirlineMark flight={flight} />
+      <div className="grid min-w-0 gap-3 bp-1920:gap-4 bp-1400:grid-cols-[minmax(10rem,0.75fr)_minmax(0,1.8fr)] bp-1920:grid-cols-[minmax(10rem,0.82fr)_minmax(0,1.6fr)]">
+        <div className="grid min-w-0 gap-2 border-b border-[color:var(--line)] pb-3 text-center bp-1400:border-b-0 bp-1400:border-r bp-1400:pr-3 bp-1400:pb-0 bp-1400:text-left">
+          <div className="flex justify-center">
+            <HeroAirlineMark flight={flight} />
+          </div>
           <div className="min-w-0 grid gap-1">
-            <p className={cn("m-0 text-[var(--eyebrow)]", labelTextClassName)}>SELECTED FLIGHT</p>
             <p className={cn("m-0 min-w-0 text-[var(--text-heading)]", bodyMdTextClassName, "font-semibold bp-1920:text-[1rem]")}>
               {flight.compactFlightLabel || "N/A"}
             </p>
@@ -76,7 +77,7 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
           </div>
         </div>
 
-        <div className="grid min-w-0 gap-2 pt-1 bp-1920:gap-3 bp-1920:pt-0">
+        <div className="grid min-w-0 gap-2 bp-1920:gap-3 bp-1400:pt-0">
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 bp-1920:gap-3">
             <div className="grid min-w-0 gap-1">
               <HeroValue
