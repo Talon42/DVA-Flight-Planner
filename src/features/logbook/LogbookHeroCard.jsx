@@ -47,15 +47,42 @@ function HeroAirlineMark({ flight }) {
   return null;
 }
 
+function compactAirportName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const normalize = (input) =>
+    String(input || "")
+      .replace(/\b(International|Intl|Airport|Regional)\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+  let compact = normalize(raw);
+  const splitMatch = compact.match(/^(.*?)(?:\s*[-–—]\s*)(.+)$/);
+  if (splitMatch) {
+    const left = normalize(splitMatch[1]);
+    const right = normalize(splitMatch[2]);
+    if (right && right.length >= Math.max(3, left.length * 0.6)) {
+      compact = right;
+    }
+  }
+
+  return compact.replace(/\s{2,}/g, " ").trim();
+}
+
 // Renders the selected-flight hero summary shown above the metric tiles.
 export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
   const flight = selectedLogbookFlight || {};
   const departureName = String(flight.rawEntry?.airportD?.name || "").trim();
   const arrivalName = String(flight.rawEntry?.airportA?.name || "").trim();
+  const departureDisplayName = compactAirportName(departureName);
+  const arrivalDisplayName = compactAirportName(arrivalName);
 
   return (
     <Panel className="relative isolate rounded-none border border-[rgba(160,180,202,0.52)] bg-[var(--surface)] p-3 dark:border-[color:var(--surface-border)] dark:bg-[var(--surface-raised)] bp-1920:p-4">
-      <div className="grid min-w-0 gap-3 bp-1920:gap-4 bp-1400:grid-cols-[minmax(10rem,0.75fr)_minmax(0,1.8fr)] bp-1920:grid-cols-[minmax(10rem,0.82fr)_minmax(0,1.6fr)]">
+      <div className="grid min-w-0 gap-3 bp-1920:gap-4 bp-1400:grid-cols-[minmax(9rem,0.6fr)_minmax(0,2fr)] bp-1920:grid-cols-[minmax(10rem,0.82fr)_minmax(0,1.6fr)]">
         <div className="flex min-w-0 items-center gap-3 border-b border-[color:var(--line)] pb-3 bp-1400:border-b-0 bp-1400:border-r bp-1400:pr-3 bp-1400:pb-0">
           <div className="flex shrink-0 justify-center">
             <HeroAirlineMark flight={flight} />
@@ -86,15 +113,35 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
                 className="truncate text-[clamp(1.25rem,2.35vw,1.85rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
               />
               {departureName ? (
-                <p
-                  className={cn(
-                    "m-0 hidden min-w-0 truncate text-[var(--text-muted)] bp-1400:block",
-                    bodySmTextClassName
-                  )}
-                  title={departureName}
-                >
-                  {departureName}
-                </p>
+                <>
+                  <p
+                    className={cn(
+                      "m-0 min-w-0 truncate text-[var(--text-muted)] bp-1920:hidden",
+                      bodySmTextClassName
+                    )}
+                    title={departureName}
+                  >
+                    {departureDisplayName || departureName}
+                  </p>
+                  <p
+                    className={cn(
+                      "m-0 hidden min-w-0 truncate text-[var(--text-muted)] bp-1920:hidden",
+                      bodySmTextClassName
+                    )}
+                    title={departureName}
+                  >
+                    {departureDisplayName || departureName}
+                  </p>
+                  <p
+                    className={cn(
+                      "m-0 hidden min-w-0 truncate text-[var(--text-muted)] bp-1920:block",
+                      bodySmTextClassName
+                    )}
+                    title={departureName}
+                  >
+                    {departureName}
+                  </p>
+                </>
               ) : null}
             </div>
             <div className="flex min-w-0 flex-col items-center justify-center gap-1 text-[var(--text-muted)]">
@@ -115,15 +162,35 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
                 className="truncate text-right text-[clamp(1.25rem,2.35vw,1.85rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
               />
               {arrivalName ? (
-                <p
-                  className={cn(
-                    "m-0 hidden min-w-0 truncate text-right text-[var(--text-muted)] bp-1400:block",
-                    bodySmTextClassName
-                  )}
-                  title={arrivalName}
-                >
-                  {arrivalName}
-                </p>
+                <>
+                  <p
+                    className={cn(
+                      "m-0 min-w-0 truncate text-right text-[var(--text-muted)] bp-1920:hidden",
+                      bodySmTextClassName
+                    )}
+                    title={arrivalName}
+                  >
+                    {arrivalDisplayName || arrivalName}
+                  </p>
+                  <p
+                    className={cn(
+                      "m-0 hidden min-w-0 truncate text-right text-[var(--text-muted)] bp-1920:hidden",
+                      bodySmTextClassName
+                    )}
+                    title={arrivalName}
+                  >
+                    {arrivalDisplayName || arrivalName}
+                  </p>
+                  <p
+                    className={cn(
+                      "m-0 hidden min-w-0 truncate text-right text-[var(--text-muted)] bp-1920:block",
+                      bodySmTextClassName
+                    )}
+                    title={arrivalName}
+                  >
+                    {arrivalName}
+                  </p>
+                </>
               ) : null}
             </div>
           </div>
