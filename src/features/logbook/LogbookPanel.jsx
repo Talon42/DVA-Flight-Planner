@@ -14,13 +14,11 @@ export default function LogbookPanel({
   viewportWidth = 0,
   selectedTab,
   sort,
-  expandedRowId,
   selectedRowId,
   pilotStats,
   onSelectTab,
   onSort,
   onSelectRow,
-  onToggleExpandedRow,
   onLoadMoreRows
 }) {
   if (!allRows.length) {
@@ -67,11 +65,9 @@ export default function LogbookPanel({
             hasMoreRows={hasMoreRows}
             viewportWidth={viewportWidth}
             sort={sort}
-            expandedRowId={expandedRowId}
             selectedRowId={selectedRowId}
             onSort={onSort}
             onSelectRow={onSelectRow}
-            onToggleExpandedRow={onToggleExpandedRow}
             onLoadMoreRows={onLoadMoreRows}
           />
         )}

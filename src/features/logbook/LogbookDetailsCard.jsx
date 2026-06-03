@@ -6,6 +6,7 @@ import {
   bodySmTextClassName,
   labelTextClassName
 } from "../../components/ui/typography";
+import LogbookFlightDetails from "./LogbookFlightDetails.jsx";
 
 function LogbookDetailRow({ label, value, title = "" }) {
   return (
@@ -72,6 +73,7 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
                   title={selectedLogbookFlight.landingRateDisplay}
                 />
               </div>
+              <LogbookFlightDetails row={selectedLogbookFlight} variant="card" />
             </div>
           ) : (
             <div className="grid h-full min-h-[10rem] content-start gap-2 pt-1">

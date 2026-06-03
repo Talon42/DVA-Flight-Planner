@@ -1,5 +1,5 @@
-import { labelTextClassName, bodySmTextClassName } from "../../components/ui/typography";
 import { cn } from "../../components/ui/cn";
+import { labelTextClassName, bodySmTextClassName } from "../../components/ui/typography";
 
 function DetailSection({ title, items }) {
   if (!items?.length) {
@@ -22,11 +22,11 @@ function DetailSection({ title, items }) {
 }
 
 // Renders the compact read-only logbook row expansion content.
-export default function LogbookFlightDetails({ row }) {
+export default function LogbookFlightDetails({ row, variant = "inline" }) {
   const details = row?.details || {};
 
   return (
-    <div className="grid gap-3 p-3">
+    <div className={cn("grid gap-3", variant === "inline" ? "p-3" : "p-0")}>
       <DetailSection title="Flight Summary" items={details.flightSummary} />
       <DetailSection title="Aircraft" items={details.aircraft} />
       <DetailSection title="Times" items={details.times} />

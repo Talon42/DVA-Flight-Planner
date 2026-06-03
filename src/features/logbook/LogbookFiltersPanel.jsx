@@ -1,4 +1,5 @@
 import Button from "../../components/ui/Button";
+import { cn } from "../../components/ui/cn";
 import Panel from "../../components/ui/Panel";
 import { SearchableMultiSelect } from "../../components/ui/SearchableSelect";
 import { Field, RangeSlider, useTransientRangeSlider } from "../../components/ui/filterFields";
@@ -114,6 +115,7 @@ export default function LogbookFiltersPanel({
   filters,
   filterBounds,
   filterOptions,
+  selectedLogbookFlight = null,
   onFilterChange,
   onReset
 }) {
@@ -128,6 +130,12 @@ export default function LogbookFiltersPanel({
   useEffect(() => {
     setDestinationIcaoInput(filters.destination.length === 1 ? filters.destination[0] : "");
   }, [filters.destination]);
+
+  useEffect(() => {
+    if (selectedLogbookFlight) {
+      setLogbookFiltersCollapsed(true);
+    }
+  }, [selectedLogbookFlight]);
 
   const originAirportOptions = useMemo(
     () =>
@@ -195,7 +203,12 @@ export default function LogbookFiltersPanel({
   return (
     <Panel
       data-planner-controls="true"
-      className="app-scrollbar relative grid h-full min-h-0 content-start gap-3 overflow-y-auto overflow-x-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] p-5 dark:border-[color:var(--surface-border)] bp-1024:p-4"
+      className={cn(
+        "app-scrollbar relative grid content-start gap-3 overflow-x-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] p-5 dark:border-[color:var(--surface-border)] bp-1024:p-4",
+        logbookFiltersCollapsed
+          ? "max-h-[min(44vh,420px)] overflow-y-hidden"
+          : "h-full min-h-0 max-h-none overflow-y-auto"
+      )}
     >
       <div className="flex items-start justify-between gap-3">
         <div>

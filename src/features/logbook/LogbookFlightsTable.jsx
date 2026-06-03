@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../../components/ui/cn";
 import { labelTextClassName, bodyMdTextClassName } from "../../components/ui/typography";
 import { buildColumnTemplate, fitColumnsToWidth } from "../../components/data-table/tableUtils.js";
-import LogbookFlightDetails from "./LogbookFlightDetails.jsx";
 
 const COMPACT_LAYOUT_MAX_WIDTH = 900;
 
@@ -159,29 +158,21 @@ function HeaderButton({ column, sort, onSort }) {
 function LogbookRow({
   row,
   columns,
-  expanded,
   selected,
   onSelectRow,
-  onToggleExpanded,
   columnTemplate
 }) {
-  const detailsId = `logbook-details-${row.id}`;
-
   return (
     <li className="border-b border-[color:var(--line)] last:border-b-0">
       <button
         type="button"
         className={cn(
           "relative w-full bg-[var(--surface-table-row)] text-left transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[rgba(255,255,255,0.18)]",
-          (expanded || selected) &&
-            "bg-[var(--surface-table-row-selected)] hover:bg-[var(--surface-table-row-selected)]"
+          selected && "bg-[rgb(31,70,110)] hover:bg-[rgb(31,70,110)]"
         )}
         onClick={() => {
           onSelectRow?.(row.id, row);
-          onToggleExpanded?.(row.id);
         }}
-        aria-expanded={expanded}
-        aria-controls={detailsId}
       >
         <span className="grid min-w-0" style={{ gridTemplateColumns: columnTemplate }}>
           {columns.map((column) => (
@@ -202,11 +193,6 @@ function LogbookRow({
           ))}
         </span>
       </button>
-      {expanded ? (
-        <div id={detailsId} className="border-t border-[color:var(--line)] bg-[var(--surface-raised)]">
-          <LogbookFlightDetails row={row} />
-        </div>
-      ) : null}
     </li>
   );
 }
@@ -217,11 +203,9 @@ export default function LogbookFlightsTable({
   hasMoreRows,
   viewportWidth = 0,
   sort,
-  expandedRowId,
   selectedRowId,
   onSort,
   onSelectRow,
-  onToggleExpandedRow,
   onLoadMoreRows
 }) {
   const scrollContainerRef = useRef(null);
@@ -348,10 +332,8 @@ export default function LogbookFlightsTable({
               key={row.id}
               row={row}
               columns={fittedColumns}
-              expanded={expandedRowId === row.id}
               selected={selectedRowId === row.id}
               onSelectRow={onSelectRow}
-              onToggleExpanded={onToggleExpandedRow}
               columnTemplate={columnTemplate}
             />
           ))}

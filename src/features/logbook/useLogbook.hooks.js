@@ -39,7 +39,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const [selectedTab, setSelectedTab] = useState("flights");
   const [filters, setFilters] = useState(DEFAULT_LOGBOOK_FILTERS);
   const [sort, setSort] = useState(DEFAULT_LOGBOOK_SORT);
-  const [expandedRowId, setExpandedRowId] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [visibleRowCount, setVisibleRowCount] = useState(INITIAL_VISIBLE_ROWS);
   const hasHydratedPersistedStateRef = useRef(false);
@@ -110,7 +109,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
 
   useEffect(() => {
     setVisibleRowCount(INITIAL_VISIBLE_ROWS);
-    setExpandedRowId(null);
     setSelectedRowId(null);
   }, [filters, sort]);
 
@@ -141,10 +139,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     });
   }, []);
 
-  const handleToggleExpandedRow = useCallback((rowId) => {
-    setExpandedRowId((current) => (current === rowId ? null : rowId));
-  }, []);
-
   const handleSelectRow = useCallback((rowId) => {
     setSelectedRowId((current) => (current === rowId ? current : rowId));
   }, []);
@@ -171,7 +165,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     setSelectedTab,
     filters,
     sort,
-    expandedRowId,
     selectedRowId,
     filterBounds,
     filterOptions,
@@ -180,7 +173,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     handleResetFilters,
     handleSort,
     handleSelectRow,
-    handleToggleExpandedRow,
     handleLoadMoreRows
   };
 }
