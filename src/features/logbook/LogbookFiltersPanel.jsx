@@ -1,5 +1,4 @@
 import Button from "../../components/ui/Button";
-import { cn } from "../../components/ui/cn";
 import Panel from "../../components/ui/Panel";
 import { SearchableMultiSelect } from "../../components/ui/SearchableSelect";
 import { Field, RangeSlider, useTransientRangeSlider } from "../../components/ui/filterFields";
@@ -169,12 +168,14 @@ export default function LogbookFiltersPanel({
     }
   );
   const collapseToggle = (
-    <button
-      type="button"
-      className={cn(
-        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-none border border-[color:var(--surface-border)] bg-[var(--input-bg)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]"
-      )}
-      onClick={() => setLogbookFiltersCollapsed((current) => !current)}
+    <Button
+      variant="ghost"
+      size="sm"
+      className="w-9 rounded-none !px-0 !bg-[var(--delta-blue)] !text-white hover:!bg-[var(--delta-blue)] dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F]"
+      onClick={(event) => {
+        event.stopPropagation();
+        setLogbookFiltersCollapsed((current) => !current);
+      }}
       aria-expanded={!logbookFiltersCollapsed}
       aria-label={logbookFiltersCollapsed ? "Show logbook filters" : "Hide logbook filters"}
     >
@@ -188,7 +189,7 @@ export default function LogbookFiltersPanel({
           strokeWidth="1.5"
         />
       </svg>
-    </button>
+    </Button>
   );
 
   return (

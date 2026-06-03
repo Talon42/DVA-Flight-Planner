@@ -156,7 +156,15 @@ function HeaderButton({ column, sort, onSort }) {
   );
 }
 
-function LogbookRow({ row, columns, expanded, onToggleExpanded, columnTemplate }) {
+function LogbookRow({
+  row,
+  columns,
+  expanded,
+  selected,
+  onSelectRow,
+  onToggleExpanded,
+  columnTemplate
+}) {
   const detailsId = `logbook-details-${row.id}`;
 
   return (
@@ -165,9 +173,13 @@ function LogbookRow({ row, columns, expanded, onToggleExpanded, columnTemplate }
         type="button"
         className={cn(
           "relative w-full bg-[var(--surface-table-row)] text-left transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[rgba(255,255,255,0.18)]",
-          expanded && "bg-[var(--surface-table-row-selected)] hover:bg-[var(--surface-table-row-selected)]"
+          (expanded || selected) &&
+            "bg-[var(--surface-table-row-selected)] hover:bg-[var(--surface-table-row-selected)]"
         )}
-        onClick={() => onToggleExpanded?.(row.id)}
+        onClick={() => {
+          onSelectRow?.(row.id, row);
+          onToggleExpanded?.(row.id);
+        }}
         aria-expanded={expanded}
         aria-controls={detailsId}
       >
@@ -206,7 +218,9 @@ export default function LogbookFlightsTable({
   viewportWidth = 0,
   sort,
   expandedRowId,
+  selectedRowId,
   onSort,
+  onSelectRow,
   onToggleExpandedRow,
   onLoadMoreRows
 }) {
@@ -335,6 +349,8 @@ export default function LogbookFlightsTable({
               row={row}
               columns={fittedColumns}
               expanded={expandedRowId === row.id}
+              selected={selectedRowId === row.id}
+              onSelectRow={onSelectRow}
               onToggleExpanded={onToggleExpandedRow}
               columnTemplate={columnTemplate}
             />

@@ -2,6 +2,7 @@ import FilterBar from "../components/FilterBar";
 import DetailsPanel from "../components/DetailsPanel";
 import { cn } from "../components/ui/cn";
 import LogbookFiltersPanel from "../features/logbook/LogbookFiltersPanel.jsx";
+import LogbookDetailsCard from "../features/logbook/LogbookDetailsCard.jsx";
 import { normalizeFilters } from "../features/schedule/scheduleFilters.model";
 
 // Renders the right-hand workspace column without owning any planner state.
@@ -15,6 +16,7 @@ export default function AppRightColumn({
   logbookFilterBounds,
   logbookFilterOptions,
   logbookFilters,
+  selectedLogbookFlight,
   airlines,
   airportOptions,
   geoOptions,
@@ -91,13 +93,21 @@ export default function AppRightColumn({
 
   if (scheduleView === "logbook") {
     return (
-      <LogbookFiltersPanel
-        filters={logbookFilters}
-        filterBounds={logbookFilterBounds}
-        filterOptions={logbookFilterOptions}
-        onFilterChange={onLogbookFilterChange}
-        onReset={onResetLogbookFilters}
-      />
+      <div
+        className={cn(
+          "grid h-full min-h-0 w-full min-w-0 gap-3 bp-1024:gap-2.5",
+          "[grid-template-rows:auto_minmax(0,1fr)]"
+        )}
+      >
+        <LogbookFiltersPanel
+          filters={logbookFilters}
+          filterBounds={logbookFilterBounds}
+          filterOptions={logbookFilterOptions}
+          onFilterChange={onLogbookFilterChange}
+          onReset={onResetLogbookFilters}
+        />
+        <LogbookDetailsCard selectedLogbookFlight={selectedLogbookFlight} />
+      </div>
     );
   }
 

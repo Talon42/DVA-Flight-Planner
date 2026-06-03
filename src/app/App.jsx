@@ -388,6 +388,10 @@ export default function App() {
     persistedUiState: restoredUiState,
     reloadVersion: logbookReloadVersion
   });
+  const selectedLogbookFlight = useMemo(
+    () => logbook.allRows.find((row) => row.id === logbook.selectedRowId) || null,
+    [logbook.allRows, logbook.selectedRowId]
+  );
   // Keep the derived flight list stable so downstream hooks can read it safely.
   const scheduleFlights = useMemo(() => schedule?.flights || [], [schedule]);
   const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
@@ -1617,6 +1621,7 @@ export default function App() {
       logbookFilters={logbook.filters}
       logbookFilterBounds={logbook.filterBounds}
       logbookFilterOptions={logbook.filterOptions}
+      selectedLogbookFlight={selectedLogbookFlight}
       airlines={airlines}
       airportOptions={airportOptions}
       geoOptions={geoOptions}
@@ -1675,9 +1680,11 @@ export default function App() {
       selectedTab: logbook.selectedTab,
       sort: logbook.sort,
       expandedRowId: logbook.expandedRowId,
+      selectedRowId: logbook.selectedRowId,
       pilotStats: logbook.pilotStats,
       onSelectTab: logbook.setSelectedTab,
       onSort: logbook.handleSort,
+      onSelectRow: logbook.handleSelectRow,
       onToggleExpandedRow: logbook.handleToggleExpandedRow,
       onLoadMoreRows: logbook.handleLoadMoreRows
     },
