@@ -4,8 +4,6 @@ import { SearchableMultiSelect } from "../../components/ui/SearchableSelect";
 import { Field, RangeSlider, useTransientRangeSlider } from "../../components/ui/filterFields";
 import { fieldInputClassName } from "../../components/ui/forms";
 import { Eyebrow } from "../../components/ui/SectionHeader";
-import { cn } from "../../components/ui/cn";
-import { sectionTitleTextClassName } from "../../components/ui/typography";
 import { useEffect, useMemo, useState } from "react";
 import {
   getEffectiveLogbookDistanceRange,
@@ -177,7 +175,6 @@ export default function LogbookFiltersPanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <Eyebrow>LOGBOOK FILTERS</Eyebrow>
-          <h2 className={cn("m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>Filter cached flights</h2>
         </div>
         <Button
           variant="ghost"
