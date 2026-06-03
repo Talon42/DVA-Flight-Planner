@@ -1,21 +1,14 @@
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { Eyebrow } from "../../components/ui/SectionHeader";
-import {
-  bodyMdTextClassName,
-  bodySmTextClassName
-} from "../../components/ui/typography";
+import { bodyMdTextClassName, bodySmTextClassName } from "../../components/ui/typography";
 import LogbookFlightDetails from "./LogbookFlightDetails.jsx";
 import LogbookSummaryTile from "./LogbookSummaryTile.jsx";
+import LogbookHeroCard from "./LogbookHeroCard.jsx";
 
 // Renders the selected logbook flight summary card in the right column.
 export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   const hasSelection = Boolean(selectedLogbookFlight);
-  const routeLabel = hasSelection
-    ? `${String(selectedLogbookFlight?.origin || "").trim()} \u2192 ${String(
-        selectedLogbookFlight?.destination || ""
-      ).trim()}`
-    : "";
 
   return (
     <aside className="details-panel min-h-0 min-w-0">
@@ -27,22 +20,9 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
         <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto pt-4">
           {hasSelection ? (
             <div className="grid gap-3">
-              <div className="grid gap-1">
-                <div className={cn("text-[var(--text-heading)]", bodyMdTextClassName, "font-semibold")}>
-                  {selectedLogbookFlight.compactFlightLabel || "N/A"}
-                </div>
-                <div className={cn("text-[var(--text-muted)]", bodySmTextClassName)}>
-                  {selectedLogbookFlight.dateDisplay || "N/A"}
-                </div>
-              </div>
+              <LogbookHeroCard selectedLogbookFlight={selectedLogbookFlight} />
 
               <div className="grid gap-3 bp-1024:grid-cols-2">
-                <LogbookSummaryTile
-                  label="Route"
-                  value={routeLabel || "N/A"}
-                  title={routeLabel}
-                  className="bp-1024:col-span-2"
-                />
                 <LogbookSummaryTile
                   label="Equipment"
                   value={selectedLogbookFlight.equipment}
