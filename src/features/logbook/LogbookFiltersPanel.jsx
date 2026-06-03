@@ -5,20 +5,12 @@ import { Field, RangeSlider, useTransientRangeSlider } from "../../components/ui
 import { fieldInputClassName } from "../../components/ui/forms";
 import { Eyebrow } from "../../components/ui/SectionHeader";
 import { cn } from "../../components/ui/cn";
-import { bodySmTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
+import { sectionTitleTextClassName } from "../../components/ui/typography";
+import { useEffect, useMemo, useState } from "react";
 import {
   getEffectiveLogbookDistanceRange,
   getEffectiveLogbookDurationRange
 } from "./logbookFilters.model.js";
-
-function buildStringOptions(values, keywordsPrefix = "") {
-  return values.map((value) => ({
-    value,
-    label: value,
-    selectedLabel: value,
-    keywords: `${keywordsPrefix} ${value}`.trim()
-  }));
-}
 
 function formatHoursOnly(minutes) {
   return `${Math.round(Number(minutes || 0) / 60)}h`;
@@ -39,6 +31,86 @@ function LogbookDateField({ label, value, min, max, onChange }) {
   );
 }
 
+// Renders a departure/arrival pair with the same ICAO textbox behavior used in basic filters.
+function LogbookAirportFilterRow({
+  label,
+  placeholder,
+  emptyLabel,
+  allLabel,
+  filterKey,
+  query,
+  options,
+  selectedValues,
+  onQueryChange,
+  onFilterChange
+}) {
+  const inputId = `${filterKey}-icao`;
+
+  function normalizeIcao(value) {
+    return String(value || "")
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "")
+      .slice(0, 4);
+  }
+
+  function commitIcaoValue(value) {
+    const icao = normalizeIcao(value);
+    const exactMatch = options.find((option) => option.value === icao);
+
+    if (exactMatch) {
+      onQueryChange(exactMatch.value);
+      onFilterChange([exactMatch.value]);
+      return;
+    }
+
+    onQueryChange("");
+    onFilterChange([]);
+  }
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_140px] gap-3">
+      <SearchableMultiSelect
+        label={label}
+        placeholder={placeholder}
+        emptyLabel={emptyLabel}
+        allLabel={allLabel}
+        allowMultiple={false}
+        hideChips
+        showClearAction={false}
+        showSingleSelectedLabel
+        filterQuery={query}
+        options={options}
+        selectedValues={selectedValues}
+        onChange={(value) => {
+          onQueryChange(value.length === 1 ? value[0] : "");
+          onFilterChange(value);
+        }}
+      />
+      <Field label="ICAO" className="filter-block filter-block--icao min-w-0">
+        <input
+          id={inputId}
+          className={fieldInputClassName}
+          type="text"
+          value={query}
+          onChange={(event) => onQueryChange(normalizeIcao(event.target.value))}
+          onBlur={() => commitIcaoValue(query)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") {
+              return;
+            }
+
+            event.preventDefault();
+            commitIcaoValue(query);
+            event.currentTarget.blur();
+          }}
+          placeholder={label === "Departure" ? "KATL" : "KLAX"}
+          maxLength={4}
+        />
+      </Field>
+    </div>
+  );
+}
+
 // Renders the logbook-specific filter rail using the existing planner filter language.
 export default function LogbookFiltersPanel({
   filters,
@@ -47,6 +119,37 @@ export default function LogbookFiltersPanel({
   onFilterChange,
   onReset
 }) {
+  const [originIcaoInput, setOriginIcaoInput] = useState(filters.origin[0] || "");
+  const [destinationIcaoInput, setDestinationIcaoInput] = useState(filters.destination[0] || "");
+
+  useEffect(() => {
+    setOriginIcaoInput(filters.origin.length === 1 ? filters.origin[0] : "");
+  }, [filters.origin]);
+
+  useEffect(() => {
+    setDestinationIcaoInput(filters.destination.length === 1 ? filters.destination[0] : "");
+  }, [filters.destination]);
+
+  const originAirportOptions = useMemo(
+    () =>
+      filterOptions.origins.map((airport) => ({
+        value: airport,
+        label: airport,
+        selectedLabel: airport,
+        keywords: airport
+      })),
+    [filterOptions.origins]
+  );
+  const destinationAirportOptions = useMemo(
+    () =>
+      filterOptions.destinations.map((airport) => ({
+        value: airport,
+        label: airport,
+        selectedLabel: airport,
+        keywords: airport
+      })),
+    [filterOptions.destinations]
+  );
   const effectiveDistanceRange = getEffectiveLogbookDistanceRange(filters, filterBounds);
   const effectiveDurationRange = getEffectiveLogbookDurationRange(filters, filterBounds);
   const distanceSlider = useTransientRangeSlider(
@@ -114,7 +217,12 @@ export default function LogbookFiltersPanel({
           showAddActionText
           showPinnedSelectedBlockForMultiple
           pinnedSelectedActionLabel="Remove"
-          options={buildStringOptions(filterOptions.airlines, "airline")}
+          options={filterOptions.airlines.map((value) => ({
+            value,
+            label: value,
+            selectedLabel: value,
+            keywords: `airline ${value}`.trim()
+          }))}
           selectedValues={filters.airline}
           onChange={(value) => onFilterChange("airline", value)}
         />
@@ -127,38 +235,42 @@ export default function LogbookFiltersPanel({
           showAddActionText
           showPinnedSelectedBlockForMultiple
           pinnedSelectedActionLabel="Remove"
-          options={buildStringOptions(filterOptions.equipment, "equipment")}
+          options={filterOptions.equipment.map((value) => ({
+            value,
+            label: value,
+            selectedLabel: value,
+            keywords: `equipment ${value}`.trim()
+          }))}
           selectedValues={filters.equipment}
           onChange={(value) => onFilterChange("equipment", value)}
         />
       </div>
 
-      <div className="grid gap-3 bp-1024:grid-cols-2">
-        <SearchableMultiSelect
+      <div className="grid gap-3">
+        <LogbookAirportFilterRow
           label="Departure"
           placeholder="Search departure airports"
           emptyLabel="No matching departure airports"
           allLabel="All"
-          hideChips
-          showAddActionText
-          showPinnedSelectedBlockForMultiple
-          pinnedSelectedActionLabel="Remove"
-          options={buildStringOptions(filterOptions.origins, "origin")}
+          filterKey="origin"
+          query={originIcaoInput}
+          options={originAirportOptions}
           selectedValues={filters.origin}
-          onChange={(value) => onFilterChange("origin", value)}
+          onQueryChange={setOriginIcaoInput}
+          onFilterChange={(value) => onFilterChange("origin", value)}
         />
-        <SearchableMultiSelect
+
+        <LogbookAirportFilterRow
           label="Arrival"
           placeholder="Search arrival airports"
           emptyLabel="No matching arrival airports"
           allLabel="All"
-          hideChips
-          showAddActionText
-          showPinnedSelectedBlockForMultiple
-          pinnedSelectedActionLabel="Remove"
-          options={buildStringOptions(filterOptions.destinations, "destination")}
+          filterKey="destination"
+          query={destinationIcaoInput}
+          options={destinationAirportOptions}
           selectedValues={filters.destination}
-          onChange={(value) => onFilterChange("destination", value)}
+          onQueryChange={setDestinationIcaoInput}
+          onFilterChange={(value) => onFilterChange("destination", value)}
         />
       </div>
 
@@ -187,10 +299,6 @@ export default function LogbookFiltersPanel({
           formatValue={formatHoursOnly}
         />
       </div>
-
-      <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
-        Filters update the flights table and Pilot Stats together.
-      </p>
     </Panel>
   );
 }
