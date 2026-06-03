@@ -4,6 +4,7 @@ import { cn } from "../components/ui/cn";
 import LogbookFiltersPanel from "../features/logbook/LogbookFiltersPanel.jsx";
 import LogbookDetailsCard from "../features/logbook/LogbookDetailsCard.jsx";
 import { normalizeFilters } from "../features/schedule/scheduleFilters.model";
+import { useEffect, useState } from "react";
 
 // Renders the right-hand workspace column without owning any planner state.
 export default function AppRightColumn({
@@ -57,6 +58,14 @@ export default function AppRightColumn({
   onDraftOnlySubmit,
   onCompleteTourFlight
 }) {
+  const [logbookFiltersCollapsed, setLogbookFiltersCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (scheduleView === "logbook" && selectedLogbookFlight) {
+      setLogbookFiltersCollapsed(true);
+    }
+  }, [scheduleView, selectedLogbookFlight]);
+
   const detailsPanel = (
     <DetailsPanel
       shortlist={shortlist}
@@ -96,17 +105,23 @@ export default function AppRightColumn({
       <div
         className={cn(
           "grid h-full min-h-0 w-full min-w-0 gap-3 bp-1024:gap-2.5",
-          "[grid-template-rows:auto_minmax(0,1fr)]"
+          logbookFiltersCollapsed
+            ? "[grid-template-rows:auto_minmax(0,1fr)]"
+            : "grid-rows-[minmax(0,1fr)]"
         )}
       >
         <LogbookFiltersPanel
           filters={logbookFilters}
           filterBounds={logbookFilterBounds}
           filterOptions={logbookFilterOptions}
+          collapsed={logbookFiltersCollapsed}
+          onToggleCollapsed={() => setLogbookFiltersCollapsed((current) => !current)}
           onFilterChange={onLogbookFilterChange}
           onReset={onResetLogbookFilters}
         />
-        <LogbookDetailsCard selectedLogbookFlight={selectedLogbookFlight} />
+        {logbookFiltersCollapsed ? (
+          <LogbookDetailsCard selectedLogbookFlight={selectedLogbookFlight} />
+        ) : null}
       </div>
     );
   }

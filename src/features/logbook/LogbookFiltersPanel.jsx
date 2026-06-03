@@ -115,11 +115,11 @@ export default function LogbookFiltersPanel({
   filters,
   filterBounds,
   filterOptions,
-  selectedLogbookFlight = null,
+  collapsed = false,
+  onToggleCollapsed,
   onFilterChange,
   onReset
 }) {
-  const [logbookFiltersCollapsed, setLogbookFiltersCollapsed] = useState(false);
   const [originIcaoInput, setOriginIcaoInput] = useState(filters.origin[0] || "");
   const [destinationIcaoInput, setDestinationIcaoInput] = useState(filters.destination[0] || "");
 
@@ -130,12 +130,6 @@ export default function LogbookFiltersPanel({
   useEffect(() => {
     setDestinationIcaoInput(filters.destination.length === 1 ? filters.destination[0] : "");
   }, [filters.destination]);
-
-  useEffect(() => {
-    if (selectedLogbookFlight) {
-      setLogbookFiltersCollapsed(true);
-    }
-  }, [selectedLogbookFlight]);
 
   const originAirportOptions = useMemo(
     () =>
@@ -182,14 +176,14 @@ export default function LogbookFiltersPanel({
       className="w-9 rounded-none !px-0 !bg-[var(--delta-blue)] !text-white hover:!bg-[var(--delta-blue)] dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F]"
       onClick={(event) => {
         event.stopPropagation();
-        setLogbookFiltersCollapsed((current) => !current);
+        onToggleCollapsed?.();
       }}
-      aria-expanded={!logbookFiltersCollapsed}
-      aria-label={logbookFiltersCollapsed ? "Show logbook filters" : "Hide logbook filters"}
+      aria-expanded={!collapsed}
+      aria-label={collapsed ? "Show logbook filters" : "Hide logbook filters"}
     >
       <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden="true">
         <path
-          d={logbookFiltersCollapsed ? "M4.5 6.5 8 10l3.5-3.5" : "M4.5 9.5 8 6l3.5 3.5"}
+          d={collapsed ? "M4.5 6.5 8 10l3.5-3.5" : "M4.5 9.5 8 6l3.5 3.5"}
           fill="none"
           stroke="currentColor"
           strokeLinecap="round"
@@ -205,7 +199,7 @@ export default function LogbookFiltersPanel({
       data-planner-controls="true"
       className={cn(
         "app-scrollbar relative grid content-start gap-3 overflow-x-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] p-5 dark:border-[color:var(--surface-border)] bp-1024:p-4",
-        logbookFiltersCollapsed
+        collapsed
           ? "max-h-[min(44vh,420px)] overflow-y-hidden"
           : "h-full min-h-0 max-h-none overflow-y-auto"
       )}
@@ -228,7 +222,7 @@ export default function LogbookFiltersPanel({
         </div>
       </div>
 
-      {logbookFiltersCollapsed ? null : (
+      {collapsed ? null : (
         <>
           <div className="grid gap-3 bp-1024:grid-cols-2">
             <LogbookDateField

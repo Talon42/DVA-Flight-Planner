@@ -168,11 +168,12 @@ function LogbookRow({
         type="button"
         className={cn(
           "relative w-full bg-[var(--surface-table-row)] text-left transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[rgba(255,255,255,0.18)]",
-          selected && "bg-[rgb(31,70,110)] hover:bg-[rgb(31,70,110)]"
+          selected && "bg-[#27547F] hover:bg-[#27547F]"
         )}
         onClick={() => {
           onSelectRow?.(row.id, row);
         }}
+        aria-current={selected ? "true" : undefined}
       >
         <span className="grid min-w-0" style={{ gridTemplateColumns: columnTemplate }}>
           {columns.map((column) => (
