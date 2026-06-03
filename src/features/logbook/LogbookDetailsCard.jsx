@@ -11,7 +11,7 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   return (
     <aside className="details-panel app-scrollbar min-h-0 min-w-0 overflow-y-auto">
       {hasSelection ? (
-        <div className="grid gap-3 pr-1">
+        <div className="grid gap-3">
           <Panel className="relative isolate rounded-none border-2 border-[rgba(160,180,202,0.52)] p-3 dark:border-[color:var(--surface-border)] bp-1920:p-4">
             <div className="grid gap-3">
               <LogbookHeroCard selectedLogbookFlight={selectedLogbookFlight} />
@@ -42,7 +42,7 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
           </Panel>
         </div>
       ) : (
-        <div className="grid h-full min-h-[10rem] content-start gap-2 pr-1">
+        <div className="grid h-full min-h-[10rem] content-start gap-2">
           <div className="grid gap-2 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3">
             <p className={cn("m-0 text-[var(--text-heading)]", bodyMdTextClassName, "font-semibold")}>
               Select a logbook flight to view advanced flight details.
