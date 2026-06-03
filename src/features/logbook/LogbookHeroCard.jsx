@@ -1,6 +1,7 @@
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName, bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
+import planeLight from "../../data/images/plane_light.png";
 
 function HeroValue({ value, className = "", title = "" }) {
   return (
@@ -24,14 +25,7 @@ function HeroAirlineMark({ flight }) {
   const airlineCode = String(flight?.airlineCode || "").trim();
 
   if (logoSrc) {
-    return (
-      <img
-        src={logoSrc}
-        alt=""
-        aria-hidden="true"
-        className="h-10 w-10 shrink-0 object-contain"
-      />
-    );
+    return <img src={logoSrc} alt="" aria-hidden="true" className="h-10 w-10 shrink-0 object-contain" />;
   }
 
   if (airlineCode) {
@@ -56,6 +50,8 @@ function HeroAirlineMark({ flight }) {
 // Renders the selected-flight hero summary shown above the metric tiles.
 export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
   const flight = selectedLogbookFlight || {};
+  const departureName = String(flight.rawEntry?.airportD?.name || "").trim();
+  const arrivalName = String(flight.rawEntry?.airportA?.name || "").trim();
 
   return (
     <Panel className="relative isolate rounded-none border border-[rgba(160,180,202,0.52)] bg-[var(--surface)] p-3 dark:border-[color:var(--surface-border)] dark:bg-[var(--surface-raised)] bp-1920:p-4">
@@ -82,24 +78,44 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
 
         <div className="grid min-w-0 gap-2 pt-1 bp-1920:gap-3 bp-1920:pt-0">
           <div className="grid min-w-0 gap-2 bp-1920:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] bp-1920:items-center">
-            <HeroValue
-              value={flight.origin}
-              title={flight.origin}
-              className="truncate text-[clamp(1.4rem,2.8vw,2rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
-            />
+            <div className="grid min-w-0 gap-1">
+              <HeroValue
+                value={flight.origin}
+                title={flight.origin}
+                className="truncate text-[clamp(1.4rem,2.8vw,2rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
+              />
+              {departureName ? (
+                <p className={cn("m-0 min-w-0 text-[var(--text-muted)]", bodySmTextClassName)} title={departureName}>
+                  {departureName}
+                </p>
+              ) : null}
+            </div>
             <div className="flex min-w-0 flex-col items-center justify-center gap-1 text-[var(--text-muted)] bp-1920:px-2">
-              <span aria-hidden="true" className="text-[1.05rem] leading-none bp-1920:text-[1.15rem]">
-                →
-              </span>
+              <img
+                src={planeLight}
+                alt=""
+                aria-hidden="true"
+                className="h-[18px] w-[34px] shrink-0 object-contain brightness-0 opacity-80 dark:brightness-100 dark:opacity-100"
+              />
               <span className={cn("whitespace-nowrap text-center text-[var(--text-muted)]", bodySmTextClassName)}>
                 {flight.durationDisplay || "N/A"}
               </span>
             </div>
-            <HeroValue
-              value={flight.destination}
-              title={flight.destination}
-              className="truncate text-right text-[clamp(1.4rem,2.8vw,2rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
-            />
+            <div className="grid min-w-0 gap-1 bp-1920:justify-items-end">
+              <HeroValue
+                value={flight.destination}
+                title={flight.destination}
+                className="truncate text-right text-[clamp(1.4rem,2.8vw,2rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
+              />
+              {arrivalName ? (
+                <p
+                  className={cn("m-0 min-w-0 text-[var(--text-muted)] bp-1920:text-right", bodySmTextClassName)}
+                  title={arrivalName}
+                >
+                  {arrivalName}
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
