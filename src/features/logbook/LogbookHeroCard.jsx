@@ -77,20 +77,26 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
         </div>
 
         <div className="grid min-w-0 gap-2 pt-1 bp-1920:gap-3 bp-1920:pt-0">
-          <div className="grid min-w-0 gap-2 bp-1920:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] bp-1920:items-center">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 bp-1920:gap-3">
             <div className="grid min-w-0 gap-1">
               <HeroValue
                 value={flight.origin}
                 title={flight.origin}
-                className="truncate text-[clamp(1.4rem,2.8vw,2rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
+                className="truncate text-[clamp(1.25rem,2.35vw,1.85rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
               />
               {departureName ? (
-                <p className={cn("m-0 min-w-0 text-[var(--text-muted)]", bodySmTextClassName)} title={departureName}>
+                <p
+                  className={cn(
+                    "m-0 hidden min-w-0 truncate text-[var(--text-muted)] bp-1400:block",
+                    bodySmTextClassName
+                  )}
+                  title={departureName}
+                >
                   {departureName}
                 </p>
               ) : null}
             </div>
-            <div className="flex min-w-0 flex-col items-center justify-center gap-1 text-[var(--text-muted)] bp-1920:px-2">
+            <div className="flex min-w-0 flex-col items-center justify-center gap-1 text-[var(--text-muted)]">
               <img
                 src={planeLight}
                 alt=""
@@ -101,15 +107,18 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
                 {flight.durationDisplay || "N/A"}
               </span>
             </div>
-            <div className="grid min-w-0 gap-1 bp-1920:justify-items-end">
+            <div className="grid min-w-0 justify-items-end gap-1">
               <HeroValue
                 value={flight.destination}
                 title={flight.destination}
-                className="truncate text-right text-[clamp(1.4rem,2.8vw,2rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
+                className="truncate text-right text-[clamp(1.25rem,2.35vw,1.85rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
               />
               {arrivalName ? (
                 <p
-                  className={cn("m-0 min-w-0 text-[var(--text-muted)] bp-1920:text-right", bodySmTextClassName)}
+                  className={cn(
+                    "m-0 hidden min-w-0 truncate text-right text-[var(--text-muted)] bp-1400:block",
+                    bodySmTextClassName
+                  )}
                   title={arrivalName}
                 >
                   {arrivalName}
