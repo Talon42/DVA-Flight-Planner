@@ -34,7 +34,7 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   return (
     <aside className="details-panel min-h-0 min-w-0">
       <Panel className="details-card relative isolate flex h-full min-h-0 flex-col rounded-none border-2 border-[rgba(160,180,202,0.52)] p-4 dark:border-[color:var(--surface-border)] bp-1024:p-4">
-        <div className="flex items-start justify-between gap-3 border-b border-[color:var(--panel-border)] pb-3">
+        <div className="flex items-start justify-between gap-3 pb-3">
           <Eyebrow>SELECTED FLIGHT</Eyebrow>
         </div>
 

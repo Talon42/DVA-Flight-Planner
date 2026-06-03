@@ -167,9 +167,10 @@ function LogbookRow({
       <button
         type="button"
         className={cn(
-          "relative w-full bg-[var(--surface-table-row)] text-left text-[var(--text-primary)] transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[rgba(255,255,255,0.18)] dark:text-white",
-          selected &&
-            "bg-[var(--delta-blue)] text-white hover:bg-[var(--delta-blue)] dark:bg-[#1F466E] dark:text-white dark:hover:bg-[#27547F]"
+          "relative w-full text-left text-[var(--text-primary)] transition-colors duration-150 dark:text-white",
+          selected
+            ? "bg-[var(--delta-blue)] text-white hover:bg-[var(--delta-blue)] dark:bg-[#1F466E] dark:text-white dark:hover:bg-[#1F466E]"
+            : "bg-[var(--surface-table-row)] even:bg-[var(--surface-table-row-alt)] hover:bg-[#e8edf3] dark:bg-[var(--surface-table-row)] dark:even:bg-[var(--surface-table-row-alt)] dark:hover:bg-[#e8edf3]"
         )}
         onClick={() => {
           onSelectRow?.(row.id, row);
