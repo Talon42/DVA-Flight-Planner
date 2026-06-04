@@ -49,9 +49,11 @@ function FlightCardAircraftSelector({
   const isLocked = locked || readOnly || disabled;
 
   return (
-    <div className="grid gap-1.5">
+    <label className={cn(fieldLabelClassName, "min-w-0")}>
+      <span className={fieldTitleClassName}>Aircraft</span>
       <SearchableMultiSelect
         label="Aircraft"
+        hideLabel
         placeholder={isLoading ? "Loading aircraft..." : "Search aircraft"}
         emptyLabel="No matching aircraft"
         allLabel="Select one aircraft"
@@ -67,7 +69,7 @@ function FlightCardAircraftSelector({
         disabled={isLocked}
         triggerClassName={flightBoardControlButtonClassName}
       />
-    </div>
+    </label>
   );
 }
 
