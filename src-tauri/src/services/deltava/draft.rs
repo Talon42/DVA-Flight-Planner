@@ -643,27 +643,46 @@ fn build_deltava_draft_delete_script(
       const responseText = await response.text().catch(() => '');
       const responseContentType = response.headers?.get?.('content-type') || '';
       const finalUrl = response.url || '';
-      const hasFailureText = /Invalid Flight Report ID|Error|Access Denied|Log In|not authorized/i.test(responseText);
-      const parsedMessage = response.ok && !hasFailureText
-        ? ''
-        : (extractResponseMessage(responseText) || `HTTP ${response.status}`);
+      const deleteHttpOk = Boolean(response.ok);
+      const verifyUrl = `${window.location.origin}/pirep.do?id=0x${draftIdHex}`;
+      const verifyResponse = await fetch(verifyUrl, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        redirect: 'follow',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      const verifyText = await verifyResponse.text().catch(() => '');
+      const verifyFinalUrl = verifyResponse.url || '';
+      const verifyUnavailable =
+        !verifyResponse.ok ||
+        /Invalid Flight Report ID|not found|deleted|Access Denied|not authorized/i.test(verifyText);
+      const ok = deleteHttpOk && verifyUnavailable;
+      const parsedMessage = ok ? '' : (extractResponseMessage(verifyText) || extractResponseMessage(responseText) || `HTTP ${response.status}`);
       const result = {
-        ok: Boolean(response.ok && !hasFailureText),
+        ok,
         status: response.status,
         contentType: responseContentType,
         responseText,
         id: draftReportId,
-        error: response.ok && !hasFailureText ? null : (parsedMessage || null)
+        error: ok ? null : (parsedMessage || null)
       };
 
       emitAppLog('delete-response', {
         draftReportId,
         draftIdHex,
+        deleteStatus: response.status,
+        deleteFinalUrl: finalUrl,
+        verifyStatus: verifyResponse.status,
+        verifyFinalUrl,
+        verifyPreview: buildResponsePreview(verifyText),
         status: result.status,
         contentType: result.contentType || '',
         finalUrl,
         responsePreview: buildResponsePreview(responseText),
-        ok: result.ok
+        ok
       });
       window.__flightPlannerDeltaDraftPending = false;
       postResult(result);

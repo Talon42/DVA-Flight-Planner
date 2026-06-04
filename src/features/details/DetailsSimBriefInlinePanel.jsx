@@ -289,8 +289,7 @@ export default function SimBriefInlinePanel({
   const [dismissedErrorSignature, setDismissedErrorSignature] = useState("");
   const [isDeleteDraftConfirmOpen, setIsDeleteDraftConfirmOpen] = useState(false);
   const actionErrorOverlayHost = typeof document !== "undefined" ? document.body : null;
-  const selectorRowClassName =
-    "grid gap-2 bp-1400:grid-cols-[minmax(0,1fr)_13rem]";
+  const selectorRowClassName = "grid grid-cols-2 gap-2";
 
   // Keep the popup closed until the underlying error changes or clears.
   useEffect(() => {
