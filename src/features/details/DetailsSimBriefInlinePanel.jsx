@@ -111,6 +111,12 @@ export default function SimBriefInlinePanel({
     error: "",
     result: null
   },
+  deltaDraftDeleteState = {
+    boardEntryId: "",
+    isDeleting: false,
+    error: "",
+    result: null
+  },
   deltaDraftReportUrlState: _deltaDraftReportUrlState = {
     boardEntryId: "",
     url: ""
@@ -126,7 +132,8 @@ export default function SimBriefInlinePanel({
   onDispatchWorkflow,
   onRegenerateDispatch,
   onOpenSimBriefFlight,
-  onDraftOnlySubmit
+  onDraftOnlySubmit,
+  onDeleteDeltaVirtualDraftReport = () => {}
 }) {
   const rawSelectedAircraft = String(flight?.selectedAircraft || "").trim();
   const normalizedSelectedAircraft = getSelectedAircraftForFlight(flight, simBriefCustomAirframes);
@@ -145,6 +152,7 @@ export default function SimBriefInlinePanel({
     flight?.simbriefPlan?.staticId || flight?.simbriefPlan?.static_id || ""
   ).trim();
   const hasSimBriefPlan = Boolean(simBriefStaticId);
+  const draftDeleteRequiresRegenerate = Boolean(flight?.draftDeleteRequiresRegenerate);
   const draftReportId = Number.parseInt(
     String(flight?.draftReportId ?? flight?.dvaDraftReportId ?? ""),
     10
@@ -168,9 +176,16 @@ export default function SimBriefInlinePanel({
   const isDraftSubmitting =
     deltaDraftSubmitState.boardEntryId === flight.boardEntryId &&
     deltaDraftSubmitState.isSubmitting;
+  const isDraftDeleting =
+    deltaDraftDeleteState.boardEntryId === flight.boardEntryId &&
+    deltaDraftDeleteState.isDeleting;
   const draftOnlyErrorMessage =
     deltaDraftSubmitState.boardEntryId === flight.boardEntryId
       ? String(deltaDraftSubmitState.error || "").trim()
+      : "";
+  const deleteDraftErrorMessage =
+    deltaDraftDeleteState.boardEntryId === flight.boardEntryId
+      ? String(deltaDraftDeleteState.error || "").trim()
       : "";
   const selectedDraftNetwork = normalizeDraftNetwork(flight?.draftNetwork);
   const simBriefStatusMessage =
@@ -209,6 +224,7 @@ export default function SimBriefInlinePanel({
     ? !isDesktopSimBriefAvailable ||
       isDispatching ||
       isDraftSubmitting ||
+      draftDeleteRequiresRegenerate ||
       !simBriefStaticId ||
       !simBriefCredentialsConfigured
     : !isDesktopSimBriefAvailable ||
@@ -239,9 +255,14 @@ export default function SimBriefInlinePanel({
   const draftDisabled = isDraftSubmitting || !draftValidation.valid;
   const draftDisabledTitle =
     draftDisabled && draftValidation.errors.length ? draftValidation.errors.join("; ") : "";
+  const showDraftOnlyAction = !hasSimBriefPlan;
   const draftReportUrl = hasDraftReportId
     ? `https://www.deltava.org/pirep.do?id=0x${Number(draftReportId).toString(16)}`
     : "";
+  const deleteDraftDisabled =
+    isDraftSubmitting || isDispatching || isDraftDeleting || !hasDraftReportId ||
+    draftDeleteRequiresRegenerate;
+  const deleteDraftLabel = isDraftDeleting ? "Deleting DVA Draft..." : "Delete DVA Draft";
   const draftLabel = isDraftSubmitting
     ? hasDraftReportId
       ? "Updating Draft Only..."
@@ -250,11 +271,16 @@ export default function SimBriefInlinePanel({
       ? "Update Draft Only"
       : "Create Draft Only";
   const actionGridClassName = gridClassNames.boardActionsQuad;
-  const actionErrorMessage = draftOnlyErrorMessage || simBriefErrorMessage;
+  const actionErrorMessage =
+    deleteDraftErrorMessage || draftOnlyErrorMessage || simBriefErrorMessage;
   const actionErrorSignature = actionErrorMessage
-    ? `${draftOnlyErrorMessage ? "draft" : "simbrief"}:${actionErrorMessage}`
+    ? `${deleteDraftErrorMessage ? "delete" : draftOnlyErrorMessage ? "draft" : "simbrief"}:${actionErrorMessage}`
     : "";
+  const finalActionRowClassName = hasDraftReportId
+    ? "grid gap-2 bp-1400:grid-cols-3"
+    : "grid gap-2 bp-1400:grid-cols-2";
   const [dismissedErrorSignature, setDismissedErrorSignature] = useState("");
+  const [isDeleteDraftConfirmOpen, setIsDeleteDraftConfirmOpen] = useState(false);
   const actionErrorOverlayHost = typeof document !== "undefined" ? document.body : null;
   const selectorRowClassName =
     "grid gap-2 bp-1400:grid-cols-[minmax(0,1fr)_13rem]";
@@ -271,11 +297,28 @@ export default function SimBriefInlinePanel({
     }
   }, [actionErrorSignature, dismissedErrorSignature]);
 
+  useEffect(() => {
+    if (!isDeleteDraftConfirmOpen) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsDeleteDraftConfirmOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isDeleteDraftConfirmOpen]);
+
   const isActionErrorVisible =
     Boolean(actionErrorSignature) && dismissedErrorSignature !== actionErrorSignature;
 
   return (
-    <div className="grid min-w-0 max-w-full gap-3 rounded-none border border-[color:transparent] bg-[var(--surface-panel)] p-3">
+    <div className="relative grid min-w-0 max-w-full gap-3 rounded-none border border-[color:transparent] bg-[var(--surface-panel)] p-3">
       <div className={selectorRowClassName}>
         <FlightCardAircraftSelector
           options={aircraftTypeOptions}
@@ -297,6 +340,7 @@ export default function SimBriefInlinePanel({
           size="sm"
           onClick={onDispatchWorkflow}
           disabled={dispatchDisabled}
+          title={hasSimBriefPlan && draftDeleteRequiresRegenerate ? "Regenerate dispatch before refreshing." : ""}
         >
           {dispatchLabel}
         </Button>
@@ -321,7 +365,7 @@ export default function SimBriefInlinePanel({
             Open in Simbrief
           </Button>
         )}
-        {!hasSimBriefPlan ? (
+        {showDraftOnlyAction ? (
           <Button
             className="min-w-0 w-full"
             variant="board"
@@ -346,6 +390,9 @@ export default function SimBriefInlinePanel({
             Open in DVA
           </Button>
         ) : null}
+      </div>
+
+      <div className={finalActionRowClassName}>
         <Button
           className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
           variant={flight.isCompleted ? "ghost" : "success"}
@@ -354,15 +401,85 @@ export default function SimBriefInlinePanel({
         >
           {flight.isCompleted ? "Click to Revert Status" : "Complete Flight"}
         </Button>
+        {hasDraftReportId ? (
+          <Button
+            className="min-w-0 w-full"
+            variant="danger"
+            size="sm"
+            onClick={() => setIsDeleteDraftConfirmOpen(true)}
+            disabled={deleteDraftDisabled}
+            title={
+              draftDeleteRequiresRegenerate
+                ? "Regenerate dispatch before deleting again."
+                : ""
+            }
+          >
+            {deleteDraftLabel}
+          </Button>
+        ) : null}
         <Button
           className="min-w-0 w-full"
           variant="danger"
           size="sm"
           onClick={() => onRemoveFromFlightBoard(flight.boardEntryId)}
         >
-          Remove from Flight Board
+          Remove from Board
         </Button>
       </div>
+      {isDeleteDraftConfirmOpen ? (
+        <div
+          className="absolute inset-0 z-[70] flex items-center justify-center overflow-hidden p-4 bp-1024:p-3"
+          role="presentation"
+          onClick={() => setIsDeleteDraftConfirmOpen(false)}
+        >
+          <div
+            className="absolute inset-0 bg-[rgba(5,10,18,0.55)]"
+            aria-hidden="true"
+          />
+          <Panel
+            className={cn(
+              modalPanelClassName,
+              "relative z-[71] w-[min(520px,calc(100%-1.5rem))] p-5 bp-1024:w-[min(500px,calc(100%-1rem))] bp-1024:p-4"
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Delete DVA draft confirmation"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <p className="m-0 text-[var(--text-heading)] text-[1rem] font-semibold">
+                  Delete DVA draft?
+                </p>
+                <p className={cn("m-0", bodySmTextClassName)}>
+                  This will delete the draft from the Delta Virtual website and remove it from your
+                  logbook. It will not remove the flight board entry.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="board"
+                  size="sm"
+                  onClick={() => setIsDeleteDraftConfirmOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={async () => {
+                    setIsDeleteDraftConfirmOpen(false);
+                    await onDeleteDeltaVirtualDraftReport(flight.boardEntryId);
+                  }}
+                  disabled={deleteDraftDisabled}
+                >
+                  Delete DVA Draft
+                </Button>
+              </div>
+            </div>
+          </Panel>
+        </div>
+      ) : null}
       {isActionErrorVisible && actionErrorOverlayHost
         ? createPortal(
             <ModalBackdrop

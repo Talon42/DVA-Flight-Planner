@@ -6,7 +6,10 @@ import {
   validateDeltaVirtualDraftReportPayload
 } from "../../domain/deltaVirtual/draftReport.js";
 import { logSystemError, logSystemEvent } from "../../services/logging/appLog.client.js";
-import { submitDeltaVirtualDraftReport } from "../../services/tauri/deltaVirtualDraftReport.client.js";
+import {
+  deleteDeltaVirtualDraftReport,
+  submitDeltaVirtualDraftReport
+} from "../../services/tauri/deltaVirtualDraftReport.client.js";
 import { normalizeBoardEntry, normalizePositiveDraftReportId } from "../flightBoard/flightBoard.model.js";
 
 function buildDraftReportUrl(reportId) {
@@ -26,6 +29,17 @@ function getDraftFailureMessage(error) {
     : "Unable to send draft flight report to ACARS.";
 }
 
+function getDraftDeleteFailureMessage(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  if (message.startsWith("validation_failed:")) {
+    return message.replace(/^validation_failed:\s*/, "");
+  }
+
+  return message.startsWith("session_required:")
+    ? message.replace(/^session_required:\s*/, "")
+    : "Unable to delete the DVA draft flight report.";
+}
+
 // Owns the Delta Virtual draft-report submission state so App.jsx can keep the flight-board
 // and SimBrief workflows separate.
 export function useDeltaVirtualDraftReport({
@@ -41,6 +55,12 @@ export function useDeltaVirtualDraftReport({
     error: "",
     result: null
   });
+  const [deltaDraftDeleteState, setDeltaDraftDeleteState] = useState({
+    boardEntryId: "",
+    isDeleting: false,
+    error: "",
+    result: null
+  });
   const [deltaDraftReportUrlState, setDeltaDraftReportUrlState] = useState({
     boardEntryId: "",
     url: ""
@@ -51,6 +71,12 @@ export function useDeltaVirtualDraftReport({
     setDeltaDraftSubmitState({
       boardEntryId: "",
       isSubmitting: false,
+      error: "",
+      result: null
+    });
+    setDeltaDraftDeleteState({
+      boardEntryId: "",
+      isDeleting: false,
       error: "",
       result: null
     });
@@ -76,7 +102,7 @@ export function useDeltaVirtualDraftReport({
   }, []);
 
   const handleSubmitDeltaVirtualDraftReport = useCallback(
-    async (boardEntryOrId, { boardEntryId } = {}) => {
+    async (boardEntryOrId, { boardEntryId, clearDraftDeleteLock = false } = {}) => {
       const normalizedBoardEntryId = String(
         boardEntryId ||
           (typeof boardEntryOrId === "string" ? boardEntryOrId : boardEntryOrId?.boardEntryId || "")
@@ -236,7 +262,10 @@ export function useDeltaVirtualDraftReport({
                   ? {
                       ...entry,
                       draftReportId: returnedId,
-                      dvaDraftReportId: returnedId
+                      dvaDraftReportId: returnedId,
+                      draftDeleteRequiresRegenerate: clearDraftDeleteLock
+                        ? false
+                        : Boolean(entry.draftDeleteRequiresRegenerate)
                     }
                   : entry
               )
@@ -322,7 +351,7 @@ export function useDeltaVirtualDraftReport({
         );
       }
     },
-    [
+    [ 
       flightBoard,
       isDevToolsEnabled,
       setStatusMessage,
@@ -331,12 +360,150 @@ export function useDeltaVirtualDraftReport({
     ]
   );
 
+  const handleDeleteDeltaVirtualDraftReport = useCallback(
+    async (boardEntryOrId, { boardEntryId } = {}) => {
+      const normalizedBoardEntryId = String(
+        boardEntryId ||
+          (typeof boardEntryOrId === "string" ? boardEntryOrId : boardEntryOrId?.boardEntryId || "")
+      ).trim();
+      const requestedBoardEntry =
+        typeof boardEntryOrId === "string" ? null : boardEntryOrId || null;
+      if (!normalizedBoardEntryId) {
+        return null;
+      }
+
+      const currentBoardEntry =
+        normalizeBoardEntry(requestedBoardEntry) ||
+        flightBoard.find((entry) => entry.boardEntryId === normalizedBoardEntryId) ||
+        null;
+      if (!currentBoardEntry) {
+        const message = "Draft flight board entry was not found.";
+        setDeltaDraftDeleteState({
+          boardEntryId: normalizedBoardEntryId,
+          isDeleting: false,
+          error: message,
+          result: null
+        });
+        setStatusMessage?.(message);
+        await logSystemError("DVA Draft", "delete-failed", new Error(message), {
+          boardEntryId: normalizedBoardEntryId
+        });
+        return null;
+      }
+
+      const draftReportId = normalizePositiveDraftReportId(
+        currentBoardEntry.draftReportId ?? currentBoardEntry.dvaDraftReportId
+      );
+      if (draftReportId === null) {
+        const message = "No DVA draft report ID is available for this flight.";
+        setDeltaDraftDeleteState({
+          boardEntryId: normalizedBoardEntryId,
+          isDeleting: false,
+          error: message,
+          result: null
+        });
+        setStatusMessage?.(message);
+        await logSystemError("DVA Draft", "delete-failed", new Error(message), {
+          boardEntryId: normalizedBoardEntryId
+        });
+        return null;
+      }
+
+      setDeltaDraftDeleteState({
+        boardEntryId: normalizedBoardEntryId,
+        isDeleting: true,
+        error: "",
+        result: null
+      });
+      setStatusMessage?.("Deleting DVA Draft...");
+
+      try {
+        const result = await deleteDeltaVirtualDraftReport(draftReportId, {
+          debugEnabled: isDevToolsEnabled
+        });
+        const resultErrorMessage = result.ok ? "" : getDraftDeleteFailureMessage(result.error);
+
+        setDeltaDraftDeleteState({
+          boardEntryId: normalizedBoardEntryId,
+          isDeleting: false,
+          error: resultErrorMessage,
+          result
+        });
+
+        if (result.ok) {
+          updateActiveFlightBoardEntries?.((currentEntries) =>
+            currentEntries.map((entry) =>
+              entry.boardEntryId === normalizedBoardEntryId
+                ? {
+                    ...entry,
+                    draftReportId: null,
+                    dvaDraftReportId: null,
+                    draftDeleteRequiresRegenerate: true
+                  }
+                : entry
+            )
+          );
+          setDeltaDraftReportUrlState({
+            boardEntryId: normalizedBoardEntryId,
+            url: ""
+          });
+          setStatusMessage?.("DVA Draft Deleted.");
+          await logSystemEvent("DVA Draft", "delete-succeeded", {
+            boardEntryId: normalizedBoardEntryId,
+            draftReportId,
+            status: result.status,
+            contentType: result.contentType || ""
+          });
+          return result;
+        }
+
+        setStatusMessage?.(resultErrorMessage);
+        await logSystemError("DVA Draft", "delete-failed", new Error(result.error || resultErrorMessage), {
+          boardEntryId: normalizedBoardEntryId,
+          draftReportId,
+          status: result.status,
+          contentType: result.contentType || "",
+          message: result.error || resultErrorMessage
+        });
+        return result;
+      } catch (error) {
+        const normalizedError = error instanceof Error ? error : new Error(String(error));
+        const statusMessage = getDraftDeleteFailureMessage(normalizedError);
+        setDeltaDraftDeleteState({
+          boardEntryId: normalizedBoardEntryId,
+          isDeleting: false,
+          error: statusMessage,
+          result: null
+        });
+        setStatusMessage?.(statusMessage);
+        await logSystemError("DVA Draft", "delete-failed", normalizedError, {
+          boardEntryId: normalizedBoardEntryId,
+          draftReportId,
+          status: 0,
+          contentType: "",
+          message: statusMessage
+        });
+        return null;
+      } finally {
+        setDeltaDraftDeleteState((current) =>
+          current.boardEntryId === normalizedBoardEntryId
+            ? { ...current, isDeleting: false }
+            : current
+        );
+      }
+    },
+    [flightBoard, isDevToolsEnabled, setStatusMessage, updateActiveFlightBoardEntries]
+  );
+
   return {
     deltaDraftSubmitState,
     setDeltaDraftSubmitState,
+    deltaDraftDeleteState,
+    setDeltaDraftDeleteState,
     deltaDraftReportUrlState,
     setDeltaDraftReportUrlState,
     handleSubmitDeltaVirtualDraftReport,
+    handleDeleteDeltaVirtualDraftReport,
     handleOpenDeltaVirtualDraftReport,
     handleCloseDeltaVirtualDraftReport,
     handleClearDeltaVirtualDraftReportState

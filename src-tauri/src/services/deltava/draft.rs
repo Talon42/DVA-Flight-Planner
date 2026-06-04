@@ -100,13 +100,11 @@ impl DraftSubmitManager {
         sender: oneshot::Sender<DraftSubmitResult>,
     ) -> Result<(), String> {
         let mut active = self.active.lock().map_err(|_| {
-            "submit_failed: Unable to lock Delta Virtual draft submit state.".to_string()
+            "submit_failed: Unable to lock Delta Virtual draft operation state.".to_string()
         })?;
 
         if active.is_some() {
-            return Err(
-                "submit_failed: A Delta Virtual draft submission is already in progress.".into(),
-            );
+            return Err("submit_failed: A Delta Virtual draft operation is already in progress.".into());
         }
 
         *active = Some(ActiveDraftSubmit { label, sender });
@@ -283,6 +281,14 @@ fn append_draft_submit_failed_stage(app: &AppHandle, stage: &str, error: &str) {
         "error": error
     });
     append_draft_app_log_event(app, "submit-failed", Some(&payload));
+}
+
+fn append_draft_delete_failed_stage(app: &AppHandle, stage: &str, error: &str) {
+    let payload = json!({
+        "stage": stage,
+        "error": error
+    });
+    append_draft_app_log_event(app, "delete-failed", Some(&payload));
 }
 
 fn build_draft_webview_data_directory(app: &AppHandle) -> Result<PathBuf, String> {
@@ -519,6 +525,174 @@ fn build_deltava_draft_submission_script(
 
     TEMPLATE
         .replace("__PAYLOAD_DATA__", &payload_json)
+        .replace("__NONCE__", &nonce)
+        .replace("__APP_LOG_PREFIX__", &app_log_prefix)
+        .replace("__RESULT_PREFIX__", &result_prefix)
+}
+
+fn build_deltava_draft_delete_script(
+    draft_report_id: i64,
+    app_log_prefix: &str,
+    nonce: &str,
+) -> String {
+    let draft_report_id_value = draft_report_id.to_string();
+    let draft_id_hex = format!("{:x}", draft_report_id);
+    let draft_report_id = draft_report_id_value;
+    let draft_id_hex = serde_json::to_string(&draft_id_hex)
+        .unwrap_or_else(|_| "\"0\"".to_string());
+    let app_log_prefix = serde_json::to_string(app_log_prefix)
+        .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_DVA_DRAFT_APP_LOG__\"".to_string());
+    let result_prefix = serde_json::to_string(DVA_DRAFT_RESULT_MESSAGE_PREFIX)
+        .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_DVA_DRAFT_RESULT__\"".to_string());
+    let nonce = serde_json::to_string(nonce).unwrap_or_else(|_| "\"\"".to_string());
+
+    const TEMPLATE: &str = r#"
+(() => {
+  const draftReportId = __DRAFT_REPORT_ID__;
+  const draftIdHex = __DRAFT_ID_HEX__;
+  const nonce = __NONCE__;
+  const appLogPrefix = __APP_LOG_PREFIX__;
+  const resultPrefix = __RESULT_PREFIX__;
+  const allowedOrigins = new Set(['https://www.deltava.org']);
+
+  const emitAppLog = (event, data = null) => {
+    if (window.chrome?.webview?.postMessage) {
+      window.chrome.webview.postMessage(appLogPrefix + JSON.stringify({ nonce, event, data }));
+    }
+  };
+
+  const normalizeValue = (value) => String(value || '').trim();
+  const extractResponseMessage = (responseText) => {
+    const text = normalizeValue(responseText);
+
+    if (!text) {
+      return '';
+    }
+
+    if (text.startsWith('{') || text.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(text);
+        const message = typeof parsed?.message === 'string' ? parsed.message : '';
+        if (message) {
+          return normalizeValue(message);
+        }
+
+        const errorMessage = typeof parsed?.error === 'string' ? parsed.error : '';
+        if (errorMessage) {
+          return normalizeValue(errorMessage);
+        }
+      } catch (_) {}
+    }
+
+    const messageMatch = text.match(/<p><b>Message<\/b>\s*([^<]+)<\/p>/i);
+    if (messageMatch?.[1]) {
+      return normalizeValue(messageMatch[1]);
+    }
+
+    const invalidIdMatch = text.match(/Invalid Flight Report ID - \d+/i);
+    if (invalidIdMatch?.[0]) {
+      return normalizeValue(invalidIdMatch[0]);
+    }
+
+    return text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const buildResponsePreview = (responseText) => normalizeValue(responseText).replace(/\s+/g, ' ').slice(0, 160);
+  const postResult = (result) => {
+    if (window.chrome?.webview?.postMessage) {
+      window.chrome.webview.postMessage(resultPrefix + JSON.stringify({ nonce, ...result }));
+    }
+  };
+
+  emitAppLog('delete-location', {
+    draftReportId,
+    draftIdHex,
+    href: window.location.href,
+    origin: window.location.origin
+  });
+
+  if (!allowedOrigins.has(window.location.origin)) {
+    return;
+  }
+
+  if (window.__flightPlannerDeltaDraftPending) {
+    return;
+  }
+
+  window.__flightPlannerDeltaDraftPending = true;
+
+  window.setTimeout(async () => {
+    try {
+      const requestUrl = `${window.location.origin}/pirepdelete.do?id=0x${draftIdHex}&op=force`;
+      emitAppLog('delete-request', {
+        draftReportId,
+        draftIdHex,
+        requestUrl,
+        href: window.location.href,
+        origin: window.location.origin
+      });
+      const response = await fetch(requestUrl, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        redirect: 'follow',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      const responseText = await response.text().catch(() => '');
+      const responseContentType = response.headers?.get?.('content-type') || '';
+      const finalUrl = response.url || '';
+      const hasFailureText = /Invalid Flight Report ID|Error|Access Denied|Log In|not authorized/i.test(responseText);
+      const parsedMessage = response.ok && !hasFailureText
+        ? ''
+        : (extractResponseMessage(responseText) || `HTTP ${response.status}`);
+      const result = {
+        ok: Boolean(response.ok && !hasFailureText),
+        status: response.status,
+        contentType: responseContentType,
+        responseText,
+        id: draftReportId,
+        error: response.ok && !hasFailureText ? null : (parsedMessage || null)
+      };
+
+      emitAppLog('delete-response', {
+        draftReportId,
+        draftIdHex,
+        status: result.status,
+        contentType: result.contentType || '',
+        finalUrl,
+        responsePreview: buildResponsePreview(responseText),
+        ok: result.ok
+      });
+      window.__flightPlannerDeltaDraftPending = false;
+      postResult(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const result = {
+        ok: false,
+        status: 0,
+        contentType: '',
+        responseText: '',
+        id: draftReportId,
+        error: message || 'DVA draft deletion failed.'
+      };
+      emitAppLog('delete-failed', {
+        stage: 'fetch',
+        draftReportId,
+        draftIdHex,
+        error: message || 'DVA draft deletion failed.'
+      });
+      window.__flightPlannerDeltaDraftPending = false;
+      postResult(result);
+    }
+  }, 100);
+})();
+"#;
+
+    TEMPLATE
+        .replace("__DRAFT_REPORT_ID__", &draft_report_id)
+        .replace("__DRAFT_ID_HEX__", &draft_id_hex)
         .replace("__NONCE__", &nonce)
         .replace("__APP_LOG_PREFIX__", &app_log_prefix)
         .replace("__RESULT_PREFIX__", &result_prefix)
@@ -827,6 +1001,8 @@ async fn run_deltava_draft_submission_attempt(
         flight_for_log.clone(),
         airport_d_for_log.clone(),
         airport_a_for_log.clone(),
+        "submit-succeeded",
+        "submit-failed",
     ) {
         append_draft_submit_failed_stage(app, "message-handler", &error);
         finish_draft_submit_result(
@@ -949,6 +1125,8 @@ fn attach_windows_draft_message_handler(
     flight_for_log: String,
     airport_d_for_log: String,
     airport_a_for_log: String,
+    operation_success_event: &'static str,
+    operation_failure_event: &'static str,
 ) -> Result<(), String> {
     let registration_error = std::sync::Arc::new(Mutex::new(None::<String>));
     let registration_error_for_closure = registration_error.clone();
@@ -1167,7 +1345,7 @@ fn attach_windows_draft_message_handler(
                                                     let payload = Value::Object(data);
                                                     append_draft_app_log_event(
                                                         &app_handle,
-                                                        "submit-succeeded",
+                                                        operation_success_event,
                                                         Some(&payload),
                                                     );
                                                 } else {
@@ -1179,7 +1357,7 @@ fn attach_windows_draft_message_handler(
                                                     });
                                                     append_draft_app_log_event(
                                                         &app_handle,
-                                                        "submit-failed",
+                                                        operation_failure_event,
                                                         Some(&payload),
                                                     );
                                                 }
@@ -1193,7 +1371,7 @@ fn attach_windows_draft_message_handler(
                                                 });
                                                 append_draft_app_log_event(
                                                     &app_handle,
-                                                    "submit-failed",
+                                                    operation_failure_event,
                                                     Some(&payload),
                                                 );
                                                 finish_draft_submit_result(
@@ -1255,6 +1433,8 @@ fn attach_windows_draft_message_handler(
     _flight_for_log: String,
     _airport_d_for_log: String,
     _airport_a_for_log: String,
+    _operation_success_event: &'static str,
+    _operation_failure_event: &'static str,
 ) -> Result<(), String> {
     Ok(())
 }
@@ -1382,4 +1562,360 @@ pub async fn submit_deltava_draft_flight_report(
         &draft_nonce,
     )
     .await
+}
+
+pub async fn delete_deltava_draft_flight_report(
+    app: AppHandle,
+    draft_report_id: i64,
+    debug_enabled: bool,
+) -> DraftSubmitResult {
+    if draft_report_id <= 0 {
+        let error = "validation_failed: Draft report ID is missing or invalid.".to_string();
+        append_draft_delete_failed_stage(&app, "validation", &error);
+        return DraftSubmitResult {
+            ok: false,
+            status: 0,
+            content_type: String::new(),
+            response_text: String::new(),
+            id: None,
+            error: Some(error),
+        };
+    }
+
+    #[cfg(not(windows))]
+    {
+        let error = "Delta Virtual draft deletion is only available on Windows.".to_string();
+        append_draft_delete_failed_stage(&app, "platform", &error);
+        return DraftSubmitResult {
+            ok: false,
+            status: 0,
+            content_type: String::new(),
+            response_text: String::new(),
+            id: None,
+            error: Some(error),
+        };
+    }
+
+    let draft_nonce = crate::new_dva_nonce();
+    let draft_report_id_hex = format!("{:x}", draft_report_id);
+    let auth_context = match read_auth_context_internal(&app) {
+        Ok(context) => context,
+        Err(_) => DeltaVirtualAuthContext {
+            settings: Default::default(),
+            password: None,
+        },
+    };
+    let login_script = build_deltava_login_automation_script(
+        &auth_context,
+        DVA_DRAFT_LOGIN_URL,
+        DVA_DRAFT_TARGET_URL,
+        &draft_nonce,
+    );
+    let delete_script = build_deltava_draft_delete_script(
+        draft_report_id,
+        DVA_DRAFT_APP_LOG_MESSAGE_PREFIX,
+        &draft_nonce,
+    );
+
+    let login_url = match DVA_DRAFT_LOGIN_URL.parse::<tauri::webview::Url>() {
+        Ok(url) => url,
+        Err(error) => {
+            let error = format!("Invalid Delta Virtual login URL: {error}");
+            append_draft_delete_failed_stage(&app, "login-url", &error);
+            return DraftSubmitResult {
+                ok: false,
+                status: 0,
+                content_type: String::new(),
+                response_text: String::new(),
+                id: Some(draft_report_id),
+                error: Some(error),
+            };
+        }
+    };
+
+    let (sender, receiver) = oneshot::channel();
+    {
+        let draft_manager = app.state::<DraftSubmitManager>();
+        if let Err(error) = draft_manager.begin(DVA_DRAFT_LABEL.to_string(), sender) {
+            append_draft_delete_failed_stage(&app, "draft-manager", &error);
+            return DraftSubmitResult {
+                ok: false,
+                status: 0,
+                content_type: String::new(),
+                response_text: String::new(),
+                id: Some(draft_report_id),
+                error: Some(error),
+            };
+        }
+    }
+
+    let flow_state = Arc::new(Mutex::new(DraftFlowState::default()));
+    let app_for_window_event = app.clone();
+    let app_for_page_load = app.clone();
+    let flow_state_for_page_load = flow_state.clone();
+    let flow_state_for_event = flow_state.clone();
+    let delete_script_for_page_load = delete_script.clone();
+    let draft_report_id_for_log = draft_report_id;
+    let draft_report_id_hex_for_log = draft_report_id_hex.clone();
+    let webview_data_directory = match build_draft_webview_data_directory(&app_for_page_load) {
+        Ok(directory) => directory,
+        Err(error) => {
+            append_draft_delete_failed_stage(&app, "webview-data-directory", &error);
+            return DraftSubmitResult {
+                ok: false,
+                status: 0,
+                content_type: String::new(),
+                response_text: String::new(),
+                id: Some(draft_report_id),
+                error: Some(error),
+            };
+        }
+    };
+
+    append_draft_app_log_event(
+        &app,
+        "webview-build-started",
+        Some(&json!({
+            "operation": "delete",
+            "loginUrl": DVA_DRAFT_LOGIN_URL,
+            "targetUrl": DVA_DRAFT_TARGET_URL,
+            "draftReportId": draft_report_id_for_log,
+            "draftIdHex": draft_report_id_hex_for_log
+        })),
+    );
+    let window = match WebviewWindowBuilder::new(
+        &app,
+        DVA_DRAFT_LABEL,
+        WebviewUrl::External("about:blank".parse().unwrap()),
+    )
+    .title("Delta Virtual Draft Report")
+    .inner_size(520.0, 760.0)
+    .min_inner_size(460.0, 680.0)
+    .resizable(true)
+    .visible(false)
+    .center()
+    .data_directory(webview_data_directory)
+    .on_navigation(|url| is_allowed_deltava_draft_url(url))
+    .on_page_load(move |webview_window, payload| {
+        if payload.event() != tauri::webview::PageLoadEvent::Finished
+            || !is_allowed_deltava_draft_url(payload.url())
+        {
+            return;
+        }
+
+        let current_url = payload.url().to_string();
+        let is_login_page = current_url.starts_with(DVA_DRAFT_LOGIN_URL);
+        let state_snapshot = flow_state_for_page_load
+            .lock()
+            .ok()
+            .map(|state| state.clone());
+
+        if is_login_page {
+            if let Some(state) = state_snapshot.as_ref() {
+                if state.authenticated || state.login_script_sent {
+                    return;
+                }
+            }
+
+            if let Ok(mut state) = flow_state_for_page_load.lock() {
+                if state.login_script_sent {
+                    return;
+                }
+                state.login_script_sent = true;
+            }
+
+            append_draft_app_log_event(
+                &app_for_page_load,
+                "login-started",
+                Some(&json!({
+                    "status": "started"
+                })),
+            );
+            let eval_result = webview_window.eval(&login_script);
+            if let Err(error) = eval_result {
+                let delete_error = format!("Unable to inject Delta Virtual login script: {error}");
+                append_draft_delete_failed_stage(&app_for_page_load, "login-script", &delete_error);
+                finish_draft_submit_result(
+                    &app_for_page_load,
+                    debug_enabled,
+                    DraftSubmitResult {
+                        ok: false,
+                        status: 0,
+                        content_type: String::new(),
+                        response_text: String::new(),
+                        id: Some(draft_report_id),
+                        error: Some(delete_error),
+                    },
+                );
+            }
+            return;
+        }
+
+        if let Some(state) = state_snapshot.as_ref() {
+            if !state.authenticated && !state.login_script_sent {
+                return;
+            }
+        }
+
+        schedule_deltava_draft_submit_script(
+            webview_window.clone(),
+            app_for_page_load.clone(),
+            debug_enabled,
+            flow_state_for_page_load.clone(),
+            delete_script_for_page_load.clone(),
+            String::new(),
+            String::new(),
+            String::new(),
+        );
+    })
+    .build()
+    {
+        Ok(window) => window,
+        Err(error) => {
+            let error = format!("Unable to open Delta Virtual draft window: {error}");
+            append_draft_delete_failed_stage(&app, "webview-open", &error);
+            finish_draft_submit_result(
+                &app,
+                debug_enabled,
+                DraftSubmitResult {
+                    ok: false,
+                    status: 0,
+                    content_type: String::new(),
+                    response_text: String::new(),
+                    id: Some(draft_report_id),
+                    error: Some(error.clone()),
+                },
+            );
+            return DraftSubmitResult {
+                ok: false,
+                status: 0,
+                content_type: String::new(),
+                response_text: String::new(),
+                id: Some(draft_report_id),
+                error: Some(error),
+            };
+        }
+    };
+
+    if let Err(error) = attach_windows_draft_message_handler(
+        &window,
+        window.clone(),
+        app.clone(),
+        debug_enabled,
+        draft_nonce.clone(),
+        flow_state_for_event.clone(),
+        delete_script.clone(),
+        String::new(),
+        String::new(),
+        String::new(),
+        "delete-succeeded",
+        "delete-failed",
+    ) {
+        append_draft_delete_failed_stage(&app, "message-handler", &error);
+        finish_draft_submit_result(
+            &app,
+            debug_enabled,
+            DraftSubmitResult {
+                ok: false,
+                status: 0,
+                content_type: String::new(),
+                response_text: String::new(),
+                id: Some(draft_report_id),
+                error: Some(error.clone()),
+            },
+        );
+        return DraftSubmitResult {
+            ok: false,
+            status: 0,
+            content_type: String::new(),
+            response_text: String::new(),
+            id: Some(draft_report_id),
+            error: Some(error),
+        };
+    }
+    let _ = window.navigate(login_url.clone());
+
+    window.on_window_event(move |event| match event {
+        WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
+            let session_is_active = app_for_window_event
+                .state::<DraftSubmitManager>()
+                .active
+                .lock()
+                .ok()
+                .map(|active| active.is_some())
+                .unwrap_or(false);
+            if !session_is_active {
+                return;
+            }
+
+            let error = login_required_error_message();
+            append_draft_delete_failed_stage(&app_for_window_event, "window-closed", &error);
+            finish_draft_submit_result(
+                &app_for_window_event,
+                debug_enabled,
+                DraftSubmitResult {
+                    ok: false,
+                    status: 0,
+                    content_type: String::new(),
+                    response_text: String::new(),
+                    id: Some(draft_report_id),
+                    error: Some(error),
+                },
+            );
+        }
+        _ => {}
+    });
+
+    match tokio::time::timeout(Duration::from_secs(DVA_DRAFT_TIMEOUT_SECONDS), receiver).await {
+        Ok(Ok(result)) => result,
+        Ok(Err(_)) => {
+            finish_draft_submit_result(
+                &app,
+                debug_enabled,
+                DraftSubmitResult {
+                    ok: false,
+                    status: 0,
+                    content_type: String::new(),
+                    response_text: String::new(),
+                    id: Some(draft_report_id),
+                    error: Some("Delta Virtual draft deletion stopped unexpectedly.".into()),
+                },
+            );
+            DraftSubmitResult {
+                ok: false,
+                status: 0,
+                content_type: String::new(),
+                response_text: String::new(),
+                id: Some(draft_report_id),
+                error: Some("Delta Virtual draft deletion stopped unexpectedly.".into()),
+            }
+        }
+        Err(_) => {
+            append_draft_delete_failed_stage(
+                &app,
+                "timeout",
+                "Delta Virtual draft deletion timed out.",
+            );
+            finish_draft_submit_result(
+                &app,
+                debug_enabled,
+                DraftSubmitResult {
+                    ok: false,
+                    status: 0,
+                    content_type: String::new(),
+                    response_text: String::new(),
+                    id: Some(draft_report_id),
+                    error: Some("Delta Virtual draft deletion timed out.".into()),
+                },
+            );
+            DraftSubmitResult {
+                ok: false,
+                status: 0,
+                content_type: String::new(),
+                response_text: String::new(),
+                id: Some(draft_report_id),
+                error: Some("Delta Virtual draft deletion timed out.".into()),
+            }
+        }
+    }
 }

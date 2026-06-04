@@ -31,6 +31,12 @@ export default function DetailsPanel({
     error: "",
     result: null
   },
+  deltaDraftDeleteState = {
+    boardEntryId: "",
+    isDeleting: false,
+    error: "",
+    result: null
+  },
   deltaDraftReportUrlState = {
     boardEntryId: "",
     url: ""
@@ -53,6 +59,7 @@ export default function DetailsPanel({
   onRegenerateDispatch,
   onOpenSimBriefFlight = () => {},
   onDraftOnlySubmit = () => {},
+  onDeleteDeltaVirtualDraftReport = () => {},
   onCompleteTourFlight,
   showFlightBoard = true
 }) {
@@ -341,6 +348,7 @@ export default function DetailsPanel({
           selectedAccomplishment={selectedAccomplishment}
           simBriefDispatchState={simBriefDispatchState}
           deltaDraftSubmitState={deltaDraftSubmitState}
+          deltaDraftDeleteState={deltaDraftDeleteState}
           deltaDraftReportUrlState={deltaDraftReportUrlState}
           simBriefCredentialsConfigured={simBriefCredentialsConfigured}
           isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
@@ -356,6 +364,7 @@ export default function DetailsPanel({
           onRegenerateDispatch={onRegenerateDispatch}
           onOpenSimBriefFlight={onOpenSimBriefFlight}
           onDraftOnlySubmit={onDraftOnlySubmit}
+          onDeleteDeltaVirtualDraftReport={onDeleteDeltaVirtualDraftReport}
           onCompleteTourFlight={onCompleteTourFlight}
           setItemRef={setItemRef}
           suppressClickRef={suppressClickRef}

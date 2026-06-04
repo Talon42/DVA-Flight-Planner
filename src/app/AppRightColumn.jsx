@@ -27,6 +27,7 @@ export default function AppRightColumn({
   selectedAccomplishment,
   simBriefDispatchState,
   deltaDraftSubmitState,
+  deltaDraftDeleteState,
   deltaDraftReportUrlState,
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
@@ -48,6 +49,7 @@ export default function AppRightColumn({
   onRegenerateDispatch,
   onOpenSimBriefFlight,
   onDraftOnlySubmit,
+  onDeleteDeltaVirtualDraftReport,
   onCompleteTourFlight
 }) {
   const detailsPanel = (
@@ -59,6 +61,7 @@ export default function AppRightColumn({
       selectedAccomplishment={selectedAccomplishment}
       simBriefDispatchState={simBriefDispatchState}
       deltaDraftSubmitState={deltaDraftSubmitState}
+      deltaDraftDeleteState={deltaDraftDeleteState}
       deltaDraftReportUrlState={deltaDraftReportUrlState}
       simBriefCredentialsConfigured={simBriefCredentialsConfigured}
       isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
@@ -80,6 +83,7 @@ export default function AppRightColumn({
       onRegenerateDispatch={onRegenerateDispatch}
       onOpenSimBriefFlight={onOpenSimBriefFlight}
       onDraftOnlySubmit={onDraftOnlySubmit}
+      onDeleteDeltaVirtualDraftReport={onDeleteDeltaVirtualDraftReport}
       onCompleteTourFlight={onCompleteTourFlight}
       showFlightBoard
     />

@@ -1331,8 +1331,10 @@ export default function App() {
 
   const {
     deltaDraftSubmitState,
+    deltaDraftDeleteState,
     deltaDraftReportUrlState,
-    handleSubmitDeltaVirtualDraftReport
+    handleSubmitDeltaVirtualDraftReport,
+    handleDeleteDeltaVirtualDraftReport
   } = appDeltaVirtualDraftReport;
 
   const appSimBriefDispatch = useSimBriefDispatch({
@@ -1623,6 +1625,7 @@ export default function App() {
       selectedAccomplishment={selectedAccomplishment}
       simBriefDispatchState={simBriefDispatchState}
       deltaDraftSubmitState={deltaDraftSubmitState}
+      deltaDraftDeleteState={deltaDraftDeleteState}
       deltaDraftReportUrlState={deltaDraftReportUrlState}
       simBriefCredentialsConfigured={simBriefCredentialsConfigured}
       isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
@@ -1644,6 +1647,7 @@ export default function App() {
       onRegenerateDispatch={handleRegenerateDispatchWorkflow}
       onOpenSimBriefFlight={handleOpenSimBriefFlight}
       onDraftOnlySubmit={handleSubmitDeltaVirtualDraftReport}
+      onDeleteDeltaVirtualDraftReport={handleDeleteDeltaVirtualDraftReport}
       onCompleteTourFlight={handleCompleteTourFlight}
     />
   );

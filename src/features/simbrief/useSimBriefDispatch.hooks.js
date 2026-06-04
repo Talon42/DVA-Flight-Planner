@@ -584,7 +584,8 @@ export function useSimBriefDispatch({
       );
 
       await submitDraftReportForBoardEntry?.(normalizedBoardEntry, {
-        boardEntryId: flightId
+        boardEntryId: flightId,
+        clearDraftDeleteLock: forceNewDispatch
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "SimBrief dispatch failed.";

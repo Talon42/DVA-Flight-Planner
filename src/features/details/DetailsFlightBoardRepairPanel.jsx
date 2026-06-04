@@ -18,7 +18,7 @@ export default function DetailsFlightBoardRepairPanel({ flight, onRemoveFromFlig
           size="sm"
           onClick={() => onRemoveFromFlightBoard(flight.boardEntryId)}
         >
-          Remove from Flight Board
+          Remove from Board
         </Button>
       </div>
     </div>

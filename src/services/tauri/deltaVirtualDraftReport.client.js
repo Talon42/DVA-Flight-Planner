@@ -7,20 +7,29 @@ import {
 } from "../../domain/deltaVirtual/draftReport.js";
 
 const DRAFT_COMMAND_NAME = "submit_deltava_draft_flight_report";
+const DELETE_DRAFT_COMMAND_NAME = "delete_deltava_draft_flight_report";
 
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
 function normalizeDraftSubmitError(message) {
+  return normalizeDraftOperationError(
+    message,
+    "Draft flight report submission failed.",
+    "submit_failed"
+  );
+}
+
+function normalizeDraftOperationError(message, fallbackMessage, fallbackKind = "submit_failed") {
   if (!message) {
-    return new Error("Draft flight report submission failed.");
+    return new Error(fallbackMessage);
   }
 
   const [kind, ...rest] = String(message).split(":");
   const normalizedMessage = rest.length ? rest.join(":").trim() : String(message);
-  const error = new Error(normalizedMessage || "Draft flight report submission failed.");
-  error.kind = rest.length ? kind : "submit_failed";
+  const error = new Error(normalizedMessage || fallbackMessage);
+  error.kind = rest.length ? kind : fallbackKind;
   return error;
 }
 
@@ -142,6 +151,80 @@ export async function submitDeltaVirtualDraftReport(flight, options = {}) {
       responseText: "",
       id: null,
       error: normalizeDraftSubmitError(String(error)).message
+    });
+  }
+}
+
+function normalizeDraftDeleteError(message) {
+  return normalizeDraftOperationError(message, "DVA draft deletion failed.", "delete_failed");
+}
+
+function normalizeDraftDeleteResult(result) {
+  if (!result || typeof result !== "object") {
+    return {
+      ok: false,
+      status: 0,
+      contentType: "",
+      responseText: "",
+      id: null,
+      error: "DVA draft deletion failed."
+    };
+  }
+
+  const normalizedResult = normalizeDraftSubmitResult(result);
+  return {
+    ...normalizedResult,
+    error: normalizedResult.error || (normalizedResult.ok ? null : "DVA draft deletion failed.")
+  };
+}
+
+// Deletes an existing Delta Virtual draft report through the Tauri command.
+export async function deleteDeltaVirtualDraftReport(draftReportId, options = {}) {
+  const debugEnabled = Boolean(options?.debugEnabled);
+  const normalizedDraftReportId = Number.parseInt(String(draftReportId || "").trim(), 10);
+
+  if (!Number.isInteger(normalizedDraftReportId) || normalizedDraftReportId <= 0) {
+    return normalizeDraftDeleteResult({
+      ok: false,
+      status: 0,
+      responseText: "",
+      id: null,
+      error: "validation_failed: Draft report ID is missing or invalid."
+    });
+  }
+
+  if (!isTauriRuntime()) {
+    return normalizeDraftDeleteResult({
+      ok: false,
+      status: 0,
+      responseText: "",
+      id: null,
+      error: "DVA draft deletion is only available in the desktop app."
+    });
+  }
+
+  try {
+    const result = await invokeAppCommand(
+      DELETE_DRAFT_COMMAND_NAME,
+      { draftReportId: normalizedDraftReportId, debugEnabled },
+      {
+        metadata: {
+          debugEnabled,
+          draftReportId: normalizedDraftReportId
+        }
+      }
+    );
+    return normalizeDraftDeleteResult(result);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : String(error || "DVA draft deletion failed.");
+    return normalizeDraftDeleteResult({
+      ok: false,
+      status: 0,
+      contentType: "",
+      responseText: "",
+      id: null,
+      error: normalizeDraftDeleteError(errorMessage).message
     });
   }
 }

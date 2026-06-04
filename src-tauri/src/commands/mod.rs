@@ -22,6 +22,7 @@ pub(crate) fn app_invoke_handler(
         self::deltava_auth::save_deltava_auth_settings,
         self::deltava_auth::clear_deltava_auth_settings,
         self::deltava_draft::submit_deltava_draft_flight_report,
+        self::deltava_draft::delete_deltava_draft_flight_report,
         self::deltava_tours::fetch_delta_virtual_tour_briefing,
         self::storage::clear_user_data,
         self::storage::open_main_devtools,

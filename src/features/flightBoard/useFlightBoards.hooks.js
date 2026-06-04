@@ -42,6 +42,7 @@ function repairBoardEntryAgainstSchedule(entry, flights = []) {
     simbriefPlan: null,
     draftNetwork: normalizedEntry.draftNetwork,
     draftReportId: normalizedEntry.draftReportId,
+    draftDeleteRequiresRegenerate: normalizedEntry.draftDeleteRequiresRegenerate,
     isStale: false
   });
 }
