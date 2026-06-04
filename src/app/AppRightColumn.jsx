@@ -45,6 +45,7 @@ export default function AppRightColumn({
   onSimBriefTypeChange,
   onDraftNetworkChange,
   onDispatchWorkflow,
+  onRegenerateDispatch,
   onOpenSimBriefFlight,
   onDraftOnlySubmit,
   onCompleteTourFlight
@@ -76,6 +77,7 @@ export default function AppRightColumn({
       onSimBriefTypeChange={onSimBriefTypeChange}
       onDraftNetworkChange={onDraftNetworkChange}
       onDispatchWorkflow={onDispatchWorkflow}
+      onRegenerateDispatch={onRegenerateDispatch}
       onOpenSimBriefFlight={onOpenSimBriefFlight}
       onDraftOnlySubmit={onDraftOnlySubmit}
       onCompleteTourFlight={onCompleteTourFlight}

@@ -28,7 +28,8 @@ import { normalizeDraftNetwork } from "../flightBoard/flightBoard.model.js";
 // SimBrief reuses the status field for success copy, so the dismissible popup only shows errors.
 const SIMBRIEF_SUCCESS_STATUS_MESSAGES = new Set([
   "SimBrief flight plan loaded.",
-  "SimBrief flight plan refreshed."
+  "SimBrief flight plan refreshed.",
+  "SimBrief flight plan regenerated."
 ]);
 
 // Renders the aircraft selector shown above the expanded SimBrief/DVA action buttons.
@@ -123,6 +124,7 @@ export default function SimBriefInlinePanel({
   onSimBriefTypeChange,
   onDraftNetworkChange,
   onDispatchWorkflow,
+  onRegenerateDispatch,
   onOpenSimBriefFlight,
   onDraftOnlySubmit
 }) {
@@ -190,19 +192,19 @@ export default function SimBriefInlinePanel({
     Boolean(selectorSelectedAircraft) &&
     (Boolean(selectedCustomAirframe?.internalId) ||
       availableAircraftTypes.some((type) => type?.value === selectorSelectedAircraft));
-  const dispatchAircraftResolution = hasSimBriefPlan
-    ? null
-    : resolveSimBriefDispatchAircraft(
-        {
-          ...flight,
-          selectedAircraft: selectorSelectedAircraft
-        },
-        simBriefCustomAirframes
-      );
-  const canGenerateDispatch =
+  const dispatchAircraftResolution = resolveSimBriefDispatchAircraft(
+    {
+      ...flight,
+      selectedAircraft: selectorSelectedAircraft
+    },
+    simBriefCustomAirframes
+  );
+  const canResolveDispatchAircraft =
     Boolean(selectorSelectedAircraft) &&
     Boolean(dispatchAircraftResolution?.ok) &&
     Boolean(selectedTypeSupported);
+  const canGenerateDispatch =
+    Boolean(canResolveDispatchAircraft);
   const dispatchDisabled = hasSimBriefPlan
     ? !isDesktopSimBriefAvailable ||
       isDispatching ||
@@ -214,6 +216,12 @@ export default function SimBriefInlinePanel({
       isDraftSubmitting ||
       !canGenerateDispatch ||
       !simBriefCredentialsConfigured;
+  const regenerateDisabled =
+    !isDesktopSimBriefAvailable ||
+    isDispatching ||
+    isDraftSubmitting ||
+    !simBriefCredentialsConfigured ||
+    !canResolveDispatchAircraft;
   const dispatchLabel = isDispatching
     ? hasSimBriefPlan
       ? "Refreshing Dispatch..."
@@ -221,6 +229,13 @@ export default function SimBriefInlinePanel({
     : hasSimBriefPlan
       ? "Refresh Dispatch"
       : "Generate Dispatch";
+  const isRegeneratingDispatch =
+    isDispatching &&
+    hasSimBriefPlan &&
+    String(simBriefDispatchState.message || "").startsWith("Regenerating");
+  const regenerateLabel = isRegeneratingDispatch
+    ? "Regenerating Dispatch..."
+    : "Regenerate Dispatch";
   const draftDisabled = isDraftSubmitting || !draftValidation.valid;
   const draftDisabledTitle =
     draftDisabled && draftValidation.errors.length ? draftValidation.errors.join("; ") : "";
@@ -285,6 +300,17 @@ export default function SimBriefInlinePanel({
         >
           {dispatchLabel}
         </Button>
+        {hasSimBriefPlan && (
+          <Button
+            className="min-w-0 w-full"
+            variant="board"
+            size="sm"
+            onClick={onRegenerateDispatch}
+            disabled={regenerateDisabled}
+          >
+            {regenerateLabel}
+          </Button>
+        )}
         {hasSimBriefPlan && (
           <Button
             className="min-w-0 w-full"

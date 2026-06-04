@@ -50,6 +50,7 @@ export default function DetailsPanel({
   onSimBriefTypeChange,
   onDraftNetworkChange,
   onDispatchWorkflow,
+  onRegenerateDispatch,
   onOpenSimBriefFlight = () => {},
   onDraftOnlySubmit = () => {},
   onCompleteTourFlight,
@@ -352,6 +353,7 @@ export default function DetailsPanel({
           onSimBriefTypeChange={onSimBriefTypeChange}
           onDraftNetworkChange={onDraftNetworkChange}
           onDispatchWorkflow={onDispatchWorkflow}
+          onRegenerateDispatch={onRegenerateDispatch}
           onOpenSimBriefFlight={onOpenSimBriefFlight}
           onDraftOnlySubmit={onDraftOnlySubmit}
           onCompleteTourFlight={onCompleteTourFlight}

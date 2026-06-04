@@ -31,6 +31,7 @@ export default function DetailsFlightBoardList({
   onSimBriefTypeChange,
   onDraftNetworkChange,
   onDispatchWorkflow,
+  onRegenerateDispatch,
   onOpenSimBriefFlight,
   onDraftOnlySubmit,
   onCompleteTourFlight,
@@ -133,6 +134,7 @@ export default function DetailsFlightBoardList({
                     onSimBriefTypeChange={onSimBriefTypeChange}
                     onDraftNetworkChange={onDraftNetworkChange}
                     onDispatchWorkflow={onDispatchWorkflow}
+                    onRegenerateDispatch={onRegenerateDispatch}
                     onOpenSimBriefFlight={onOpenSimBriefFlight}
                     onDraftOnlySubmit={onDraftOnlySubmit}
                   />

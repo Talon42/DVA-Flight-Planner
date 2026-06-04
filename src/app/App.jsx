@@ -1360,7 +1360,8 @@ export default function App() {
     isSimBriefAircraftTypesLoading,
     simBriefAircraftTypesError,
     simBriefDispatchOptions: simBriefDispatchOptionsFromHook,
-    handleStartSimBriefDispatch
+    handleStartSimBriefDispatch,
+    handleRegenerateSimBriefDispatch
   } = appSimBriefDispatch;
   useEffect(() => {
     simBriefDispatchStateRef.current = simBriefDispatchState;
@@ -1382,6 +1383,7 @@ export default function App() {
 
   const simBriefDispatchOptions = simBriefDispatchOptionsFromHook;
   const handleDispatchWorkflow = handleStartSimBriefDispatch;
+  const handleRegenerateDispatchWorkflow = handleRegenerateSimBriefDispatch;
 
   async function handleDeleteUserData() {
     const confirmed = await confirmDeleteUserDataInApp();
@@ -1639,6 +1641,7 @@ export default function App() {
       onSimBriefTypeChange={handleSimBriefTypeChange}
       onDraftNetworkChange={handleDraftNetworkChange}
       onDispatchWorkflow={handleDispatchWorkflow}
+      onRegenerateDispatch={handleRegenerateDispatchWorkflow}
       onOpenSimBriefFlight={handleOpenSimBriefFlight}
       onDraftOnlySubmit={handleSubmitDeltaVirtualDraftReport}
       onCompleteTourFlight={handleCompleteTourFlight}
