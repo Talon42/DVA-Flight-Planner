@@ -150,10 +150,6 @@ export default function SimBriefInlinePanel({
   const selectorSelectedAircraft = selectedCustomAirframe?.internalId
     ? rawSelectedAircraft
     : normalizedSelectedAircraft;
-  const lockedSelectedAircraft =
-    selectorSelectedAircraft && !/[\s/]/.test(selectorSelectedAircraft)
-      ? selectorSelectedAircraft
-      : "";
   const simBriefStaticId = String(
     flight?.simbriefPlan?.staticId || flight?.simbriefPlan?.static_id || ""
   ).trim();
@@ -333,9 +329,9 @@ export default function SimBriefInlinePanel({
       <div className={selectorRowClassName}>
         <FlightCardAircraftSelector
           options={aircraftTypeOptions}
-          selectedValue={hasSimBriefPlan ? lockedSelectedAircraft : selectorSelectedAircraft}
+          selectedValue={selectorSelectedAircraft}
           isLoading={false}
-          locked={hasSimBriefPlan}
+          disabled={isDispatching || isDraftSubmitting || isDraftDeleting}
           onChange={(value) => onSimBriefTypeChange(flight.boardEntryId, value || "")}
         />
         <FlightCardNetworkSelector

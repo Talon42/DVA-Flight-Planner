@@ -1268,19 +1268,13 @@ export default function App() {
       simBriefPlan,
       normalizedBoardEntry.simbriefPlan?.staticId || normalizedBoardEntry.simbriefPlan?.static_id || ""
     );
-    const selectedCustomAirframe = findCustomAirframeByInternalId(
-      normalizedBoardEntry.selectedAircraft,
-      simBriefCustomAirframes
-    );
     const existingSelectedAircraft =
-      selectedCustomAirframe?.internalId
-        ? String(normalizedBoardEntry.selectedAircraft || "").trim()
-        : getSelectedAircraftForFlight(normalizedBoardEntry, simBriefCustomAirframes) || "";
-    const refreshedSelectedAircraft = getAircraftDisplayName(normalizedPlan?.aircraftType);
-    // Preserve a custom internal ID after refresh so the selector keeps sending the custom airframe.
-    const resolvedSelectedAircraft = selectedCustomAirframe?.internalId
-      ? existingSelectedAircraft
-      : refreshedSelectedAircraft || existingSelectedAircraft;
+      getSelectedAircraftForFlight(normalizedBoardEntry, simBriefCustomAirframes) || "";
+    const refreshedSelectedAircraft =
+      getAircraftDisplayName(normalizedPlan?.aircraftType) ||
+      String(normalizedPlan?.aircraftType || "").trim();
+    // Always sync the stored selection to the aircraft that SimBrief returned for the plan.
+    const resolvedSelectedAircraft = refreshedSelectedAircraft || existingSelectedAircraft;
     const resolvedPlan = normalizedPlan
       ? {
           ...normalizedPlan,
