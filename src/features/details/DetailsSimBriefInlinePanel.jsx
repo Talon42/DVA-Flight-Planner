@@ -284,6 +284,12 @@ export default function SimBriefInlinePanel({
       ? "Update Draft Only"
       : "Create Draft Only";
   const actionGridClassName = "grid gap-2 grid-cols-2 bp-1400:grid-cols-4";
+  const desktopDispatchActionRowClassName = hasSimBriefPlan
+    ? "hidden gap-2 bp-1400:grid bp-1400:grid-cols-2"
+    : "hidden gap-2 bp-1400:grid bp-1400:grid-cols-1";
+  const desktopPrimaryActionRowClassName = hasDraftReportId
+    ? "hidden gap-2 bp-1400:grid bp-1400:grid-cols-3"
+    : "hidden gap-2 bp-1400:grid bp-1400:grid-cols-2";
   const actionErrorMessage =
     deleteDraftErrorMessage || draftOnlyErrorMessage || simBriefErrorMessage;
   const actionErrorSignature = actionErrorMessage
@@ -293,6 +299,7 @@ export default function SimBriefInlinePanel({
   const [isDeleteDraftConfirmOpen, setIsDeleteDraftConfirmOpen] = useState(false);
   const actionErrorOverlayHost = typeof document !== "undefined" ? document.body : null;
   const selectorRowClassName = "grid grid-cols-2 gap-2";
+  const hasOpenActionRow = canShowLinkedDispatchOpenActions || showDraftOnlyAction;
 
   // Keep the popup closed until the underlying error changes or clears.
   useEffect(() => {
@@ -342,64 +349,45 @@ export default function SimBriefInlinePanel({
         />
       </div>
 
-      <div className={actionGridClassName}>
-        <Button
-          className="min-w-0 w-full"
-          variant="board"
-          size="sm"
-          onClick={onDispatchWorkflow}
-          disabled={dispatchDisabled}
-          title={hasSimBriefPlan && draftDeleteRequiresRegenerate ? "Regenerate dispatch before refreshing." : ""}
-        >
-          {dispatchLabel}
-        </Button>
-        {hasSimBriefPlan && (
-          <Button
-            className="min-w-0 w-full"
-            variant="board"
-            size="sm"
-            onClick={onRegenerateDispatch}
-            disabled={regenerateDisabled}
-          >
-            {regenerateLabel}
-          </Button>
-        )}
-        {canShowLinkedDispatchOpenActions && (
-          <Button
-            className="min-w-0 w-full"
-            variant="board"
-            size="sm"
-            onClick={() => onOpenSimBriefFlight(simBriefStaticId)}
-          >
-            Open in Simbrief
-          </Button>
-        )}
-        {showDraftOnlyAction ? (
-          <Button
-            className="min-w-0 w-full"
-            variant="board"
-            size="sm"
-            onClick={() => onDraftOnlySubmit(flight.boardEntryId)}
-            disabled={draftDisabled}
-            title={draftDisabledTitle}
-          >
-            {draftLabel}
-          </Button>
-        ) : null}
-        {canShowLinkedDispatchOpenActions && draftReportUrl ? (
-          <Button
-            as="a"
-            className="min-w-0 w-full"
-            variant="board"
-            size="sm"
-            href={draftReportUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open in DVA
-          </Button>
-        ) : null}
-      </div>
+      {hasOpenActionRow ? (
+        <div className={actionGridClassName}>
+          {canShowLinkedDispatchOpenActions && (
+            <Button
+              className="min-w-0 w-full"
+              variant="board"
+              size="sm"
+              onClick={() => onOpenSimBriefFlight(simBriefStaticId)}
+            >
+              Open in Simbrief
+            </Button>
+          )}
+          {showDraftOnlyAction ? (
+            <Button
+              className="min-w-0 w-full"
+              variant="board"
+              size="sm"
+              onClick={() => onDraftOnlySubmit(flight.boardEntryId)}
+              disabled={draftDisabled}
+              title={draftDisabledTitle}
+            >
+              {draftLabel}
+            </Button>
+          ) : null}
+          {canShowLinkedDispatchOpenActions && draftReportUrl ? (
+            <Button
+              as="a"
+              className="min-w-0 w-full"
+              variant="board"
+              size="sm"
+              href={draftReportUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open in DVA
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-2 bp-1400:hidden">
         <Button
@@ -439,7 +427,31 @@ export default function SimBriefInlinePanel({
           </Button>
         </div>
       </div>
-      <div className={hasDraftReportId ? "hidden gap-2 bp-1400:grid bp-1400:grid-cols-3" : "hidden gap-2 bp-1400:grid bp-1400:grid-cols-2"}>
+      <div className={desktopDispatchActionRowClassName}>
+        <Button
+          className="min-w-0 w-full"
+          variant="board"
+          size="sm"
+          onClick={onDispatchWorkflow}
+          disabled={dispatchDisabled}
+          title={hasSimBriefPlan && draftDeleteRequiresRegenerate ? "Regenerate dispatch before refreshing." : ""}
+        >
+          {dispatchLabel}
+        </Button>
+        {hasSimBriefPlan && (
+          <Button
+            className="min-w-0 w-full"
+            variant="board"
+            size="sm"
+            onClick={onRegenerateDispatch}
+            disabled={regenerateDisabled}
+          >
+            {regenerateLabel}
+          </Button>
+        )}
+      </div>
+
+      <div className={desktopPrimaryActionRowClassName}>
         <Button
           className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
           variant={flight.isCompleted ? "ghost" : "success"}
