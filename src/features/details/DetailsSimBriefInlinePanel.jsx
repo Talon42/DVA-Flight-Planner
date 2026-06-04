@@ -8,7 +8,6 @@ import { cn } from "../../components/ui/cn";
 import {
   fieldLabelClassName,
   fieldTitleClassName,
-  gridClassNames,
   toggleButtonClassName
 } from "../../components/ui/forms";
 import { bodySmTextClassName } from "../../components/ui/typography";
@@ -284,15 +283,12 @@ export default function SimBriefInlinePanel({
     : hasDraftReportId
       ? "Update Draft Only"
       : "Create Draft Only";
-  const actionGridClassName = gridClassNames.boardActionsQuad;
+  const actionGridClassName = "grid gap-2 grid-cols-2 bp-1400:grid-cols-4";
   const actionErrorMessage =
     deleteDraftErrorMessage || draftOnlyErrorMessage || simBriefErrorMessage;
   const actionErrorSignature = actionErrorMessage
     ? `${deleteDraftErrorMessage ? "delete" : draftOnlyErrorMessage ? "draft" : "simbrief"}:${actionErrorMessage}`
     : "";
-  const finalActionRowClassName = hasDraftReportId
-    ? "grid gap-2 bp-1400:grid-cols-3"
-    : "grid gap-2 bp-1400:grid-cols-2";
   const [dismissedErrorSignature, setDismissedErrorSignature] = useState("");
   const [isDeleteDraftConfirmOpen, setIsDeleteDraftConfirmOpen] = useState(false);
   const actionErrorOverlayHost = typeof document !== "undefined" ? document.body : null;
@@ -405,7 +401,45 @@ export default function SimBriefInlinePanel({
         ) : null}
       </div>
 
-      <div className={finalActionRowClassName}>
+      <div className="grid gap-2 bp-1400:hidden">
+        <Button
+          className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
+          variant={flight.isCompleted ? "ghost" : "success"}
+          size="sm"
+          onClick={() => onCompleteTourFlight(flight.boardEntryId)}
+        >
+          {flight.isCompleted ? "Click to Revert Status" : "Complete Flight"}
+        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          {hasDraftReportId ? (
+            <Button
+              className="min-w-0 w-full"
+              variant="danger"
+              size="sm"
+              onClick={() => setIsDeleteDraftConfirmOpen(true)}
+              disabled={deleteDraftDisabled}
+              title={
+                draftDeleteRequiresRegenerate
+                  ? "Regenerate dispatch before deleting again."
+                  : ""
+              }
+            >
+              {deleteDraftLabel}
+            </Button>
+          ) : (
+            <div aria-hidden="true" />
+          )}
+          <Button
+            className="min-w-0 w-full"
+            variant="danger"
+            size="sm"
+            onClick={() => onRemoveFromFlightBoard(flight.boardEntryId)}
+          >
+            Remove from Board
+          </Button>
+        </div>
+      </div>
+      <div className={hasDraftReportId ? "hidden gap-2 bp-1400:grid bp-1400:grid-cols-3" : "hidden gap-2 bp-1400:grid bp-1400:grid-cols-2"}>
         <Button
           className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
           variant={flight.isCompleted ? "ghost" : "success"}
