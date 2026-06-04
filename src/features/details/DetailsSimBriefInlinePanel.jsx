@@ -32,6 +32,10 @@ const SIMBRIEF_SUCCESS_STATUS_MESSAGES = new Set([
   "SimBrief flight plan regenerated."
 ]);
 
+// Matches the board-tile control height used by the expanded flight-board buttons.
+const flightBoardControlButtonClassName =
+  "!h-16 !min-h-16 !px-3 !py-0 text-[0.9rem] leading-none bp-1024:!h-16 bp-1024:!min-h-16";
+
 // Renders the aircraft selector shown above the expanded SimBrief/DVA action buttons.
 function FlightCardAircraftSelector({
   options,
@@ -61,7 +65,7 @@ function FlightCardAircraftSelector({
         onChange={(values) => onChange(values[0] || "")}
         prioritizeSelectedOptions={false}
         disabled={isLocked}
-        className="[&_.multi-select__trigger]:!min-h-9 [&_.multi-select__trigger]:!px-3 [&_.multi-select__trigger]:!py-2 [&_.multi-select__trigger]:bp-1024:!min-h-8 [&_.multi-select__trigger]:bp-1024:!px-2.5 [&_.multi-select__trigger]:bp-1024:!py-2"
+        triggerClassName={flightBoardControlButtonClassName}
       />
     </div>
   );
@@ -78,7 +82,7 @@ function FlightCardNetworkSelector({ value, onChange }) {
         <button
           className={cn(
             toggleButtonClassName(selectedValue === "Offline", "choice", "compact"),
-            "!min-h-9 !px-3 !py-2 text-[0.9rem] leading-none bp-1024:!min-h-8 bp-1024:!px-2.5 bp-1024:!py-2"
+            flightBoardControlButtonClassName
           )}
           type="button"
           aria-pressed={selectedValue === "Offline"}
@@ -89,7 +93,7 @@ function FlightCardNetworkSelector({ value, onChange }) {
         <button
           className={cn(
             toggleButtonClassName(selectedValue === "VATSIM", "choice", "compact"),
-            "!min-h-9 !px-3 !py-2 text-[0.9rem] leading-none bp-1024:!min-h-8 bp-1024:!px-2.5 bp-1024:!py-2"
+            flightBoardControlButtonClassName
           )}
           type="button"
           aria-pressed={selectedValue === "VATSIM"}
