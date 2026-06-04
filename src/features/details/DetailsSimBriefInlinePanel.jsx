@@ -45,7 +45,7 @@ function FlightCardAircraftSelector({
   const isLocked = locked || readOnly || disabled;
 
   return (
-    <div className="grid gap-1">
+    <div className="grid gap-1.5">
       <SearchableMultiSelect
         label="Aircraft"
         placeholder={isLoading ? "Loading aircraft..." : "Search aircraft"}
@@ -61,6 +61,7 @@ function FlightCardAircraftSelector({
         onChange={(values) => onChange(values[0] || "")}
         prioritizeSelectedOptions={false}
         disabled={isLocked}
+        className="[&_.multi-select__trigger]:!min-h-9 [&_.multi-select__trigger]:!px-3 [&_.multi-select__trigger]:!py-2 [&_.multi-select__trigger]:bp-1024:!min-h-8 [&_.multi-select__trigger]:bp-1024:!px-2.5 [&_.multi-select__trigger]:bp-1024:!py-2"
       />
     </div>
   );
@@ -77,7 +78,7 @@ function FlightCardNetworkSelector({ value, onChange }) {
         <button
           className={cn(
             toggleButtonClassName(selectedValue === "Offline", "choice", "compact"),
-            "px-3 py-2 text-[0.9rem] leading-none"
+            "!min-h-9 !px-3 !py-2 text-[0.9rem] leading-none bp-1024:!min-h-8 bp-1024:!px-2.5 bp-1024:!py-2"
           )}
           type="button"
           aria-pressed={selectedValue === "Offline"}
@@ -88,7 +89,7 @@ function FlightCardNetworkSelector({ value, onChange }) {
         <button
           className={cn(
             toggleButtonClassName(selectedValue === "VATSIM", "choice", "compact"),
-            "px-3 py-2 text-[0.9rem] leading-none"
+            "!min-h-9 !px-3 !py-2 text-[0.9rem] leading-none bp-1024:!min-h-8 bp-1024:!px-2.5 bp-1024:!py-2"
           )}
           type="button"
           aria-pressed={selectedValue === "VATSIM"}
