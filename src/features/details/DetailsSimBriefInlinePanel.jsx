@@ -351,21 +351,21 @@ export default function SimBriefInlinePanel({
               className="min-w-0 w-full"
               variant="board"
               size="sm"
-              onClick={() => onDraftOnlySubmit(flight.boardEntryId)}
-              disabled={draftDisabled}
-              title={draftDisabledTitle}
-            >
-              {draftLabel}
-            </Button>
-            <Button
-              className="min-w-0 w-full"
-              variant="board"
-              size="sm"
               onClick={onDispatchWorkflow}
               disabled={dispatchDisabled}
               title={hasSimBriefPlan && draftDeleteRequiresRegenerate ? "Regenerate dispatch before refreshing." : ""}
             >
               {dispatchLabel}
+            </Button>
+            <Button
+              className="min-w-0 w-full"
+              variant="board"
+              size="sm"
+              onClick={() => onDraftOnlySubmit(flight.boardEntryId)}
+              disabled={draftDisabled}
+              title={draftDisabledTitle}
+            >
+              {draftLabel}
             </Button>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -394,21 +394,21 @@ export default function SimBriefInlinePanel({
               className="min-w-0 w-full"
               variant="board"
               size="sm"
-              onClick={() => onDraftOnlySubmit(flight.boardEntryId)}
-              disabled={draftDisabled}
-              title={draftDisabledTitle}
-            >
-              {draftLabel}
-            </Button>
-            <Button
-              className="min-w-0 w-full"
-              variant="board"
-              size="sm"
               onClick={onDispatchWorkflow}
               disabled={dispatchDisabled}
               title={hasSimBriefPlan && draftDeleteRequiresRegenerate ? "Regenerate dispatch before refreshing." : ""}
             >
               {dispatchLabel}
+            </Button>
+            <Button
+              className="min-w-0 w-full"
+              variant="board"
+              size="sm"
+              onClick={() => onDraftOnlySubmit(flight.boardEntryId)}
+              disabled={draftDisabled}
+              title={draftDisabledTitle}
+            >
+              {draftLabel}
             </Button>
           </div>
 
