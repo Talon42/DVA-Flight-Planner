@@ -266,6 +266,13 @@ export default function SimBriefInlinePanel({
   const draftReportUrl = hasDraftReportId
     ? `https://www.deltava.org/pirep.do?id=0x${Number(draftReportId).toString(16)}`
     : "";
+  const canShowLinkedDispatchOpenActions =
+    hasSimBriefPlan &&
+    hasDraftReportId &&
+    !isDispatching &&
+    !isDraftSubmitting &&
+    !isDraftDeleting &&
+    !draftDeleteRequiresRegenerate;
   const deleteDraftDisabled =
     isDraftSubmitting || isDispatching || isDraftDeleting || !hasDraftReportId ||
     draftDeleteRequiresRegenerate;
@@ -361,7 +368,7 @@ export default function SimBriefInlinePanel({
             {regenerateLabel}
           </Button>
         )}
-        {hasSimBriefPlan && (
+        {canShowLinkedDispatchOpenActions && (
           <Button
             className="min-w-0 w-full"
             variant="board"
@@ -383,7 +390,7 @@ export default function SimBriefInlinePanel({
             {draftLabel}
           </Button>
         ) : null}
-        {draftReportUrl ? (
+        {canShowLinkedDispatchOpenActions && draftReportUrl ? (
           <Button
             as="a"
             className="min-w-0 w-full"
