@@ -154,6 +154,7 @@ function CenteredFilterOverlay({ children, onClick, compact = false }) {
 export function SearchableSelect({
   label,
   className = "",
+  triggerClassName = "",
   labelPlacement = "stacked",
   hideLabel = false,
   labelSuffix = null,
@@ -611,12 +612,13 @@ export function SearchableSelect({
       <div className={cn("multi-select relative min-w-0", hideLabel && "col-span-full")}>
         <button
           ref={triggerRef}
-          className={cn(
-            fieldBodyClassName,
-            "multi-select__trigger flex w-full items-center justify-between gap-3 px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-left disabled:cursor-not-allowed disabled:opacity-60 dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]",
-            isOpen && darkFieldOpenClassName
-          )}
-          type="button"
+        className={cn(
+          fieldBodyClassName,
+          "multi-select__trigger flex w-full items-center justify-between gap-3 px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-left disabled:cursor-not-allowed disabled:opacity-60 dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]",
+          isOpen && darkFieldOpenClassName,
+          triggerClassName
+        )}
+        type="button"
           onClick={() => !disabled && setIsOpen((current) => !current)}
           disabled={disabled}
         >

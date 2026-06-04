@@ -34,7 +34,7 @@ const SIMBRIEF_SUCCESS_STATUS_MESSAGES = new Set([
 
 // Matches the board-tile control height used by the expanded flight-board buttons.
 const flightBoardControlButtonClassName =
-  "!h-16 !min-h-16 !px-3 !py-0 text-[0.9rem] leading-none bp-1024:!h-16 bp-1024:!min-h-16";
+  "!h-12 !min-h-12 !px-3 !py-0 text-[0.9rem] leading-none bp-1024:!h-12 bp-1024:!min-h-12";
 
 // Renders the aircraft selector shown above the expanded SimBrief/DVA action buttons.
 function FlightCardAircraftSelector({
