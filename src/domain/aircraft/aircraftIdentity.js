@@ -125,6 +125,32 @@ function normalizeCustomAirframeMatchValue(entry) {
   return null;
 }
 
+// Resolves a custom SimBrief airframe only when the raw internal ID matches exactly.
+export function findCustomAirframeByInternalId(internalId, customAirframes = []) {
+  const normalizedInternalId = normalizeText(internalId);
+  if (!normalizedInternalId) {
+    return null;
+  }
+
+  for (const entry of Array.isArray(customAirframes) ? customAirframes : []) {
+    if (normalizeText(entry?.internalId) !== normalizedInternalId) {
+      continue;
+    }
+
+    const resolvedRow = normalizeCustomAirframeMatchValue(entry);
+    if (!resolvedRow?.name || !resolvedRow?.dva) {
+      return null;
+    }
+
+    return {
+      ...entry,
+      resolvedRow
+    };
+  }
+
+  return null;
+}
+
 function findCustomAirframeForAircraft(selectedAircraft, customAirframes = []) {
   const selectedRow = resolveIdentityRow(selectedAircraft);
   const selectedKey = normalizeAircraftKey(selectedRow?.name || selectedAircraft);
@@ -267,6 +293,51 @@ export function buildDvaAircraftOptions() {
   });
 }
 
+// Builds the flight-board aircraft options and prepends valid custom SimBrief airframes.
+export function buildDvaAircraftOptionsWithCustomAirframes(customAirframes = []) {
+  const customRows = Array.isArray(customAirframes)
+    ? customAirframes
+        .map(normalizeAircraftCustomAirframe)
+        .filter((entry) => entry && entry.internalId && entry.matchAircraft && entry.matchDva)
+    : [];
+
+  const customOptions = buildGroupedAircraftSelectOptions(customRows, (entry) => {
+    const groupLabel = "Custom SimBrief Airframes";
+    const sortLabel = normalizeText(entry.name || entry.matchAircraft || entry.internalId);
+    const keywords = [
+      entry.internalId,
+      entry.name,
+      entry.matchAircraft,
+      entry.matchDva,
+      entry.matchType,
+      entry.baseType
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return {
+      value: entry.internalId,
+      code: entry.internalId,
+      label: `${entry.name || entry.internalId} - ${entry.matchAircraft}`,
+      selectedLabel: entry.name || entry.internalId,
+      name: entry.name || entry.internalId,
+      dva: entry.matchDva,
+      simbrief: entry.matchType || entry.baseType,
+      matchAircraft: entry.matchAircraft,
+      matchDva: entry.matchDva,
+      matchType: entry.matchType,
+      baseType: entry.baseType,
+      customAirframeId: entry.internalId,
+      groupLabel,
+      sortLabel,
+      keywords,
+      kind: "custom"
+    };
+  });
+
+  return [...customOptions, ...buildDvaAircraftOptions()];
+}
+
 // Builds the custom-airframe match dropdown options from the same DVA aircraft list.
 export function buildCustomAirframeMatchOptions() {
   return buildDvaAircraftOptions();
@@ -339,6 +410,22 @@ export function getSelectedAircraftForFlight(flight, customAirframes = []) {
 
 // Resolves the dispatch target for SimBrief using the normalized aircraft identity.
 export function resolveSimBriefDispatchAircraft(flight, customAirframes = []) {
+  const selectedCustomAirframe = findCustomAirframeByInternalId(
+    flight?.selectedAircraft,
+    customAirframes
+  );
+  if (selectedCustomAirframe?.internalId) {
+    return {
+      ok: true,
+      dispatchType: selectedCustomAirframe.internalId,
+      source: "custom",
+      selectedAircraft: selectedCustomAirframe.resolvedRow?.name || "",
+      dva: selectedCustomAirframe.resolvedRow?.dva || "",
+      simbrief: selectedCustomAirframe.resolvedRow?.simbrief || "",
+      customAirframe: selectedCustomAirframe
+    };
+  }
+
   const selectedAircraft = getSelectedAircraftForFlight(flight, customAirframes);
   if (!selectedAircraft) {
     return {
@@ -358,19 +445,6 @@ export function resolveSimBriefDispatchAircraft(flight, customAirframes = []) {
       dva: identityRow.dva,
       simbrief: identityRow.simbrief,
       customAirframe: null
-    };
-  }
-
-  const customAirframe = findCustomAirframeForAircraft(selectedAircraft, customAirframes);
-  if (customAirframe?.internalId) {
-    return {
-      ok: true,
-      dispatchType: customAirframe.internalId,
-      source: "custom",
-      selectedAircraft,
-      dva: customAirframe.resolvedRow?.dva || "",
-      simbrief: customAirframe.resolvedRow?.simbrief || "",
-      customAirframe
     };
   }
 

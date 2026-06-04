@@ -19,6 +19,7 @@ import {
   validateDeltaVirtualDraftReportPayload
 } from "../../domain/deltaVirtual/draftReport.js";
 import {
+  findCustomAirframeByInternalId,
   getSelectedAircraftForFlight,
   resolveSimBriefDispatchAircraft
 } from "../../domain/aircraft/aircraftIdentity.js";
@@ -125,9 +126,19 @@ export default function SimBriefInlinePanel({
   onOpenSimBriefFlight,
   onDraftOnlySubmit
 }) {
-  const selectedAircraft = getSelectedAircraftForFlight(flight, simBriefCustomAirframes);
+  const rawSelectedAircraft = String(flight?.selectedAircraft || "").trim();
+  const normalizedSelectedAircraft = getSelectedAircraftForFlight(flight, simBriefCustomAirframes);
+  const selectedCustomAirframe = findCustomAirframeByInternalId(
+    rawSelectedAircraft,
+    simBriefCustomAirframes
+  );
+  const selectorSelectedAircraft = selectedCustomAirframe?.internalId
+    ? rawSelectedAircraft
+    : normalizedSelectedAircraft;
   const lockedSelectedAircraft =
-    selectedAircraft && !/[\s/]/.test(selectedAircraft) ? selectedAircraft : "";
+    selectorSelectedAircraft && !/[\s/]/.test(selectorSelectedAircraft)
+      ? selectorSelectedAircraft
+      : "";
   const simBriefStaticId = String(
     flight?.simbriefPlan?.staticId || flight?.simbriefPlan?.static_id || ""
   ).trim();
@@ -137,7 +148,13 @@ export default function SimBriefInlinePanel({
     10
   );
   const hasDraftReportId = Number.isInteger(draftReportId) && draftReportId > 0;
-  const draftAircraftResolution = resolveDraftAircraftCompatibility(flight, simBriefCustomAirframes);
+  const draftAircraftResolution = resolveDraftAircraftCompatibility(
+    {
+      ...flight,
+      selectedAircraft: normalizedSelectedAircraft || rawSelectedAircraft
+    },
+    simBriefCustomAirframes
+  );
   const draftPayload = buildDeltaVirtualDraftReportPayload(
     flight,
     draftAircraftResolution,
@@ -170,18 +187,20 @@ export default function SimBriefInlinePanel({
   const isDispatching =
     simBriefDispatchState.flightId === flight.boardEntryId && simBriefDispatchState.isDispatching;
   const selectedTypeSupported =
-    !selectedAircraft || availableAircraftTypes.some((type) => type?.value === selectedAircraft);
+    Boolean(selectorSelectedAircraft) &&
+    (Boolean(selectedCustomAirframe?.internalId) ||
+      availableAircraftTypes.some((type) => type?.value === selectorSelectedAircraft));
   const dispatchAircraftResolution = hasSimBriefPlan
     ? null
     : resolveSimBriefDispatchAircraft(
         {
           ...flight,
-          selectedAircraft
+          selectedAircraft: selectorSelectedAircraft
         },
         simBriefCustomAirframes
       );
   const canGenerateDispatch =
-    Boolean(selectedAircraft) &&
+    Boolean(selectorSelectedAircraft) &&
     Boolean(dispatchAircraftResolution?.ok) &&
     Boolean(selectedTypeSupported);
   const dispatchDisabled = hasSimBriefPlan
@@ -245,7 +264,7 @@ export default function SimBriefInlinePanel({
       <div className={selectorRowClassName}>
         <FlightCardAircraftSelector
           options={aircraftTypeOptions}
-          selectedValue={hasSimBriefPlan ? lockedSelectedAircraft : selectedAircraft}
+          selectedValue={hasSimBriefPlan ? lockedSelectedAircraft : selectorSelectedAircraft}
           isLoading={false}
           locked={hasSimBriefPlan}
           onChange={(value) => onSimBriefTypeChange(flight.boardEntryId, value || "")}

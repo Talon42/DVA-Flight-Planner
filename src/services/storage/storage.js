@@ -487,7 +487,10 @@ function buildPersistedCompatibilityCatalog(flights = []) {
       maxPax: flight.maxPax,
       blockMinutes: flight.blockMinutes,
       distanceNm: flight.distanceNm,
-      selectedAircraft: getSelectedAircraftForFlight(flight) || "",
+      selectedAircraft:
+        String(flight.selectedAircraft || "").trim() ||
+        getSelectedAircraftForFlight(flight) ||
+        String(flight.simbriefSelectedType || "").trim(),
       simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
       boardSequence: Number.isInteger(flight.boardSequence) ? flight.boardSequence : null,
       compatibilityRef,
@@ -539,7 +542,10 @@ function hydratePersistedFlight(flight, compatibilityEntry, shortlistSet) {
     compatibilityReason: buildCompatibilityReason(compatibleEquipment),
     missingAirportIcaos: Array.isArray(flight.missingAirportIcaos) ? flight.missingAirportIcaos : [],
     hasMissingAirportData: Boolean(flight.hasMissingAirportData),
-    selectedAircraft: getSelectedAircraftForFlight(flight) || "",
+    selectedAircraft:
+      String(flight.selectedAircraft || "").trim() ||
+      getSelectedAircraftForFlight(flight) ||
+      String(flight.simbriefSelectedType || "").trim(),
     simbriefSelectedType: "",
     simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
     isShortlisted: shortlistSet.has(flight.flightId),

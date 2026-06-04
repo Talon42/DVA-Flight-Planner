@@ -2,7 +2,7 @@ import { DateTime } from "luxon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deriveCallsign, deriveFlightNumber } from "../../domain/flights/flightIdentity";
 import {
-  buildDvaAircraftOptions,
+  buildDvaAircraftOptionsWithCustomAirframes,
   resolveSimBriefDispatchAircraft
 } from "../../domain/aircraft/aircraftIdentity.js";
 import { buildTourFlightLookupKey } from "../tours/tourIds.model";
@@ -158,7 +158,9 @@ export function useSimBriefDispatch({
   const [isSimBriefAircraftTypesLoading, setIsSimBriefAircraftTypesLoading] = useState(false);
   const [simBriefAircraftTypesError, setSimBriefAircraftTypesError] = useState("");
   const loadRequestIdRef = useRef(0);
-  const simBriefDispatchOptions = buildDvaAircraftOptions();
+  const simBriefDispatchOptions = buildDvaAircraftOptionsWithCustomAirframes(
+    simBriefCustomAirframes
+  );
 
   const handleCloseSimBriefDispatch = useCallback(() => {
     setSimBriefDispatchState({

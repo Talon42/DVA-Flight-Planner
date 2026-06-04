@@ -89,6 +89,7 @@ import {
 } from "../components/map/mapOptions.model.js";
 import {
   getAircraftDisplayName,
+  findCustomAirframeByInternalId,
   getSelectedAircraftForFlight,
   resolveSimBriefDispatchAircraft
 } from "../domain/aircraft/aircraftIdentity.js";
@@ -1118,12 +1119,19 @@ export default function App() {
   }
 
   function handleSimBriefTypeChange(boardEntryId, nextType) {
-    const normalizedAircraft = getAircraftDisplayName(nextType);
+    const rawSelection = String(nextType || "").trim();
+    const selectedCustomAirframe = findCustomAirframeByInternalId(
+      rawSelection,
+      simBriefCustomAirframes
+    );
+    const selectedAircraft = selectedCustomAirframe?.internalId
+      ? rawSelection
+      : getAircraftDisplayName(rawSelection);
     const nextFlightBoard = flightBoard.map((entry) =>
       entry.boardEntryId === boardEntryId
         ? {
             ...entry,
-            selectedAircraft: normalizedAircraft,
+            selectedAircraft,
             simbriefSelectedType: ""
           }
         : entry
@@ -1132,7 +1140,7 @@ export default function App() {
 
     const updatedEntry =
       nextFlightBoard.find((entry) => entry.boardEntryId === boardEntryId) || null;
-    if (!updatedEntry || !normalizedAircraft) {
+    if (!updatedEntry || !selectedAircraft) {
       handleCloseSimBriefDispatchBlocked();
       return;
     }
@@ -1140,7 +1148,7 @@ export default function App() {
     const dispatchResolution = resolveSimBriefDispatchAircraft(
       {
         ...updatedEntry,
-        selectedAircraft: normalizedAircraft
+        selectedAircraft
       },
       simBriefCustomAirframes
     );
@@ -1260,11 +1268,19 @@ export default function App() {
       simBriefPlan,
       normalizedBoardEntry.simbriefPlan?.staticId || normalizedBoardEntry.simbriefPlan?.static_id || ""
     );
+    const selectedCustomAirframe = findCustomAirframeByInternalId(
+      normalizedBoardEntry.selectedAircraft,
+      simBriefCustomAirframes
+    );
     const existingSelectedAircraft =
-      getSelectedAircraftForFlight(normalizedBoardEntry, simBriefCustomAirframes) || "";
+      selectedCustomAirframe?.internalId
+        ? String(normalizedBoardEntry.selectedAircraft || "").trim()
+        : getSelectedAircraftForFlight(normalizedBoardEntry, simBriefCustomAirframes) || "";
     const refreshedSelectedAircraft = getAircraftDisplayName(normalizedPlan?.aircraftType);
-    // Preserve the current locked selector unless SimBrief returns a valid replacement on refresh.
-    const resolvedSelectedAircraft = refreshedSelectedAircraft || existingSelectedAircraft;
+    // Preserve a custom internal ID after refresh so the selector keeps sending the custom airframe.
+    const resolvedSelectedAircraft = selectedCustomAirframe?.internalId
+      ? existingSelectedAircraft
+      : refreshedSelectedAircraft || existingSelectedAircraft;
     const resolvedPlan = normalizedPlan
       ? {
           ...normalizedPlan,
