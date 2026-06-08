@@ -1,7 +1,7 @@
 ---
-eyebrow: VATSIM ATC
-title: Find a VATSIM Airport
-imageAlt: VATSIM Filter
+eyebrow: Delete Draft
+title: Delete DVA Draft Report
+imageAlt: Delete DVA Draft Report
 ---
 
-Enable VATSIM to quickly filter airports that have available online ATC coverage
+Delete your DVA draft report directly from the app without having to go to the DVA Website.
