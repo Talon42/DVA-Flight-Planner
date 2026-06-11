@@ -13,6 +13,7 @@ const ACCOMPLISHMENTS = normalizeAccomplishments(accomplishmentsData);
 
 // Keeps tour and accomplishment selection state synchronized with cache and logbook data.
 export function useTourSelection({
+  boardedTourRowIds = new Set(),
   deltaVirtualToursCache = null,
   derivedTourProgress = null,
   isDevToolsEnabled = false,
@@ -121,7 +122,22 @@ export function useTourSelection({
   );
 
   const tourRows = useMemo(() => selectedTour?.rows || [], [selectedTour]);
-  const activeTourRows = tourRows;
+  const activeTourRows = useMemo(
+    () =>
+      tourRows.filter((row) => {
+        if (!row?.tourRowId) {
+          return true;
+        }
+
+        // Keep completed tour legs visible even if they are still on a board from manual or synced progress.
+        if (row.isCompleted) {
+          return true;
+        }
+
+        return !boardedTourRowIds.has(row.tourRowId);
+      }),
+    [boardedTourRowIds, tourRows]
+  );
   const tourFlightsByKey = useMemo(
     () =>
       new Map(
@@ -192,11 +208,11 @@ export function useTourSelection({
     }
 
     setSelectedTourRowId((current) =>
-      selectedTour?.rows.some((row) => row.tourRowId === current)
+      activeTourRows.some((row) => row.tourRowId === current)
         ? current
-        : selectedTour?.rows[0]?.tourRowId || null
+        : activeTourRows[0]?.tourRowId || null
     );
-  }, [scheduleView, selectedTour, setSelectedTourRowId]);
+  }, [activeTourRows, scheduleView, setSelectedTourRowId]);
 
   function handleSelectTourPath(nextTourSelectionId) {
     const nextSelectionId = normalizeDvaTourId(nextTourSelectionId);

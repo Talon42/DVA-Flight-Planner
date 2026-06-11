@@ -388,6 +388,29 @@ export default function App() {
   const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
   const scheduleDateLabel = scheduleDateInfo.label;
   const logbookDateLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
+  // Tracks which rows are already assigned to any board so the schedule tables only show available work.
+  const boardedFlightIds = useMemo(
+    () =>
+      new Set(
+        flightBoards.flatMap((board) =>
+          (Array.isArray(board?.entries) ? board.entries : [])
+            .filter((entry) => !entry?.isTourFlight && String(entry?.linkedFlightId || "").trim())
+            .map((entry) => String(entry.linkedFlightId).trim())
+        )
+      ),
+    [flightBoards]
+  );
+  const boardedTourRowIds = useMemo(
+    () =>
+      new Set(
+        flightBoards.flatMap((board) =>
+          (Array.isArray(board?.entries) ? board.entries : [])
+            .filter((entry) => entry?.isTourFlight && String(entry?.tourRowId || "").trim())
+            .map((entry) => String(entry.tourRowId).trim())
+        )
+      ),
+    [flightBoards]
+  );
   const footerMetadataItems = schedule?.importSummary
     ? [
         {
@@ -405,6 +428,7 @@ export default function App() {
       ]
     : [];
   const tourSelection = useTourSelection({
+    boardedTourRowIds,
     deltaVirtualToursCache,
     derivedTourProgress,
     isDevToolsEnabled,
@@ -779,12 +803,18 @@ export default function App() {
 
   const basicFilteredFlights = useMemo(() => {
     return selectFilteredScheduleFlights({
-      flights: scheduleFlights,
+      flights: scheduleFlights.filter((flight) => !boardedFlightIds.has(flight.flightId)),
       filters: normalizedDeferredFilters,
       addonAirports,
       vatsimCoverageIndex: activeVatsimCoverageIndex
     });
-  }, [activeVatsimCoverageIndex, addonAirports, normalizedDeferredFilters, scheduleFlights]);
+  }, [
+    activeVatsimCoverageIndex,
+    addonAirports,
+    boardedFlightIds,
+    normalizedDeferredFilters,
+    scheduleFlights
+  ]);
 
   const sortedFlights = useMemo(() => {
     return selectSortedScheduleFlights({
