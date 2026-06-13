@@ -974,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "flight-planner-app"
-version = "0.7.1-beta"
+version = "0.7.3-beta"
 dependencies = [
  "base64 0.22.1",
  "chrono",
