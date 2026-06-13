@@ -3,6 +3,7 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
   const targetUrl = 'https://www.deltava.org/pfpxsched.ws';
   const logbookPageUrl = 'https://www.deltava.org/logbook.do';
   const logbookExportUrl = 'https://www.deltava.org/mylogbook.ws';
+  const accomplishmentEligibilityUrl = 'https://www.deltava.org/acceligibility.do';
   const syncFlagKey = 'flightPlannerDeltaSyncRequested';
   const nonce = __NONCE__;
   const syncResultPrefix = '__FLIGHT_PLANNER_SYNC_RESULT__';
@@ -134,6 +135,27 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
     }
     return { jsonText, filename, contentType };
   };
+  const fetchAccomplishmentEligibilityHtml = async () => {
+    emitDebug('accomplishments:fetch-start');
+    const response = await fetch(accomplishmentEligibilityUrl, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    });
+    const htmlText = await response.text();
+    emitDebug(`accomplishments:fetch-status:${response.status}:${htmlText.length}`);
+    if (!response.ok) {
+      throw new Error(`Accomplishment eligibility request failed with HTTP ${response.status}.`);
+    }
+    const normalizedText = String(htmlText || '').toUpperCase();
+    if (!normalizedText.includes('ACCOMPLISHMENT ELIGIBILITY')) {
+      throw new Error('Delta Virtual returned an unexpected accomplishment eligibility response.');
+    }
+    if (normalizedText.includes('SECURITY VIOLATION') || normalizedText.includes('LOGIN')) {
+      throw new Error('Delta Virtual returned an authenticated accomplishment eligibility page.');
+    }
+    return htmlText;
+  };
   const postSyncResult = (payload) => {
     if (window.chrome?.webview?.postMessage) {
       window.chrome.webview.postMessage(syncResultPrefix + JSON.stringify({ nonce, ...payload }));
@@ -148,7 +170,8 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
 
     const payload = {
       xml: { ok: false },
-      logbook: { ok: false }
+      logbook: { ok: false },
+      accomplishments: { ok: false }
     };
 
     try {
@@ -163,6 +186,19 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
     } catch (error) {
       payload.logbook = { ok: false, error: error?.message || 'Logbook JSON download failed.' };
       emitDebug(`logbook:error:${payload.logbook.error}`);
+    }
+
+    try {
+      payload.accomplishments = {
+        ok: true,
+        htmlText: await fetchAccomplishmentEligibilityHtml()
+      };
+    } catch (error) {
+      payload.accomplishments = {
+        ok: false,
+        error: error?.message || 'Accomplishment eligibility download failed.'
+      };
+      emitDebug(`accomplishments:error:${payload.accomplishments.error}`);
     }
 
     postSyncResult(payload);

@@ -13,7 +13,10 @@ import { installGlobalErrorLogging } from "../services/logging/globalError.clien
 import {
   readAddonAirportCache
 } from "../services/tauri/addonAirportScan.client.js";
-import { readDeltaVirtualLogbookProgress } from "../services/tauri/deltaVirtual.client.js";
+import {
+  readDeltaVirtualAccomplishmentEligibility,
+  readDeltaVirtualLogbookProgress
+} from "../services/tauri/deltaVirtual.client.js";
 import {
   readDeltaVirtualTourProgress,
   readDeltaVirtualToursCache,
@@ -161,6 +164,7 @@ export function useAppBootstrap({
   setIsDvaPasswordEditing,
   setDerivedTourProgress,
   setDeltaVirtualToursCache,
+  setDeltaVirtualAccomplishmentEligibility,
   setFilters,
   setFlightBoards,
   setGettingStartedState,
@@ -454,12 +458,14 @@ export function useAppBootstrap({
       const [
         addonCacheResult,
         gettingStartedResult,
+        accomplishmentEligibilityResult,
         logbookProgressResult,
         tourProgressResult,
         toursCacheResult
       ] = await Promise.allSettled([
         readAddonAirportCache(),
         readGettingStartedState(),
+        readDeltaVirtualAccomplishmentEligibility(),
         readDeltaVirtualLogbookProgress(),
         readDeltaVirtualTourProgress(),
         readDeltaVirtualToursCache()
@@ -476,6 +482,12 @@ export function useAppBootstrap({
         } else {
           setStatusMessage(addonCacheResult.reason?.message || "Unable to load addon airport cache.");
           await logSystemError("AddonScan", "cache-load-failed", addonCacheResult.reason);
+        }
+
+        if (accomplishmentEligibilityResult.status === "fulfilled") {
+          setDeltaVirtualAccomplishmentEligibility(
+            accomplishmentEligibilityResult.value || { lastSyncAt: null, sourceUrl: null, rows: [] }
+          );
         }
 
         if (logbookProgressResult.status === "fulfilled") {
@@ -538,6 +550,7 @@ export function useAppBootstrap({
   }, [
     setAddonScan,
     setDeltaVirtualToursCache,
+    setDeltaVirtualAccomplishmentEligibility,
     setDerivedTourProgress,
     setGettingStartedState,
     setHasLoadedGettingStartedState,

@@ -12,6 +12,7 @@ layout: text
 - Added stronger airport/scenery matching logic for addon folders.
 
 ## Fixed
+- Switched Accomplishments to Delta Virtual synced eligibility data instead of the bundled airport catalog.
 - Fixed custom SimBrief airframes not showing on flight board aircraft dropdown.
 - Fixed aircraft matching between custom airframes, SimBrief aircraft, and DVA-supported aircraft mappings.
 - Fixed flight board action row layout, selector height, and button alignment regressions.

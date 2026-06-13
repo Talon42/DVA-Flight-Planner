@@ -126,9 +126,17 @@ export default function App() {
   const [sort, setSort] = useState(DEFAULT_SORT);
   const [selectedTourPath, setSelectedTourPath] = useState("");
   const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
+  const [isAccomplishmentSelectorCollapsed, setIsAccomplishmentSelectorCollapsed] = useState(false);
+  const [isTourSelectorCollapsed, setIsTourSelectorCollapsed] = useState(false);
   const [tourProgress, setTourProgress] = useState({});
   const [derivedTourProgress, setDerivedTourProgress] = useState(DEFAULT_DERIVED_TOUR_PROGRESS);
   const [deltaVirtualToursCache, setDeltaVirtualToursCache] = useState(null);
+  const [deltaVirtualAccomplishmentEligibility, setDeltaVirtualAccomplishmentEligibility] =
+    useState({
+      lastSyncAt: null,
+      sourceUrl: null,
+      rows: []
+    });
   const [mapOptions, setMapOptions] = useState(DEFAULT_MAP_OPTIONS);
   const [theme, setTheme] = useState(readSavedTheme);
   const {
@@ -352,6 +360,7 @@ export default function App() {
     setDvaLastName,
     setDvaLastNameDraft,
     setDerivedTourProgress,
+    setDeltaVirtualAccomplishmentEligibility,
     setDeltaVirtualToursCache,
     setFilters,
     setFlightBoards,
@@ -429,23 +438,19 @@ export default function App() {
     : [];
   const tourSelection = useTourSelection({
     boardedTourRowIds,
+    boardedFlightIds,
+    deltaVirtualAccomplishmentEligibility,
     deltaVirtualToursCache,
     derivedTourProgress,
     isDevToolsEnabled,
-    logbookAirportProgress,
     scheduleView,
     scheduleFlights,
     selectedAccomplishmentName,
     selectedTourPath,
-    setDutyFilters,
-    setFilterUiVersion,
-    setFilters,
-    setPlannerMode,
-    setScheduleView,
     setSelectedAccomplishmentName,
-    setSelectedFlightId,
     setSelectedTourPath,
     setSelectedTourRowId,
+    sort,
     tourProgress
   });
   const {
@@ -454,11 +459,16 @@ export default function App() {
     selectedAccomplishment,
     accomplishmentOptions,
     accomplishmentRows,
+    accomplishmentFlightRows,
+    accomplishmentFlightSearch,
+    accomplishmentFlightSort,
+    hasAccomplishmentFlightSearch,
     sortedTourRows,
     activeTourRows,
     tourFlightsByKey,
     handleSelectTourPath,
-    handleShowAccomplishmentFlights
+    handleShowAccomplishmentFlights,
+    handleSortAccomplishmentFlights
   } = tourSelection;
   const boardState = useFlightBoards({
     activeFlightBoardId,
@@ -496,6 +506,48 @@ export default function App() {
     handleRenameFlightBoard,
     handleDeleteFlightBoard
   } = boardState;
+  const handleToggleAccomplishmentSelectorCollapsed = useCallback((nextCollapsed) => {
+    setIsAccomplishmentSelectorCollapsed(nextCollapsed);
+  }, []);
+
+  const handleToggleTourSelectorCollapsed = useCallback((nextCollapsed) => {
+    setIsTourSelectorCollapsed(nextCollapsed);
+  }, []);
+
+  const handleActivateRow = useCallback(
+    (row) => {
+      const didAddRow = handleAddToFlightBoard(row);
+
+      // Collapse the active selector panel only after a successful add so duplicate clicks do not hide context.
+      if (didAddRow) {
+        if (scheduleView === "accomplishments") {
+          setIsAccomplishmentSelectorCollapsed(true);
+        } else if (scheduleView === "tours") {
+          setIsTourSelectorCollapsed(true);
+        }
+      }
+    },
+    [
+      handleAddToFlightBoard,
+      scheduleView,
+      setIsAccomplishmentSelectorCollapsed,
+      setIsTourSelectorCollapsed
+    ]
+  );
+  useEffect(() => {
+    // Accomplishments should always open expanded when the tab becomes active.
+    if (scheduleView === "accomplishments") {
+      setIsAccomplishmentSelectorCollapsed(false);
+    }
+  }, [scheduleView, setIsAccomplishmentSelectorCollapsed]);
+
+  useEffect(() => {
+    // Tours should always open expanded when the tab becomes active.
+    if (scheduleView === "tours") {
+      setIsTourSelectorCollapsed(false);
+    }
+  }, [scheduleView, setIsTourSelectorCollapsed]);
+
   useEffect(() => {
     if (!flightBoards.length) {
       return;
@@ -870,6 +922,7 @@ export default function App() {
     processImportedSchedule,
     onScheduleSyncComplete: handleVatsimScheduleSyncComplete,
     setDerivedTourProgress,
+    setDeltaVirtualAccomplishmentEligibility,
     setDeltaVirtualToursCache,
     setDvaHasPassword,
     setDvaSyncWarning,
@@ -1091,7 +1144,7 @@ export default function App() {
       nextScheduleView = "map";
     } else if (nextView === "tours") {
       nextScheduleView = "tours";
-    } else if (nextView === "accomplishments" && accomplishmentOptions.length) {
+    } else if (nextView === "accomplishments") {
       nextScheduleView = "accomplishments";
     }
 
@@ -1464,6 +1517,7 @@ export default function App() {
       setSimBriefCustomAirframeIdDraft("");
       setSimBriefCustomAirframeMatchTypeDraft("");
       setLogbookAirportProgress({ dateIso: null, visitedAirports: [], arrivalAirports: [] });
+      setDeltaVirtualAccomplishmentEligibility({ lastSyncAt: null, sourceUrl: null, rows: [] });
       setMapOptions(DEFAULT_MAP_OPTIONS);
       setSimBriefDispatchState({
         flightId: "",
@@ -1647,6 +1701,16 @@ export default function App() {
       activeFlightBoard={activeFlightBoard}
       expandedBoardFlightId={expandedBoardFlightId}
       selectedAccomplishment={selectedAccomplishment}
+      availableTours={availableTours}
+      accomplishmentOptions={accomplishmentOptions}
+      selectedAccomplishmentName={selectedAccomplishmentName}
+      onSelectAccomplishmentName={setSelectedAccomplishmentName}
+      isAccomplishmentSelectorCollapsed={isAccomplishmentSelectorCollapsed}
+      onToggleAccomplishmentSelectorCollapsed={handleToggleAccomplishmentSelectorCollapsed}
+      selectedTourPath={selectedTourPath}
+      onSelectTourPath={handleSelectTourPath}
+      isTourSelectorCollapsed={isTourSelectorCollapsed}
+      onToggleTourSelectorCollapsed={handleToggleTourSelectorCollapsed}
       simBriefDispatchState={simBriefDispatchState}
       deltaDraftSubmitState={deltaDraftSubmitState}
       deltaDraftDeleteState={deltaDraftDeleteState}
@@ -1695,13 +1759,15 @@ export default function App() {
     availableTours,
     selectedTourPath,
     selectedTour,
-    accomplishmentOptions,
     selectedAccomplishment,
     mapOptions,
     onPrimaryViewChange: handlePrimaryViewChange,
     onSelectTourPath: handleSelectTourPath,
-    onSelectAccomplishmentName: setSelectedAccomplishmentName,
     accomplishmentRows,
+    accomplishmentFlightRows,
+    accomplishmentFlightSearch,
+    accomplishmentFlightSort,
+    hasAccomplishmentFlightSearch,
     viewportSize,
     flightRows: sortedFlights,
     sort,
@@ -1712,11 +1778,12 @@ export default function App() {
     selectedTourRowId,
     tourSyncMessage: deltaVirtualToursCache?.message || "",
     onShowAccomplishmentFlights: handleShowAccomplishmentFlights,
+    onSortAccomplishmentFlights: handleSortAccomplishmentFlights,
     onSortFlights: handleSort,
     onToggleTimeDisplayMode: () =>
       setScheduleTableTimeDisplayMode((current) => (current === "local" ? "utc" : "local")),
     onSelectRow: handleSelectFlight,
-    onActivateRow: handleAddToFlightBoard,
+    onActivateRow: handleActivateRow,
     plannerMode,
     dutyFilters,
     airlines,

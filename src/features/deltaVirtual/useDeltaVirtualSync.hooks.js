@@ -4,6 +4,7 @@ import { logAppError, logAppEvent, logSystemError, logSystemEvent } from "../../
 import { readDeltaVirtualCredentials } from "../../services/tauri/deltaVirtualCredentials.client.js";
 import { readDeltaVirtualTourProgress } from "../../services/storage/storage.js";
 import {
+  readDeltaVirtualAccomplishmentEligibility,
   closeDeltaVirtualSyncWindow,
   pruneDeltaVirtualStorage,
   resetDeltaVirtualSyncSession,
@@ -35,6 +36,7 @@ export function useDeltaVirtualSync({
   onScheduleSyncComplete,
   setDerivedTourProgress,
   setDeltaVirtualToursCache,
+  setDeltaVirtualAccomplishmentEligibility,
   setDvaHasPassword,
   setDvaSyncWarning,
   setLogbookAirportProgress,
@@ -86,6 +88,24 @@ export function useDeltaVirtualSync({
       }
     }
   }, [isDevToolsEnabled, setDerivedTourProgress]);
+
+  const reloadAccomplishmentEligibility = useCallback(async () => {
+    const eligibility = await readDeltaVirtualAccomplishmentEligibility();
+    setDeltaVirtualAccomplishmentEligibility?.(eligibility);
+
+    if (isDevToolsEnabled) {
+      const count = Array.isArray(eligibility?.rows) ? eligibility.rows.length : 0;
+      const achievedCount = (eligibility?.rows || []).filter((row) => Boolean(row?.achieved)).length;
+
+      await logAppEvent("dva-accomplishment-eligibility-reload-succeeded", {
+        count,
+        achievedCount,
+        incompleteCount: Math.max(count - achievedCount, 0),
+        sourceUrl: eligibility?.sourceUrl || null,
+        lastSyncAt: eligibility?.lastSyncAt || null
+      });
+    }
+  }, [isDevToolsEnabled, setDeltaVirtualAccomplishmentEligibility]);
 
   const handleDeltaVirtualSync = useCallback(async () => {
     await logSystemEvent("DVA Sync", "started");
@@ -141,6 +161,7 @@ export function useDeltaVirtualSync({
       await processImportedSchedule?.(syncedFile, "deltava-sync");
       onScheduleSyncComplete?.();
       setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());
+      await reloadAccomplishmentEligibility();
       await refreshSavedCredentials();
       if (syncedFile.warnings?.length) {
         setStatusMessage?.(`Delta Virtual schedule synced with warning: ${syncedFile.warnings[0]}`);
@@ -210,6 +231,7 @@ export function useDeltaVirtualSync({
         });
       } else if (error?.kind === "partial_success") {
         setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());
+        await reloadAccomplishmentEligibility();
         await refreshSavedCredentials();
         setStatusMessage?.(error.message || "Delta Virtual sync partially completed.");
         await logSystemEvent("DVA Sync", "succeeded", {
@@ -267,6 +289,7 @@ export function useDeltaVirtualSync({
     onScheduleSyncComplete,
     refreshSavedCredentials,
     reloadTourProgress,
+    reloadAccomplishmentEligibility,
     setDeltaVirtualToursCache,
     setDvaSyncWarning,
     setIsSyncing,

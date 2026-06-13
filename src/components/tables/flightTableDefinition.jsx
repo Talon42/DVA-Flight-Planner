@@ -29,15 +29,26 @@ function VatsimAtcIndicator({ airportCode, vatsimCoverageIndex }) {
   );
 }
 
-export function AirportIndicatorContent({ airportCode, addonAirports, vatsimCoverageIndex, missingInDatabase = false }) {
+export function AirportIndicatorContent({
+  airportCode,
+  addonAirports,
+  vatsimCoverageIndex,
+  missingInDatabase = false,
+  hideAddonIndicator = false,
+  hideVatsimIndicator = false
+}) {
   const normalizedAirportCode = String(airportCode || "").trim().toUpperCase();
 
   if (!normalizedAirportCode) {
     return normalizedAirportCode;
   }
 
-  const showAddonIndicator = !missingInDatabase && addonAirports?.has(normalizedAirportCode);
-  const showVatsimIndicator = !missingInDatabase && isAirportCoveredByVatsim(normalizedAirportCode, vatsimCoverageIndex);
+  const showAddonIndicator =
+    !hideAddonIndicator && !missingInDatabase && addonAirports?.has(normalizedAirportCode);
+  const showVatsimIndicator =
+    !hideVatsimIndicator &&
+    !missingInDatabase &&
+    isAirportCoveredByVatsim(normalizedAirportCode, vatsimCoverageIndex);
 
   if (!missingInDatabase && !showAddonIndicator && !showVatsimIndicator) {
     return normalizedAirportCode;
@@ -118,6 +129,7 @@ function formatFlightCode(flightCode) {
 export function getFlightTableColumns({ addonAirports, timeDisplayMode, viewportWidth = 0, vatsimCoverageIndex = null }) {
   const timeKeyPrefix = timeDisplayMode === "local" ? "Local" : "Utc";
   const useWideFlightNumberLabel = viewportWidth >= 1400;
+  const hideAirportIndicators = viewportWidth < 1400;
 
   return [
     {
@@ -154,6 +166,8 @@ export function getFlightTableColumns({ addonAirports, timeDisplayMode, viewport
           airportCode={row.from}
           addonAirports={addonAirports}
           vatsimCoverageIndex={vatsimCoverageIndex}
+          hideAddonIndicator={hideAirportIndicators}
+          hideVatsimIndicator={hideAirportIndicators}
           missingInDatabase={
             Array.isArray(row?.missingAirportIcaos) &&
             row.missingAirportIcaos.includes(row.from)
@@ -172,6 +186,8 @@ export function getFlightTableColumns({ addonAirports, timeDisplayMode, viewport
           airportCode={row.to}
           addonAirports={addonAirports}
           vatsimCoverageIndex={vatsimCoverageIndex}
+          hideAddonIndicator={hideAirportIndicators}
+          hideVatsimIndicator={hideAirportIndicators}
           missingInDatabase={
             Array.isArray(row?.missingAirportIcaos) &&
             row.missingAirportIcaos.includes(row.to)

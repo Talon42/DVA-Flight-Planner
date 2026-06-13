@@ -61,7 +61,8 @@ export default function DetailsPanel({
   onDraftOnlySubmit = () => {},
   onDeleteDeltaVirtualDraftReport = () => {},
   onCompleteTourFlight,
-  showFlightBoard = true
+  showFlightBoard = true,
+  isCollapsed = false
 }) {
   const panelRef = useRef(null);
   const shortlistRef = useRef(null);
@@ -306,7 +307,7 @@ export default function DetailsPanel({
     closeRenameModal();
   }
 
-  if (!showFlightBoard) {
+  if (!showFlightBoard || isCollapsed) {
     return null;
   }
 

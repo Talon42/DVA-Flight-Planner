@@ -17,12 +17,14 @@ export default function AppMainWorkspace({
   availableTours,
   selectedTourPath,
   selectedTour,
-  accomplishmentOptions,
   selectedAccomplishment,
   onPrimaryViewChange,
   onSelectTourPath,
-  onSelectAccomplishmentName,
   accomplishmentRows,
+  accomplishmentFlightRows,
+  accomplishmentFlightSearch,
+  accomplishmentFlightSort,
+  hasAccomplishmentFlightSearch,
   viewportSize,
   flightRows,
   sort,
@@ -33,6 +35,7 @@ export default function AppMainWorkspace({
   selectedTourRowId,
   tourSyncMessage,
   onShowAccomplishmentFlights,
+  onSortAccomplishmentFlights,
   onSortFlights,
   onToggleTimeDisplayMode,
   onSelectRow,
@@ -92,12 +95,13 @@ export default function AppMainWorkspace({
                 }
               : null
           }
-          accomplishmentOptions={accomplishmentOptions}
-          selectedAccomplishmentName={selectedAccomplishment?.name || ""}
           onPrimaryViewChange={onPrimaryViewChange}
           onSelectTourPath={onSelectTourPath}
-          onSelectAccomplishmentName={onSelectAccomplishmentName}
           accomplishmentRows={accomplishmentRows}
+          accomplishmentFlightRows={accomplishmentFlightRows}
+          accomplishmentFlightSearch={accomplishmentFlightSearch}
+          accomplishmentFlightSort={accomplishmentFlightSort}
+          hasAccomplishmentFlightSearch={hasAccomplishmentFlightSearch}
           selectedAccomplishment={selectedAccomplishment}
           viewportWidth={viewportSize.width}
           flightRows={flightRows}
@@ -110,6 +114,7 @@ export default function AppMainWorkspace({
           selectedTourRowId={selectedTourRowId}
           tourSyncMessage={tourSyncMessage || ""}
           onShowAccomplishmentFlights={onShowAccomplishmentFlights}
+          onSortAccomplishmentFlights={onSortAccomplishmentFlights}
           onSortFlights={onSortFlights}
           onToggleTimeDisplayMode={onToggleTimeDisplayMode}
           onSelectRow={onSelectRow}

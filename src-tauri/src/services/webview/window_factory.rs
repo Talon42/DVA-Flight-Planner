@@ -253,6 +253,7 @@ fn attach_windows_xml_message_handler(
                                                 status: "partial".into(),
                                                 xml_status: "success".into(),
                                                 logbook_status: "failed".into(),
+                                                accomplishment_eligibility: None,
                                                 logbook_json: None,
                                                 warnings: vec![
                                                     "Delta Virtual logbook JSON was not downloaded by the fallback XML capture path.".into(),
@@ -388,6 +389,7 @@ pub(crate) fn build_deltava_sync_window(
                                         status: "partial".into(),
                                         xml_status: "success".into(),
                                         logbook_status: "failed".into(),
+                                        accomplishment_eligibility: None,
                                         logbook_json: None,
                                         warnings: vec![
                                             "Delta Virtual logbook JSON was not downloaded by the fallback XML download path.".into(),

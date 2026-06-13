@@ -1,7 +1,13 @@
-use crate::app::paths::{build_logbook_dir, resolve_existing_logbook_json_path};
+use crate::app::paths::{
+    build_accomplishment_eligibility_path, build_logbook_dir, resolve_existing_logbook_json_path,
+};
 use crate::services::deltava::draft::DVA_DRAFT_WEBVIEW_DIR;
 use crate::services::deltava::{
-    auth::clear_auth_settings_internal, sync_types::DeltaWebSyncResult,
+    accomplishments::{
+        build_accomplishment_eligibility_summary, parse_accomplishment_eligibility_html,
+    },
+    auth::clear_auth_settings_internal,
+    sync_types::{DeltaAccomplishmentEligibilityStore, DeltaWebSyncResult},
 };
 use crate::{append_sync_log, DELTAVA_LOGBOOK_FALLBACK_FILE, DELTAVA_SYNC_DOWNLOAD_FILE};
 use chrono::NaiveDate;
@@ -455,6 +461,34 @@ pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogb
     }
 }
 
+/// Reads the latest stored DVA accomplishment eligibility snapshot.
+pub(crate) fn read_deltava_accomplishment_eligibility(
+    app: &AppHandle,
+) -> DeltaAccomplishmentEligibilityStore {
+    let Ok(path) = build_accomplishment_eligibility_path(app) else {
+        return DeltaAccomplishmentEligibilityStore::default();
+    };
+
+    let Ok(text) = fs::read_to_string(&path) else {
+        return DeltaAccomplishmentEligibilityStore::default();
+    };
+
+    serde_json::from_str::<DeltaAccomplishmentEligibilityStore>(&text).unwrap_or_default()
+}
+
+fn store_deltava_accomplishment_eligibility(
+    app: &AppHandle,
+    store: &DeltaAccomplishmentEligibilityStore,
+) -> Result<DeltaAccomplishmentEligibilityStore, String> {
+    let path = build_accomplishment_eligibility_path(app)?;
+    let json = serde_json::to_string_pretty(store)
+        .map_err(|error| format!("download_failed: Unable to serialize accomplishment eligibility: {error}"))?;
+    fs::write(&path, json)
+        .map_err(|error| format!("download_failed: Unable to write accomplishment eligibility: {error}"))?;
+    append_sync_log(&format!("accomplishments:write {}", path.display()));
+    Ok(store.clone())
+}
+
 /// Stores a Delta Virtual logbook JSON export on disk with a stable filename.
 pub(crate) async fn store_logbook_json(
     app: &AppHandle,
@@ -550,6 +584,31 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         None
     };
 
+    let accomplishment_eligibility = if let Some(accomplishments) = result.accomplishments {
+        if accomplishments.ok {
+            let html_text = accomplishments.html_text.unwrap_or_default();
+            let parsed = parse_accomplishment_eligibility_html(&html_text);
+            append_sync_log(&format!("accomplishments:parsed rows={}", parsed.rows.len()));
+
+            match store_deltava_accomplishment_eligibility(app, &parsed) {
+                Ok(store) => Some(build_accomplishment_eligibility_summary(&store)),
+                Err(error) => {
+                    warnings.push(error);
+                    None
+                }
+            }
+        } else {
+            warnings.push(
+                accomplishments
+                    .error
+                    .unwrap_or_else(|| "Delta Virtual accomplishment eligibility download failed.".into()),
+            );
+            None
+        }
+    } else {
+        None
+    };
+
     let xml_status = if xml_text.is_some() {
         "success"
     } else {
@@ -586,6 +645,7 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         status,
         xml_status,
         logbook_status,
+        accomplishment_eligibility,
         logbook_json,
         warnings,
     })

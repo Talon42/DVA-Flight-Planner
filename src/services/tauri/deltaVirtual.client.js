@@ -171,6 +171,23 @@ export async function readDeltaVirtualLogbookProgress() {
   }
 }
 
+export async function readDeltaVirtualAccomplishmentEligibility() {
+  if (!isTauriRuntime()) {
+    return { lastSyncAt: null, sourceUrl: null, rows: [] };
+  }
+
+  try {
+    const result = await invokeAppCommand("read_deltava_accomplishment_eligibility");
+    return {
+      lastSyncAt: result?.lastSyncAt ?? result?.last_sync_at ?? null,
+      sourceUrl: result?.sourceUrl ?? result?.source_url ?? null,
+      rows: Array.isArray(result?.rows) ? result.rows : []
+    };
+  } catch {
+    return { lastSyncAt: null, sourceUrl: null, rows: [] };
+  }
+}
+
 export async function pruneDeltaVirtualStorage(removeDownloadedSchedule = false) {
   if (!isTauriRuntime()) {
     return;

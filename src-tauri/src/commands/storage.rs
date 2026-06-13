@@ -25,6 +25,13 @@ pub(crate) fn read_deltava_logbook_progress(app: AppHandle) -> crate::DeltaLogbo
 }
 
 #[tauri::command]
+pub(crate) fn read_deltava_accomplishment_eligibility(
+    app: AppHandle,
+) -> crate::services::deltava::sync_types::DeltaAccomplishmentEligibilityStore {
+    crate::services::storage::file_store::read_deltava_accomplishment_eligibility(&app)
+}
+
+#[tauri::command]
 pub(crate) fn clear_user_data(app: AppHandle) -> Result<(), String> {
     crate::services::storage::file_store::clear_user_data(&app)
 }

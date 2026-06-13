@@ -18,6 +18,7 @@ pub(crate) fn app_invoke_handler(
         self::storage::prune_deltava_storage,
         self::storage::read_deltava_logbook_metadata,
         self::storage::read_deltava_logbook_progress,
+        self::storage::read_deltava_accomplishment_eligibility,
         self::deltava_auth::read_deltava_auth_settings,
         self::deltava_auth::save_deltava_auth_settings,
         self::deltava_auth::clear_deltava_auth_settings,

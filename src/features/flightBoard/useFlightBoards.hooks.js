@@ -60,7 +60,6 @@ export function useFlightBoards({
   setActiveFlightBoardId,
   setExpandedBoardFlightId,
   setFlightBoards,
-  setPlannerControlsCollapsed,
   setStatusMessage,
   setTourProgress,
   simBriefDispatchStateRef = null,
@@ -230,6 +229,16 @@ export function useFlightBoards({
         return;
       }
 
+      // Keep DVA-synced completed tour legs off the board while allowing manually
+      // completed legs to be re-added when the user explicitly toggled them.
+      if (
+        matchedTourFlight.isCompleted &&
+        String(matchedTourFlight.completionSource || "").trim().toLowerCase() ===
+          "deltava-logbook"
+      ) {
+        return false;
+      }
+
       const nextBoardEntry = buildBoardEntryFromTourFlight(matchedTourFlight);
       const nextTourBoardName = normalizeFlightBoardName(
         matchedTourFlight?.tourLabel || matchedTourFlight?.tourName || matchedTourFlight?.route || "",
@@ -302,25 +311,30 @@ export function useFlightBoards({
           to: nextBoardEntry.to
         }).catch(() => {});
       }
-      setExpandedBoardFlightId?.(null);
-      setPlannerControlsCollapsed?.(true);
-      return;
+
+      if (!didAddTourRow) {
+        return false;
+      }
+
+      return true;
     }
 
     const matchedFlight = schedule?.flights.find((flight) => flight.flightId === flightId);
     if (!matchedFlight) {
-      return;
+      return false;
     }
 
+    let didAddFlightRow = false;
     updateActiveFlightBoardEntries((current) => {
       if (current.some((entry) => entry.linkedFlightId === flightId)) {
         return current;
       }
 
+      didAddFlightRow = true;
       return [...current, buildBoardEntryFromFlight(matchedFlight)];
     });
-    setExpandedBoardFlightId?.(null);
-    setPlannerControlsCollapsed?.(true);
+
+    return didAddFlightRow;
   }
 
   function handleCompleteTourFlight(boardEntryId) {
@@ -396,7 +410,8 @@ export function useFlightBoards({
             [entry.tourRowId]: {
               completed: true,
               completedAt: new Date().toISOString(),
-              completionOrder: nextTourCompletionOrder
+              completionOrder: nextTourCompletionOrder,
+              source: "manual"
             }
           }
         }
@@ -405,10 +420,43 @@ export function useFlightBoards({
   }
 
   function handleRemoveFromFlightBoard(boardEntryId) {
+    const entryToRemove = flightBoard.find((entry) => entry.boardEntryId === boardEntryId) || null;
+
     updateActiveFlightBoardEntries((current) =>
       current.filter((entry) => entry.boardEntryId !== boardEntryId)
     );
     setExpandedBoardFlightId?.((current) => (current === boardEntryId ? null : current));
+
+    if (entryToRemove?.isTourFlight && entryToRemove.tourPath && entryToRemove.tourRowId) {
+      const sourceFlight = tourFlightsByKey.get(
+        buildTourFlightLookupKey(entryToRemove.tourPath, entryToRemove.tourRowId)
+      );
+
+      if (String(sourceFlight?.completionSource || "").trim().toLowerCase() === "manual") {
+        setTourProgress?.((current) => {
+          const currentTourProgress = current?.[entryToRemove.tourPath]?.rows || {};
+          if (!currentTourProgress[entryToRemove.tourRowId]) {
+            return current;
+          }
+
+          const nextTourProgress = { ...(current || {}) };
+          const nextRows = { ...currentTourProgress };
+          delete nextRows[entryToRemove.tourRowId];
+
+          // Keep manual progress aligned with visible board state by removing
+          // the manual completion entry when its leg leaves the board.
+          if (!Object.keys(nextRows).length) {
+            delete nextTourProgress[entryToRemove.tourPath];
+            return nextTourProgress;
+          }
+
+          nextTourProgress[entryToRemove.tourPath] = {
+            rows: nextRows
+          };
+          return nextTourProgress;
+        });
+      }
+    }
 
     if (String(simBriefDispatchStateRef?.current?.flightId || "").trim() === boardEntryId) {
       clearSimBriefDispatchState();

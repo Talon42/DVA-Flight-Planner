@@ -1,34 +1,33 @@
-import { startTransition, useEffect, useMemo } from "react";
-import accomplishmentsData from "../../data/accomplishments/accomplishments.json";
-import { ACCOMPLISHMENT_REQUIREMENTS, buildAccomplishmentRows, normalizeAccomplishments } from "../accomplishments/accomplishments.model.js";
-import { DEFAULT_FILTERS } from "../schedule/schedule.constants.js";
+import { startTransition, useEffect, useMemo, useState } from "react";
+import {
+  ACCOMPLISHMENT_REQUIREMENTS,
+  buildAccomplishmentRowsFromEligibility,
+  selectAirportAccomplishments
+} from "../accomplishments/accomplishments.model.js";
+import { DEFAULT_FILTERS, DEFAULT_SORT } from "../schedule/schedule.constants.js";
 import { buildFilterBounds, normalizeFilters } from "../schedule/scheduleFilters.model.js";
-import { buildDefaultDutyFilters, buildRangeDefaults } from "../../logic/dutySchedule/dutyFilters.js";
+import { selectFilteredScheduleFlights } from "../schedule/scheduleFilters.selectors.js";
+import { selectSortedScheduleFlights } from "../schedule/scheduleSort.selectors.js";
+import { buildRangeDefaults } from "../../logic/dutySchedule/dutyFilters.js";
 import { logAppEvent } from "../../services/logging/appLog.client.js";
 import { buildTourFlightLookupKey, normalizeDvaTourId } from "./tourIds.model.js";
 import { mergeTourProgressSources } from "./tourProgress.selectors.js";
 import { selectAvailableTours } from "./tours.selectors.js";
 
-const ACCOMPLISHMENTS = normalizeAccomplishments(accomplishmentsData);
-
-// Keeps tour and accomplishment selection state synchronized with cache and logbook data.
+// Keeps tour and accomplishment selection state synchronized with synced cache data.
 export function useTourSelection({
   boardedTourRowIds = new Set(),
+  deltaVirtualAccomplishmentEligibility = null,
   deltaVirtualToursCache = null,
   derivedTourProgress = null,
   isDevToolsEnabled = false,
-  logbookAirportProgress = null,
   scheduleView = "flights",
   scheduleFlights = [],
   selectedAccomplishmentName = "",
   selectedTourPath = "",
-  setDutyFilters,
-  setFilterUiVersion,
-  setFilters,
-  setPlannerMode,
-  setScheduleView,
+  sort = DEFAULT_SORT,
+  boardedFlightIds = new Set(),
   setSelectedAccomplishmentName,
-  setSelectedFlightId,
   setSelectedTourPath,
   setSelectedTourRowId,
   tourProgress = {}
@@ -87,38 +86,116 @@ export function useTourSelection({
     tourProgress
   ]);
 
+  const accomplishmentOptions = useMemo(
+    () => {
+      const airportAccomplishments = selectAirportAccomplishments(deltaVirtualAccomplishmentEligibility);
+
+      return airportAccomplishments.map((accomplishment) => {
+        const totalCount =
+          accomplishment.required ??
+          accomplishment.progress ??
+          accomplishment.missingIcaoCodes.length;
+        const completedCount = accomplishment.achieved
+          ? totalCount
+          : accomplishment.progress ?? Math.max(totalCount - accomplishment.missingIcaoCodes.length, 0);
+
+        return {
+          name: accomplishment.name,
+          requirement: accomplishment.unit,
+          unit: accomplishment.unit,
+          sourceIndex: accomplishment.sourceIndex,
+          isCompleted: accomplishment.achieved,
+          achievedDate: accomplishment.achievedDate,
+          completedCount,
+          totalCount,
+          remainingCount: accomplishment.missingIcaoCodes.length,
+          missingAirports: accomplishment.missing,
+          missingIcaoCodes: accomplishment.missingIcaoCodes,
+          airports: accomplishment.missingIcaoCodes
+        };
+      });
+    },
+    [deltaVirtualAccomplishmentEligibility]
+  );
+
   const selectedAccomplishment = useMemo(() => {
-    if (!ACCOMPLISHMENTS.length) {
+    if (!accomplishmentOptions.length) {
       return null;
     }
 
     return (
-      ACCOMPLISHMENTS.find(
+      accomplishmentOptions.find(
         (accomplishment) => accomplishment.name === selectedAccomplishmentName
-      ) || ACCOMPLISHMENTS[0]
+      ) || accomplishmentOptions[0]
     );
-  }, [selectedAccomplishmentName]);
-
-  const accomplishmentOptions = useMemo(
-    () =>
-      ACCOMPLISHMENTS.map((accomplishment) => {
-        const rows = buildAccomplishmentRows(accomplishment, logbookAirportProgress);
-        const totalCount = rows.length;
-        const completedCount = rows.reduce((count, row) => count + (row.isCompleted ? 1 : 0), 0);
-
-        return {
-          ...accomplishment,
-          totalCount,
-          completedCount,
-          isCompleted: totalCount > 0 && completedCount === totalCount
-        };
-      }),
-    [logbookAirportProgress]
-  );
+  }, [accomplishmentOptions, selectedAccomplishmentName]);
 
   const accomplishmentRows = useMemo(
-    () => buildAccomplishmentRows(selectedAccomplishment, logbookAirportProgress),
-    [logbookAirportProgress, selectedAccomplishment]
+    () => buildAccomplishmentRowsFromEligibility(selectedAccomplishment),
+    [selectedAccomplishment]
+  );
+  const [accomplishmentFlightSearch, setAccomplishmentFlightSearch] = useState({
+    airport: "",
+    requirement: "",
+    label: ""
+  });
+  const [accomplishmentFlightSort, setAccomplishmentFlightSort] = useState(() => sort);
+
+  useEffect(() => {
+    // Clear the embedded search when the accomplishment selection changes so the card stays
+    // tied to the currently visible accomplishment list.
+    setAccomplishmentFlightSearch({ airport: "", requirement: "", label: "" });
+  }, [selectedAccomplishment?.name]);
+
+  // Derives the embedded accomplishment flight list from the raw schedule data so the main
+  // planner filters and tab state stay untouched.
+  const accomplishmentFlightRows = useMemo(() => {
+    const airport = String(accomplishmentFlightSearch.airport || "").trim().toUpperCase();
+    if (!airport) {
+      return [];
+    }
+
+    const normalizedRequirement = String(accomplishmentFlightSearch.requirement || "")
+      .trim()
+      .toLowerCase();
+    const filterKey =
+      normalizedRequirement === ACCOMPLISHMENT_REQUIREMENTS.ARRIVAL_AIRPORT
+        ? "destination"
+        : "originOrDestination";
+    const availableFlights = scheduleFlights.filter(
+      (flight) => !boardedFlightIds.has(String(flight?.flightId || "").trim())
+    );
+    const accomplishmentFilters = normalizeFilters(
+      {
+        ...DEFAULT_FILTERS,
+        ...buildRangeDefaults(activeFilterBounds),
+        [filterKey]: [airport]
+      },
+      activeFilterBounds
+    );
+    const filteredFlights = selectFilteredScheduleFlights({
+      flights: availableFlights,
+      filters: accomplishmentFilters,
+      addonAirports: new Set(),
+      vatsimCoverageIndex: null
+    });
+
+    return selectSortedScheduleFlights({
+      flights: filteredFlights,
+      sort: accomplishmentFlightSort,
+      filters: accomplishmentFilters,
+      addonAirports: new Set()
+    });
+  }, [
+    accomplishmentFlightSearch.airport,
+    accomplishmentFlightSearch.requirement,
+    accomplishmentFlightSort,
+    activeFilterBounds,
+    boardedFlightIds,
+    scheduleFlights
+  ]);
+  const hasAccomplishmentFlightSearch = Boolean(
+    String(accomplishmentFlightSearch.airport || "").trim()
   );
 
   const tourRows = useMemo(() => selectedTour?.rows || [], [selectedTour]);
@@ -148,26 +225,15 @@ export function useTourSelection({
     [availableTours]
   );
   const sortedTourRows = useMemo(() => {
-    const incompleteRows = [];
-    const completedRows = [];
-
-    for (const row of activeTourRows) {
-      if (row.isCompleted) {
-        completedRows.push(row);
-      } else {
-        incompleteRows.push(row);
+    // Keep incomplete legs at the top while preserving the published tour order
+    // within both incomplete and completed groups.
+    return [...activeTourRows].sort((left, right) => {
+      if (Boolean(left?.isCompleted) !== Boolean(right?.isCompleted)) {
+        return left?.isCompleted ? 1 : -1;
       }
-    }
 
-    incompleteRows.sort((left, right) => (left.sourceIndex ?? 0) - (right.sourceIndex ?? 0));
-    completedRows.sort(
-      (left, right) =>
-        (left.completionOrder ?? Number.MAX_SAFE_INTEGER) -
-          (right.completionOrder ?? Number.MAX_SAFE_INTEGER) ||
-        (left.sourceIndex ?? 0) - (right.sourceIndex ?? 0)
-    );
-
-    return [...incompleteRows, ...completedRows];
+      return (left.sourceIndex ?? 0) - (right.sourceIndex ?? 0);
+    });
   }, [activeTourRows]);
 
   useEffect(() => {
@@ -184,10 +250,7 @@ export function useTourSelection({
   }, [availableTours, scheduleView, selectedTourPath, setSelectedTourPath]);
 
   useEffect(() => {
-    if (!ACCOMPLISHMENTS.length) {
-      if (scheduleView === "accomplishments") {
-        setScheduleView("flights");
-      }
+    if (!accomplishmentOptions.length) {
       if (selectedAccomplishmentName) {
         setSelectedAccomplishmentName("");
       }
@@ -196,11 +259,15 @@ export function useTourSelection({
 
     if (
       !selectedAccomplishmentName ||
-      !ACCOMPLISHMENTS.some((accomplishment) => accomplishment.name === selectedAccomplishmentName)
+      !accomplishmentOptions.some((accomplishment) => accomplishment.name === selectedAccomplishmentName)
     ) {
-      setSelectedAccomplishmentName(ACCOMPLISHMENTS[0].name);
+      setSelectedAccomplishmentName(accomplishmentOptions[0].name);
     }
-  }, [scheduleView, selectedAccomplishmentName, setScheduleView, setSelectedAccomplishmentName]);
+  }, [
+    accomplishmentOptions,
+    selectedAccomplishmentName,
+    setSelectedAccomplishmentName
+  ]);
 
   useEffect(() => {
     if (scheduleView !== "tours") {
@@ -230,32 +297,36 @@ export function useTourSelection({
     setSelectedTourPath(nextSelectionId);
   }
 
-  function handleShowAccomplishmentFlights(airport, requirement) {
+  function handleShowAccomplishmentFlights(airport, requirement, label) {
     const normalizedAirport = String(airport || "").trim().toUpperCase();
     if (!normalizedAirport) {
       return;
     }
 
-    const filterKey =
-      String(requirement || "").trim().toLowerCase() === ACCOMPLISHMENT_REQUIREMENTS.ARRIVAL_AIRPORTS
-        ? "destination"
-        : "originOrDestination";
-    const nextFilters = normalizeFilters(
-      {
-        ...DEFAULT_FILTERS,
-        ...buildRangeDefaults(activeFilterBounds),
-        [filterKey]: [normalizedAirport]
-      },
-      activeFilterBounds
-    );
-
+    // Keep the search local to the accomplishment panel and leave the main schedule view alone.
     startTransition(() => {
-      setScheduleView("flights");
-      setPlannerMode("basic");
-      setFilters(nextFilters);
-      setDutyFilters(buildDefaultDutyFilters(activeFilterBounds));
-      setSelectedFlightId(null);
-      setFilterUiVersion((current) => current + 1);
+      setAccomplishmentFlightSearch({
+        airport: normalizedAirport,
+        requirement: String(requirement || "").trim().toLowerCase(),
+        label: String(label || "").trim()
+      });
+      setAccomplishmentFlightSort(sort);
+    });
+  }
+
+  function handleSortAccomplishmentFlights(sortKey) {
+    setAccomplishmentFlightSort((current) => {
+      if (current.key === sortKey) {
+        return {
+          key: sortKey,
+          direction: current.direction === "asc" ? "desc" : "asc"
+        };
+      }
+
+      return {
+        key: sortKey,
+        direction: "asc"
+      };
     });
   }
 
@@ -266,11 +337,16 @@ export function useTourSelection({
     selectedAccomplishment,
     accomplishmentOptions,
     accomplishmentRows,
+    accomplishmentFlightRows,
+    accomplishmentFlightSearch,
+    accomplishmentFlightSort,
+    hasAccomplishmentFlightSearch,
     tourRows,
     sortedTourRows,
     activeTourRows,
     tourFlightsByKey,
     handleSelectTourPath,
-    handleShowAccomplishmentFlights
+    handleShowAccomplishmentFlights,
+    handleSortAccomplishmentFlights
   };
 }
