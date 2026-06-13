@@ -25,10 +25,19 @@ const SATELLITE_SOURCE_ID = "esri-world-imagery";
 const SATELLITE_LAYER_ID = "esri-world-imagery-layer";
 const ROUTE_SOURCE_ID = "flight-path-overlay";
 const ROUTE_LAYER_ID = "flight-path-overlay-line";
+const ROUTE_WAYPOINT_RING_LAYER_ID = "flight-path-overlay-waypoint-ring";
+const ROUTE_WAYPOINT_DOT_LAYER_ID = "flight-path-overlay-waypoint-dot";
+const ROUTE_WAYPOINT_HOVER_LAYER_ID = "flight-path-overlay-waypoint-hover";
 const ROUTE_ENDPOINT_RING_LAYER_ID = "flight-path-overlay-endpoint-ring";
 const ROUTE_ENDPOINT_DOT_LAYER_ID = "flight-path-overlay-endpoint-dot";
 const ROUTE_ENDPOINT_HOVER_LAYER_ID = "flight-path-overlay-endpoint-hover";
 const ROUTE_LINE_COLOR = "#c8102e";
+const ROUTE_WAYPOINT_RING_COLOR = "rgba(125,211,252,0.28)";
+const ROUTE_WAYPOINT_RING_STROKE_COLOR = "rgba(14,116,144,0.7)";
+const ROUTE_WAYPOINT_DOT_COLOR = "#7dd3fc";
+const ROUTE_WAYPOINT_RING_RADIUS = 4.25;
+const ROUTE_WAYPOINT_DOT_RADIUS = 1.85;
+const ROUTE_WAYPOINT_HOVER_RADIUS = 10;
 const ROUTE_ENDPOINT_RING_COLOR = "rgba(255,255,255,0.92)";
 const ROUTE_ENDPOINT_RING_STROKE_COLOR = "#c8102e";
 const ROUTE_ENDPOINT_DOT_COLOR = "#c8102e";
@@ -82,6 +91,42 @@ const ROUTE_ENDPOINT_RING_LAYER = {
     "circle-color": ROUTE_ENDPOINT_RING_COLOR,
     "circle-stroke-color": ROUTE_ENDPOINT_RING_STROKE_COLOR,
     "circle-stroke-width": 1.5
+  }
+};
+
+const ROUTE_WAYPOINT_RING_LAYER = {
+  id: ROUTE_WAYPOINT_RING_LAYER_ID,
+  type: "circle",
+  source: ROUTE_SOURCE_ID,
+  filter: ["==", ["get", "role"], "waypoint"],
+  paint: {
+    "circle-radius": ROUTE_WAYPOINT_RING_RADIUS,
+    "circle-color": ROUTE_WAYPOINT_RING_COLOR,
+    "circle-stroke-color": ROUTE_WAYPOINT_RING_STROKE_COLOR,
+    "circle-stroke-width": 1
+  }
+};
+
+const ROUTE_WAYPOINT_DOT_LAYER = {
+  id: ROUTE_WAYPOINT_DOT_LAYER_ID,
+  type: "circle",
+  source: ROUTE_SOURCE_ID,
+  filter: ["==", ["get", "role"], "waypoint"],
+  paint: {
+    "circle-radius": ROUTE_WAYPOINT_DOT_RADIUS,
+    "circle-color": ROUTE_WAYPOINT_DOT_COLOR
+  }
+};
+
+const ROUTE_WAYPOINT_HOVER_LAYER = {
+  id: ROUTE_WAYPOINT_HOVER_LAYER_ID,
+  type: "circle",
+  source: ROUTE_SOURCE_ID,
+  filter: ["==", ["get", "role"], "waypoint"],
+  paint: {
+    "circle-radius": ROUTE_WAYPOINT_HOVER_RADIUS,
+    "circle-color": "#ffffff",
+    "circle-opacity": 0
   }
 };
 
@@ -216,6 +261,10 @@ const ENDPOINT_CALLOUT_GAP = 12;
 const ENDPOINT_CALLOUT_EDGE_PADDING = 8;
 const ENDPOINT_CALLOUT_MIN_POINT_CLEARANCE = 14;
 const ENDPOINT_CALLOUT_MIN_ROUTE_CLEARANCE = 10;
+const WAYPOINT_CALLOUT_WIDTH = 120;
+const WAYPOINT_CALLOUT_HEIGHT = 30;
+const WAYPOINT_CALLOUT_GAP = 10;
+const WAYPOINT_CALLOUT_EDGE_PADDING = 8;
 
 function toScreenPoint(map, longitude, latitude) {
   if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
@@ -734,6 +783,30 @@ function getFeatureCollectionBounds(featureCollection) {
   ];
 }
 
+function getWaypointHoverCalloutPosition(point, viewportWidth, viewportHeight) {
+  if (!point || !Number.isFinite(viewportWidth) || !Number.isFinite(viewportHeight)) {
+    return null;
+  }
+
+  const maxLeft = Math.max(
+    WAYPOINT_CALLOUT_EDGE_PADDING,
+    viewportWidth - WAYPOINT_CALLOUT_EDGE_PADDING - WAYPOINT_CALLOUT_WIDTH
+  );
+  const maxTop = Math.max(
+    WAYPOINT_CALLOUT_EDGE_PADDING,
+    viewportHeight - WAYPOINT_CALLOUT_EDGE_PADDING - WAYPOINT_CALLOUT_HEIGHT
+  );
+
+  return {
+    left: clampValue(point.x - WAYPOINT_CALLOUT_WIDTH / 2, WAYPOINT_CALLOUT_EDGE_PADDING, maxLeft),
+    top: clampValue(
+      point.y - WAYPOINT_CALLOUT_HEIGHT - WAYPOINT_CALLOUT_GAP,
+      WAYPOINT_CALLOUT_EDGE_PADDING,
+      maxTop
+    )
+  };
+}
+
 function LayerToggleSwitch({ enabled }) {
   return (
     <span
@@ -810,6 +883,7 @@ export default function FlightMapView({
   const vatsimRegionCalloutAnimationFrameRef = useRef(0);
   const [hoveredEndpointKey, setHoveredEndpointKey] = useState(null);
   const [hoveredEndpointCallout, setHoveredEndpointCallout] = useState(null);
+  const [hoveredWaypointCallout, setHoveredWaypointCallout] = useState(null);
   const [persistentEndpointCallouts, setPersistentEndpointCallouts] = useState([]);
   const [selectedVatsimAirportIcao, setSelectedVatsimAirportIcao] = useState(null);
   const [selectedVatsimAirportCallout, setSelectedVatsimAirportCallout] = useState(null);
@@ -875,6 +949,10 @@ export default function FlightMapView({
       null
     );
   }, [endpointLabels, hoveredEndpointKey, isPersistentEndpointPopupMode]);
+
+  const clearHoveredWaypointCallout = useCallback(() => {
+    setHoveredWaypointCallout(null);
+  }, []);
 
   const resizeMap = useCallback(() => {
     const map = mapRef.current?.getMap?.();
@@ -991,6 +1069,46 @@ export default function FlightMapView({
 
     setPersistentEndpointCallouts(nextCallouts);
   }, [endpointLabels, flightPathGeoJson, isPersistentEndpointPopupMode]);
+
+  // Positions the lightweight waypoint ident label directly over the hovered route point.
+  const updateHoveredWaypointCallout = useCallback((feature) => {
+    const map = mapRef.current?.getMap?.();
+    const container = containerRef.current;
+    const ident = String(feature?.properties?.ident || "").trim();
+    const coordinates = feature?.geometry?.coordinates;
+    if (
+      !map ||
+      !container ||
+      !map.isStyleLoaded?.() ||
+      !ident ||
+      !Array.isArray(coordinates) ||
+      coordinates.length < 2
+    ) {
+      setHoveredWaypointCallout(null);
+      return;
+    }
+
+    const canvas = map.getCanvas?.();
+    const viewportWidth = canvas?.clientWidth || container.clientWidth;
+    const viewportHeight = canvas?.clientHeight || container.clientHeight;
+    if (!Number.isFinite(viewportWidth) || !Number.isFinite(viewportHeight) || viewportWidth <= 0 || viewportHeight <= 0) {
+      setHoveredWaypointCallout(null);
+      return;
+    }
+
+    const point = toScreenPoint(map, coordinates[0], coordinates[1]);
+    const position = getWaypointHoverCalloutPosition(point, viewportWidth, viewportHeight);
+    if (!position) {
+      setHoveredWaypointCallout(null);
+      return;
+    }
+
+    setHoveredWaypointCallout({
+      ident,
+      left: position.left,
+      top: position.top
+    });
+  }, []);
 
   const scheduleHoveredEndpointCalloutUpdate = useCallback(() => {
     if (typeof window === "undefined") {
@@ -1300,6 +1418,7 @@ export default function FlightMapView({
   useEffect(() => {
     if (!mapReady) {
       setHoveredEndpointCallout(null);
+      setHoveredWaypointCallout(null);
       setPersistentEndpointCallouts([]);
       setSelectedVatsimAirportCallout(null);
       setSelectedVatsimRegionCallout(null);
@@ -1524,11 +1643,12 @@ export default function FlightMapView({
                   VATSIM_REGION_CENTER_FILL_LAYER_ID,
                   VATSIM_REGION_TERMINAL_FILL_LAYER_ID,
                   VATSIM_REGION_SECTOR_FILL_LAYER_ID,
+                  ROUTE_WAYPOINT_HOVER_LAYER_ID,
                   ROUTE_ENDPOINT_HOVER_LAYER_ID
                 ]
             : isPersistentEndpointPopupMode
               ? undefined
-              : [ROUTE_ENDPOINT_HOVER_LAYER_ID]
+              : [ROUTE_WAYPOINT_HOVER_LAYER_ID, ROUTE_ENDPOINT_HOVER_LAYER_ID]
         }
         dragRotate={false}
         touchPitch={false}
@@ -1546,6 +1666,9 @@ export default function FlightMapView({
           const hoveredLiveAtcRegionFeature = event?.features?.find(
             (item) => item?.properties?.role === "active-region"
           );
+          const hoveredWaypointFeature = event?.features?.find(
+            (item) => item?.properties?.role === "waypoint"
+          );
           const hoveredEndpointFeature = isPersistentEndpointPopupMode
             ? null
             : event?.features?.find(
@@ -1554,9 +1677,20 @@ export default function FlightMapView({
 
           if (map) {
             map.getCanvas().style.cursor =
-              hoveredLiveAtcFeature || hoveredLiveAtcRegionFeature || hoveredEndpointFeature
+              hoveredLiveAtcFeature ||
+              hoveredLiveAtcRegionFeature ||
+              hoveredWaypointFeature ||
+              hoveredEndpointFeature
                 ? "pointer"
                 : "";
+          }
+
+          if (!isPersistentEndpointPopupMode) {
+            if (hoveredWaypointFeature) {
+              updateHoveredWaypointCallout(hoveredWaypointFeature);
+            } else {
+              clearHoveredWaypointCallout();
+            }
           }
 
           if (!isPersistentEndpointPopupMode) {
@@ -1570,6 +1704,7 @@ export default function FlightMapView({
           }
 
           setHoveredEndpointKey(null);
+          clearHoveredWaypointCallout();
         }}
         onClick={(event) => {
           const clickedLiveAtcFeature = event?.features?.find(
@@ -1622,8 +1757,11 @@ export default function FlightMapView({
         ) : null}
         {hasFlightPathFeatures ? (
           <Source id={ROUTE_SOURCE_ID} type="geojson" data={flightPathGeoJson}>
+            <Layer {...ROUTE_WAYPOINT_HOVER_LAYER} />
             <Layer {...ROUTE_ENDPOINT_HOVER_LAYER} />
             <Layer {...ROUTE_LINE_LAYER} />
+            <Layer {...ROUTE_WAYPOINT_RING_LAYER} />
+            <Layer {...ROUTE_WAYPOINT_DOT_LAYER} />
             <Layer {...ROUTE_ENDPOINT_RING_LAYER} />
             <Layer {...ROUTE_ENDPOINT_DOT_LAYER} />
           </Source>
@@ -1687,6 +1825,28 @@ export default function FlightMapView({
               isDarkTheme={isDarkTheme}
               onClose={clearSelectedVatsimRegions}
             />
+          </div>
+        </div>
+      ) : null}
+
+      {!isPersistentEndpointPopupMode && hoveredWaypointCallout ? (
+        <div className="pointer-events-none absolute inset-0 z-[1]">
+          <div
+            className={cn(
+              "absolute rounded-none border px-2 py-1 shadow-[0_8px_24px_rgba(0,0,0,0.18)]",
+              isDarkTheme
+                ? "border-[color:rgba(255,255,255,0.16)] bg-[rgba(10,14,20,0.92)] text-white"
+                : "border-[color:var(--button-ghost-border)] bg-[var(--button-ghost-bg)] text-[var(--text-primary)]"
+            )}
+            style={{
+              left: `${hoveredWaypointCallout.left}px`,
+              top: `${hoveredWaypointCallout.top}px`,
+              width: `${WAYPOINT_CALLOUT_WIDTH}px`
+            }}
+          >
+            <div className="truncate text-[11px] font-semibold leading-none tracking-[0.12em]">
+              {hoveredWaypointCallout.ident}
+            </div>
           </div>
         </div>
       ) : null}
