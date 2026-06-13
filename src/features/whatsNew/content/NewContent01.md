@@ -1,7 +1,7 @@
 ---
-eyebrow: Delete Draft
-title: Delete DVA Draft Report
-imageAlt: Delete DVA Draft Report
+eyebrow: Accomplishments
+title: UI Changes
+imageAlt: UI Changes
 ---
 
-Delete your DVA draft report directly from the app without having to go to the DVA Website.
+Selecting an airport in the top panel will now show a list of current schedule eligible flights in the lower panel. This keeps you in the Accomplishments screen without having to navigate back and forth between Flights and Accomplishments.
