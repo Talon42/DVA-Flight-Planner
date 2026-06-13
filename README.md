@@ -129,7 +129,7 @@ Addon folder support is for matching your installed scenery coverage against the
 
 4. Click `Scan Now`.
 
-The app recursively scans for `ContentHistory.json` files and builds a cached airport list from airport entries it finds.
+The app scans addon packages for `ContentHistory.json` airport entries first. If no airport entries are found for a package, it falls back to that package's `manifest.json` and attempts to detect an ICAO from the package folder name or manifest title.
 
 ### How addon folders affect filters
 
@@ -391,12 +391,19 @@ Expand a Flight Board entry to:
 - open an existing SimBrief plan
 - open an existing DVA draft report
 - mark a flight complete or revert completion status
+- delete an existing DVA draft report
 - remove the flight from the Flight Board
 
 ### Removing flights
 
 1. Expand the Flight Board entry.
 2. Click `Remove from Flight Board`.
+
+### Delete DVA Draft
+
+If a Flight Board entry has a saved draft report ID, you can delete the DVA draft from the expanded Flight Board entry.
+
+Deleting a DVA draft removes the draft from the Delta Virtual website/logbook but does not remove the Flight Board entry.
 
 ### Persistence
 
@@ -469,6 +476,11 @@ SimBrief dispatch is available from expanded Flight Board entries.
 7. A draft flight report is then created or updated based on the SimBrief plan.
 
 If a board entry already has a SimBrief plan, the action changes to `Refresh Dispatch`.
+
+### Refresh vs Regenerate
+
+- `Refresh Dispatch` loads the latest existing SimBrief plan for the board entry.
+- `Regenerate Dispatch` sends a new dispatch request using the currently selected aircraft and flight details.
 
 ### SimBrief settings
 
