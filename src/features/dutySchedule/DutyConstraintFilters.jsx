@@ -33,7 +33,7 @@ export default function DutyConstraintFilters({
     <DutyFilterColumn
       step="3"
       title="Constraints"
-      description="Limit the flight pool by flight time, distance, addon requirements, and origin/destination preferences."
+      description="Limit the flight pool by flight time, distance, addon requirements, and departure/arrival preferences."
       className={cn(activeDutySection !== "constraints" && "hidden bp-1400:flex")}
     >
       <div className="grid gap-0 bp-1400:hidden">
@@ -95,7 +95,7 @@ export default function DutyConstraintFilters({
               presentation={DUTY_SELECT_PRESENTATION}
               placeholder="Search addon match"
               emptyLabel="No matching addon match modes"
-              allLabel="Origin or destination"
+              allLabel="Departure or Arrival"
               allowMultiple={false}
               hideChips
               searchable={false}
@@ -169,7 +169,7 @@ export default function DutyConstraintFilters({
                 presentation={DUTY_SELECT_PRESENTATION}
                 placeholder="Search addon match"
                 emptyLabel="No matching addon match modes"
-                allLabel="Origin or destination"
+                allLabel="Departure or Arrival"
                 allowMultiple={false}
                 hideChips
                 searchable={false}

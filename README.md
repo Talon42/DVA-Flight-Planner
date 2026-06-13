@@ -138,14 +138,14 @@ After scanning, addon airports affect the schedule through the `Force Addons` an
 - `Force Addons`
   - Limits results to flights that match your selected addon airport rule.
 - `Addon Match`
-  - Controls whether the origin, destination, either endpoint, or both endpoints must match your addon airport cache.
+  - Controls whether the departure, arrival, either endpoint, or both endpoints must match your addon airport cache.
 
 ### Addon match rules
 
-- `Origin or destination`: match if either airport is in your addon cache
-- `Origin only`: match only if departure is in your addon cache
-- `Destination only`: match only if arrival is in your addon cache
-- `Origin and destination`: match only if both are in your addon cache
+- `Departure or arrival`: match if either airport is in your addon cache
+- `Departure only`: match only if departure is in your addon cache
+- `Arrival only`: match only if arrival is in your addon cache
+- `Departure and arrival`: match only if both are in your addon cache
 
 ## Standard Filters
 
@@ -160,12 +160,12 @@ Use the `Basic Filters` tab for normal schedule filtering.
 - Airline
 - Region
 - Country
-- Origin Airport
-- Origin ICAO
-- Destination Airport
-- Destination ICAO
-- Origin or Destination Airport
-- Origin or Destination ICAO
+- Departure Airport
+- Departure ICAO
+- Arrival Airport
+- Arrival ICAO
+- Departure or Arrival Airport
+- Departure or Arrival ICAO
 
 ### Performance and timing
 
@@ -183,12 +183,12 @@ Use the `Basic Filters` tab for normal schedule filtering.
 
 ### VATSIM-aware controls
 
-VATSIM filtering can limit the schedule to flights with current online coverage at the origin, destination, either endpoint, or both endpoints.
+VATSIM filtering can limit the schedule to flights with current online coverage at the departure, arrival, either endpoint, or both endpoints.
 
 - `VATSIM`
   - Turns VATSIM filtering on or off.
 - `VATSIM Coverage`
-  - Controls whether the origin, destination, either endpoint, or both endpoints must have VATSIM coverage.
+  - Controls whether the departure, arrival, either endpoint, or both endpoints must have VATSIM coverage.
 
 ## Duty Schedule
 
@@ -233,7 +233,7 @@ Location mode will randomly select an airline based on geographic route location
 4. Select one aircraft type.
 5. Click `Generate Schedule`.
 
-Use `Unique Destinations` when you want the built sequence to avoid reusing the same destination airport.
+Use `Unique Arrivals` when you want the built sequence to avoid reusing the same arrival airport.
 
 ## Schedule Table
 
@@ -346,7 +346,7 @@ The map shows flight routes and lets you narrow the view to the selected flight 
 
 - Route plotting for active Flight Board entries
 - Selected-flight or all-flight path view
-- Flight-path labels at the origin and destination airports
+- Flight-path labels at the departure and arrival airports
 - Weather radar overlay
 - Satellite imagery overlay
 - Standard and World map modes
@@ -429,7 +429,7 @@ Repair is used for stale entries that came from an older schedule.
 
 1. Expand the stale Flight Board entry.
 2. Click `Repair`.
-3. The app looks for flights in the current schedule with the same airline, origin, and destination.
+3. The app looks for flights in the current schedule with the same airline, departure, and arrival.
 4. If more than one match exists, it picks the closest one by departure time.
 
 If a repair is found, the board entry is relinked to the current schedule.
@@ -442,7 +442,7 @@ Draft flight reports can be created from expanded Flight Board entries.
 
 ### Create Draft Only
 
-If you do not want to link your SimBrief profile or generate a SimBrief dispatch, you can still create a draft flight report that includes equipment type, origin, destination, and network.
+If you do not want to link your SimBrief profile or generate a SimBrief dispatch, you can still create a draft flight report that includes equipment type, departure, arrival, and network.
 
 ### Draft network
 

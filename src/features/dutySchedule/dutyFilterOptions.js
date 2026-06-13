@@ -35,7 +35,7 @@ export const DUTY_HELP_COPY = {
   timedLegs:
     "When enabled, each leg must depart after the previous arrival plus the selected minimum turn time. Timing is based on the imported schedule.",
   addons:
-    "Force Addons limits the generator to airports with detected scenery addons. Use the matching dropdown to apply this to origin, destination, or both.",
+    "Force Addons limits the generator to airports with detected scenery addons. Use the matching dropdown to apply this to departure, arrival, or both.",
   aircraft:
     "Limits eligible flights based on the selected aircraft's operational range and performance constraints."
 };
