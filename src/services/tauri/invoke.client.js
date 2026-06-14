@@ -20,6 +20,10 @@ function shouldRedactKey(key) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "");
 
+  if (normalized === "appsessionid") {
+    return false;
+  }
+
   return [
     "password",
     "cookie",
@@ -33,7 +37,22 @@ function shouldRedactKey(key) {
     "body",
     "payload",
     "response"
-  ].some((redactedKey) => normalized === redactedKey);
+  ].some((redactedKey) => normalized.includes(redactedKey));
+}
+
+function sanitizeStructuredValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeStructuredValue(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value).reduce((accumulator, [key, entry]) => {
+      accumulator[key] = shouldRedactKey(key) ? "[REDACTED]" : sanitizeStructuredValue(entry);
+      return accumulator;
+    }, {});
+  }
+
+  return value;
 }
 
 function formatValue(value) {
@@ -56,7 +75,7 @@ function formatValue(value) {
 
   if (Array.isArray(value)) {
     try {
-      return truncateText(JSON.stringify(value), 220);
+      return truncateText(JSON.stringify(sanitizeStructuredValue(value)), 220);
     } catch {
       return "[unserializable]";
     }
@@ -64,7 +83,7 @@ function formatValue(value) {
 
   if (typeof value === "object") {
     try {
-      return truncateText(JSON.stringify(value), 220);
+      return truncateText(JSON.stringify(sanitizeStructuredValue(value)), 220);
     } catch {
       return "[unserializable]";
     }

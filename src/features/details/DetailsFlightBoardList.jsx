@@ -19,6 +19,7 @@ export default function DetailsFlightBoardList({
   selectedAccomplishment,
   simBriefDispatchState,
   deltaDraftSubmitState,
+  deltaDraftDeleteState,
   deltaDraftReportUrlState,
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
@@ -31,8 +32,10 @@ export default function DetailsFlightBoardList({
   onSimBriefTypeChange,
   onDraftNetworkChange,
   onDispatchWorkflow,
+  onRegenerateDispatch,
   onOpenSimBriefFlight,
   onDraftOnlySubmit,
+  onDeleteDeltaVirtualDraftReport,
   onCompleteTourFlight,
   setItemRef,
   suppressClickRef
@@ -123,6 +126,7 @@ export default function DetailsFlightBoardList({
                     flight={flight}
                     simBriefDispatchState={simBriefDispatchState}
                     deltaDraftSubmitState={deltaDraftSubmitState}
+                    deltaDraftDeleteState={deltaDraftDeleteState}
                     deltaDraftReportUrlState={deltaDraftReportUrlState}
                     simBriefCredentialsConfigured={simBriefCredentialsConfigured}
                     isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
@@ -133,8 +137,10 @@ export default function DetailsFlightBoardList({
                     onSimBriefTypeChange={onSimBriefTypeChange}
                     onDraftNetworkChange={onDraftNetworkChange}
                     onDispatchWorkflow={onDispatchWorkflow}
+                    onRegenerateDispatch={onRegenerateDispatch}
                     onOpenSimBriefFlight={onOpenSimBriefFlight}
                     onDraftOnlySubmit={onDraftOnlySubmit}
+                    onDeleteDeltaVirtualDraftReport={onDeleteDeltaVirtualDraftReport}
                   />
                 )
               ) : null}

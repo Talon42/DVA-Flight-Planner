@@ -1,7 +1,7 @@
 ---
-eyebrow: VATSIM ATC
-title: Find a VATSIM Airport
-imageAlt: VATSIM Filter
+eyebrow: Accomplishments
+title: UI Changes
+imageAlt: UI Changes
 ---
 
-Enable VATSIM to quickly filter airports that have available online ATC coverage
+Selecting an airport in the top panel will now show a list of current schedule eligible flights in the lower panel. This keeps you in the Accomplishments screen without having to navigate back and forth between Flights and Accomplishments.

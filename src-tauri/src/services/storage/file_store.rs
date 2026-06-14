@@ -1,13 +1,16 @@
-use crate::app::paths::resolve_existing_logbook_json_path;
+use crate::app::paths::{
+    build_accomplishment_eligibility_path, resolve_existing_logbook_json_path,
+};
 use crate::services::deltava::draft::DVA_DRAFT_WEBVIEW_DIR;
 use crate::services::deltava::{
-    auth::clear_auth_settings_internal,
-    logbook::{
-        extract_latest_logbook_date_iso, normalize_logbook_entries, store_logbook_json,
+    accomplishments::{
+        build_accomplishment_eligibility_summary, parse_accomplishment_eligibility_html,
     },
-    sync_types::DeltaWebSyncResult,
+    auth::clear_auth_settings_internal,
+    logbook::{extract_latest_logbook_date_iso, normalize_logbook_entries, store_logbook_json},
+    sync_types::{DeltaAccomplishmentEligibilityStore, DeltaWebSyncResult},
 };
-use crate::{append_sync_log, DELTAVA_SYNC_DOWNLOAD_FILE};
+use crate::{append_sync_log, append_sync_log_debug, DELTAVA_SYNC_DOWNLOAD_FILE};
 use serde_json::Value;
 use std::{collections::BTreeSet, fs, path::Path};
 use tauri::{AppHandle, Manager};
@@ -380,10 +383,39 @@ pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogb
     }
 }
 
+/// Reads the latest stored DVA accomplishment eligibility snapshot.
+pub(crate) fn read_deltava_accomplishment_eligibility(
+    app: &AppHandle,
+) -> DeltaAccomplishmentEligibilityStore {
+    let Ok(path) = build_accomplishment_eligibility_path(app) else {
+        return DeltaAccomplishmentEligibilityStore::default();
+    };
+
+    let Ok(text) = fs::read_to_string(&path) else {
+        return DeltaAccomplishmentEligibilityStore::default();
+    };
+
+    serde_json::from_str::<DeltaAccomplishmentEligibilityStore>(&text).unwrap_or_default()
+}
+
+fn store_deltava_accomplishment_eligibility(
+    app: &AppHandle,
+    store: &DeltaAccomplishmentEligibilityStore,
+) -> Result<DeltaAccomplishmentEligibilityStore, String> {
+    let path = build_accomplishment_eligibility_path(app)?;
+    let json = serde_json::to_string_pretty(store)
+        .map_err(|error| format!("download_failed: Unable to serialize accomplishment eligibility: {error}"))?;
+    fs::write(&path, json)
+        .map_err(|error| format!("download_failed: Unable to write accomplishment eligibility: {error}"))?;
+    Ok(store.clone())
+}
+
+
 /// Builds the final Delta sync payload once the webview has downloaded both artifacts.
 pub(crate) async fn build_delta_sync_payload_from_web_result(
     app: &AppHandle,
     result: DeltaWebSyncResult,
+    debug_enabled: bool,
 ) -> Result<crate::DeltaSyncPayload, String> {
     let mut warnings = Vec::new();
 
@@ -408,7 +440,7 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
 
     let logbook_json = if result.logbook.ok {
         let json_text = result.logbook.json_text.unwrap_or_default();
-        append_sync_log("logbook-fetch");
+        append_sync_log_debug(debug_enabled, "logbook-fetch");
         match store_logbook_json(
             app,
             &json_text,
@@ -429,6 +461,34 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
                 .error
                 .unwrap_or_else(|| "Delta Virtual logbook JSON download failed.".into()),
         );
+        None
+    };
+
+    let accomplishment_eligibility = if let Some(accomplishments) = result.accomplishments {
+        if accomplishments.ok {
+            let html_text = accomplishments.html_text.unwrap_or_default();
+            let parsed = parse_accomplishment_eligibility_html(&html_text);
+            append_sync_log_debug(debug_enabled, &format!(
+                "accomplishments:parsed rows={}",
+                parsed.rows.len()
+            ));
+
+            match store_deltava_accomplishment_eligibility(app, &parsed) {
+                Ok(store) => Some(build_accomplishment_eligibility_summary(&store)),
+                Err(error) => {
+                    warnings.push(error);
+                    None
+                }
+            }
+        } else {
+            warnings.push(
+                accomplishments
+                    .error
+                    .unwrap_or_else(|| "Delta Virtual accomplishment eligibility download failed.".into()),
+            );
+            None
+        }
+    } else {
         None
     };
 
@@ -468,6 +528,7 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         status,
         xml_status,
         logbook_status,
+        accomplishment_eligibility,
         logbook_json,
         warnings,
     })

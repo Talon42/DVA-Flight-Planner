@@ -72,6 +72,8 @@ import {
   logAppEvent,
   logSystemError,
   logSystemEvent,
+  getAppSessionId,
+  setDebugLoggingEnabled,
   openAppLogFile
 } from "../services/logging/appLog.client.js";
 import {
@@ -90,6 +92,7 @@ import {
 } from "../components/map/mapOptions.model.js";
 import {
   getAircraftDisplayName,
+  findCustomAirframeByInternalId,
   getSelectedAircraftForFlight,
   resolveSimBriefDispatchAircraft
 } from "../domain/aircraft/aircraftIdentity.js";
@@ -127,9 +130,17 @@ export default function App() {
   const [logbookReloadVersion, setLogbookReloadVersion] = useState(0);
   const [selectedTourPath, setSelectedTourPath] = useState("");
   const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
+  const [isAccomplishmentSelectorCollapsed, setIsAccomplishmentSelectorCollapsed] = useState(false);
+  const [isTourSelectorCollapsed, setIsTourSelectorCollapsed] = useState(false);
   const [tourProgress, setTourProgress] = useState({});
   const [derivedTourProgress, setDerivedTourProgress] = useState(DEFAULT_DERIVED_TOUR_PROGRESS);
   const [deltaVirtualToursCache, setDeltaVirtualToursCache] = useState(null);
+  const [deltaVirtualAccomplishmentEligibility, setDeltaVirtualAccomplishmentEligibility] =
+    useState({
+      lastSyncAt: null,
+      sourceUrl: null,
+      rows: []
+    });
   const [mapOptions, setMapOptions] = useState(DEFAULT_MAP_OPTIONS);
   const [theme, setTheme] = useState(readSavedTheme);
   const {
@@ -353,6 +364,7 @@ export default function App() {
     setDvaLastName,
     setDvaLastNameDraft,
     setDerivedTourProgress,
+    setDeltaVirtualAccomplishmentEligibility,
     setDeltaVirtualToursCache,
     setFilters,
     setFlightBoards,
@@ -397,6 +409,29 @@ export default function App() {
   const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
   const scheduleDateLabel = scheduleDateInfo.label;
   const logbookDateLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
+  // Tracks which rows are already assigned to any board so the schedule tables only show available work.
+  const boardedFlightIds = useMemo(
+    () =>
+      new Set(
+        flightBoards.flatMap((board) =>
+          (Array.isArray(board?.entries) ? board.entries : [])
+            .filter((entry) => !entry?.isTourFlight && String(entry?.linkedFlightId || "").trim())
+            .map((entry) => String(entry.linkedFlightId).trim())
+        )
+      ),
+    [flightBoards]
+  );
+  const boardedTourRowIds = useMemo(
+    () =>
+      new Set(
+        flightBoards.flatMap((board) =>
+          (Array.isArray(board?.entries) ? board.entries : [])
+            .filter((entry) => entry?.isTourFlight && String(entry?.tourRowId || "").trim())
+            .map((entry) => String(entry.tourRowId).trim())
+        )
+      ),
+    [flightBoards]
+  );
   const footerMetadataItems = schedule?.importSummary
     ? [
         {
@@ -414,23 +449,20 @@ export default function App() {
       ]
     : [];
   const tourSelection = useTourSelection({
+    boardedTourRowIds,
+    boardedFlightIds,
+    deltaVirtualAccomplishmentEligibility,
     deltaVirtualToursCache,
     derivedTourProgress,
     isDevToolsEnabled,
-    logbookAirportProgress,
     scheduleView,
     scheduleFlights,
     selectedAccomplishmentName,
     selectedTourPath,
-    setDutyFilters,
-    setFilterUiVersion,
-    setFilters,
-    setPlannerMode,
-    setScheduleView,
     setSelectedAccomplishmentName,
-    setSelectedFlightId,
     setSelectedTourPath,
     setSelectedTourRowId,
+    sort,
     tourProgress
   });
   const {
@@ -439,11 +471,16 @@ export default function App() {
     selectedAccomplishment,
     accomplishmentOptions,
     accomplishmentRows,
+    accomplishmentFlightRows,
+    accomplishmentFlightSearch,
+    accomplishmentFlightSort,
+    hasAccomplishmentFlightSearch,
     sortedTourRows,
     activeTourRows,
     tourFlightsByKey,
     handleSelectTourPath,
-    handleShowAccomplishmentFlights
+    handleShowAccomplishmentFlights,
+    handleSortAccomplishmentFlights
   } = tourSelection;
   const boardState = useFlightBoards({
     activeFlightBoardId,
@@ -481,6 +518,48 @@ export default function App() {
     handleRenameFlightBoard,
     handleDeleteFlightBoard
   } = boardState;
+  const handleToggleAccomplishmentSelectorCollapsed = useCallback((nextCollapsed) => {
+    setIsAccomplishmentSelectorCollapsed(nextCollapsed);
+  }, []);
+
+  const handleToggleTourSelectorCollapsed = useCallback((nextCollapsed) => {
+    setIsTourSelectorCollapsed(nextCollapsed);
+  }, []);
+
+  const handleActivateRow = useCallback(
+    (row) => {
+      const didAddRow = handleAddToFlightBoard(row);
+
+      // Collapse the active selector panel only after a successful add so duplicate clicks do not hide context.
+      if (didAddRow) {
+        if (scheduleView === "accomplishments") {
+          setIsAccomplishmentSelectorCollapsed(true);
+        } else if (scheduleView === "tours") {
+          setIsTourSelectorCollapsed(true);
+        }
+      }
+    },
+    [
+      handleAddToFlightBoard,
+      scheduleView,
+      setIsAccomplishmentSelectorCollapsed,
+      setIsTourSelectorCollapsed
+    ]
+  );
+  useEffect(() => {
+    // Accomplishments should always open expanded when the tab becomes active.
+    if (scheduleView === "accomplishments") {
+      setIsAccomplishmentSelectorCollapsed(false);
+    }
+  }, [scheduleView, setIsAccomplishmentSelectorCollapsed]);
+
+  useEffect(() => {
+    // Tours should always open expanded when the tab becomes active.
+    if (scheduleView === "tours") {
+      setIsTourSelectorCollapsed(false);
+    }
+  }, [scheduleView, setIsTourSelectorCollapsed]);
+
   useEffect(() => {
     if (!flightBoards.length) {
       return;
@@ -673,7 +752,14 @@ export default function App() {
   }, [isDevToolsEnabled, isDesktopAddonScanAvailable]);
 
   useEffect(() => {
-    logAppEvent("start").catch(() => {});
+    setDebugLoggingEnabled(isDevToolsEnabled);
+  }, [isDevToolsEnabled]);
+
+  useEffect(() => {
+    logAppEvent("start", {
+      appSessionId: getAppSessionId(),
+      version: APP_BUILD_GIT_TAG
+    }).catch(() => {});
   }, []);
 
   useDebouncedEffect(
@@ -804,12 +890,18 @@ export default function App() {
 
   const basicFilteredFlights = useMemo(() => {
     return selectFilteredScheduleFlights({
-      flights: scheduleFlights,
+      flights: scheduleFlights.filter((flight) => !boardedFlightIds.has(flight.flightId)),
       filters: normalizedDeferredFilters,
       addonAirports,
       vatsimCoverageIndex: activeVatsimCoverageIndex
     });
-  }, [activeVatsimCoverageIndex, addonAirports, normalizedDeferredFilters, scheduleFlights]);
+  }, [
+    activeVatsimCoverageIndex,
+    addonAirports,
+    boardedFlightIds,
+    normalizedDeferredFilters,
+    scheduleFlights
+  ]);
 
   const sortedFlights = useMemo(() => {
     return selectSortedScheduleFlights({
@@ -866,6 +958,7 @@ export default function App() {
     processImportedSchedule,
     onScheduleSyncComplete: handleVatsimScheduleSyncComplete,
     setDerivedTourProgress,
+    setDeltaVirtualAccomplishmentEligibility,
     setDeltaVirtualToursCache,
     setDvaHasPassword,
     setDvaSyncWarning,
@@ -1089,7 +1182,7 @@ export default function App() {
       nextScheduleView = "logbook";
     } else if (nextView === "tours") {
       nextScheduleView = "tours";
-    } else if (nextView === "accomplishments" && accomplishmentOptions.length) {
+    } else if (nextView === "accomplishments") {
       nextScheduleView = "accomplishments";
     }
 
@@ -1147,12 +1240,19 @@ export default function App() {
   }
 
   function handleSimBriefTypeChange(boardEntryId, nextType) {
-    const normalizedAircraft = getAircraftDisplayName(nextType);
+    const rawSelection = String(nextType || "").trim();
+    const selectedCustomAirframe = findCustomAirframeByInternalId(
+      rawSelection,
+      simBriefCustomAirframes
+    );
+    const selectedAircraft = selectedCustomAirframe?.internalId
+      ? rawSelection
+      : getAircraftDisplayName(rawSelection);
     const nextFlightBoard = flightBoard.map((entry) =>
       entry.boardEntryId === boardEntryId
         ? {
             ...entry,
-            selectedAircraft: normalizedAircraft,
+            selectedAircraft,
             simbriefSelectedType: ""
           }
         : entry
@@ -1161,7 +1261,7 @@ export default function App() {
 
     const updatedEntry =
       nextFlightBoard.find((entry) => entry.boardEntryId === boardEntryId) || null;
-    if (!updatedEntry || !normalizedAircraft) {
+    if (!updatedEntry || !selectedAircraft) {
       handleCloseSimBriefDispatchBlocked();
       return;
     }
@@ -1169,7 +1269,7 @@ export default function App() {
     const dispatchResolution = resolveSimBriefDispatchAircraft(
       {
         ...updatedEntry,
-        selectedAircraft: normalizedAircraft
+        selectedAircraft
       },
       simBriefCustomAirframes
     );
@@ -1291,8 +1391,10 @@ export default function App() {
     );
     const existingSelectedAircraft =
       getSelectedAircraftForFlight(normalizedBoardEntry, simBriefCustomAirframes) || "";
-    const refreshedSelectedAircraft = getAircraftDisplayName(normalizedPlan?.aircraftType);
-    // Preserve the current locked selector unless SimBrief returns a valid replacement on refresh.
+    const refreshedSelectedAircraft =
+      getAircraftDisplayName(normalizedPlan?.aircraftType) ||
+      String(normalizedPlan?.aircraftType || "").trim();
+    // Always sync the stored selection to the aircraft that SimBrief returned for the plan.
     const resolvedSelectedAircraft = refreshedSelectedAircraft || existingSelectedAircraft;
     const resolvedPlan = normalizedPlan
       ? {
@@ -1344,8 +1446,10 @@ export default function App() {
 
   const {
     deltaDraftSubmitState,
+    deltaDraftDeleteState,
     deltaDraftReportUrlState,
-    handleSubmitDeltaVirtualDraftReport
+    handleSubmitDeltaVirtualDraftReport,
+    handleDeleteDeltaVirtualDraftReport
   } = appDeltaVirtualDraftReport;
 
   const appSimBriefDispatch = useSimBriefDispatch({
@@ -1373,7 +1477,8 @@ export default function App() {
     isSimBriefAircraftTypesLoading,
     simBriefAircraftTypesError,
     simBriefDispatchOptions: simBriefDispatchOptionsFromHook,
-    handleStartSimBriefDispatch
+    handleStartSimBriefDispatch,
+    handleRegenerateSimBriefDispatch
   } = appSimBriefDispatch;
   useEffect(() => {
     simBriefDispatchStateRef.current = simBriefDispatchState;
@@ -1395,6 +1500,7 @@ export default function App() {
 
   const simBriefDispatchOptions = simBriefDispatchOptionsFromHook;
   const handleDispatchWorkflow = handleStartSimBriefDispatch;
+  const handleRegenerateDispatchWorkflow = handleRegenerateSimBriefDispatch;
 
   async function handleDeleteUserData() {
     const confirmed = await confirmDeleteUserDataInApp();
@@ -1449,6 +1555,7 @@ export default function App() {
       setSimBriefCustomAirframeIdDraft("");
       setSimBriefCustomAirframeMatchTypeDraft("");
       setLogbookAirportProgress({ dateIso: null, visitedAirports: [], arrivalAirports: [] });
+      setDeltaVirtualAccomplishmentEligibility({ lastSyncAt: null, sourceUrl: null, rows: [] });
       setMapOptions(DEFAULT_MAP_OPTIONS);
       setSimBriefDispatchState({
         flightId: "",
@@ -1638,8 +1745,19 @@ export default function App() {
       activeFlightBoard={activeFlightBoard}
       expandedBoardFlightId={expandedBoardFlightId}
       selectedAccomplishment={selectedAccomplishment}
+      availableTours={availableTours}
+      accomplishmentOptions={accomplishmentOptions}
+      selectedAccomplishmentName={selectedAccomplishmentName}
+      onSelectAccomplishmentName={setSelectedAccomplishmentName}
+      isAccomplishmentSelectorCollapsed={isAccomplishmentSelectorCollapsed}
+      onToggleAccomplishmentSelectorCollapsed={handleToggleAccomplishmentSelectorCollapsed}
+      selectedTourPath={selectedTourPath}
+      onSelectTourPath={handleSelectTourPath}
+      isTourSelectorCollapsed={isTourSelectorCollapsed}
+      onToggleTourSelectorCollapsed={handleToggleTourSelectorCollapsed}
       simBriefDispatchState={simBriefDispatchState}
       deltaDraftSubmitState={deltaDraftSubmitState}
+      deltaDraftDeleteState={deltaDraftDeleteState}
       deltaDraftReportUrlState={deltaDraftReportUrlState}
       simBriefCredentialsConfigured={simBriefCredentialsConfigured}
       isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
@@ -1658,8 +1776,10 @@ export default function App() {
       onSimBriefTypeChange={handleSimBriefTypeChange}
       onDraftNetworkChange={handleDraftNetworkChange}
       onDispatchWorkflow={handleDispatchWorkflow}
+      onRegenerateDispatch={handleRegenerateDispatchWorkflow}
       onOpenSimBriefFlight={handleOpenSimBriefFlight}
       onDraftOnlySubmit={handleSubmitDeltaVirtualDraftReport}
+      onDeleteDeltaVirtualDraftReport={handleDeleteDeltaVirtualDraftReport}
       onCompleteTourFlight={handleCompleteTourFlight}
     />
   );
@@ -1698,13 +1818,15 @@ export default function App() {
     availableTours,
     selectedTourPath,
     selectedTour,
-    accomplishmentOptions,
     selectedAccomplishment,
     mapOptions,
     onPrimaryViewChange: handlePrimaryViewChange,
     onSelectTourPath: handleSelectTourPath,
-    onSelectAccomplishmentName: setSelectedAccomplishmentName,
     accomplishmentRows,
+    accomplishmentFlightRows,
+    accomplishmentFlightSearch,
+    accomplishmentFlightSort,
+    hasAccomplishmentFlightSearch,
     viewportSize,
     flightRows: sortedFlights,
     sort,
@@ -1715,11 +1837,12 @@ export default function App() {
     selectedTourRowId,
     tourSyncMessage: deltaVirtualToursCache?.message || "",
     onShowAccomplishmentFlights: handleShowAccomplishmentFlights,
+    onSortAccomplishmentFlights: handleSortAccomplishmentFlights,
     onSortFlights: handleSort,
     onToggleTimeDisplayMode: () =>
       setScheduleTableTimeDisplayMode((current) => (current === "local" ? "utc" : "local")),
     onSelectRow: handleSelectFlight,
-    onActivateRow: handleAddToFlightBoard,
+    onActivateRow: handleActivateRow,
     plannerMode,
     dutyFilters,
     airlines,

@@ -1,7 +1,7 @@
 ---
-eyebrow: VATSIM ATC
-title: Find an Airport
-imageAlt: VATSIM Icon
+eyebrow: Accomplishments/Tours
+title: List Selection
+imageAlt: List Selection
 ---
 
-Quickly identify VATSIM ATC coverage with the new controller icon next to Departure or Arrival airports.
+Tours and Accomplishments can now be selected from the right side panel. Click the expand/collapse arrow to bring the Flight Board back. Alternatively, adding a flight in either Accomplishments or Tours will automatically collapse the list to show the Flight Board.

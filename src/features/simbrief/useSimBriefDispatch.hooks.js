@@ -2,11 +2,16 @@ import { DateTime } from "luxon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deriveCallsign, deriveFlightNumber } from "../../domain/flights/flightIdentity";
 import {
-  buildDvaAircraftOptions,
+  buildDvaAircraftOptionsWithCustomAirframes,
   resolveSimBriefDispatchAircraft
 } from "../../domain/aircraft/aircraftIdentity.js";
 import { buildTourFlightLookupKey } from "../tours/tourIds.model";
-import { logSystemError, logSystemEvent } from "../../services/logging/appLog.client.js";
+import {
+  createLogRunId,
+  logSystemDebug,
+  logSystemError,
+  logSystemEvent
+} from "../../services/logging/appLog.client.js";
 import {
   closeSimBriefDispatchWindow,
   fetchSimBriefAircraftTypes,
@@ -158,7 +163,9 @@ export function useSimBriefDispatch({
   const [isSimBriefAircraftTypesLoading, setIsSimBriefAircraftTypesLoading] = useState(false);
   const [simBriefAircraftTypesError, setSimBriefAircraftTypesError] = useState("");
   const loadRequestIdRef = useRef(0);
-  const simBriefDispatchOptions = buildDvaAircraftOptions();
+  const simBriefDispatchOptions = buildDvaAircraftOptionsWithCustomAirframes(
+    simBriefCustomAirframes
+  );
 
   const handleCloseSimBriefDispatch = useCallback(() => {
     setSimBriefDispatchState({
@@ -253,11 +260,13 @@ export function useSimBriefDispatch({
     };
   }, [handleFetchSimBriefAircraftTypes, isDesktopSimBriefAvailable]);
 
-  const handleStartSimBriefDispatch = useCallback(async () => {
+  const runSimBriefDispatchWorkflow = useCallback(async ({ forceNewDispatch = false } = {}) => {
     if (!selectedShortlistFlight) {
       return;
     }
 
+    const dispatchRunId = createLogRunId("dispatch");
+    const workflowStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
     const boardEntryId = String(selectedShortlistFlight.boardEntryId || "").trim();
     const dispatchFlight =
       flightBoard.find((entry) => entry.boardEntryId === boardEntryId) || selectedShortlistFlight;
@@ -288,15 +297,18 @@ export function useSimBriefDispatch({
     const flightId = boardEntryId;
     const currentBoardEntry = dispatchFlight;
     const existingSimBriefPlan = currentBoardEntry?.simbriefPlan || null;
-    const hasSimBriefPlan = Boolean(
-      String(existingSimBriefPlan?.staticId || existingSimBriefPlan?.static_id || "").trim()
-    );
+    const existingStaticId = String(
+      existingSimBriefPlan?.staticId || existingSimBriefPlan?.static_id || ""
+    ).trim();
+    const hasSimBriefPlan = Boolean(existingStaticId);
     const username = String(simBriefUsername || "").trim();
     const pilotId = String(simBriefPilotId || "").trim();
+    const dispatchMode = forceNewDispatch ? "regenerate" : hasSimBriefPlan ? "refresh" : "generate";
     if (!username && !pilotId) {
-      const message = hasSimBriefPlan
-        ? "Save a SimBrief Navigraph Alias or Pilot ID before refreshing."
-        : "Save a SimBrief Navigraph Alias or Pilot ID before dispatching.";
+      const message =
+        dispatchMode === "refresh"
+          ? "Save a SimBrief Navigraph Alias or Pilot ID before refreshing."
+          : "Save a SimBrief Navigraph Alias or Pilot ID before dispatching.";
       setSimBriefDispatchState({
         flightId,
         isDispatching: false,
@@ -309,24 +321,29 @@ export function useSimBriefDispatch({
     setSimBriefDispatchState({
       flightId,
       isDispatching: true,
-      message: hasSimBriefPlan
-        ? "Refreshing latest SimBrief flight plan..."
-        : "Waiting for SimBrief login and flight plan generation..."
+      message:
+        dispatchMode === "refresh"
+          ? "Refreshing latest SimBrief flight plan..."
+          : forceNewDispatch
+            ? "Regenerating latest SimBrief flight plan..."
+            : "Waiting for SimBrief login and flight plan generation..."
     });
     setPendingMapFlightPathViewMode?.("selected");
     setScheduleView?.("map");
     setExpandedBoardFlightId?.(flightId);
-      setStatusMessage?.(
-        hasSimBriefPlan ? "Refreshing SimBrief dispatch..." : "Opening SimBrief dispatch..."
-      );
+    setStatusMessage?.(
+      dispatchMode === "refresh"
+        ? "Refreshing SimBrief dispatch..."
+        : forceNewDispatch
+          ? "Regenerating SimBrief dispatch..."
+          : "Opening SimBrief dispatch..."
+    );
 
     try {
       let simBriefPlan = null;
 
-      if (hasSimBriefPlan) {
-        const staticId = String(
-          existingSimBriefPlan?.staticId || existingSimBriefPlan?.static_id || ""
-        ).trim();
+      if (!forceNewDispatch && hasSimBriefPlan) {
+        const staticId = existingStaticId;
         if (!staticId) {
           const message = "Load a SimBrief plan before refreshing it.";
           setSimBriefDispatchState({
@@ -339,16 +356,32 @@ export function useSimBriefDispatch({
         }
 
         await logSystemEvent("SimBrief", "refresh-requested", {
-          flightId,
+          dispatchMode,
+          dispatchRunId,
+          flight: selectedShortlistFlight.flightCode || "",
+          route: `${selectedShortlistFlight.from || ""}-${selectedShortlistFlight.to || ""}`,
+          aircraft: currentBoardEntry?.simbriefPlan?.aircraftType || "",
           staticId,
           origin: selectedShortlistFlight.from,
           destination: selectedShortlistFlight.to
+        });
+        await logSystemDebug("SimBrief", "refresh-debug", {
+          dispatchRunId,
+          boardEntryId,
+          dispatchFlightId,
+          dispatchFlightIdLength: dispatchFlightId.length,
+          originalBoardEntryIdLength: boardEntryId.length,
+          previousStaticId: existingStaticId,
+          hasUsername: Boolean(username),
+          hasPilotId: Boolean(pilotId)
         });
         simBriefPlan = await refreshSimBriefDispatch({
           flightId,
           staticId,
           username,
           pilotId
+        }, {
+          debugEnabled: isDevToolsEnabled
         });
       } else {
         const dispatchResolution = resolveSimBriefDispatchAircraft(
@@ -396,22 +429,37 @@ export function useSimBriefDispatch({
           return;
         }
 
-        await logSystemEvent("SimBrief", "dispatch-requested", {
-          flightId,
-          dispatchFlightId,
+        await logSystemEvent(
+          "SimBrief",
+          forceNewDispatch ? "regenerate-requested" : "dispatch-requested",
+          {
+            dispatchMode,
+            dispatchRunId,
+            flight: selectedShortlistFlight.flightCode || "",
+            route: `${selectedShortlistFlight.from || ""}-${selectedShortlistFlight.to || ""}`,
+            aircraft: dispatchResolution.dispatchType || "",
+            dispatchFlightId,
+            origin: selectedShortlistFlight.from,
+            destination: selectedShortlistFlight.to,
+            departureDate,
+            departureTimeUtc,
+            useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime
+          }
+        );
+        await logSystemDebug("SimBrief", "dispatch-debug", {
+          dispatchRunId,
+          boardEntryId,
           dispatchFlightIdLength: dispatchFlightId.length,
           originalBoardEntryIdLength: boardEntryId.length,
-          origin: selectedShortlistFlight.from,
-          destination: selectedShortlistFlight.to,
-          aircraftType: dispatchResolution.dispatchType || "",
+          previousStaticId: existingStaticId,
           selectedAircraft: dispatchResolution.selectedAircraft || "",
-          dva: dispatchResolution.dva || "",
-          simbrief: dispatchResolution.simbrief || "",
           hasUsername: Boolean(username),
           hasPilotId: Boolean(pilotId),
-          departureDate,
-          departureTimeUtc,
-          useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime
+          routePointCount: Array.isArray(dispatchResolution.routePoints)
+            ? dispatchResolution.routePoints.length
+            : 0,
+          dva: dispatchResolution.dva || "",
+          simbrief: dispatchResolution.simbrief || ""
         });
 
         simBriefPlan = await startSimBriefDispatch({
@@ -427,7 +475,75 @@ export function useSimBriefDispatch({
           departureDate,
           username,
           pilotId
+        }, {
+          debugEnabled: isDevToolsEnabled
         });
+      }
+
+      const returnedStaticId = String(simBriefPlan?.staticId || simBriefPlan?.static_id || "").trim();
+      if (forceNewDispatch) {
+        if (!returnedStaticId) {
+          const message = "SimBrief regenerated the dispatch, but no new plan ID was returned.";
+          setSimBriefDispatchState({
+            flightId,
+            isDispatching: false,
+            message
+          });
+          setStatusMessage?.(message);
+          await logSystemError(
+            "SimBrief",
+            "regenerate-failed",
+            new Error("SimBrief regenerated the dispatch, but no new plan ID was returned."),
+            {
+              dispatchMode,
+              dispatchRunId,
+              flight: selectedShortlistFlight.flightCode || "",
+              route: `${selectedShortlistFlight.from || ""}-${selectedShortlistFlight.to || ""}`,
+              aircraft: currentBoardEntry?.simbriefPlan?.aircraftType || "",
+              stage: "regenerate-plan",
+              durationMs: Math.max(
+                0,
+                Math.round(
+                  (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+                    workflowStartedAt
+                )
+              )
+            }
+          );
+          return;
+        }
+
+        if (existingStaticId && returnedStaticId === existingStaticId) {
+          const message =
+            "SimBrief regenerated the dispatch, but the new plan ID matched the previous one.";
+          setSimBriefDispatchState({
+            flightId,
+            isDispatching: false,
+            message
+          });
+          setStatusMessage?.(message);
+          await logSystemError(
+            "SimBrief",
+            "regenerate-failed",
+            new Error("SimBrief returned the same static ID during regeneration."),
+            {
+              dispatchMode,
+              dispatchRunId,
+              flight: selectedShortlistFlight.flightCode || "",
+              route: `${selectedShortlistFlight.from || ""}-${selectedShortlistFlight.to || ""}`,
+              aircraft: currentBoardEntry?.simbriefPlan?.aircraftType || "",
+              stage: "regenerate-unchanged",
+              durationMs: Math.max(
+                0,
+                Math.round(
+                  (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+                    workflowStartedAt
+                )
+              )
+            }
+          );
+          return;
+        }
       }
 
       const normalizedBoardEntry = applySimBriefPlanToBoardEntry?.(flightId, simBriefPlan);
@@ -445,50 +561,88 @@ export function useSimBriefDispatch({
       setSimBriefDispatchState({
         flightId,
         isDispatching: false,
-        message: hasSimBriefPlan
-          ? "SimBrief flight plan refreshed."
-          : "SimBrief flight plan loaded."
+        message:
+          dispatchMode === "refresh"
+            ? "SimBrief flight plan refreshed."
+            : forceNewDispatch
+              ? "SimBrief flight plan regenerated."
+              : "SimBrief flight plan loaded."
       });
       setStatusMessage?.(
-        hasSimBriefPlan
+        dispatchMode === "refresh"
           ? `SimBrief plan refreshed for ${selectedShortlistFlight.flightCode} ${selectedShortlistFlight.from}-${selectedShortlistFlight.to}.`
-          : `SimBrief plan ready for ${selectedShortlistFlight.flightCode} ${selectedShortlistFlight.from}-${selectedShortlistFlight.to}.`
+          : forceNewDispatch
+            ? `SimBrief dispatch regenerated for ${selectedShortlistFlight.flightCode} ${selectedShortlistFlight.from}-${selectedShortlistFlight.to}.`
+            : `SimBrief plan ready for ${selectedShortlistFlight.flightCode} ${selectedShortlistFlight.from}-${selectedShortlistFlight.to}.`
+      );
+      const durationMs = Math.max(
+        0,
+        Math.round(
+          (typeof performance !== "undefined" ? performance.now() : Date.now()) - workflowStartedAt
+        )
       );
       const pax = simBriefPlan?.pax;
       const hasPax = Number.isInteger(pax) && pax >= 0;
       const simBriefResolution = resolveDraftSimBriefId(simBriefPlan || null);
-      await logSystemEvent("SimBrief", hasSimBriefPlan ? "refresh-succeeded" : "dispatch-succeeded", {
-        flightId,
-        dispatchFlightId,
+      const normalizedDraftReportId = Number.parseInt(
+        String(normalizedBoardEntry?.draftReportId ?? normalizedBoardEntry?.dvaDraftReportId ?? ""),
+        10
+      );
+      const hasDraftReportId = Number.isInteger(normalizedDraftReportId) && normalizedDraftReportId > 0;
+      await logSystemEvent(
+        "SimBrief",
+        forceNewDispatch
+          ? "regenerate-succeeded"
+          : dispatchMode === "refresh"
+            ? "refresh-succeeded"
+            : "dispatch-succeeded",
+        {
+          dispatchMode,
+          dispatchRunId,
+          flight: selectedShortlistFlight.flightCode || "",
+          route: `${selectedShortlistFlight.from || ""}-${selectedShortlistFlight.to || ""}`,
+          dispatchFlightId,
+          newStaticId: returnedStaticId,
+          cruiseAltitude: simBriefPlan?.cruiseAltitude || "",
+          alternate: simBriefPlan?.alternate || "",
+          ete: simBriefPlan?.ete || "",
+          blockFuel: simBriefPlan?.blockFuel || "",
+          hasOfpXmlId: Boolean(simBriefResolution.simBriefID),
+          hasPax,
+          pax: hasPax ? pax : undefined,
+          hasDraftReportId,
+          durationMs
+        }
+      );
+      await logSystemDebug("SimBrief", "dispatch-result-debug", {
+        dispatchRunId,
+        boardEntryId,
         dispatchFlightIdLength: dispatchFlightId.length,
         originalBoardEntryIdLength: boardEntryId.length,
-        aircraftType:
-          (hasSimBriefPlan
-            ? normalizedBoardEntry?.simbriefPlan?.aircraftType
-            : "") ||
-          simBriefPlan?.aircraftType ||
-          "",
-        cruiseAltitude: simBriefPlan?.cruiseAltitude || "",
-        alternate: simBriefPlan?.alternate || "",
-        ete: simBriefPlan?.ete || "",
-        blockFuel: simBriefPlan?.blockFuel || "",
+        previousStaticId: existingStaticId,
+        selectedAircraft: currentBoardEntry?.simbriefPlan?.aircraftType || "",
+        hasUsername: Boolean(username),
+        hasPilotId: Boolean(pilotId),
+        routePointCount: Array.isArray(simBriefPlan?.routePoints) ? simBriefPlan.routePoints.length : 0,
+        routeLength: simBriefPlan?.route?.length || 0,
         hasPdfUrl: Boolean(simBriefPlan?.pdfUrl),
         hasOfpUrl: Boolean(simBriefPlan?.ofpUrl),
-        hasOfpXmlId: Boolean(simBriefResolution.simBriefID),
         simBriefIDState: simBriefResolution.simBriefIDState,
-        simBriefIDSource: simBriefResolution.simBriefIDSource,
-        routePresent: Boolean(simBriefPlan?.route),
-        routeLength: simBriefPlan?.route?.length || 0,
-        routePoints: Array.isArray(simBriefPlan?.routePoints) ? simBriefPlan.routePoints.length : 0,
-        hasPax,
-        pax: hasPax ? pax : undefined
+        simBriefIDSource: simBriefResolution.simBriefIDSource
       });
 
       await submitDraftReportForBoardEntry?.(normalizedBoardEntry, {
-        boardEntryId: flightId
+        boardEntryId: flightId,
+        clearDraftDeleteLock: forceNewDispatch
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "SimBrief dispatch failed.";
+      const durationMs = Math.max(
+        0,
+        Math.round(
+          (typeof performance !== "undefined" ? performance.now() : Date.now()) - workflowStartedAt
+        )
+      );
       setSimBriefDispatchState({
         flightId,
         isDispatching: false,
@@ -496,13 +650,13 @@ export function useSimBriefDispatch({
       });
       setStatusMessage?.(message);
       await logSystemError("SimBrief", "dispatch-failed", error, {
-        flightId,
-        dispatchFlightId,
-        dispatchFlightIdLength: dispatchFlightId.length,
-        originalBoardEntryIdLength: boardEntryId.length,
-        origin: selectedShortlistFlight.from,
-        destination: selectedShortlistFlight.to,
-        aircraftType: currentBoardEntry?.simbriefPlan?.aircraftType || ""
+        dispatchRunId,
+        dispatchMode,
+        flight: selectedShortlistFlight.flightCode || "",
+        route: `${selectedShortlistFlight.from || ""}-${selectedShortlistFlight.to || ""}`,
+        aircraft: currentBoardEntry?.simbriefPlan?.aircraftType || "",
+        stage: "dispatch",
+        durationMs
       });
     } finally {
       setPendingMapFlightPathViewMode?.(null);
@@ -526,9 +680,20 @@ export function useSimBriefDispatch({
     tourFlightsByKey
   ]);
 
-  const handleRefreshSimBriefDispatch = useCallback(() => handleStartSimBriefDispatch(), [
-    handleStartSimBriefDispatch
-  ]);
+  const handleStartSimBriefDispatch = useCallback(
+    () => runSimBriefDispatchWorkflow(),
+    [runSimBriefDispatchWorkflow]
+  );
+
+  const handleRegenerateSimBriefDispatch = useCallback(
+    () => runSimBriefDispatchWorkflow({ forceNewDispatch: true }),
+    [runSimBriefDispatchWorkflow]
+  );
+
+  const handleRefreshSimBriefDispatch = useCallback(
+    () => runSimBriefDispatchWorkflow(),
+    [runSimBriefDispatchWorkflow]
+  );
 
   return {
     simBriefDispatchState,
@@ -541,6 +706,7 @@ export function useSimBriefDispatch({
     setSimBriefAircraftTypesError,
     simBriefDispatchOptions,
     handleStartSimBriefDispatch,
+    handleRegenerateSimBriefDispatch,
     handleRefreshSimBriefDispatch,
     handleCloseSimBriefDispatch,
     handleFetchSimBriefAircraftTypes

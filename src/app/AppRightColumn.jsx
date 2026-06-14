@@ -1,10 +1,12 @@
+import { useEffect, useState } from "react";
 import FilterBar from "../components/FilterBar";
 import DetailsPanel from "../components/DetailsPanel";
 import { cn } from "../components/ui/cn";
 import LogbookFiltersPanel from "../features/logbook/LogbookFiltersPanel.jsx";
 import LogbookDetailsCard from "../features/logbook/LogbookDetailsCard.jsx";
+import AccomplishmentSelectorPanel from "../features/accomplishments/AccomplishmentSelectorPanel.jsx";
+import TourSelectorPanel from "../features/tours/TourSelectorPanel.jsx";
 import { normalizeFilters } from "../features/schedule/scheduleFilters.model";
-import { useEffect, useState } from "react";
 
 // Renders the right-hand workspace column without owning any planner state.
 export default function AppRightColumn({
@@ -33,9 +35,20 @@ export default function AppRightColumn({
   flightBoards,
   activeFlightBoard,
   expandedBoardFlightId,
+  availableTours,
+  selectedTourPath,
+  onSelectTourPath,
   selectedAccomplishment,
+  accomplishmentOptions,
+  selectedAccomplishmentName,
+  onSelectAccomplishmentName,
+  isAccomplishmentSelectorCollapsed,
+  onToggleAccomplishmentSelectorCollapsed,
+  isTourSelectorCollapsed,
+  onToggleTourSelectorCollapsed,
   simBriefDispatchState,
   deltaDraftSubmitState,
+  deltaDraftDeleteState,
   deltaDraftReportUrlState,
   simBriefCredentialsConfigured,
   isDesktopSimBriefAvailable,
@@ -54,8 +67,10 @@ export default function AppRightColumn({
   onSimBriefTypeChange,
   onDraftNetworkChange,
   onDispatchWorkflow,
+  onRegenerateDispatch,
   onOpenSimBriefFlight,
   onDraftOnlySubmit,
+  onDeleteDeltaVirtualDraftReport,
   onCompleteTourFlight
 }) {
   const [logbookFiltersCollapsed, setLogbookFiltersCollapsed] = useState(false);
@@ -66,6 +81,11 @@ export default function AppRightColumn({
     }
   }, [scheduleView, selectedLogbookFlight]);
 
+  const isAccomplishmentsView = scheduleView === "accomplishments";
+  const isToursView = scheduleView === "tours";
+  const showAccomplishmentFlightBoard = isAccomplishmentsView && isAccomplishmentSelectorCollapsed;
+  const showTourFlightBoard = isToursView && isTourSelectorCollapsed;
+
   const detailsPanel = (
     <DetailsPanel
       shortlist={shortlist}
@@ -75,6 +95,7 @@ export default function AppRightColumn({
       selectedAccomplishment={selectedAccomplishment}
       simBriefDispatchState={simBriefDispatchState}
       deltaDraftSubmitState={deltaDraftSubmitState}
+      deltaDraftDeleteState={deltaDraftDeleteState}
       deltaDraftReportUrlState={deltaDraftReportUrlState}
       simBriefCredentialsConfigured={simBriefCredentialsConfigured}
       isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
@@ -93,12 +114,18 @@ export default function AppRightColumn({
       onSimBriefTypeChange={onSimBriefTypeChange}
       onDraftNetworkChange={onDraftNetworkChange}
       onDispatchWorkflow={onDispatchWorkflow}
+      onRegenerateDispatch={onRegenerateDispatch}
       onOpenSimBriefFlight={onOpenSimBriefFlight}
       onDraftOnlySubmit={onDraftOnlySubmit}
+      onDeleteDeltaVirtualDraftReport={onDeleteDeltaVirtualDraftReport}
       onCompleteTourFlight={onCompleteTourFlight}
       showFlightBoard
     />
   );
+
+  if (plannerMode === "duty") {
+    return detailsPanel;
+  }
 
   if (scheduleView === "logbook") {
     return (
@@ -126,14 +153,56 @@ export default function AppRightColumn({
     );
   }
 
-  if (plannerMode === "duty" || scheduleView !== "flights") {
+  if (scheduleView === "accomplishments") {
+    return (
+      <div
+        className={cn(
+          "grid h-full min-h-0 gap-3 bp-1024:gap-2.5",
+          showAccomplishmentFlightBoard ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)]"
+        )}
+      >
+        <AccomplishmentSelectorPanel
+          accomplishmentOptions={accomplishmentOptions}
+          selectedAccomplishmentName={selectedAccomplishmentName}
+          onSelectAccomplishmentName={onSelectAccomplishmentName}
+          isCollapsed={isAccomplishmentSelectorCollapsed}
+          onToggleCollapsed={onToggleAccomplishmentSelectorCollapsed}
+          isFullHeight={!isAccomplishmentSelectorCollapsed}
+        />
+        {showAccomplishmentFlightBoard ? detailsPanel : null}
+      </div>
+    );
+  }
+
+  if (scheduleView === "tours") {
+    return (
+      <div
+        className={cn(
+          "grid h-full min-h-0 gap-3 bp-1024:gap-2.5",
+          showTourFlightBoard ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)]"
+        )}
+      >
+        <TourSelectorPanel
+          availableTours={availableTours}
+          selectedTourPath={selectedTourPath}
+          onSelectTourPath={onSelectTourPath}
+          isCollapsed={isTourSelectorCollapsed}
+          onToggleCollapsed={onToggleTourSelectorCollapsed}
+          isFullHeight={!isTourSelectorCollapsed}
+        />
+        {showTourFlightBoard ? detailsPanel : null}
+      </div>
+    );
+  }
+
+  if (scheduleView !== "flights") {
     return detailsPanel;
   }
 
   return (
     <div
       className={cn(
-        "grid min-w-0 min-h-0 gap-3 bp-1024:gap-2.5",
+        "grid h-full min-w-0 min-h-0 gap-3 bp-1024:gap-2.5",
         isPlannerControlsInlineCollapsed
           ? "[grid-template-rows:auto_minmax(0,1fr)]"
           : "grid-rows-[minmax(0,1fr)]"

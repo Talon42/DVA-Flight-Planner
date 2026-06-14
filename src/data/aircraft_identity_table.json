@@ -163,21 +163,21 @@
   {
     "name": "AvroRJ-100",
     "simbrief": "RJ1H",
-    "dva": "AvroRJ-100",
+    "dva": "Avro RJ-100",
     "simbriefIcao": "RJ1H",
     "simbriefName": "Avro RJ100"
   },
   {
     "name": "AvroRJ-70",
     "simbrief": "RJ70",
-    "dva": "AvroRJ-70",
+    "dva": "Avro RJ-70",
     "simbriefIcao": "RJ70",
     "simbriefName": "Avro RJ70"
   },
   {
     "name": "AvroRJ-85",
     "simbrief": "RJ85",
-    "dva": "AvroRJ-85",
+    "dva": "Avro RJ-85",
     "simbriefIcao": "RJ85",
     "simbriefName": "Avro RJ85"
   },
@@ -254,21 +254,21 @@
   {
     "name": "B737MAX7",
     "simbrief": "",
-    "dva": "B737MAX7",
+    "dva": "B737 MAX 7",
     "simbriefIcao": "",
     "simbriefName": ""
   },
   {
     "name": "B737MAX8",
     "simbrief": "B38M",
-    "dva": "B737MAX8",
+    "dva": "B737 MAX 8",
     "simbriefIcao": "B38M",
     "simbriefName": "B737 MAX 8"
   },
   {
     "name": "B737MAX9",
     "simbrief": "",
-    "dva": "B737MAX9",
+    "dva": "B737 MAX 9",
     "simbriefIcao": "",
     "simbriefName": ""
   },
@@ -352,7 +352,7 @@
   {
     "name": "B747SP",
     "simbrief": "",
-    "dva": "B747SP",
+    "dva": "B747 SP",
     "simbriefIcao": "",
     "simbriefName": ""
   },
@@ -1045,14 +1045,14 @@
   {
     "name": "L-188Electra",
     "simbrief": "",
-    "dva": "L-188Electra",
+    "dva": "L-188 Electra",
     "simbriefIcao": "",
     "simbriefName": ""
   },
   {
     "name": "Martin4-0-4",
     "simbrief": "",
-    "dva": "Martin4-0-4",
+    "dva": "Martin 4-0-4",
     "simbriefIcao": "",
     "simbriefName": ""
   },
@@ -1150,14 +1150,14 @@
   {
     "name": "SuperConnie",
     "simbrief": "",
-    "dva": "SuperConnie",
+    "dva": "Super Connie",
     "simbriefIcao": "",
     "simbriefName": ""
   },
   {
     "name": "Trimotor5-AT",
     "simbrief": "",
-    "dva": "Trimotor5-AT",
+    "dva": "Trimotor 5-AT",
     "simbriefIcao": "",
     "simbriefName": ""
   },

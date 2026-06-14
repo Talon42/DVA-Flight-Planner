@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getDefaultBasicFilterSectionState,
   getDefaultPlannerControlsCollapsed,
@@ -13,7 +13,10 @@ import { installGlobalErrorLogging } from "../services/logging/globalError.clien
 import {
   readAddonAirportCache
 } from "../services/tauri/addonAirportScan.client.js";
-import { readDeltaVirtualLogbookProgress } from "../services/tauri/deltaVirtual.client.js";
+import {
+  readDeltaVirtualAccomplishmentEligibility,
+  readDeltaVirtualLogbookProgress
+} from "../services/tauri/deltaVirtual.client.js";
 import {
   readDeltaVirtualTourProgress,
   readDeltaVirtualToursCache,
@@ -131,15 +134,10 @@ function normalizePersistedFlightBoards(uiState, flights) {
 
 function buildAddonScanSummary(addonScan) {
   return {
-    rootCount: addonScan?.roots?.length || 0,
     airportsCached: addonScan?.airports?.length || 0,
-    filesScanned: addonScan?.contentHistoryFilesScanned || 0,
-    entriesFound: addonScan?.airportEntriesFound || 0,
     contentHistoryFilesScanned: addonScan?.contentHistoryFilesScanned || 0,
     manifestFilesScanned: addonScan?.manifestFilesScanned || 0,
     manifestFallbacksUsed: addonScan?.manifestFallbacksUsed || 0,
-    airportEntriesFound: addonScan?.airportEntriesFound || 0,
-    manifestAirportEntriesFound: addonScan?.manifestAirportEntriesFound || 0,
     duplicateAirportEntries: addonScan?.duplicateAirportEntries || 0,
     status: addonScan?.status || "idle",
     warningCount: Array.isArray(addonScan?.warnings) ? addonScan.warnings.length : 0
@@ -161,6 +159,7 @@ export function useAppBootstrap({
   setIsDvaPasswordEditing,
   setDerivedTourProgress,
   setDeltaVirtualToursCache,
+  setDeltaVirtualAccomplishmentEligibility,
   setFilters,
   setFlightBoards,
   setGettingStartedState,
@@ -203,6 +202,9 @@ export function useAppBootstrap({
   const [scheduleUiHydrated, setScheduleUiHydrated] = useState(false);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [cacheHydrated, setCacheHydrated] = useState(false);
+  const bootstrapStartedAtRef = useRef(
+    typeof performance !== "undefined" ? performance.now() : Date.now()
+  );
 
   useEffect(() => {
     installGlobalErrorLogging();
@@ -242,9 +244,25 @@ export function useAppBootstrap({
         }
         if (scheduleResult.status === "rejected") {
           setStatusMessage(scheduleResult.reason?.message || "Unable to load saved schedule.");
-          await logAppError("hydrate-failed", scheduleResult.reason);
+          await logAppError("hydrate-failed", scheduleResult.reason, {
+            durationMs: Math.max(
+              0,
+              Math.round(
+                (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+                  bootstrapStartedAtRef.current
+              )
+            )
+          });
         } else {
-          await logAppEvent("hydrate-empty");
+          await logAppEvent("hydrate-empty", {
+            durationMs: Math.max(
+              0,
+              Math.round(
+                (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+                  bootstrapStartedAtRef.current
+              )
+            )
+          });
         }
         setScheduleUiHydrated(true);
         return;
@@ -313,7 +331,14 @@ export function useAppBootstrap({
       );
       await logAppEvent("hydrate-succeeded", {
         flights: savedSchedule.flights.length,
-        source: savedSchedule.importSummary?.sourceFileName || "unknown"
+        source: savedSchedule.importSummary?.sourceFileName || "unknown",
+        durationMs: Math.max(
+          0,
+          Math.round(
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+              bootstrapStartedAtRef.current
+          )
+        )
       });
       setScheduleUiHydrated(true);
     }
@@ -323,7 +348,15 @@ export function useAppBootstrap({
         setStatusMessage(error.message || "Unable to initialize the app.");
         setScheduleUiHydrated(true);
       }
-      await logAppError("hydrate-unhandled-failed", error);
+      await logAppError("hydrate-unhandled-failed", error, {
+        durationMs: Math.max(
+          0,
+          Math.round(
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+              bootstrapStartedAtRef.current
+          )
+        )
+      });
     });
 
     return () => {
@@ -375,9 +408,7 @@ export function useAppBootstrap({
         setDvaHasPassword?.(hasPassword);
         setIsDvaPasswordEditing?.(false);
         await logAppEvent("deltava-auth-loaded", {
-          firstNameSaved: Boolean(firstName),
-          lastNameSaved: Boolean(lastName),
-          hasPassword
+          configured: Boolean(firstName || lastName || hasPassword)
         });
       } else {
         await logAppError("deltava-auth-hydrate-failed", dvaCredentialsResult.reason);
@@ -459,12 +490,14 @@ export function useAppBootstrap({
       const [
         addonCacheResult,
         gettingStartedResult,
+        accomplishmentEligibilityResult,
         logbookProgressResult,
         tourProgressResult,
         toursCacheResult
       ] = await Promise.allSettled([
         readAddonAirportCache(),
         readGettingStartedState(),
+        readDeltaVirtualAccomplishmentEligibility(),
         readDeltaVirtualLogbookProgress(),
         readDeltaVirtualTourProgress(),
         readDeltaVirtualToursCache()
@@ -477,10 +510,33 @@ export function useAppBootstrap({
 
         if (addonCacheResult.status === "fulfilled") {
           setAddonScan(addonCacheResult.value);
-          await logSystemEvent("AddonScan", "cache-loaded", buildAddonScanSummary(addonCacheResult.value));
+          await logSystemEvent("AddonScan", "cache-loaded", {
+            ...buildAddonScanSummary(addonCacheResult.value),
+            durationMs: Math.max(
+              0,
+              Math.round(
+                (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+                  bootstrapStartedAtRef.current
+              )
+            )
+          });
         } else {
           setStatusMessage(addonCacheResult.reason?.message || "Unable to load addon airport cache.");
-          await logSystemError("AddonScan", "cache-load-failed", addonCacheResult.reason);
+          await logSystemError("AddonScan", "cache-load-failed", addonCacheResult.reason, {
+            durationMs: Math.max(
+              0,
+              Math.round(
+                (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+                  bootstrapStartedAtRef.current
+              )
+            )
+          });
+        }
+
+        if (accomplishmentEligibilityResult.status === "fulfilled") {
+          setDeltaVirtualAccomplishmentEligibility(
+            accomplishmentEligibilityResult.value || { lastSyncAt: null, sourceUrl: null, rows: [] }
+          );
         }
 
         if (logbookProgressResult.status === "fulfilled") {
@@ -543,6 +599,7 @@ export function useAppBootstrap({
   }, [
     setAddonScan,
     setDeltaVirtualToursCache,
+    setDeltaVirtualAccomplishmentEligibility,
     setDerivedTourProgress,
     setGettingStartedState,
     setHasLoadedGettingStartedState,

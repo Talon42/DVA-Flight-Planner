@@ -1,7 +1,20 @@
 ---
-eyebrow: VATSIM ATC
-title: VATSIM Map Overlay
-imageAlt: VATSIM Map
+eyebrow: Release Notes
+title: v0.7.3-beta
+imageAlt: 
+layout: text
 ---
 
-Built in map view can now display VATSIM availability regions and airports. Click to view who is online and see additional details. 
+## What's New
+- Added SimBrief dispatch regeneration from generated dispatch state.
+- Added support for changing selected aircraft after SimBrief dispatch generation.
+- Added DVA draft delete action from flight board details.
+- Added stronger airport/scenery matching logic for addon folders.
+
+## Fixed
+- Switched Accomplishments to Delta Virtual synced eligibility data instead of the bundled airport catalog.
+- Fixed custom SimBrief airframes not showing on flight board aircraft dropdown.
+- Fixed aircraft matching between custom airframes, SimBrief aircraft, and DVA-supported aircraft mappings.
+- Fixed flight board action row layout, selector height, and button alignment regressions.
+- Improved addon airport scan status and scanner performance.
+- Improved schedule parsing/cache reliability.

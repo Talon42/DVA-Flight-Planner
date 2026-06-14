@@ -47,6 +47,18 @@ export function matchesAddonAirport(flight, addonAirports, matchMode) {
   }
 }
 
+// Treats geo filters as "touches this location" so a route can match by either endpoint.
+function matchesEitherEndpoint(selectedValues, fromValue, toValue) {
+  if (!selectedValues.length) {
+    return true;
+  }
+
+  return (
+    selectedValues.includes(String(fromValue || "").trim()) ||
+    selectedValues.includes(String(toValue || "").trim())
+  );
+}
+
 // Checks whether the flight endpoints satisfy the selected VATSIM coverage mode.
 export function matchesVatsimCoverage(flight, coverageIndex, mode) {
   return matchesVatsimCoverageMode(flight, coverageIndex, mode);
@@ -73,17 +85,21 @@ export function selectFilteredScheduleFlights({
     }
 
     if (
-      filters.region.length &&
-      (!filters.region.includes(String(fromAirport?.regionCode || "").trim().toUpperCase()) ||
-        !filters.region.includes(String(toAirport?.regionCode || "").trim().toUpperCase()))
+      !matchesEitherEndpoint(
+        filters.region,
+        String(fromAirport?.regionCode || "").trim().toUpperCase(),
+        String(toAirport?.regionCode || "").trim().toUpperCase()
+      )
     ) {
       return false;
     }
 
     if (
-      filters.country.length &&
-      (!filters.country.includes(String(fromAirport?.country || "").trim()) ||
-        !filters.country.includes(String(toAirport?.country || "").trim()))
+      !matchesEitherEndpoint(
+        filters.country,
+        String(fromAirport?.country || "").trim(),
+        String(toAirport?.country || "").trim()
+      )
     ) {
       return false;
     }

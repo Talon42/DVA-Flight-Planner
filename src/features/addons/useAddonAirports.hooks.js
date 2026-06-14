@@ -1,6 +1,12 @@
 import { useCallback, useState } from "react";
 import { formatNumber } from "../../domain/formatting/formatters.js";
-import { logAppError, logSystemError, logSystemEvent } from "../../services/logging/appLog.client.js";
+import {
+  createLogRunId,
+  logAppError,
+  logSystemDebug,
+  logSystemError,
+  logSystemEvent
+} from "../../services/logging/appLog.client.js";
 import { writeGettingStartedState } from "../../services/storage/storage.js";
 import {
   createEmptyAddonAirportScan,
@@ -11,15 +17,10 @@ import {
 
 function buildAddonScanSummary(addonScan) {
   return {
-    rootCount: addonScan?.roots?.length || 0,
     airportsCached: addonScan?.airports?.length || 0,
-    filesScanned: addonScan?.contentHistoryFilesScanned || 0,
-    entriesFound: addonScan?.airportEntriesFound || 0,
     contentHistoryFilesScanned: addonScan?.contentHistoryFilesScanned || 0,
     manifestFilesScanned: addonScan?.manifestFilesScanned || 0,
     manifestFallbacksUsed: addonScan?.manifestFallbacksUsed || 0,
-    airportEntriesFound: addonScan?.airportEntriesFound || 0,
-    manifestAirportEntriesFound: addonScan?.manifestAirportEntriesFound || 0,
     duplicateAirportEntries: addonScan?.duplicateAirportEntries || 0,
     status: addonScan?.status || "idle",
     warningCount: Array.isArray(addonScan?.warnings) ? addonScan.warnings.length : 0
@@ -30,7 +31,6 @@ function buildAddonScanSummary(addonScan) {
 // broader app flows separate.
 export function useAddonAirports({
   gettingStartedState,
-  isDevToolsEnabled,
   setGettingStartedState,
   setStatusMessage
 } = {}) {
@@ -75,6 +75,8 @@ export function useAddonAirports({
         return null;
       }
 
+      const scanRunId = createLogRunId("scan");
+      const scanStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
       setIsAddonAutoScanning(true);
 
       if (options.resetCache) {
@@ -85,6 +87,7 @@ export function useAddonAirports({
       setIsAddonScanBusy(true);
       setStatusMessage?.("Scanning addon folders for ContentHistory.json and manifest.json...");
       await logSystemEvent("AddonScan", "scan-start", {
+        scanRunId,
         rootCount: roots.length,
         previousAirportsCached: options.resetCache ? 0 : addonScan.airports.length,
         previousContentHistoryFilesScanned: options.resetCache ? 0 : addonScan.contentHistoryFilesScanned,
@@ -97,9 +100,19 @@ export function useAddonAirports({
         setStatusMessage?.(
           `Scan complete. Cached ${formatNumber(nextScan.airports.length)} addon airports.`
         );
-        await logSystemEvent("AddonScan", "scan-succeeded", buildAddonScanSummary(nextScan));
-        if (isDevToolsEnabled && Array.isArray(nextScan.scanDetails) && nextScan.scanDetails.length) {
-          await logSystemEvent("AddonScan", "scan-details", {
+        await logSystemEvent("AddonScan", "scan-succeeded", {
+          scanRunId,
+          durationMs: Math.max(
+            0,
+            Math.round(
+              (typeof performance !== "undefined" ? performance.now() : Date.now()) - scanStartedAt
+            )
+          ),
+          ...buildAddonScanSummary(nextScan)
+        });
+        if (Array.isArray(nextScan.scanDetails) && nextScan.scanDetails.length) {
+          await logSystemDebug("AddonScan", "scan-details", {
+            scanRunId,
             scanDetails: nextScan.scanDetails
           });
         }
@@ -107,7 +120,14 @@ export function useAddonAirports({
       } catch (error) {
         setStatusMessage?.(error.message || "Addon airport scan failed.");
         await logSystemError("AddonScan", "scan-failed", error, {
-          rootCount: roots.length
+          scanRunId,
+          rootCount: roots.length,
+          durationMs: Math.max(
+            0,
+            Math.round(
+              (typeof performance !== "undefined" ? performance.now() : Date.now()) - scanStartedAt
+            )
+          )
         });
         return null;
       } finally {
@@ -120,7 +140,6 @@ export function useAddonAirports({
       addonScan.contentHistoryFilesScanned,
       addonScan.manifestFilesScanned,
       addonScan.roots,
-      isDevToolsEnabled,
       persistAddonRoots,
       setStatusMessage
     ]

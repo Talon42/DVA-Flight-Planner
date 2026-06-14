@@ -93,6 +93,14 @@ pub(crate) fn build_logbook_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(logbook_dir)
 }
 
+pub(crate) fn build_accomplishment_eligibility_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let accomplishments_dir = deltava_sync_dir(app)?.join("accomplishments");
+    fs::create_dir_all(&accomplishments_dir).map_err(|error| {
+        format!("download_failed: Unable to create accomplishment storage: {error}")
+    })?;
+    Ok(accomplishments_dir.join("accomplishment-eligibility.json"))
+}
+
 pub(crate) fn resolve_existing_logbook_json_path(app: &AppHandle) -> Option<PathBuf> {
     let logbook_dir = build_logbook_dir(app).ok()?;
     let canonical_path = logbook_dir.join(DELTAVA_LOGBOOK_FILE);

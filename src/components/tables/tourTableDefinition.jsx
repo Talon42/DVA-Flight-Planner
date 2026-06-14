@@ -16,6 +16,7 @@ function getDurationLabel(row) {
 export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCoverageIndex }) {
   const useTabletCompactWidths = viewportWidth <= 1024;
   const useAbbreviatedTourTimingLabels = viewportWidth < 1400;
+  const hideAirportIndicators = viewportWidth < 1400;
   const compactColumnSizing = useTabletCompactWidths
     ? {
         tourLeg: { minWidth: 72, flexWeight: 0.65 },
@@ -46,6 +47,19 @@ export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCovera
           duration: { minWidth: 112, flexWeight: 1 }
         }
       : {};
+  const mediumDesktopColumnSizing =
+    viewportWidth >= 1400 && viewportWidth < 1920
+      ? {
+          airlineName: { minWidth: 178, flexWeight: 2.55 },
+          tourFlightNumber: { minWidth: 98, flexWeight: 1.2 },
+          segment: { minWidth: 68, flexWeight: 0.7 },
+          aircraft: { minWidth: 112, flexWeight: 1.15 },
+          from: { minWidth: 96, flexWeight: 1.45 },
+          to: { minWidth: 96, flexWeight: 1.45 },
+          distanceMi: { minWidth: 98, flexWeight: 1.15 },
+          duration: { minWidth: 98, flexWeight: 1.15 }
+        }
+      : {};
 
   return [
     {
@@ -67,6 +81,7 @@ export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCovera
       minWidth: 188,
       flexWeight: 2.9,
       ...compactColumnSizing.airlineName,
+      ...mediumDesktopColumnSizing.airlineName,
       ...expandedColumnSizing.airlineName,
       truncate: true,
       renderCell: (row) => <AirlineCell flight={row} />
@@ -80,6 +95,7 @@ export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCovera
       minWidth: 104,
       flexWeight: 1.4,
       ...compactColumnSizing.tourFlightNumber,
+      ...mediumDesktopColumnSizing.tourFlightNumber,
       ...expandedColumnSizing.tourFlightNumber,
       truncate: true,
       renderCell: (row) => row.tourFlightNumber
@@ -90,6 +106,7 @@ export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCovera
       compactLabel: "Leg",
       role: "compact",
       ...compactColumnSizing.segment,
+      ...mediumDesktopColumnSizing.segment,
       ...expandedColumnSizing.segment,
       truncate: true,
       renderCell: (row) => row.segment
@@ -100,6 +117,7 @@ export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCovera
       role: "secondary",
       minWidth: 126,
       flexWeight: 1.45,
+      ...mediumDesktopColumnSizing.aircraft,
       ...expandedColumnSizing.aircraft,
       truncate: true,
       hiddenAtOrBelow: 1024,
@@ -110,12 +128,15 @@ export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCovera
       label: "DEP",
       role: "compact",
       ...compactColumnSizing.from,
+      ...mediumDesktopColumnSizing.from,
       ...expandedColumnSizing.from,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.from}
           addonAirports={addonAirports}
           vatsimCoverageIndex={vatsimCoverageIndex}
+          hideAddonIndicator={hideAirportIndicators}
+          hideVatsimIndicator={hideAirportIndicators}
           missingInDatabase={
             Array.isArray(row?.missingAirportIcaos) &&
             row.missingAirportIcaos.includes(row.from)
@@ -128,12 +149,15 @@ export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCovera
       label: "ARR",
       role: "compact",
       ...compactColumnSizing.to,
+      ...mediumDesktopColumnSizing.to,
       ...expandedColumnSizing.to,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.to}
           addonAirports={addonAirports}
           vatsimCoverageIndex={vatsimCoverageIndex}
+          hideAddonIndicator={hideAirportIndicators}
+          hideVatsimIndicator={hideAirportIndicators}
           missingInDatabase={
             Array.isArray(row?.missingAirportIcaos) &&
             row.missingAirportIcaos.includes(row.to)
@@ -176,6 +200,7 @@ export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCovera
       minWidth: 108,
       flexWeight: 1.3,
       ...compactColumnSizing.distanceMi,
+      ...mediumDesktopColumnSizing.distanceMi,
       ...expandedColumnSizing.distanceMi,
       renderCell: (row) =>
         Number.isFinite(row.distanceMi) ? `${formatNumber(row.distanceMi)} mi` : "N/A"
@@ -189,6 +214,7 @@ export function getTourTableColumns({ viewportWidth, addonAirports, vatsimCovera
       minWidth: 108,
       flexWeight: 1.3,
       ...compactColumnSizing.duration,
+      ...mediumDesktopColumnSizing.duration,
       ...expandedColumnSizing.duration,
       renderCell: (row) => getDurationLabel(row)
     }

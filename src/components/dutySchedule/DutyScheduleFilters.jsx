@@ -90,10 +90,10 @@ export default function DutyScheduleFilters({
   );
   const dutyAddonMatchOptions = useMemo(
     () => [
-      { value: "either", label: "Origin or destination", keywords: "either origin destination" },
-      { value: "origin", label: "Origin only", keywords: "origin only" },
-      { value: "destination", label: "Destination only", keywords: "destination only" },
-      { value: "both", label: "Origin and destination", keywords: "both origin destination" }
+      { value: "either", label: "Departure or Arrival", keywords: "departure arrival either" },
+      { value: "origin", label: "Departure only", keywords: "departure only" },
+      { value: "destination", label: "Arrival only", keywords: "arrival only" },
+      { value: "both", label: "Departure and Arrival", keywords: "departure arrival both" }
     ],
     []
   );

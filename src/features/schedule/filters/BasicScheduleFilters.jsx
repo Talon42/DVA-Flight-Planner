@@ -149,10 +149,10 @@ export default function BasicScheduleFilters({
   );
   const addonMatchOptions = useMemo(
     () => [
-      { value: "either", label: "Departure or arrival", keywords: "either departure arrival" },
+      { value: "either", label: "Departure or Arrival", keywords: "departure arrival either" },
       { value: "origin", label: "Departure only", keywords: "departure only" },
       { value: "destination", label: "Arrival only", keywords: "arrival only" },
-      { value: "both", label: "Departure and arrival", keywords: "both departure arrival" }
+      { value: "both", label: "Departure and Arrival", keywords: "departure arrival both" }
     ],
     []
   );
@@ -160,8 +160,8 @@ export default function BasicScheduleFilters({
     () => [
       { value: "origin", label: "Departure", keywords: "departure" },
       { value: "destination", label: "Arrival", keywords: "arrival" },
-      { value: "either", label: "Departure or arrival", keywords: "either departure arrival" },
-      { value: "both", label: "Departure and arrival", keywords: "both departure arrival" }
+      { value: "either", label: "Departure or Arrival", keywords: "departure arrival either" },
+      { value: "both", label: "Departure and Arrival", keywords: "departure arrival both" }
     ],
     []
   );

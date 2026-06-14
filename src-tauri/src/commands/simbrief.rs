@@ -16,8 +16,10 @@ pub(crate) async fn fetch_simbrief_aircraft_types(
 pub(crate) async fn refresh_simbrief_dispatch(
     app: AppHandle,
     payload: crate::services::simbrief::dispatch::SimBriefRefreshPayload,
+    debug_enabled: bool,
 ) -> Result<crate::services::simbrief::dispatch::SimBriefPlanSummary, String> {
-    crate::services::simbrief::dispatch::refresh_simbrief_dispatch(app, payload).await
+    crate::services::simbrief::dispatch::refresh_simbrief_dispatch(app, payload, debug_enabled)
+        .await
 }
 
 #[tauri::command]
@@ -25,6 +27,8 @@ pub(crate) async fn start_simbrief_dispatch(
     app: AppHandle,
     manager: tauri::State<'_, crate::services::simbrief::dispatch::SimBriefDispatchManager>,
     payload: crate::services::simbrief::dispatch::SimBriefDispatchPayload,
+    debug_enabled: bool,
 ) -> Result<crate::services::simbrief::dispatch::SimBriefPlanSummary, String> {
-    crate::services::simbrief::dispatch::start_simbrief_dispatch(app, manager, payload).await
+    crate::services::simbrief::dispatch::start_simbrief_dispatch(app, manager, payload, debug_enabled)
+        .await
 }

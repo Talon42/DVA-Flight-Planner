@@ -95,6 +95,9 @@ export function buildBoardEntryFromFlight(flight, overrides = {}) {
     draftNetwork: normalizeDraftNetwork(
       overrides.draftNetwork ?? flight?.draftNetwork ?? flight?.network
     ),
+    draftDeleteRequiresRegenerate: Boolean(
+      overrides.draftDeleteRequiresRegenerate ?? flight?.draftDeleteRequiresRegenerate
+    ),
     draftReportId: normalizePositiveDraftReportId(
       overrides.draftReportId ?? flight?.draftReportId ?? flight?.dvaDraftReportId
     ),
@@ -197,6 +200,9 @@ export function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     draftNetwork: normalizeDraftNetwork(
       overrides.draftNetwork ?? flight?.draftNetwork ?? flight?.network
     ),
+    draftDeleteRequiresRegenerate: Boolean(
+      overrides.draftDeleteRequiresRegenerate ?? flight?.draftDeleteRequiresRegenerate
+    ),
     draftReportId: normalizePositiveDraftReportId(
       overrides.draftReportId ?? flight?.draftReportId ?? flight?.dvaDraftReportId
     ),
@@ -264,6 +270,7 @@ export function normalizeBoardEntry(entry) {
     ),
     simbriefSelectedType: "",
     draftNetwork: normalizeDraftNetwork(entry.draftNetwork ?? entry.network),
+    draftDeleteRequiresRegenerate: Boolean(entry.draftDeleteRequiresRegenerate),
     draftReportId: normalizePositiveDraftReportId(entry.draftReportId ?? entry.dvaDraftReportId),
     dvaDraftReportId: normalizePositiveDraftReportId(entry.dvaDraftReportId ?? entry.draftReportId),
     simbriefPlan: entry.simbriefPlan || null

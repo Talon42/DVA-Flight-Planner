@@ -1,6 +1,7 @@
 import {
   IMPORT_LOG_FILE,
   GETTING_STARTED_STATE_FILE,
+  DEV_TOOLS_STATE_FILE,
   SAVED_SCHEDULE_FILE,
   SIMBRIEF_SETTINGS_FILE,
   UI_STATE_FILE,
@@ -372,6 +373,10 @@ function buildNextLogText(existingText, incomingText) {
   return trimLogTextToLimit(combined, BROWSER_LOG_SIZE_LIMIT_BYTES);
 }
 
+function normalizePersistedBoolean(value) {
+  return typeof value === "boolean" ? value : null;
+}
+
 function uint8ArrayToBase64(bytes) {
   let binary = "";
 
@@ -487,7 +492,10 @@ function buildPersistedCompatibilityCatalog(flights = []) {
       maxPax: flight.maxPax,
       blockMinutes: flight.blockMinutes,
       distanceNm: flight.distanceNm,
-      selectedAircraft: getSelectedAircraftForFlight(flight) || "",
+      selectedAircraft:
+        String(flight.selectedAircraft || "").trim() ||
+        getSelectedAircraftForFlight(flight) ||
+        String(flight.simbriefSelectedType || "").trim(),
       simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
       boardSequence: Number.isInteger(flight.boardSequence) ? flight.boardSequence : null,
       compatibilityRef,
@@ -539,7 +547,10 @@ function hydratePersistedFlight(flight, compatibilityEntry, shortlistSet) {
     compatibilityReason: buildCompatibilityReason(compatibleEquipment),
     missingAirportIcaos: Array.isArray(flight.missingAirportIcaos) ? flight.missingAirportIcaos : [],
     hasMissingAirportData: Boolean(flight.hasMissingAirportData),
-    selectedAircraft: getSelectedAircraftForFlight(flight) || "",
+    selectedAircraft:
+      String(flight.selectedAircraft || "").trim() ||
+      getSelectedAircraftForFlight(flight) ||
+      String(flight.simbriefSelectedType || "").trim(),
     simbriefSelectedType: "",
     simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
     isShortlisted: shortlistSet.has(flight.flightId),
@@ -737,6 +748,60 @@ export async function writeSavedUiState(uiState) {
   }
 
   window.localStorage.setItem("flight-planner.ui-state", serialized);
+}
+
+export async function readSavedDevToolsEnabled() {
+  if (isTauriRuntime()) {
+    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
+    const hasFile = await exists(DEV_TOOLS_STATE_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+
+    if (!hasFile) {
+      return null;
+    }
+
+    const text = await readTextFile(DEV_TOOLS_STATE_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+    if (!text) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(text);
+      return normalizePersistedBoolean(parsed?.enabled);
+    } catch (error) {
+      await quarantineCorruptStorageFile(DEV_TOOLS_STATE_FILE, "dev tools state");
+      logCorruptStorageFileOnce("dev tools state", DEV_TOOLS_STATE_FILE, error);
+      return null;
+    }
+  }
+
+  const text = window.localStorage.getItem("flight-planner.dev-tools-enabled");
+  if (text === "true") {
+    return true;
+  }
+  if (text === "false") {
+    return false;
+  }
+
+  return null;
+}
+
+export async function writeSavedDevToolsEnabled(enabled) {
+  const serialized = JSON.stringify({ enabled: Boolean(enabled) });
+
+  if (isTauriRuntime()) {
+    const { writeTextFile, BaseDirectory } = await loadFsModule();
+    await ensureAppDataRoot();
+    await writeTextFile(DEV_TOOLS_STATE_FILE, serialized, {
+      baseDir: BaseDirectory.AppData
+    });
+    return;
+  }
+
+  window.localStorage.setItem("flight-planner.dev-tools-enabled", enabled ? "true" : "false");
 }
 
 export async function readSimBriefSettings() {

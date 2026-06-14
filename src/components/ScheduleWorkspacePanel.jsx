@@ -20,13 +20,14 @@ export default function ScheduleWorkspacePanel({
   availableTours = [],
   selectedTourPath,
   selectedTourCompletionSummary = null,
-  accomplishmentOptions = [],
-  selectedAccomplishmentName,
   onPrimaryViewChange,
   onSelectTourPath,
-  onSelectAccomplishmentName,
   selectedAccomplishment,
   accomplishmentRows = [],
+  accomplishmentFlightRows = [],
+  accomplishmentFlightSearch = null,
+  accomplishmentFlightSort,
+  hasAccomplishmentFlightSearch = false,
   viewportWidth,
   flightRows,
   selectedFlightRowId,
@@ -38,6 +39,7 @@ export default function ScheduleWorkspacePanel({
   selectedTourRowId,
   tourSyncMessage,
   onShowAccomplishmentFlights,
+  onSortAccomplishmentFlights,
   onSortFlights,
   onToggleTimeDisplayMode,
   onSelectRow,
@@ -87,12 +89,13 @@ export default function ScheduleWorkspacePanel({
               availableTours={availableTours}
               selectedTourPath={selectedTourPath}
               selectedTourCompletionSummary={selectedTourCompletionSummary}
-              accomplishmentOptions={accomplishmentOptions}
-              selectedAccomplishmentName={selectedAccomplishmentName}
               onSelectTourPath={onSelectTourPath}
-              onSelectAccomplishmentName={onSelectAccomplishmentName}
               selectedAccomplishment={selectedAccomplishment}
               accomplishmentRows={accomplishmentRows}
+              accomplishmentFlightRows={accomplishmentFlightRows}
+              accomplishmentFlightSearch={accomplishmentFlightSearch}
+              accomplishmentFlightSort={accomplishmentFlightSort}
+              hasAccomplishmentFlightSearch={hasAccomplishmentFlightSearch}
               viewportWidth={viewportWidth}
               flightRows={flightRows}
               selectedFlightRowId={selectedFlightRowId}
@@ -104,6 +107,7 @@ export default function ScheduleWorkspacePanel({
               selectedTourRowId={selectedTourRowId}
               tourSyncMessage={tourSyncMessage}
               onShowAccomplishmentFlights={onShowAccomplishmentFlights}
+              onSortAccomplishmentFlights={onSortAccomplishmentFlights}
               onSortFlights={onSortFlights}
               onToggleTimeDisplayMode={onToggleTimeDisplayMode}
               onSelectRow={onSelectRow}

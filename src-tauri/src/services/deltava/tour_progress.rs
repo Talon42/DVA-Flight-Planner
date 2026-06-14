@@ -1203,6 +1203,7 @@ fn build_tour_progress_from_values(
 fn write_tour_progress_cache(
     app: &AppHandle,
     cache: &DeltaTourProgressCache,
+    debug_enabled: bool,
 ) -> Result<(), String> {
     let path = tour_progress_cache_path(app)?;
     let serialized = serde_json::to_string_pretty(cache).map_err(|error| {
@@ -1212,7 +1213,7 @@ fn write_tour_progress_cache(
     fs::write(&path, serialized).map_err(|error| {
         format!("download_failed: Unable to write Delta Virtual tour progress cache: {error}")
     })?;
-    append_sync_log(&format!("tour-progress:write {}", path.display()));
+    crate::append_sync_log_debug(debug_enabled, &format!("tour-progress:write {}", path.display()));
     Ok(())
 }
 
@@ -1255,12 +1256,15 @@ fn read_logbook_json_values(app: &AppHandle) -> Vec<Value> {
         .collect()
 }
 
-pub(crate) fn reconcile_deltava_tour_progress_internal(app: &AppHandle) -> Result<(), String> {
+pub(crate) fn reconcile_deltava_tour_progress_internal(
+    app: &AppHandle,
+    debug_enabled: bool,
+) -> Result<(), String> {
     let tours_json = read_tours_cache_json(app);
     let logbook_jsons = read_logbook_json_values(app);
     let mut cache = build_tour_progress_from_values(&tours_json, &logbook_jsons);
     cache.last_sync_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
-    write_tour_progress_cache(app, &cache)
+    write_tour_progress_cache(app, &cache, debug_enabled)
 }
 
 // Keeps the older logbook-to-progress entry point available for tests and compatibility.

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../ui/Button";
 import { cn } from "../ui/cn";
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
-import { logAppError, logAppEvent } from "../../services/logging/appLog.client.js";
+import { logAppDebug, logAppError, logAppEvent } from "../../services/logging/appLog.client.js";
 import { MAP_MODE_OPTIONS, resolveMapModeConfig } from "./mapModes";
 import FlightMapView from "./FlightMapView";
 
@@ -42,6 +42,24 @@ function appendCoordinate(coordinates, coordinate) {
   coordinates.push(coordinate);
 }
 
+function buildWaypointFeature(entry, coordinate, ident, index) {
+  return {
+    type: "Feature",
+    geometry: {
+      type: "Point",
+      coordinates: coordinate
+    },
+    properties: {
+      boardEntryId: String(entry?.boardEntryId || "").trim() || null,
+      flightId: String(entry?.flightId || "").trim() || null,
+      linkedFlightId: String(entry?.linkedFlightId || "").trim() || null,
+      role: "waypoint",
+      ident: String(ident || "").trim() || null,
+      index
+    }
+  };
+}
+
 function truncateAirportName(name, maxLength = ENDPOINT_NAME_MAX_LENGTH) {
   const trimmedName = String(name || "").trim();
   if (trimmedName.length <= maxLength) {
@@ -55,12 +73,30 @@ function buildEndpointKey(boardEntryId, flightId, kind) {
   return `${String(boardEntryId || flightId || "").trim() || "endpoint"}:${kind}`;
 }
 
-function buildEndpointLabels(entries) {
+function resolveFallbackEndpointCoordinate(routeCoordinates, kind) {
+  if (!Array.isArray(routeCoordinates) || routeCoordinates.length === 0) {
+    return null;
+  }
+
+  const coordinate = kind === "origin" ? routeCoordinates[0] : routeCoordinates.at(-1);
+  return buildCoordinate(coordinate?.[0], coordinate?.[1]);
+}
+
+function resolveEndpointCoordinate(airport, fallbackCoordinate = null) {
+  return (
+    buildCoordinate(airport?.longitude, airport?.latitude) ||
+    buildCoordinate(fallbackCoordinate?.[0], fallbackCoordinate?.[1])
+  );
+}
+
+function buildEndpointLabels(entries, routeCoordinatesByEntry = null) {
   const labels = [];
 
   for (const entry of entries || []) {
     const boardEntryId = String(entry?.boardEntryId || "").trim() || null;
     const flightId = String(entry?.flightId || "").trim() || null;
+    const routeCoordinates =
+      routeCoordinatesByEntry?.get?.(boardEntryId || flightId || "") || null;
 
     for (const [icao, kind] of [
       [entry?.from, "origin"],
@@ -72,7 +108,11 @@ function buildEndpointLabels(entries) {
       }
 
       const airport = getAirportByIcao(normalizedIcao);
-      if (!Number.isFinite(airport?.longitude) || !Number.isFinite(airport?.latitude)) {
+      const endpointCoordinate = resolveEndpointCoordinate(
+        airport,
+        resolveFallbackEndpointCoordinate(routeCoordinates, kind)
+      );
+      if (!endpointCoordinate) {
         continue;
       }
 
@@ -83,8 +123,8 @@ function buildEndpointLabels(entries) {
         kind,
         icao: normalizedIcao,
         airportName: truncateAirportName(airport?.name || normalizedIcao),
-        longitude: airport.longitude,
-        latitude: airport.latitude
+        longitude: endpointCoordinate[0],
+        latitude: endpointCoordinate[1]
       });
     }
   }
@@ -92,14 +132,15 @@ function buildEndpointLabels(entries) {
   return labels;
 }
 
-function buildSimBriefRouteCoordinates(entry) {
+// Builds the selected SimBrief route line plus waypoint dots using the same coordinate dedupe flow.
+function buildSimBriefRouteData(entry) {
   const fromAirport = getAirportByIcao(entry?.from);
   const toAirport = getAirportByIcao(entry?.to);
   const coordinates = [];
+  const waypointFeatures = [];
   const routePoints = Array.isArray(entry?.simbriefPlan?.routePoints)
     ? entry.simbriefPlan.routePoints
     : [];
-
   const originCoordinate = buildCoordinate(fromAirport?.longitude, fromAirport?.latitude);
   const destinationCoordinate = buildCoordinate(toAirport?.longitude, toAirport?.latitude);
 
@@ -107,27 +148,49 @@ function buildSimBriefRouteCoordinates(entry) {
     appendCoordinate(coordinates, originCoordinate);
   }
 
-  for (const point of routePoints) {
+  for (let index = 0; index < routePoints.length; index += 1) {
+    const point = routePoints[index];
     const routeCoordinate = buildCoordinate(point?.longitude, point?.latitude);
-    if (routeCoordinate) {
-      appendCoordinate(coordinates, routeCoordinate);
+    if (!routeCoordinate) {
+      continue;
     }
+
+    const coordinateCountBeforeAppend = coordinates.length;
+    appendCoordinate(coordinates, routeCoordinate);
+    if (coordinates.length === coordinateCountBeforeAppend) {
+      continue;
+    }
+
+    waypointFeatures.push(
+      buildWaypointFeature(entry, routeCoordinate, point?.ident, index)
+    );
   }
 
   if (destinationCoordinate) {
     appendCoordinate(coordinates, destinationCoordinate);
   }
 
-  return coordinates.length >= 2 ? coordinates : null;
+  return {
+    routeCoordinates: coordinates.length >= 2 ? coordinates : null,
+    waypointFeatures
+  };
 }
 
 function buildRouteFeatures(entry, routeCoordinates = null) {
   const fromAirport = getAirportByIcao(entry?.from);
   const toAirport = getAirportByIcao(entry?.to);
-  const fromLongitude = fromAirport?.longitude;
-  const fromLatitude = fromAirport?.latitude;
-  const toLongitude = toAirport?.longitude;
-  const toLatitude = toAirport?.latitude;
+  const originCoordinate = resolveEndpointCoordinate(
+    fromAirport,
+    resolveFallbackEndpointCoordinate(routeCoordinates, "origin")
+  );
+  const destinationCoordinate = resolveEndpointCoordinate(
+    toAirport,
+    resolveFallbackEndpointCoordinate(routeCoordinates, "destination")
+  );
+  const fromLongitude = originCoordinate?.[0];
+  const fromLatitude = originCoordinate?.[1];
+  const toLongitude = destinationCoordinate?.[0];
+  const toLatitude = destinationCoordinate?.[1];
   const hasRouteCoordinates =
     Array.isArray(routeCoordinates) && routeCoordinates.length >= 2;
   const lineCoordinates = hasRouteCoordinates
@@ -288,10 +351,6 @@ export default function FlightMapPanel({
 
     return activeFlightBoardEntries;
   }, [activeFlightBoardEntries, flightPathViewMode, selectedEntry]);
-  const endpointLabels = useMemo(
-    () => buildEndpointLabels(visibleFlightBoardEntries),
-    [visibleFlightBoardEntries]
-  );
   const allFlightPathGeoJson = useMemo(() => {
     const features = [];
 
@@ -315,10 +374,12 @@ export default function FlightMapPanel({
         }
       : EMPTY_ROUTE_FEATURE_COLLECTION;
   }, [activeFlightBoardEntries]);
+  const selectedRouteData = useMemo(
+    () => (selectedEntry ? buildSimBriefRouteData(selectedEntry) : null),
+    [selectedEntry]
+  );
   const selectedFlightPathGeoJson = useMemo(() => {
-    const selectedRouteCoordinates = selectedEntry
-      ? buildSimBriefRouteCoordinates(selectedEntry)
-      : null;
+    const selectedRouteCoordinates = selectedRouteData?.routeCoordinates || null;
     const selectedFeature = selectedEntry
       ? buildRouteFeatures(selectedEntry, selectedRouteCoordinates)
       : null;
@@ -328,12 +389,29 @@ export default function FlightMapPanel({
           type: "FeatureCollection",
           features: [
             selectedFeature.route,
+            ...(selectedRouteData?.waypointFeatures || []),
             selectedFeature.origin,
             selectedFeature.destination
           ].filter(Boolean)
         }
       : EMPTY_ROUTE_FEATURE_COLLECTION;
-  }, [selectedEntry]);
+  }, [selectedEntry, selectedRouteData]);
+  const endpointLabels = useMemo(() => {
+    if (flightPathViewMode !== "selected" || !selectedEntry) {
+      return buildEndpointLabels(visibleFlightBoardEntries);
+    }
+
+    const entryKey =
+      String(selectedEntry?.boardEntryId || "").trim() ||
+      String(selectedEntry?.flightId || "").trim();
+    const routeCoordinatesByEntry = new Map(
+      entryKey && selectedRouteData?.routeCoordinates
+        ? [[entryKey, selectedRouteData.routeCoordinates]]
+        : []
+    );
+
+    return buildEndpointLabels(visibleFlightBoardEntries, routeCoordinatesByEntry);
+  }, [flightPathViewMode, selectedEntry, selectedRouteData, visibleFlightBoardEntries]);
   const flightPathGeoJson =
     flightPathViewMode === "selected" ? selectedFlightPathGeoJson : allFlightPathGeoJson;
 
@@ -362,6 +440,10 @@ export default function FlightMapPanel({
 
     if (hasRenderedRoute) {
       logAppEvent("simbrief-route-rendered", {
+        flight: selectedEntry.flightId || selectedEntry.linkedFlightId || "",
+        route: `${selectedEntry.from || ""}-${selectedEntry.to || ""}`
+      }).catch(() => {});
+      logAppDebug("simbrief-route-rendered-debug", {
         boardEntryId: selectedEntry.boardEntryId,
         flightId: selectedEntry.flightId || selectedEntry.linkedFlightId || ""
       }).catch(() => {});

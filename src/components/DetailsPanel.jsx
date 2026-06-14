@@ -31,6 +31,12 @@ export default function DetailsPanel({
     error: "",
     result: null
   },
+  deltaDraftDeleteState = {
+    boardEntryId: "",
+    isDeleting: false,
+    error: "",
+    result: null
+  },
   deltaDraftReportUrlState = {
     boardEntryId: "",
     url: ""
@@ -50,10 +56,13 @@ export default function DetailsPanel({
   onSimBriefTypeChange,
   onDraftNetworkChange,
   onDispatchWorkflow,
+  onRegenerateDispatch,
   onOpenSimBriefFlight = () => {},
   onDraftOnlySubmit = () => {},
+  onDeleteDeltaVirtualDraftReport = () => {},
   onCompleteTourFlight,
-  showFlightBoard = true
+  showFlightBoard = true,
+  isCollapsed = false
 }) {
   const panelRef = useRef(null);
   const shortlistRef = useRef(null);
@@ -298,7 +307,7 @@ export default function DetailsPanel({
     closeRenameModal();
   }
 
-  if (!showFlightBoard) {
+  if (!showFlightBoard || isCollapsed) {
     return null;
   }
 
@@ -340,6 +349,7 @@ export default function DetailsPanel({
           selectedAccomplishment={selectedAccomplishment}
           simBriefDispatchState={simBriefDispatchState}
           deltaDraftSubmitState={deltaDraftSubmitState}
+          deltaDraftDeleteState={deltaDraftDeleteState}
           deltaDraftReportUrlState={deltaDraftReportUrlState}
           simBriefCredentialsConfigured={simBriefCredentialsConfigured}
           isDesktopSimBriefAvailable={isDesktopSimBriefAvailable}
@@ -352,8 +362,10 @@ export default function DetailsPanel({
           onSimBriefTypeChange={onSimBriefTypeChange}
           onDraftNetworkChange={onDraftNetworkChange}
           onDispatchWorkflow={onDispatchWorkflow}
+          onRegenerateDispatch={onRegenerateDispatch}
           onOpenSimBriefFlight={onOpenSimBriefFlight}
           onDraftOnlySubmit={onDraftOnlySubmit}
+          onDeleteDeltaVirtualDraftReport={onDeleteDeltaVirtualDraftReport}
           onCompleteTourFlight={onCompleteTourFlight}
           setItemRef={setItemRef}
           suppressClickRef={suppressClickRef}

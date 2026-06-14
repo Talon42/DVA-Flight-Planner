@@ -133,16 +133,14 @@ export default function FilterBar({
           <Eyebrow>Basic Filters</Eyebrow>
         </div>
         <div className="filter-heading__actions flex flex-wrap items-center gap-2">
-          {!plannerControlsCollapsed ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-none !bg-[var(--delta-blue)] !text-white hover:!bg-[var(--delta-blue)] dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F]"
-              onClick={onReset}
-            >
-              Reset
-            </Button>
-          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-none !bg-[var(--delta-blue)] !text-white hover:!bg-[var(--delta-blue)] dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F]"
+            onClick={onReset}
+          >
+            Reset
+          </Button>
           <Button
             variant="ghost"
             size="icon"

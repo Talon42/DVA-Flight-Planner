@@ -411,9 +411,7 @@ fn attach_windows_briefing_message_handler(
                                             } = message;
 
                                             match kind {
-                                                DvaLoginMessageKind::LoginSuccess => {
-                                                    append_sync_log("auth-succeeded");
-                                                }
+                                                DvaLoginMessageKind::LoginSuccess => {}
                                                 DvaLoginMessageKind::StorePassword => {
                                                     if let Some(password) = password.as_deref() {
                                                         let _ = crate::services::deltava::auth::save_password_to_credential_manager(password);

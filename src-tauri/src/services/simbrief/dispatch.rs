@@ -559,13 +559,20 @@ fn close_simbrief_dispatch_window_internal(app: &AppHandle) {
     }
 }
 
+fn append_simbrief_debug_log(app: &AppHandle, debug_enabled: bool, message: &str) {
+    if debug_enabled {
+        append_simbrief_log(app, message);
+    }
+}
+
 fn spawn_simbrief_background_fetch(
     app: AppHandle,
     payload: SimBriefDispatchPayload,
     static_id: String,
+    debug_enabled: bool,
 ) {
     tauri::async_runtime::spawn(async move {
-        append_simbrief_log(&app, "fetch-started");
+        append_simbrief_debug_log(&app, debug_enabled, "fetch-started");
         let result = fetch_simbrief_plan_summary(
             &app,
             &payload.flight_id,
@@ -575,7 +582,7 @@ fn spawn_simbrief_background_fetch(
         )
         .await;
         let fetch_succeeded = result.is_ok();
-        append_simbrief_log(&app, &format!("fetch-finished ok={fetch_succeeded}"));
+        append_simbrief_debug_log(&app, debug_enabled, &format!("fetch-finished ok={fetch_succeeded}"));
         let dispatch_error = result.as_ref().err().cloned();
 
         if fetch_succeeded {
@@ -1583,14 +1590,16 @@ pub fn close_simbrief_dispatch_window(app: AppHandle) {
 pub async fn refresh_simbrief_dispatch(
     app: AppHandle,
     payload: SimBriefRefreshPayload,
+    debug_enabled: bool,
 ) -> Result<SimBriefPlanSummary, String> {
     let flight_id = payload.flight_id.trim().to_string();
     let static_id = payload.static_id.trim().to_string();
     let username = payload.username.trim().to_string();
     let pilot_id = payload.pilot_id.trim().to_string();
 
-    append_simbrief_log(
+    append_simbrief_debug_log(
         &app,
+        debug_enabled,
         &format!(
             "refresh-requested flightId={} staticId={}",
             flight_id, static_id
@@ -1611,8 +1620,9 @@ pub async fn refresh_simbrief_dispatch(
     let plan =
         fetch_simbrief_plan_summary(&app, &flight_id, &username, &pilot_id, &static_id).await?;
 
-    append_simbrief_log(
+    append_simbrief_debug_log(
         &app,
+        debug_enabled,
         &format!(
             "refresh-succeeded flightId={} staticId={} aircraftType={}",
             flight_id, static_id, plan.aircraft_type
@@ -1626,6 +1636,7 @@ pub async fn start_simbrief_dispatch(
     app: AppHandle,
     manager: State<'_, SimBriefDispatchManager>,
     payload: SimBriefDispatchPayload,
+    debug_enabled: bool,
 ) -> Result<SimBriefPlanSummary, String> {
     let normalized_payload = SimBriefDispatchPayload {
         flight_id: payload.flight_id.trim().to_string(),
@@ -1646,8 +1657,9 @@ pub async fn start_simbrief_dispatch(
         pilot_id: payload.pilot_id.trim().to_string(),
     };
 
-    append_simbrief_log(
+    append_simbrief_debug_log(
         &app,
+        debug_enabled,
         &format!(
             "dispatch-requested flightId={} origin={} destination={} aircraftType={}",
             normalized_payload.flight_id,
@@ -1674,8 +1686,9 @@ pub async fn start_simbrief_dispatch(
     let signing_request =
         build_simbrief_dispatch_signing_request(&normalized_payload, &static_id, &outputpage)?;
 
-    append_simbrief_log(
+    append_simbrief_debug_log(
         &app,
+        debug_enabled,
         &format!(
             "dispatch-signing-requested flightId={} staticId={}",
             normalized_payload.flight_id, static_id
@@ -1684,8 +1697,9 @@ pub async fn start_simbrief_dispatch(
 
     let dispatch_url = match request_simbrief_dispatch_url(&signing_request).await {
         Ok(url) => {
-            append_simbrief_log(
+            append_simbrief_debug_log(
                 &app,
+                debug_enabled,
                 &format!(
                     "dispatch-signing-finished ok=true flightId={} staticId={}",
                     normalized_payload.flight_id, static_id
@@ -1756,7 +1770,12 @@ pub async fn start_simbrief_dispatch(
         message
     })?;
 
-    spawn_simbrief_background_fetch(app.clone(), normalized_payload.clone(), static_id.clone());
+    spawn_simbrief_background_fetch(
+        app.clone(),
+        normalized_payload.clone(),
+        static_id.clone(),
+        debug_enabled,
+    );
 
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed)

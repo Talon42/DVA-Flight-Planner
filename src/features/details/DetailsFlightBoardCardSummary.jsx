@@ -26,8 +26,12 @@ function formatBadgeTitleFromPath(path) {
     .replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
 }
 
-const ROUTE_LINE_CLASS =
-  "route-banner__line h-[2px] w-[clamp(2.25rem,72%,5.25rem)] bg-[var(--delta-red)]";
+const ROUTE_LEFT_LINE_CLASS =
+  "block h-[2px] w-full bg-gradient-to-r from-transparent from-0% via-[rgba(200,16,46,0.7)] via-60% to-[rgba(200,16,46,1)] to-100%";
+const ROUTE_RIGHT_LINE_CLASS =
+  "block h-[2px] w-full bg-gradient-to-r from-[rgba(200,16,46,1)] from-0% via-[rgba(200,16,46,0.7)] via-40% to-transparent to-100%";
+const ROUTE_META_TEXT_CLASS =
+  "text-[var(--text-muted)] dark:text-[var(--route-banner-muted)] text-[0.8rem] font-normal leading-[1.35] tracking-[0]";
 
 function FlightBoardBadge({ label, title }) {
   return (
@@ -145,9 +149,10 @@ export default function DetailsFlightBoardCardSummary({ flight, selectedAccompli
       </div>
       <div className="grid min-w-0 gap-2 bp-1024:gap-1.5">
         <div className="relative">
+          {/* Keeps the route row centered on the airplane while fading the ends toward each airport code. */}
           <div
             className={cn(
-              "grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_3.7rem] items-center gap-2.5 bp-1024:gap-2",
+              "grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_auto_minmax(0,1fr)_3.7rem] items-center gap-2.5 bp-1024:gap-2",
               isCompletedFlight && "opacity-45"
             )}
             aria-hidden="true"
@@ -156,19 +161,21 @@ export default function DetailsFlightBoardCardSummary({ flight, selectedAccompli
               {flight.from}
             </span>
             {isCompletedFlight ? (
-              <span className="flex min-w-0 items-center justify-center">
+              <>
+                <span aria-hidden="true" className="block h-px w-full opacity-0" />
                 <span className="inline-flex min-h-[1.75rem] min-w-[6.5rem]" aria-hidden="true" />
-              </span>
+                <span aria-hidden="true" className="block h-px w-full opacity-0" />
+              </>
             ) : (
-              <span className="flex min-w-0 items-center gap-2">
-                <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
+              <>
+                <span aria-hidden="true" className={ROUTE_LEFT_LINE_CLASS} />
                 <img
                   src={planeLight}
                   alt=""
-                  className="route-banner__plane h-[18px] w-[34px] shrink-0 object-contain brightness-0 opacity-80 dark:brightness-100 dark:opacity-100"
+                  className="route-banner__plane justify-self-center h-[18px] w-[34px] shrink-0 object-contain brightness-0 opacity-80 dark:brightness-100 dark:opacity-100"
                 />
-                <span className={cn(ROUTE_LINE_CLASS, "min-w-0 flex-1")} />
-              </span>
+                <span aria-hidden="true" className={ROUTE_RIGHT_LINE_CLASS} />
+              </>
             )}
             <span className={cn("text-right text-[1.1rem] font-semibold tracking-[-0.03em]")}>
               {flight.to}
@@ -221,14 +228,14 @@ export default function DetailsFlightBoardCardSummary({ flight, selectedAccompli
             isCompletedFlight && "opacity-45"
           )}
         >
-          <small className={cn("min-w-0 truncate text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
+          <small className={cn("min-w-0 truncate", ROUTE_META_TEXT_CLASS)}>
             {simplifyAirportName(flight.fromAirport)}
           </small>
-          <div className={cn("grid shrink-0 grid-cols-2 items-center gap-4 whitespace-nowrap text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
-            <small>{boardDistanceLabel}</small>
-            <small>{boardTimeLabel}</small>
+          <div className="grid shrink-0 grid-cols-2 items-center gap-4 whitespace-nowrap">
+            <span className={ROUTE_META_TEXT_CLASS}>{boardDistanceLabel}</span>
+            <span className={ROUTE_META_TEXT_CLASS}>{boardTimeLabel}</span>
           </div>
-          <small className={cn("min-w-0 truncate text-right text-[var(--text-muted)] dark:text-[var(--route-banner-muted)]", bodySmTextClassName)}>
+          <small className={cn("min-w-0 truncate text-right", ROUTE_META_TEXT_CLASS)}>
             {simplifyAirportName(flight.toAirport)}
           </small>
         </div>

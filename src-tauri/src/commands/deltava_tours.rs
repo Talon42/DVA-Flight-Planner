@@ -4,8 +4,16 @@ use tauri::AppHandle;
 pub(crate) async fn sync_delta_virtual_tours(
     app: AppHandle,
     tours_sync_manager: tauri::State<'_, crate::services::deltava::tours::DeltaToursSyncManager>,
+    sync_run_id: String,
+    debug_enabled: bool,
 ) -> Result<crate::services::deltava::tours::DeltaToursSyncPayload, String> {
-    crate::services::deltava::tours::sync_delta_virtual_tours(app, tours_sync_manager).await
+    crate::services::deltava::tours::sync_delta_virtual_tours(
+        app,
+        tours_sync_manager,
+        sync_run_id,
+        debug_enabled,
+    )
+    .await
 }
 
 #[tauri::command]

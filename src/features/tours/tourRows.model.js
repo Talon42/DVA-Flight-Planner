@@ -265,6 +265,8 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
             derivedProgressEntry?.completed ||
             legacyProgressEntry?.completed
         ),
+        // Exposes whether completion came from a manual toggle or derived DVA sync.
+        completionSource: String(progressEntry?.source || "").trim() || null,
         completedAt: progressEntry?.completedAt || null,
         completionOrder: Number.isFinite(progressEntry?.completionOrder)
           ? progressEntry.completionOrder
@@ -389,6 +391,8 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
           derivedProgressEntry?.completed ||
           legacyProgressEntry?.completed
       ),
+      // Exposes whether completion came from a manual toggle or derived DVA sync.
+      completionSource: String(progressEntry?.source || "").trim() || null,
       completedAt: progressEntry?.completedAt || null,
       completionOrder: Number.isFinite(progressEntry?.completionOrder)
         ? progressEntry.completionOrder

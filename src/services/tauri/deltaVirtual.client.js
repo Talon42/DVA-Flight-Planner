@@ -51,13 +51,19 @@ function buildSafeLogbookResult(error = "") {
   };
 }
 
-export async function syncScheduleFromDeltaVirtual() {
+export async function syncScheduleFromDeltaVirtual({
+  syncRunId = "",
+  debugEnabled = false
+} = {}) {
   if (!isTauriRuntime()) {
     throw new Error("Delta Virtual sync is only available in the desktop app.");
   }
 
   try {
-    const result = await invokeAppCommand("start_deltava_sync");
+    const result = await invokeAppCommand("start_deltava_sync", {
+      syncRunId: String(syncRunId || "").trim(),
+      debugEnabled: Boolean(debugEnabled)
+    });
     const fileName = result?.fileName ?? result?.file_name;
     const xmlText = result?.xmlText ?? result?.xml_text;
     const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
@@ -102,13 +108,19 @@ export async function resetDeltaVirtualSyncSession() {
   }
 }
 
-export async function syncDeltaVirtualTours() {
+export async function syncDeltaVirtualTours({
+  syncRunId = "",
+  debugEnabled = false
+} = {}) {
   if (!isTauriRuntime()) {
     throw new Error("Delta Virtual tour sync is only available in the desktop app.");
   }
 
   try {
-    const result = await invokeAppCommand("sync_delta_virtual_tours");
+    const result = await invokeAppCommand("sync_delta_virtual_tours", {
+      syncRunId: String(syncRunId || "").trim(),
+      debugEnabled: Boolean(debugEnabled)
+    });
     return {
       ok: Boolean(result?.ok),
       source: String(result?.source || "dva").trim().toLowerCase() || "dva",
@@ -199,6 +211,23 @@ export async function readDeltaVirtualLogbook() {
     };
   } catch (error) {
     return buildSafeLogbookResult(error instanceof Error ? error.message : String(error));
+  }
+}
+
+export async function readDeltaVirtualAccomplishmentEligibility() {
+  if (!isTauriRuntime()) {
+    return { lastSyncAt: null, sourceUrl: null, rows: [] };
+  }
+
+  try {
+    const result = await invokeAppCommand("read_deltava_accomplishment_eligibility");
+    return {
+      lastSyncAt: result?.lastSyncAt ?? result?.last_sync_at ?? null,
+      sourceUrl: result?.sourceUrl ?? result?.source_url ?? null,
+      rows: Array.isArray(result?.rows) ? result.rows : []
+    };
+  } catch {
+    return { lastSyncAt: null, sourceUrl: null, rows: [] };
   }
 }
 
