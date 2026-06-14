@@ -169,8 +169,8 @@ function LogbookRow({
         className={cn(
           "relative w-full text-left text-[var(--text-primary)] transition-colors duration-150 dark:text-white",
           selected
-            ? "bg-[var(--delta-blue)] text-white hover:bg-[var(--delta-blue)] dark:bg-[#1F466E] dark:text-white dark:hover:bg-[#1F466E]"
-            : "bg-[var(--surface-table-row)] even:bg-[var(--surface-table-row-alt)] hover:bg-[#e8edf3] dark:bg-[var(--surface-table-row)] dark:even:bg-[var(--surface-table-row-alt)] dark:hover:bg-[#e8edf3]"
+            ? "bg-[#D7E8F7] text-[#0B1F36] hover:bg-[#D7E8F7] dark:bg-[#1F466E] dark:text-white dark:hover:bg-[#1F466E]"
+            : "bg-[var(--surface-table-row)] even:bg-[var(--surface-table-row-alt)] hover:bg-[var(--surface-table-row-hover)] dark:bg-[var(--surface-table-row)] dark:even:bg-[var(--surface-table-row-alt)] dark:hover:bg-[var(--surface-table-row-hover)]"
         )}
         onClick={() => {
           onSelectRow?.(row.id, row);

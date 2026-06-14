@@ -24,7 +24,6 @@ export default function TableRow({
   style,
   columns,
   columnTemplate,
-  isSelected,
   onSelectRow,
   onActivateRow,
   getRowClassName,
@@ -33,8 +32,7 @@ export default function TableRow({
   return (
     <div
       className={cn(
-        "relative grid h-full w-full min-w-0 items-stretch border-b border-[color:var(--line)] bg-[var(--surface-table-row)] transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[rgba(255,255,255,0.18)]",
-        isSelected && "bg-[var(--surface-table-row-selected)] hover:bg-[var(--surface-table-row-selected)]",
+        "relative grid h-full w-full min-w-0 items-stretch border-b border-[color:var(--line)] bg-[var(--surface-table-row)] transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[var(--surface-table-row-hover)]",
         getRowClassName?.(row)
       )}
       style={{

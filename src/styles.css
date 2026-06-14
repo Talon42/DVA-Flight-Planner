@@ -63,6 +63,7 @@
   --surface-panel: rgba(226, 236, 246, 0.99);
   --surface-table-row: rgba(248, 251, 254, 0.94);
   --surface-table-row-alt: rgba(238, 244, 249, 0.98);
+  --surface-table-row-hover: #E8EEF5;
   --surface-table-row-selected:
     linear-gradient(90deg, rgba(0, 58, 112, 0.18), rgba(11, 31, 54, 0.08)),
     rgba(255, 255, 255, 0.84);
@@ -122,6 +123,7 @@
   --surface-panel: rgba(15, 33, 54, 0.99);
   --surface-table-row: rgba(10, 24, 43, 0.96);
   --surface-table-row-alt: rgba(13, 29, 49, 0.99);
+  --surface-table-row-hover: #142A44;
   --surface-table-row-selected:
     linear-gradient(90deg, rgba(200, 16, 46, 0.3), rgba(0, 58, 112, 0.2)),
     rgba(10, 24, 43, 0.9);

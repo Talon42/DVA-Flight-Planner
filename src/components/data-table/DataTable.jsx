@@ -43,7 +43,6 @@ function RowRenderer({ index, style, data }) {
       style={style}
       columns={data.columns}
       columnTemplate={data.columnTemplate}
-      isSelected={data.selectedRowId === rowId}
       onSelectRow={data.onSelectRow}
       onActivateRow={data.onActivateRow}
       getRowClassName={data.getRowClassName}
@@ -60,7 +59,6 @@ export default function DataTable({
   onSort,
   timeDisplayMode,
   onToggleTimeDisplayMode,
-  selectedRowId,
   onSelectRow,
   onActivateRow,
   getRowId = (row) => row.id,
@@ -189,7 +187,6 @@ export default function DataTable({
       rows: visibleRows,
       columns: resolvedColumns,
       columnTemplate,
-      selectedRowId,
       onSelectRow,
       onActivateRow,
       getRowId,
@@ -200,7 +197,6 @@ export default function DataTable({
       visibleRows,
       resolvedColumns,
       columnTemplate,
-      selectedRowId,
       onSelectRow,
       onActivateRow,
       getRowId,
@@ -259,7 +255,6 @@ export default function DataTable({
                 style={{ height: rowHeight }}
                 columns={resolvedColumns}
                 columnTemplate={columnTemplate}
-                isSelected={selectedRowId === rowId}
                 onSelectRow={onSelectRow}
                 onActivateRow={onActivateRow}
                 getRowClassName={getRowClassName}
