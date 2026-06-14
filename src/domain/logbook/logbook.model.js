@@ -218,6 +218,10 @@ function normalizeStatus(value) {
   return normalizeText(value) || LOGBOOK_EMPTY_VALUE;
 }
 
+function isEligibleLogbookStatus(value) {
+  return ["SUBMITTED", "HOLD", "OK", "REJECTED"].includes(normalizeUpperText(value));
+}
+
 function buildCompactFlightLabel(entry) {
   const airlineCode = normalizeUpperText(entry?.airline || entry?.airlineCode || entry?.airlineIata);
   const flightNumber = normalizeText(entry?.flight || entry?.flightNumber || entry?.flightNo);
@@ -356,6 +360,11 @@ export function normalizeLogbookRows(entries) {
 
   activeEntries.forEach((entry, sourceIndex) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry) || !isUsefulLogbookEntry(entry)) {
+      return;
+    }
+
+    // Keep only the statuses that represent synced logbook reports, not editable draft records.
+    if (!isEligibleLogbookStatus(entry.status)) {
       return;
     }
 

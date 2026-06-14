@@ -370,13 +370,13 @@ fn extract_logbook_status(value: &Value) -> Option<String> {
 }
 
 fn is_eligible_logbook_status(status: Option<&str>) -> bool {
-    match status {
-        None => true,
-        Some(value) => matches!(
-            value.trim().to_ascii_lowercase().as_str(),
-            "ok" | "accepted" | "submitted" | "approved" | "completed" | "complete"
-        ),
-    }
+  match status {
+    None => true,
+    Some(value) => matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+            "ok" | "submitted" | "hold" | "rejected"
+    ),
+  }
 }
 
 fn extract_logbook_airport_code(value: &Value, key: &str) -> Option<String> {
@@ -1839,6 +1839,43 @@ mod tests {
             "flights": [
                 {
                     "status": "REJECTED",
+                    "date": { "y": 2023, "m": 10, "d": 25 },
+                    "airportD": { "icao": "KBUR", "iata": "BUR" },
+                    "airportA": { "icao": "KSAN", "iata": "SAN" },
+                    "updates": [
+                        { "type": "SYSTEM", "msg": "Leg 1 in Flight Tour Example Tour" }
+                    ]
+                }
+            ]
+        });
+        let tours_json = build_tours_json(
+            vec![json!({
+                "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN",
+                "from": "KBUR",
+                "to": "KSAN",
+                "airline": "AA",
+                "tourFlightNumber": "100",
+                "matchLeg": true,
+                "matchEQ": false,
+                "leg": 1
+            })],
+            "Example Tour",
+        );
+
+        let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(!completed_row_id(
+            &cache,
+            "dva:16",
+            "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN"
+        ));
+    }
+
+    #[test]
+    fn draft_status_does_not_complete() {
+        let logbook_json = json!({
+            "flights": [
+                {
+                    "status": "DRAFT",
                     "date": { "y": 2023, "m": 10, "d": 25 },
                     "airportD": { "icao": "KBUR", "iata": "BUR" },
                     "airportA": { "icao": "KSAN", "iata": "SAN" },
