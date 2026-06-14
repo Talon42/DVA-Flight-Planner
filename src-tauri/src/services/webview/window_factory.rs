@@ -10,9 +10,9 @@ use crate::services::deltava::sync_types::{
     DeltaWebDebugMessage, DeltaWebSyncResult, DeltaWebXmlCaptureMessage,
 };
 use crate::{
-    append_sync_log, services::storage::file_store, DeltaSyncManager, DeltaSyncPayload,
-    DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_DOWNLOAD_FILE, DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
-    DELTAVA_XML_MESSAGE_PREFIX,
+    append_sync_log, append_sync_log_debug, services::storage::file_store, DeltaSyncManager,
+    DeltaSyncPayload, DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_DOWNLOAD_FILE,
+    DELTAVA_SYNC_RESULT_MESSAGE_PREFIX, DELTAVA_XML_MESSAGE_PREFIX,
 };
 
 pub(crate) const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
@@ -43,6 +43,7 @@ pub(crate) fn close_deltava_sync_window(app: &AppHandle) {
 async fn wait_for_sync_window_focus_return(
     app: &AppHandle,
     focus_lost_at: &Arc<Mutex<Option<Instant>>>,
+    debug_enabled: bool,
 ) {
     let Some(window) = app.get_webview_window(DELTAVA_SYNC_LABEL) else {
         return;
@@ -61,24 +62,24 @@ async fn wait_for_sync_window_focus_return(
         return;
     }
 
-    append_sync_log("sync:waiting-for-focus-return");
+    append_sync_log_debug(debug_enabled, "sync:waiting-for-focus-return");
     let deadline =
         tokio::time::Instant::now() + Duration::from_secs(DELTAVA_CLOSE_AFTER_PROMPT_WAIT_SECONDS);
 
     loop {
         if tokio::time::Instant::now() >= deadline {
-            append_sync_log("sync:focus-return-timeout");
+            append_sync_log_debug(debug_enabled, "sync:focus-return-timeout");
             break;
         }
 
         match window.is_focused() {
             Ok(true) => {
-                append_sync_log("sync:focus-returned");
+                append_sync_log_debug(debug_enabled, "sync:focus-returned");
                 break;
             }
             Ok(false) => {}
             Err(error) => {
-                append_sync_log(&format!("sync:focus-check-failed {error}"));
+                append_sync_log_debug(debug_enabled, &format!("sync:focus-check-failed {error}"));
                 break;
             }
         }
@@ -93,6 +94,7 @@ fn attach_windows_xml_message_handler(
     app: AppHandle,
     download_path: PathBuf,
     sync_nonce: String,
+    debug_enabled: bool,
 ) -> Result<(), String> {
     use std::sync::Mutex as StdMutex;
 
@@ -118,9 +120,9 @@ fn attach_windows_xml_message_handler(
                 if let Ok(settings4) = settings.cast::<ICoreWebView2Settings4>() {
                     let _ = settings4.SetIsPasswordAutosaveEnabled(false);
                     let _ = settings4.SetIsGeneralAutofillEnabled(false);
-                    append_sync_log("webview:settings4-autofill-disabled");
+                    append_sync_log_debug(debug_enabled, "webview:settings4-autofill-disabled");
                 } else {
-                    append_sync_log("webview:settings4-unavailable");
+                    append_sync_log_debug(debug_enabled, "webview:settings4-unavailable");
                 }
 
                 let app_handle = app.clone();
@@ -142,7 +144,10 @@ fn attach_windows_xml_message_handler(
                             if let Some(debug_line) = message.strip_prefix(DELTAVA_DEBUG_MESSAGE_PREFIX) {
                                 if let Ok(debug_line) = serde_json::from_str::<DeltaWebDebugMessage>(debug_line) {
                                     if debug_line.nonce == sync_nonce {
-                                        append_sync_log(&format!("webview:{}", debug_line.message));
+                                        append_sync_log_debug(
+                                            debug_enabled,
+                                            &format!("webview:{}", debug_line.message),
+                                        );
                                     }
                                 }
                                 return Ok(());
@@ -155,26 +160,26 @@ fn attach_windows_xml_message_handler(
 
                                 tauri::async_runtime::spawn(async move {
                                     match serde_json::from_str::<crate::services::deltava::login::DvaLoginMessage>(&payload_text) {
-                                        Ok(message) if message.nonce == sync_nonce => {
-                                            let crate::services::deltava::login::DvaLoginMessage {
-                                                kind,
-                                                reason,
-                                                password,
-                                                ..
-                                            } = message;
+                                                Ok(message) if message.nonce == sync_nonce => {
+                                                    let crate::services::deltava::login::DvaLoginMessage {
+                                                        kind,
+                                                        reason,
+                                                        password,
+                                                        .. 
+                                                    } = message;
 
-                                            match kind {
-                                                crate::services::deltava::login::DvaLoginMessageKind::LoginSuccess => {
-                                                    append_sync_log("auth-succeeded");
-                                                }
-                                                crate::services::deltava::login::DvaLoginMessageKind::StorePassword => {
-                                                    if let Some(password) = password.as_deref() {
-                                                        match crate::services::deltava::auth::save_password_to_credential_manager(password) {
-                                                            Ok(()) => append_sync_log("auth-succeeded"),
-                                                            Err(error) => append_sync_log(&format!("auth-failed error={error}")),
+                                                    match kind {
+                                                        crate::services::deltava::login::DvaLoginMessageKind::LoginSuccess => {
+                                                            append_sync_log_debug(debug_enabled, "auth-succeeded");
                                                         }
-                                                    }
-                                                }
+                                                        crate::services::deltava::login::DvaLoginMessageKind::StorePassword => {
+                                                            if let Some(password) = password.as_deref() {
+                                                                match crate::services::deltava::auth::save_password_to_credential_manager(password) {
+                                                                    Ok(()) => append_sync_log_debug(debug_enabled, "auth-succeeded"),
+                                                                    Err(error) => append_sync_log(&format!("auth-failed error={error}")),
+                                                                }
+                                                            }
+                                                        }
                                                 crate::services::deltava::login::DvaLoginMessageKind::LoginFailed => {
                                                     let reason = reason
                                                         .as_deref()
@@ -205,6 +210,7 @@ fn attach_windows_xml_message_handler(
                                             file_store::build_delta_sync_payload_from_web_result(
                                                 &app_handle,
                                                 web_result,
+                                                debug_enabled,
                                             )
                                             .await
                                         }
@@ -214,9 +220,9 @@ fn attach_windows_xml_message_handler(
                                         )),
                                     };
                                     if result.is_ok() {
-                                        append_sync_log("succeeded");
+                                        append_sync_log_debug(debug_enabled, "succeeded stage=sync-result");
                                     } else {
-                                        append_sync_log("failed");
+                                        append_sync_log_debug(debug_enabled, "failed stage=sync-result");
                                     }
 
                                     app_handle
@@ -242,7 +248,7 @@ fn attach_windows_xml_message_handler(
 
                                     let xml_text = message.xml_text;
                                     let trimmed = xml_text.trim_start().to_string();
-                                    append_sync_log("schedule-fetch");
+                                    append_sync_log_debug(debug_enabled, "schedule-fetch-requested");
                                     let result = if !trimmed.starts_with('<') || !xml_text.contains("<FLIGHT>") {
                                         Err("invalid_xml: Delta Virtual returned a non-schedule response.".to_string())
                                     } else {
@@ -265,9 +271,9 @@ fn attach_windows_xml_message_handler(
                                         }
                                     };
                                     if result.is_ok() {
-                                        append_sync_log("succeeded");
+                                        append_sync_log("succeeded stage=xml-capture");
                                     } else {
-                                        append_sync_log("failed");
+                                        append_sync_log("failed stage=xml-capture");
                                     }
 
                                     app_handle
@@ -310,6 +316,7 @@ pub(crate) fn build_deltava_sync_window(
     webview_data_directory: PathBuf,
     download_path: PathBuf,
     sync_nonce: String,
+    debug_enabled: bool,
     login_automation_script: String,
     auto_sync_script: String,
     focus_lost_at: Arc<Mutex<Option<Instant>>>,
@@ -339,24 +346,31 @@ pub(crate) fn build_deltava_sync_window(
             };
             let url = payload.url().to_string();
             let should_probe = should_probe_for_schedule(payload.url());
-            append_sync_log(&format!("webview:page-load event={event_name} url={url} probe={should_probe}"));
+            append_sync_log_debug(
+                debug_enabled,
+                &format!("webview:page-load event={event_name} url={url} probe={should_probe}"),
+            );
 
             if payload.event() == tauri::webview::PageLoadEvent::Finished && should_probe {
                 match webview_window.eval(&login_automation_script) {
-                    Ok(()) => append_sync_log("webview:eval:login:ok"),
-                    Err(error) => append_sync_log(&format!("webview:eval:login:failed error={error}")),
+                    Ok(()) => append_sync_log_debug(debug_enabled, "webview:eval:login:ok"),
+                    Err(error) => append_sync_log_debug(
+                        debug_enabled,
+                        &format!("webview:eval:login:failed error={error}"),
+                    ),
                 }
                 match webview_window.eval(&auto_sync_script) {
-                    Ok(()) => append_sync_log("webview:eval:auto-sync:ok"),
-                    Err(error) => {
-                        append_sync_log(&format!("webview:eval:auto-sync:failed error={error}"))
-                    }
+                    Ok(()) => append_sync_log_debug(debug_enabled, "webview:eval:auto-sync:ok"),
+                    Err(error) => append_sync_log_debug(
+                        debug_enabled,
+                        &format!("webview:eval:auto-sync:failed error={error}"),
+                    ),
                 }
             }
         })
         .on_download(move |_webview, event| match event {
             tauri::webview::DownloadEvent::Requested { url, destination } => {
-                append_sync_log("schedule-fetch");
+                append_sync_log_debug(debug_enabled, "schedule-fetch-requested");
                 if !is_schedule_download_url(&url) {
                     return false;
                 }
@@ -405,8 +419,13 @@ pub(crate) fn build_deltava_sync_window(
                         Err("download_failed: Delta Virtual schedule download did not complete.".into())
                     };
 
-                    if result.is_ok() {
-                        append_sync_log("succeeded");
+                    if let Ok(metadata) = tokio::fs::metadata(&resolved_path).await {
+                        append_sync_log(&format!(
+                            "schedule-fetch-succeeded source=download bytes={}",
+                            metadata.len()
+                        ));
+                    } else if result.is_ok() {
+                        append_sync_log("schedule-fetch-succeeded source=download bytes=0");
                     } else {
                         append_sync_log("failed");
                     }
@@ -431,9 +450,10 @@ pub(crate) fn build_deltava_sync_window(
         app.clone(),
         download_path.clone(),
         sync_nonce.clone(),
+        debug_enabled,
     )?;
 
-    append_sync_log("sync:webview-ready");
+    append_sync_log_debug(debug_enabled, "sync:webview-ready");
 
     window.on_window_event(move |event| match event {
         WindowEvent::Focused(focused) => {
@@ -441,12 +461,12 @@ pub(crate) fn build_deltava_sync_window(
                 if let Ok(mut guard) = focus_lost_at_for_events.lock() {
                     *guard = None;
                 }
-                append_sync_log("sync-window:focused");
+                append_sync_log_debug(debug_enabled, "sync-window:focused");
             } else {
                 if let Ok(mut guard) = focus_lost_at_for_events.lock() {
                     *guard = Some(Instant::now());
                 }
-                append_sync_log("sync-window:blurred");
+                append_sync_log_debug(debug_enabled, "sync-window:blurred");
             }
         }
         WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
@@ -464,6 +484,7 @@ pub(crate) fn build_deltava_sync_window(
 pub(crate) async fn wait_for_deltava_sync_window_focus_return(
     app: &AppHandle,
     focus_lost_at: &Arc<Mutex<Option<Instant>>>,
+    debug_enabled: bool,
 ) {
-    wait_for_sync_window_focus_return(app, focus_lost_at).await;
+    wait_for_sync_window_focus_return(app, focus_lost_at, debug_enabled).await;
 }

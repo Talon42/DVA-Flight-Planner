@@ -6,8 +6,8 @@ use crate::services::deltava::login::{
 };
 use crate::services::deltava::url::{is_allowed_deltava_url, should_probe_for_schedule};
 use crate::{
-    append_sync_log, build_webview_data_directory, initialize_sync_log_path, iso_now_utc,
-    new_dva_nonce,
+    append_sync_log, append_sync_log_debug, build_webview_data_directory, initialize_sync_log_path,
+    iso_now_utc, new_dva_nonce,
 };
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex, time::Duration};
@@ -935,6 +935,7 @@ fn close_deltava_tours_sync_window(app: &AppHandle) {
 async fn build_tours_sync_payload_from_web_result(
     app: &AppHandle,
     mut result: DeltaToursSyncPayload,
+    debug_enabled: bool,
 ) -> Result<DeltaToursSyncPayload, String> {
     if result.last_sync_at.is_none() {
         result.last_sync_at = Some(iso_now_utc());
@@ -946,7 +947,10 @@ async fn build_tours_sync_payload_from_web_result(
 
     write_delta_virtual_tours_cache_internal(app, &result)?;
     if let Err(error) =
-        crate::services::deltava::tour_progress::reconcile_deltava_tour_progress_internal(app)
+        crate::services::deltava::tour_progress::reconcile_deltava_tour_progress_internal(
+            app,
+            debug_enabled,
+        )
     {
         append_sync_log(&format!("tour-progress:reconcile-failed {error}"));
     }
@@ -959,6 +963,7 @@ fn attach_windows_tours_message_handler(
     window: &WebviewWindow,
     app: AppHandle,
     sync_nonce: String,
+    debug_enabled: bool,
 ) -> Result<(), String> {
     let registration_error = std::sync::Arc::new(Mutex::new(None::<String>));
     let registration_error_for_closure = registration_error.clone();
@@ -976,9 +981,9 @@ fn attach_windows_tours_message_handler(
                 if let Ok(settings4) = settings.cast::<ICoreWebView2Settings4>() {
                     let _ = settings4.SetIsPasswordAutosaveEnabled(false);
                     let _ = settings4.SetIsGeneralAutofillEnabled(false);
-                    append_sync_log("webview:settings4-autofill-disabled");
+                    append_sync_log_debug(debug_enabled, "webview:settings4-autofill-disabled");
                 } else {
-                    append_sync_log("webview:settings4-unavailable");
+                    append_sync_log_debug(debug_enabled, "webview:settings4-unavailable");
                 }
 
                 let app_handle = app.clone();
@@ -999,7 +1004,10 @@ fn attach_windows_tours_message_handler(
                             if let Some(debug_line) = message.strip_prefix(DELTAVA_DEBUG_MESSAGE_PREFIX) {
                                 if let Ok(debug_line) = serde_json::from_str::<DeltaWebDebugMessage>(debug_line) {
                                     if debug_line.nonce == sync_nonce {
-                                        append_sync_log(&format!("webview:{}", debug_line.message));
+                                        append_sync_log_debug(
+                                            debug_enabled,
+                                            &format!("webview:{}", debug_line.message),
+                                        );
                                     }
                                 }
                                 return Ok(());
@@ -1022,12 +1030,12 @@ fn attach_windows_tours_message_handler(
 
                                             match kind {
                                                 DvaLoginMessageKind::LoginSuccess => {
-                                                    append_sync_log("auth-succeeded");
+                                                    append_sync_log_debug(debug_enabled, "auth-succeeded");
                                                 }
                                                 DvaLoginMessageKind::StorePassword => {
                                                     if let Some(password) = password.as_deref() {
                                                         match save_password_to_credential_manager(password) {
-                                                            Ok(()) => append_sync_log("auth-succeeded"),
+                                                            Ok(()) => append_sync_log_debug(debug_enabled, "auth-succeeded"),
                                                             Err(error) => append_sync_log(&format!("auth-failed error={error}")),
                                                         }
                                                     }
@@ -1059,7 +1067,12 @@ fn attach_windows_tours_message_handler(
                                 tauri::async_runtime::spawn(async move {
                                     match serde_json::from_str::<DeltaToursSyncResultEnvelope>(&payload_text) {
                                         Ok(envelope) if envelope.nonce == sync_nonce => {
-                                            let result = build_tours_sync_payload_from_web_result(&app_handle, envelope.payload).await;
+                                            let result = build_tours_sync_payload_from_web_result(
+                                                &app_handle,
+                                                envelope.payload,
+                                                debug_enabled,
+                                            )
+                                            .await;
                                             app_handle
                                                 .state::<DeltaToursSyncManager>()
                                                 .finish(DELTAVA_TOURS_SYNC_LABEL, result);
@@ -1111,33 +1124,48 @@ fn attach_windows_tours_message_handler(
 pub async fn sync_delta_virtual_tours(
     app: AppHandle,
     tours_sync_manager: State<'_, DeltaToursSyncManager>,
+    sync_run_id: String,
+    debug_enabled: bool,
 ) -> Result<DeltaToursSyncPayload, String> {
     let initialized_log_path = initialize_sync_log_path(&app);
     let _ = initialized_log_path;
     let sync_nonce = new_dva_nonce();
-    append_sync_log("tours:started");
+    let sync_run_id = {
+        let normalized = sync_run_id.trim();
+        if normalized.is_empty() {
+            new_dva_nonce()
+        } else {
+            normalized.to_string()
+        }
+    };
+    let started_at = std::time::Instant::now();
+    append_sync_log(&format!("tours:started syncRunId={sync_run_id}"));
     close_deltava_tours_sync_window(&app);
 
     let (sender, receiver) = oneshot::channel();
     tours_sync_manager.begin(DELTAVA_TOURS_SYNC_LABEL.to_string(), sender)?;
 
     let webview_data_directory = build_webview_data_directory(&app)?;
-    let auth_context = match read_auth_context_internal(&app) {
-        Ok(context) => context,
+    let (auth_context, auth_loaded_from_storage) = match read_auth_context_internal(&app) {
+        Ok(context) => (context, true),
         Err(error) => {
-            append_sync_log(&format!("auth-failed error={error}"));
-            crate::services::deltava::auth::DeltaVirtualAuthContext {
-                settings: Default::default(),
-                password: None,
-            }
+            append_sync_log(&format!(
+                "auth-failed syncRunId={sync_run_id} error={error} stage=credentials"
+            ));
+            (
+                crate::services::deltava::auth::DeltaVirtualAuthContext {
+                    settings: Default::default(),
+                    password: None,
+                },
+                false,
+            )
         }
     };
-    append_sync_log(&format!(
-        "auth-succeeded hasPassword={} firstNameSaved={} lastNameSaved={}",
-        auth_context.settings.has_password,
-        !auth_context.settings.first_name.is_empty(),
-        !auth_context.settings.last_name.is_empty()
-    ));
+    if auth_loaded_from_storage {
+        append_sync_log(&format!(
+            "auth-succeeded syncRunId={sync_run_id} method=saved-credentials"
+        ));
+    }
 
     let login_automation_script = build_deltava_login_automation_script(
         &auth_context,
@@ -1178,8 +1206,8 @@ pub async fn sync_delta_virtual_tours(
     })?;
 
     #[cfg(windows)]
-    attach_windows_tours_message_handler(&window, app.clone(), sync_nonce.clone())?;
-    append_sync_log("tours:webview-ready");
+    attach_windows_tours_message_handler(&window, app.clone(), sync_nonce.clone(), debug_enabled)?;
+    append_sync_log_debug(debug_enabled, "tours:webview-ready");
 
     let app_for_close = app.clone();
     window.on_window_event(move |event| {
@@ -1197,9 +1225,26 @@ pub async fn sync_delta_virtual_tours(
     )
     .await
     {
-        Ok(Ok(result)) => result,
-        Ok(Err(_)) => Err("download_failed: Delta Virtual tours sync stopped unexpectedly.".into()),
+        Ok(Ok(result)) => {
+            let synced_tours = result.as_ref().map(|payload| payload.synced_tours).unwrap_or(0);
+            append_sync_log(&format!(
+                "tour-sync-succeeded syncRunId={sync_run_id} syncedTours={} durationMs={}",
+                synced_tours,
+                started_at.elapsed().as_millis()
+            ));
+            result
+        }
+        Ok(Err(_)) => {
+            append_sync_log(&format!(
+                "failed syncRunId={sync_run_id} reason=unexpected_receiver stage=receiver"
+            ));
+            Err("download_failed: Delta Virtual tours sync stopped unexpectedly.".into())
+        }
         Err(_) => {
+            append_sync_log(&format!(
+                "failed syncRunId={sync_run_id} reason=timeout stage=timeout durationMs={}",
+                started_at.elapsed().as_millis()
+            ));
             app.state::<DeltaToursSyncManager>().finish(
                 DELTAVA_TOURS_SYNC_LABEL,
                 Err(

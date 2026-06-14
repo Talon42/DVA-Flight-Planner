@@ -137,13 +137,10 @@ pub fn close_deltava_draft_window(app: &AppHandle) {
     }
 }
 
-fn finish_draft_submit_result(app: &AppHandle, debug_enabled: bool, result: DraftSubmitResult) {
-    let should_close = result.ok || !debug_enabled;
+fn finish_draft_submit_result(app: &AppHandle, _debug_enabled: bool, result: DraftSubmitResult) {
     app.state::<DraftSubmitManager>()
         .finish(DVA_DRAFT_LABEL, result);
-    if should_close {
-        close_deltava_draft_window(app);
-    }
+    close_deltava_draft_window(app);
 }
 
 fn is_allowed_deltava_draft_url(url: &tauri::webview::Url) -> bool {
@@ -201,30 +198,52 @@ fn truncate_log_text(value: &str, limit: usize) -> String {
 }
 
 fn redact_app_log_key(key: &str) -> bool {
-    let normalized = key
-        .trim()
-        .to_ascii_lowercase()
-        .chars()
+  let normalized = key
+    .trim()
+    .to_ascii_lowercase()
+    .chars()
         .filter(|character| character.is_ascii_alphanumeric())
-        .collect::<String>();
+    .collect::<String>();
 
-    matches!(
-        normalized.as_str(),
-        "password"
-            | "cookie"
-            | "token"
-            | "auth"
-            | "apikey"
-            | "authorization"
-            | "setcookie"
-            | "credential"
-            | "secret"
-    )
+  matches!(
+    normalized.as_str(),
+    value if value.contains("password")
+        || value.contains("cookie")
+        || value.contains("token")
+        || value.contains("auth")
+        || value.contains("apikey")
+        || value.contains("authorization")
+        || value.contains("setcookie")
+        || value.contains("credential")
+        || value.contains("secret")
+  )
+}
+
+fn sanitize_app_log_value(value: &Value) -> Value {
+    match value {
+        Value::Array(items) => Value::Array(items.iter().map(sanitize_app_log_value).collect()),
+        Value::Object(object) => Value::Object(
+            object
+                .iter()
+                .map(|(key, entry)| {
+                    (
+                        key.clone(),
+                        if redact_app_log_key(key) {
+                            Value::String("[REDACTED]".to_string())
+                        } else {
+                            sanitize_app_log_value(entry)
+                        },
+                    )
+                })
+                .collect(),
+        ),
+        _ => value.clone(),
+    }
 }
 
 fn format_app_log_value(value: &Value) -> String {
-    match value {
-        Value::Null => "null".to_string(),
+  match value {
+    Value::Null => "null".to_string(),
         Value::Bool(boolean) => boolean.to_string(),
         Value::Number(number) => number.to_string(),
         Value::String(text) => {
@@ -236,7 +255,7 @@ fn format_app_log_value(value: &Value) -> String {
                 serde_json::to_string(&truncated).unwrap_or_else(|_| truncated)
             }
         }
-        other => serde_json::to_string(other)
+        other => serde_json::to_string(&sanitize_app_log_value(other))
             .map(|text| truncate_log_text(&text, 220))
             .unwrap_or_else(|_| other.to_string()),
     }
@@ -271,8 +290,19 @@ fn format_app_log_data(data: Option<&Value>) -> String {
 }
 
 fn append_draft_app_log_event(app: &AppHandle, event: &str, data: Option<&Value>) {
-    let message = format!("{event}{}", format_app_log_data(data));
-    crate::app::logging::append_app_log(app, "DVA Draft", &message);
+  let message = format!("{event}{}", format_app_log_data(data));
+  crate::app::logging::append_app_log(app, "DVA Draft", &message);
+}
+
+fn append_draft_debug_log_event(
+    app: &AppHandle,
+    debug_enabled: bool,
+    event: &str,
+    data: Option<&Value>,
+) {
+    if debug_enabled {
+        append_draft_app_log_event(app, event, data);
+    }
 }
 
 fn append_draft_submit_failed_stage(app: &AppHandle, stage: &str, error: &str) {
@@ -492,7 +522,7 @@ fn build_deltava_draft_submission_script(
         error: response.ok && hasPositiveId ? null : (parsedMessage || null)
       };
 
-      emitAppLog('submit-response', {
+      emitAppLog('submit-response-debug', {
         status: result.status,
         contentType: result.contentType || '',
         sentEqType: result.sentEqType || '',
@@ -512,7 +542,7 @@ fn build_deltava_draft_submission_script(
         id: null,
         error: message || 'Delta Virtual draft submission failed.'
       };
-      emitAppLog('submit-failed', {
+      emitAppLog('submit-failed-debug', {
         stage: 'fetch',
         error: message || 'Delta Virtual draft submission failed.'
       });
@@ -670,19 +700,24 @@ fn build_deltava_draft_delete_script(
         error: ok ? null : (parsedMessage || null)
       };
 
-      emitAppLog('delete-response', {
+      const includePreview = !ok || Boolean(window.__flightPlannerDeltaDraftPreviewEnabled);
+      emitAppLog('delete-response-debug', {
         draftReportId,
         draftIdHex,
         deleteStatus: response.status,
         deleteFinalUrl: finalUrl,
         verifyStatus: verifyResponse.status,
         verifyFinalUrl,
-        verifyPreview: buildResponsePreview(verifyText),
         status: result.status,
         contentType: result.contentType || '',
         finalUrl,
-        responsePreview: buildResponsePreview(responseText),
-        ok
+        ok,
+        ...(includePreview
+          ? {
+              verifyPreview: buildResponsePreview(verifyText),
+              responsePreview: buildResponsePreview(responseText)
+            }
+          : {})
       });
       window.__flightPlannerDeltaDraftPending = false;
       postResult(result);
@@ -696,7 +731,7 @@ fn build_deltava_draft_delete_script(
         id: draftReportId,
         error: message || 'DVA draft deletion failed.'
       };
-      emitAppLog('delete-failed', {
+      emitAppLog('delete-failed-debug', {
         stage: 'fetch',
         draftReportId,
         draftIdHex,
@@ -887,8 +922,9 @@ async fn run_deltava_draft_submission_attempt(
     let airport_a_for_page_load = airport_a_for_log.clone();
     let submit_script_for_page_load = submit_script.clone();
 
-    append_draft_app_log_event(
+    append_draft_debug_log_event(
         app,
+        debug_enabled,
         "webview-build-started",
         Some(&json!({
             "loginUrl": DVA_DRAFT_LOGIN_URL,
@@ -936,8 +972,9 @@ async fn run_deltava_draft_submission_attempt(
                 state.login_script_sent = true;
             }
 
-            append_draft_app_log_event(
+            append_draft_debug_log_event(
                 &app_for_page_load,
+                debug_enabled,
                 "login-started",
                 Some(&json!({
                     "status": "started"
@@ -1020,8 +1057,8 @@ async fn run_deltava_draft_submission_attempt(
         flight_for_log.clone(),
         airport_d_for_log.clone(),
         airport_a_for_log.clone(),
-        "submit-succeeded",
-        "submit-failed",
+        "submit-response-debug",
+        "submit-failed-debug",
     ) {
         append_draft_submit_failed_stage(app, "message-handler", &error);
         finish_draft_submit_result(
@@ -1164,8 +1201,9 @@ fn attach_windows_draft_message_handler(
                 if let Ok(settings4) = settings.cast::<ICoreWebView2Settings4>() {
                     let _ = settings4.SetIsPasswordAutosaveEnabled(false);
                     let _ = settings4.SetIsGeneralAutofillEnabled(false);
-                    append_draft_app_log_event(
+                    append_draft_debug_log_event(
                         &app,
+                        debug_enabled,
                         "webview-settings4-autofill-disabled",
                         Some(&json!({ "status": "disabled" })),
                     );
@@ -1190,8 +1228,9 @@ fn attach_windows_draft_message_handler(
                                 if let Some(app_log_text) = message.strip_prefix(DVA_DRAFT_APP_LOG_MESSAGE_PREFIX) {
                                     if let Ok(payload) = serde_json::from_str::<DraftAppLogEnvelope>(app_log_text) {
                                         if payload.nonce == draft_nonce {
-                                            append_draft_app_log_event(
+                                            append_draft_debug_log_event(
                                                 &app_handle,
+                                                debug_enabled,
                                                 &payload.event,
                                                 payload.data.as_ref(),
                                             );
@@ -1234,8 +1273,9 @@ fn attach_windows_draft_message_handler(
                                         }
 
                                         if should_log_login_finished {
-                                            append_draft_app_log_event(
+                                            append_draft_debug_log_event(
                                                 &app_handle,
+                                                debug_enabled,
                                                 "login-finished",
                                                 Some(&json!({
                                                     "status": "success"
@@ -1290,8 +1330,9 @@ fn attach_windows_draft_message_handler(
                                         }
 
                                         if should_log_login_finished {
-                                            append_draft_app_log_event(
+                                            append_draft_debug_log_event(
                                                 &app_handle,
+                                                debug_enabled,
                                                 "login-finished",
                                                 Some(&json!({
                                                     "status": "success"
@@ -1362,8 +1403,9 @@ fn attach_windows_draft_message_handler(
                                                         json!(result.content_type.clone()),
                                                     );
                                                     let payload = Value::Object(data);
-                                                    append_draft_app_log_event(
+                                                    append_draft_debug_log_event(
                                                         &app_handle,
+                                                        debug_enabled,
                                                         operation_success_event,
                                                         Some(&payload),
                                                     );
@@ -1374,8 +1416,9 @@ fn attach_windows_draft_message_handler(
                                                         "returnedIdPresent": false,
                                                         "parsedError": result.error.clone().unwrap_or_default()
                                                     });
-                                                    append_draft_app_log_event(
+                                                    append_draft_debug_log_event(
                                                         &app_handle,
+                                                        debug_enabled,
                                                         operation_failure_event,
                                                         Some(&payload),
                                                     );
@@ -1388,8 +1431,9 @@ fn attach_windows_draft_message_handler(
                                                     "status": 0,
                                                     "parsedError": format!("parse-failed: {error}")
                                                 });
-                                                append_draft_app_log_event(
+                                                append_draft_debug_log_event(
                                                     &app_handle,
+                                                    debug_enabled,
                                                     operation_failure_event,
                                                     Some(&payload),
                                                 );
@@ -1691,8 +1735,9 @@ pub async fn delete_deltava_draft_flight_report(
         }
     };
 
-    append_draft_app_log_event(
+    append_draft_debug_log_event(
         &app,
+        debug_enabled,
         "webview-build-started",
         Some(&json!({
             "operation": "delete",
@@ -1743,8 +1788,9 @@ pub async fn delete_deltava_draft_flight_report(
                 state.login_script_sent = true;
             }
 
-            append_draft_app_log_event(
+            append_draft_debug_log_event(
                 &app_for_page_load,
+                debug_enabled,
                 "login-started",
                 Some(&json!({
                     "status": "started"
@@ -1827,8 +1873,8 @@ pub async fn delete_deltava_draft_flight_report(
         String::new(),
         String::new(),
         String::new(),
-        "delete-succeeded",
-        "delete-failed",
+        "delete-response-debug",
+        "delete-failed-debug",
     ) {
         append_draft_delete_failed_stage(&app, "message-handler", &error);
         finish_draft_submit_result(

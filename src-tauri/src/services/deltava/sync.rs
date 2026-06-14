@@ -35,9 +35,20 @@ pub(crate) fn close_deltava_sync_window(app: AppHandle) {
 pub(crate) async fn start_deltava_sync(
     app: AppHandle,
     sync_manager: State<'_, crate::DeltaSyncManager>,
+    sync_run_id: String,
+    debug_enabled: bool,
 ) -> Result<DeltaSyncPayload, String> {
     let _ = initialize_sync_log_path(&app);
     let sync_nonce = new_dva_nonce();
+    let sync_run_id = {
+        let normalized = sync_run_id.trim();
+        if normalized.is_empty() {
+            new_dva_nonce()
+        } else {
+            normalized.to_string()
+        }
+    };
+    let started_at = Instant::now();
     close_deltava_sync_window(app.clone());
 
     let download_path = crate::app::paths::build_download_path(&app)?;
@@ -45,22 +56,28 @@ pub(crate) async fn start_deltava_sync(
     let _ = fs::remove_file(&download_path);
 
     let focus_lost_at = Arc::new(Mutex::new(None::<Instant>));
-    let auth_context = match read_auth_context_internal(&app) {
-        Ok(context) => context,
+    let (auth_context, auth_loaded_from_storage) = match read_auth_context_internal(&app) {
+        Ok(context) => (context, true),
         Err(error) => {
-            append_sync_log(&format!("auth-failed error={error}"));
-            DeltaVirtualAuthContext {
-                settings: Default::default(),
-                password: None,
-            }
+            append_sync_log(&format!(
+                "auth-failed syncRunId={} error={error} stage=credentials",
+                sync_run_id
+            ));
+            (
+                DeltaVirtualAuthContext {
+                    settings: Default::default(),
+                    password: None,
+                },
+                false,
+            )
         }
     };
-    append_sync_log(&format!(
-        "auth-succeeded hasPassword={} firstNameSaved={} lastNameSaved={}",
-        auth_context.settings.has_password,
-        !auth_context.settings.first_name.is_empty(),
-        !auth_context.settings.last_name.is_empty()
-    ));
+    if auth_loaded_from_storage {
+        append_sync_log(&format!(
+            "auth-succeeded syncRunId={} method=saved-credentials",
+            sync_run_id
+        ));
+    }
 
     let login_automation_script =
         crate::services::deltava::login::build_deltava_login_automation_script(
@@ -73,7 +90,10 @@ pub(crate) async fn start_deltava_sync(
 
     let (sender, receiver) = oneshot::channel();
     if let Err(error) = sync_manager.begin(window_factory::DELTAVA_SYNC_LABEL.to_string(), sender) {
-        append_sync_log(&format!("start-rejected error={error}"));
+        append_sync_log(&format!(
+            "start-rejected syncRunId={} error={error}",
+            sync_run_id
+        ));
         return Err(error);
     }
 
@@ -82,6 +102,7 @@ pub(crate) async fn start_deltava_sync(
         webview_data_directory,
         download_path,
         sync_nonce,
+        debug_enabled,
         login_automation_script,
         auto_sync_script,
         focus_lost_at.clone(),
@@ -102,12 +123,27 @@ pub(crate) async fn start_deltava_sync(
     .await
     {
         Ok(Ok(result)) => {
-            window_factory::wait_for_deltava_sync_window_focus_return(&app, &focus_lost_at).await;
+            window_factory::wait_for_deltava_sync_window_focus_return(
+                &app,
+                &focus_lost_at,
+                debug_enabled,
+            )
+            .await;
             result
         }
-        Ok(Err(_)) => Err("download_failed: Delta Virtual sync stopped unexpectedly.".into()),
+        Ok(Err(_)) => {
+            append_sync_log(&format!(
+                "failed syncRunId={} reason=unexpected_receiver stage=receiver",
+                sync_run_id
+            ));
+            Err("download_failed: Delta Virtual sync stopped unexpectedly.".into())
+        }
         Err(_) => {
-            append_sync_log("sync:backend-timeout");
+            append_sync_log(&format!(
+                "failed syncRunId={} reason=backend-timeout stage=timeout durationMs={}",
+                sync_run_id,
+                started_at.elapsed().as_millis()
+            ));
             app.state::<crate::DeltaSyncManager>().finish(
                 window_factory::DELTAVA_SYNC_LABEL,
                 Err(

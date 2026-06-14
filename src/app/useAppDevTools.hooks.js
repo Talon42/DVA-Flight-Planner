@@ -1,9 +1,13 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEV_TOOLS_STORAGE_KEY,
   DEV_WINDOW_WIDTH_STORAGE_KEY
 } from "./appRuntime.js";
 import { logAppError, logAppEvent } from "../services/logging/appLog.client.js";
+import {
+  readSavedDevToolsEnabled as readPersistedDevToolsEnabled,
+  writeSavedDevToolsEnabled
+} from "../services/storage/storage.js";
 import { invokeAppCommand } from "../services/tauri/invoke.client.js";
 
 export const DEV_WINDOW_WIDTH_PRESETS = [
@@ -41,6 +45,33 @@ export function useAppDevTools({ isDesktopAddonScanAvailable, setStatusMessage }
 
   const selectedDevWindowPreset =
     DEV_WINDOW_WIDTH_PRESETS.find((option) => option.width === devWindowWidth) || null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateDevToolsPreference() {
+      try {
+        const persistedValue = await readPersistedDevToolsEnabled();
+        if (!cancelled && typeof persistedValue === "boolean") {
+          setIsDevToolsEnabled(persistedValue);
+        }
+      } catch {
+        // Best-effort only. The browser fallback remains available.
+      }
+    }
+
+    void hydrateDevToolsPreference();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    writeSavedDevToolsEnabled(isDevToolsEnabled).catch(() => {
+      // Persistence is best-effort.
+    });
+  }, [isDevToolsEnabled]);
 
   function handleToggleDevTools() {
     const nextValue = !isDevToolsEnabled;

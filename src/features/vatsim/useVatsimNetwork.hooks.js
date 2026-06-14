@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { buildVatsimAirportCoverage } from "../../domain/vatsim/vatsimCoverage.model.js";
-import { logAppError, logAppEvent } from "../../services/logging/appLog.client.js";
+import {
+  logSystemDebug,
+  logSystemError,
+  logSystemEvent
+} from "../../services/logging/appLog.client.js";
 import { fetchVatsimNetworkData } from "../../services/vatsim/vatsimNetwork.client.js";
 
 export const VATSIM_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
@@ -235,7 +239,7 @@ export function useVatsimNetwork(enabled, refreshVersion = 0) {
   const isFetchingRef = useRef(false);
   const intervalRef = useRef(0);
   const abortControllerRef = useRef(null);
-  const lastLoggedUpdateTimestampRef = useRef("");
+  const lastScheduledSuccessHourRef = useRef("");
   const lastSuccessfulSnapshotRef = useRef(EMPTY_VATSIM_NETWORK);
 
   useEffect(() => {
@@ -256,7 +260,7 @@ export function useVatsimNetwork(enabled, refreshVersion = 0) {
 
     let cancelled = false;
 
-    const refreshVatsimNetwork = async () => {
+    const refreshVatsimNetwork = async (source = "scheduled") => {
       if (isFetchingRef.current) {
         return;
       }
@@ -286,13 +290,30 @@ export function useVatsimNetwork(enabled, refreshVersion = 0) {
           window.__DVA_VATSIM_DEBUG__ = buildVatsimDebugSnapshot(normalizedNetwork);
         }
 
-        if (normalizedNetwork.updateTimestamp !== lastLoggedUpdateTimestampRef.current) {
-          lastLoggedUpdateTimestampRef.current = normalizedNetwork.updateTimestamp;
-          logAppEvent(
-            "vatsim-live-atc-updated",
-            buildVatsimLogSummary(normalizedNetwork)
-          ).catch(() => {});
+        const summary = buildVatsimLogSummary(normalizedNetwork);
+        const successHour = new Date().toISOString().slice(0, 13);
+        const shouldWriteNormalLog =
+          source !== "scheduled" || lastScheduledSuccessHourRef.current !== successHour;
+
+        if (shouldWriteNormalLog) {
+          if (source === "scheduled") {
+            lastScheduledSuccessHourRef.current = successHour;
+          }
+
+          logSystemEvent("VATSIM", "refresh-succeeded", {
+            source,
+            ...summary
+          }).catch(() => {});
         }
+
+        logSystemDebug("VATSIM", "refresh-debug", {
+          source,
+          updateTimestamp: normalizedNetwork.updateTimestamp || "",
+          airportCoverageFeatureCount: summary.airportCoverageFeatureCount,
+          regionalCoverageFeatureCount: summary.regionalCoverageFeatureCount,
+          rawControllerCount: summary.rawControllerCount,
+          normalizedControllerCount: summary.normalizedControllerCount
+        }).catch(() => {});
       } catch (error) {
         if (cancelled || abortController.signal.aborted) {
           return;
@@ -305,7 +326,8 @@ export function useVatsimNetwork(enabled, refreshVersion = 0) {
         setNetworkError(normalizedError);
 
         const lastSnapshot = lastSuccessfulSnapshotRef.current;
-        logAppError("vatsim-live-atc-refresh-failed", normalizedError, {
+        logSystemError("VATSIM", "refresh-failed", normalizedError, {
+          source,
           ...buildVatsimLogSummary(lastSnapshot),
           networkState: lastSuccessfulSnapshotRef.current.airportCount > 0 ? "stale" : "error"
         }).catch(() => {});
@@ -318,7 +340,7 @@ export function useVatsimNetwork(enabled, refreshVersion = 0) {
       }
     };
 
-    void refreshVatsimNetwork();
+    void refreshVatsimNetwork(refreshVersion > 0 ? "manual" : "initial");
     intervalRef.current = window.setInterval(() => {
       void refreshVatsimNetwork();
     }, VATSIM_REFRESH_INTERVAL_MS);

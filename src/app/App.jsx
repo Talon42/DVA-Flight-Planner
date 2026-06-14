@@ -71,6 +71,8 @@ import {
   logAppEvent,
   logSystemError,
   logSystemEvent,
+  getAppSessionId,
+  setDebugLoggingEnabled,
   openAppLogFile
 } from "../services/logging/appLog.client.js";
 import {
@@ -740,7 +742,14 @@ export default function App() {
   }, [isDevToolsEnabled, isDesktopAddonScanAvailable]);
 
   useEffect(() => {
-    logAppEvent("start").catch(() => {});
+    setDebugLoggingEnabled(isDevToolsEnabled);
+  }, [isDevToolsEnabled]);
+
+  useEffect(() => {
+    logAppEvent("start", {
+      appSessionId: getAppSessionId(),
+      version: APP_BUILD_GIT_TAG
+    }).catch(() => {});
   }, []);
 
   useDebouncedEffect(

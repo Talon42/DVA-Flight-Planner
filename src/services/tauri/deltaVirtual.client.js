@@ -41,13 +41,19 @@ function normalizeSyncError(message) {
   return error;
 }
 
-export async function syncScheduleFromDeltaVirtual() {
+export async function syncScheduleFromDeltaVirtual({
+  syncRunId = "",
+  debugEnabled = false
+} = {}) {
   if (!isTauriRuntime()) {
     throw new Error("Delta Virtual sync is only available in the desktop app.");
   }
 
   try {
-    const result = await invokeAppCommand("start_deltava_sync");
+    const result = await invokeAppCommand("start_deltava_sync", {
+      syncRunId: String(syncRunId || "").trim(),
+      debugEnabled: Boolean(debugEnabled)
+    });
     const fileName = result?.fileName ?? result?.file_name;
     const xmlText = result?.xmlText ?? result?.xml_text;
     const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
@@ -92,13 +98,19 @@ export async function resetDeltaVirtualSyncSession() {
   }
 }
 
-export async function syncDeltaVirtualTours() {
+export async function syncDeltaVirtualTours({
+  syncRunId = "",
+  debugEnabled = false
+} = {}) {
   if (!isTauriRuntime()) {
     throw new Error("Delta Virtual tour sync is only available in the desktop app.");
   }
 
   try {
-    const result = await invokeAppCommand("sync_delta_virtual_tours");
+    const result = await invokeAppCommand("sync_delta_virtual_tours", {
+      syncRunId: String(syncRunId || "").trim(),
+      debugEnabled: Boolean(debugEnabled)
+    });
     return {
       ok: Boolean(result?.ok),
       source: String(result?.source || "dva").trim().toLowerCase() || "dva",

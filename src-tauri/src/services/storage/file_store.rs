@@ -9,7 +9,10 @@ use crate::services::deltava::{
     auth::clear_auth_settings_internal,
     sync_types::{DeltaAccomplishmentEligibilityStore, DeltaWebSyncResult},
 };
-use crate::{append_sync_log, DELTAVA_LOGBOOK_FALLBACK_FILE, DELTAVA_SYNC_DOWNLOAD_FILE};
+use crate::{
+    append_sync_log, append_sync_log_debug, DELTAVA_LOGBOOK_FALLBACK_FILE,
+    DELTAVA_SYNC_DOWNLOAD_FILE,
+};
 use chrono::NaiveDate;
 use serde_json::Value;
 use std::{collections::BTreeSet, fs, path::Path};
@@ -485,7 +488,6 @@ fn store_deltava_accomplishment_eligibility(
         .map_err(|error| format!("download_failed: Unable to serialize accomplishment eligibility: {error}"))?;
     fs::write(&path, json)
         .map_err(|error| format!("download_failed: Unable to write accomplishment eligibility: {error}"))?;
-    append_sync_log(&format!("accomplishments:write {}", path.display()));
     Ok(store.clone())
 }
 
@@ -504,7 +506,6 @@ pub(crate) async fn store_logbook_json(
     serde_json::from_str::<Value>(trimmed).map_err(|error| {
         format!("invalid_json: Delta Virtual logbook JSON was invalid: {error}")
     })?;
-    append_sync_log("logbook:json-valid");
 
     let logbook_dir = build_logbook_dir(app)?;
     let file_name = sanitize_logbook_filename(filename_hint);
@@ -521,8 +522,6 @@ pub(crate) async fn store_logbook_json(
         .await
         .map_err(|error| format!("download_failed: Unable to store logbook JSON: {error}"))?;
 
-    append_sync_log(&format!("logbook:write {}", final_path.display()));
-
     Ok(crate::DeltaLogbookArtifact {
         file_name,
         path: final_path.to_string_lossy().into_owned(),
@@ -535,6 +534,7 @@ pub(crate) async fn store_logbook_json(
 pub(crate) async fn build_delta_sync_payload_from_web_result(
     app: &AppHandle,
     result: DeltaWebSyncResult,
+    debug_enabled: bool,
 ) -> Result<crate::DeltaSyncPayload, String> {
     let mut warnings = Vec::new();
 
@@ -559,7 +559,7 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
 
     let logbook_json = if result.logbook.ok {
         let json_text = result.logbook.json_text.unwrap_or_default();
-        append_sync_log("logbook-fetch");
+        append_sync_log_debug(debug_enabled, "logbook-fetch");
         match store_logbook_json(
             app,
             &json_text,
@@ -588,7 +588,10 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         if accomplishments.ok {
             let html_text = accomplishments.html_text.unwrap_or_default();
             let parsed = parse_accomplishment_eligibility_html(&html_text);
-            append_sync_log(&format!("accomplishments:parsed rows={}", parsed.rows.len()));
+            append_sync_log_debug(debug_enabled, &format!(
+                "accomplishments:parsed rows={}",
+                parsed.rows.len()
+            ));
 
             match store_deltava_accomplishment_eligibility(app, &parsed) {
                 Ok(store) => Some(build_accomplishment_eligibility_summary(&store)),

@@ -1,6 +1,11 @@
 import { useCallback, useState } from "react";
 import { DEFAULT_DERIVED_TOUR_PROGRESS } from "../tours/tours.constants.js";
-import { logAppError, logAppEvent, logSystemError, logSystemEvent } from "../../services/logging/appLog.client.js";
+import {
+  createLogRunId,
+  logAppDebug,
+  logSystemError,
+  logSystemEvent
+} from "../../services/logging/appLog.client.js";
 import { readDeltaVirtualCredentials } from "../../services/tauri/deltaVirtualCredentials.client.js";
 import { readDeltaVirtualTourProgress } from "../../services/storage/storage.js";
 import {
@@ -58,57 +63,55 @@ export function useDeltaVirtualSync({
   }, [setDvaHasPassword]);
 
   const reloadTourProgress = useCallback(async () => {
-    if (isDevToolsEnabled) {
-      await logAppEvent("dva-tour-progress-reload-started", {
-        reason: "post-dva-sync"
-      });
-    }
+    await logAppDebug("dva-tour-progress-reload-started", {
+      reason: "post-dva-sync"
+    });
 
     try {
       const reloadedTourProgress = await readDeltaVirtualTourProgress();
       setDerivedTourProgress?.(reloadedTourProgress);
 
-      if (isDevToolsEnabled) {
-        const tourCount = Object.keys(reloadedTourProgress?.tourProgress || {}).length;
-        const completedRowCount = Object.values(reloadedTourProgress?.tourProgress || {}).reduce(
-          (count, tourEntry) => count + Object.keys(tourEntry?.rows || {}).length,
-          0
-        );
+      const tourCount = Object.keys(reloadedTourProgress?.tourProgress || {}).length;
+      const completedRowCount = Object.values(reloadedTourProgress?.tourProgress || {}).reduce(
+        (count, tourEntry) => count + Object.keys(tourEntry?.rows || {}).length,
+        0
+      );
 
-        await logAppEvent("dva-tour-progress-reload-succeeded", {
-          totalDerivedTours: tourCount,
-          totalDerivedCompletedRows: completedRowCount,
-          lastSyncAt: reloadedTourProgress?.lastSyncAt || null
-        });
-      }
+      await logAppDebug("dva-tour-progress-reload-succeeded", {
+        totalDerivedTours: tourCount,
+        totalDerivedCompletedRows: completedRowCount,
+        lastSyncAt: reloadedTourProgress?.lastSyncAt || null
+      });
     } catch (error) {
       setDerivedTourProgress?.(DEFAULT_DERIVED_TOUR_PROGRESS);
-      if (isDevToolsEnabled) {
-        await logAppError("dva-tour-progress-reload-failed", error);
-      }
+      await logAppDebug("dva-tour-progress-reload-failed", {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
-  }, [isDevToolsEnabled, setDerivedTourProgress]);
+  }, [setDerivedTourProgress]);
 
   const reloadAccomplishmentEligibility = useCallback(async () => {
     const eligibility = await readDeltaVirtualAccomplishmentEligibility();
     setDeltaVirtualAccomplishmentEligibility?.(eligibility);
 
-    if (isDevToolsEnabled) {
-      const count = Array.isArray(eligibility?.rows) ? eligibility.rows.length : 0;
-      const achievedCount = (eligibility?.rows || []).filter((row) => Boolean(row?.achieved)).length;
+    const count = Array.isArray(eligibility?.rows) ? eligibility.rows.length : 0;
+    const achievedCount = (eligibility?.rows || []).filter((row) => Boolean(row?.achieved)).length;
 
-      await logAppEvent("dva-accomplishment-eligibility-reload-succeeded", {
-        count,
-        achievedCount,
-        incompleteCount: Math.max(count - achievedCount, 0),
-        sourceUrl: eligibility?.sourceUrl || null,
-        lastSyncAt: eligibility?.lastSyncAt || null
-      });
-    }
-  }, [isDevToolsEnabled, setDeltaVirtualAccomplishmentEligibility]);
+    await logAppDebug("dva-accomplishment-eligibility-reload-succeeded", {
+      count,
+      achievedCount,
+      incompleteCount: Math.max(count - achievedCount, 0),
+      sourceUrl: eligibility?.sourceUrl || null,
+      lastSyncAt: eligibility?.lastSyncAt || null
+    });
+  }, [setDeltaVirtualAccomplishmentEligibility]);
 
   const handleDeltaVirtualSync = useCallback(async () => {
-    await logSystemEvent("DVA Sync", "started");
+    const syncRunId = createLogRunId("sync");
+    const syncStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+    await logSystemEvent("DVA Sync", "started", {
+      syncRunId
+    });
 
     const hasSavedDeltaVirtualCredentials =
       Boolean(String(dvaFirstName || "").trim()) &&
@@ -130,7 +133,7 @@ export function useDeltaVirtualSync({
         "DVA Sync",
         "failed",
         new Error("Delta Virtual login settings are not saved."),
-        { reason: "missing-credentials" }
+        { syncRunId, reason: "missing-credentials", stage: "credentials" }
       );
       return;
     }
@@ -143,7 +146,7 @@ export function useDeltaVirtualSync({
     try {
       setStatusMessage?.("Syncing data from Delta Virtual.");
       const syncedFile = await withTimeout(
-        syncScheduleFromDeltaVirtual(),
+        syncScheduleFromDeltaVirtual({ syncRunId, debugEnabled: isDevToolsEnabled }),
         DELTA_VIRTUAL_SYNC_TIMEOUT_MS,
         () => {
           const error = new Error("Delta Virtual Sync timed out after 30 seconds.");
@@ -152,10 +155,17 @@ export function useDeltaVirtualSync({
         }
       );
       await logSystemEvent("DVA Sync", "succeeded", {
+        syncRunId,
         file: syncedFile.fileName,
         bytes: syncedFile.xmlText?.length || 0,
         logbookJson: syncedFile.logbookJson?.fileName || null,
-        warningCount: Array.isArray(syncedFile.warnings) ? syncedFile.warnings.length : 0
+        warningCount: Array.isArray(syncedFile.warnings) ? syncedFile.warnings.length : 0,
+        durationMs: Math.max(
+          0,
+          Math.round(
+            (typeof performance !== "undefined" ? performance.now() : Date.now()) - syncStartedAt
+          )
+        )
       });
       setStatusMessage?.("Processing Delta Virtual schedule...");
       await processImportedSchedule?.(syncedFile, "deltava-sync");
@@ -168,11 +178,15 @@ export function useDeltaVirtualSync({
       }
       setStatusMessage?.("Syncing Delta Virtual tours...");
       try {
-        const tourSyncResult = await syncDeltaVirtualTours();
+        const tourSyncResult = await syncDeltaVirtualTours({
+          syncRunId,
+          debugEnabled: isDevToolsEnabled
+        });
         setDeltaVirtualToursCache?.(tourSyncResult);
 
         if (tourSyncResult.ok) {
           await logSystemEvent("DVA Tours Sync", "succeeded", {
+            syncRunId,
             totalListTours: tourSyncResult.totalListTours,
             candidateTours: tourSyncResult.candidateTours,
             syncedTours: tourSyncResult.syncedTours,
@@ -181,6 +195,7 @@ export function useDeltaVirtualSync({
           setStatusMessage?.(tourSyncResult.message || "Delta Virtual tours synced.");
         } else if (tourSyncResult.syncedTours > 0) {
           await logSystemEvent("DVA Tours Sync", "succeeded", {
+            syncRunId,
             partial: true,
             totalListTours: tourSyncResult.totalListTours,
             candidateTours: tourSyncResult.candidateTours,
@@ -194,6 +209,7 @@ export function useDeltaVirtualSync({
             "failed",
             new Error(tourSyncResult.message || "Delta Virtual tours sync failed."),
             {
+              syncRunId,
               totalListTours: tourSyncResult.totalListTours,
               candidateTours: tourSyncResult.candidateTours,
               syncedTours: tourSyncResult.syncedTours,
@@ -204,7 +220,10 @@ export function useDeltaVirtualSync({
         }
       } catch (error) {
         setStatusMessage?.(error.message || "Delta Virtual tours sync failed.");
-        await logSystemError("DVA Tours Sync", "failed", error);
+        await logSystemError("DVA Tours Sync", "failed", error, {
+          syncRunId,
+          stage: "tours"
+        });
       }
 
       await reloadTourProgress();
@@ -213,6 +232,7 @@ export function useDeltaVirtualSync({
       if (error?.kind === "cancelled") {
         setStatusMessage?.("Delta Virtual sync canceled.");
         await logSystemEvent("DVA Sync", "failed", {
+          syncRunId,
           reason: "cancelled"
         });
       } else if (error?.kind === "auth_failed") {
@@ -227,7 +247,9 @@ export function useDeltaVirtualSync({
           primaryLabel: "Open Delta Virtual Settings"
         });
         await logSystemError("DVA Sync", "failed", error, {
-          reason: "auth_failed"
+          syncRunId,
+          reason: "auth_failed",
+          stage: "auth"
         });
       } else if (error?.kind === "partial_success") {
         setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());
@@ -235,9 +257,16 @@ export function useDeltaVirtualSync({
         await refreshSavedCredentials();
         setStatusMessage?.(error.message || "Delta Virtual sync partially completed.");
         await logSystemEvent("DVA Sync", "succeeded", {
+          syncRunId,
           partial: true,
           logbookJson: error.syncResult?.logbookJson?.fileName || null,
-          warningCount: Array.isArray(error.syncResult?.warnings) ? error.syncResult.warnings.length : 0
+          warningCount: Array.isArray(error.syncResult?.warnings) ? error.syncResult.warnings.length : 0,
+          durationMs: Math.max(
+            0,
+            Math.round(
+              (typeof performance !== "undefined" ? performance.now() : Date.now()) - syncStartedAt
+            )
+          )
         });
       } else if (error?.kind === "sync_timeout") {
         shouldResetSyncSession = true;
@@ -254,8 +283,10 @@ export function useDeltaVirtualSync({
         });
         await closeDeltaVirtualSyncWindow();
         await logSystemError("DVA Sync", "failed", error, {
+          syncRunId,
           reason: "sync_timeout",
-          timeoutMs: DELTA_VIRTUAL_SYNC_TIMEOUT_MS
+          timeoutMs: DELTA_VIRTUAL_SYNC_TIMEOUT_MS,
+          stage: "sync"
         });
       } else {
         const message = error?.message || "Delta Virtual sync failed.";
@@ -267,7 +298,10 @@ export function useDeltaVirtualSync({
           primaryAction: "open_delta_virtual_settings",
           primaryLabel: "Open Delta Virtual Settings"
         });
-        await logSystemError("DVA Sync", "failed", error);
+        await logSystemError("DVA Sync", "failed", error, {
+          syncRunId,
+          stage: "unknown"
+        });
       }
     } finally {
       await closeDeltaVirtualSyncWindow();
@@ -275,7 +309,9 @@ export function useDeltaVirtualSync({
         try {
           await resetDeltaVirtualSyncSession();
         } catch (resetError) {
-          await logSystemError("DVA Sync Reset", "failed", resetError);
+          await logSystemError("DVA Sync Reset", "failed", resetError, {
+            syncRunId
+          });
         }
       }
       await pruneDeltaVirtualStorage(shouldRemoveDownloadedSchedule);
@@ -285,6 +321,7 @@ export function useDeltaVirtualSync({
     dvaFirstName,
     dvaHasPassword,
     dvaLastName,
+    isDevToolsEnabled,
     processImportedSchedule,
     onScheduleSyncComplete,
     refreshSavedCredentials,

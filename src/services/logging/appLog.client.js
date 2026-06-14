@@ -1,7 +1,27 @@
 import { appendImportLog, openImportLog } from "../storage/storage.js";
 
+let debugLoggingEnabled = false;
+let appSessionId = null;
+let lastLoggedAppStartSessionId = "";
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function createRandomToken(length = 10) {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(length);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+  }
+
+  return Array.from({ length }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+}
+
+function buildSessionId(prefix) {
+  return `${prefix}-${createRandomToken(12)}`;
 }
 
 function normalizeError(error) {
@@ -38,6 +58,10 @@ function shouldRedactKey(key) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "");
 
+  if (normalized === "appsessionid") {
+    return false;
+  }
+
   return [
     "password",
     "cookie",
@@ -48,7 +72,22 @@ function shouldRedactKey(key) {
     "setcookie",
     "credential",
     "secret"
-  ].some((redactedKey) => normalized === redactedKey);
+  ].some((redactedKey) => normalized.includes(redactedKey));
+}
+
+function sanitizeStructuredValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeStructuredValue(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value).reduce((accumulator, [key, entry]) => {
+      accumulator[key] = shouldRedactKey(key) ? "[REDACTED]" : sanitizeStructuredValue(entry);
+      return accumulator;
+    }, {});
+  }
+
+  return value;
 }
 
 function formatStringValue(value) {
@@ -64,7 +103,7 @@ function formatStringValue(value) {
 
 function formatComplexValue(value) {
   try {
-    return truncateText(JSON.stringify(value), 220);
+    return truncateText(JSON.stringify(sanitizeStructuredValue(value)), 220);
   } catch {
     return JSON.stringify(String(value));
   }
@@ -116,6 +155,22 @@ function formatValue(value) {
 }
 
 export async function logSystemEvent(subsystem, event, data = null) {
+  if (subsystem === "App" && event === "start") {
+    const sessionId = String(data?.appSessionId || "").trim();
+    if (sessionId && sessionId === lastLoggedAppStartSessionId) {
+      return;
+    }
+    if (sessionId) {
+      lastLoggedAppStartSessionId = sessionId;
+    }
+  }
+
+  const suffix = formatData(data);
+  const line = `[${nowIso()}] [${subsystem}] ${event}${suffix ? ` ${suffix}` : ""}`;
+  await appendImportLog(line);
+}
+
+export async function logSystemWarn(subsystem, event, data = null) {
   const suffix = formatData(data);
   const line = `[${nowIso()}] [${subsystem}] ${event}${suffix ? ` ${suffix}` : ""}`;
   await appendImportLog(line);
@@ -131,12 +186,47 @@ export async function logSystemError(subsystem, event, error, data = null) {
   await appendImportLog(line);
 }
 
+export async function logSystemDebug(subsystem, event, data = null) {
+  if (!debugLoggingEnabled) {
+    return;
+  }
+
+  const suffix = formatData(data);
+  const line = `[${nowIso()}] [${subsystem}] ${event}${suffix ? ` ${suffix}` : ""}`;
+  await appendImportLog(line);
+}
+
 export async function logAppEvent(event, data = null) {
   return logSystemEvent("App", event, data);
 }
 
+export async function logAppWarn(event, data = null) {
+  return logSystemWarn("App", event, data);
+}
+
 export async function logAppError(event, error, data = null) {
   return logSystemError("App", event, error, data);
+}
+
+export async function logAppDebug(event, data = null) {
+  return logSystemDebug("App", event, data);
+}
+
+export function setDebugLoggingEnabled(enabled) {
+  debugLoggingEnabled = Boolean(enabled);
+}
+
+export function getAppSessionId() {
+  if (!appSessionId) {
+    appSessionId = buildSessionId("app");
+  }
+
+  return appSessionId;
+}
+
+export function createLogRunId(prefix) {
+  const normalizedPrefix = String(prefix || "run").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") || "run";
+  return `${normalizedPrefix}-${createRandomToken(10)}`;
 }
 
 export async function openAppLogFile() {

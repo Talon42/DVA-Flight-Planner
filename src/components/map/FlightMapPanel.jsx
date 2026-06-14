@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../ui/Button";
 import { cn } from "../ui/cn";
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
-import { logAppError, logAppEvent } from "../../services/logging/appLog.client.js";
+import { logAppDebug, logAppError, logAppEvent } from "../../services/logging/appLog.client.js";
 import { MAP_MODE_OPTIONS, resolveMapModeConfig } from "./mapModes";
 import FlightMapView from "./FlightMapView";
 
@@ -440,6 +440,10 @@ export default function FlightMapPanel({
 
     if (hasRenderedRoute) {
       logAppEvent("simbrief-route-rendered", {
+        flight: selectedEntry.flightId || selectedEntry.linkedFlightId || "",
+        route: `${selectedEntry.from || ""}-${selectedEntry.to || ""}`
+      }).catch(() => {});
+      logAppDebug("simbrief-route-rendered-debug", {
         boardEntryId: selectedEntry.boardEntryId,
         flightId: selectedEntry.flightId || selectedEntry.linkedFlightId || ""
       }).catch(() => {});

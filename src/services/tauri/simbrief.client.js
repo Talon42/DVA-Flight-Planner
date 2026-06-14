@@ -70,13 +70,16 @@ export function buildSimBriefDispatchOptions() {
   return buildDvaAircraftOptions();
 }
 
-export async function startSimBriefDispatch(payload) {
+export async function startSimBriefDispatch(payload, { debugEnabled = false } = {}) {
   if (!isTauriRuntime()) {
     throw new Error("SimBrief dispatch is only available in the desktop app.");
   }
 
   try {
-    return await invokeAppCommand("start_simbrief_dispatch", { payload });
+    return await invokeAppCommand("start_simbrief_dispatch", {
+      payload,
+      debugEnabled: Boolean(debugEnabled)
+    });
   } catch (error) {
     if (error instanceof Error) {
       throw normalizeSimBriefError(error.message);
@@ -86,13 +89,16 @@ export async function startSimBriefDispatch(payload) {
   }
 }
 
-export async function refreshSimBriefDispatch(payload) {
+export async function refreshSimBriefDispatch(payload, { debugEnabled = false } = {}) {
   if (!isTauriRuntime()) {
     throw new Error("SimBrief refresh is only available in the desktop app.");
   }
 
   try {
-    return await invokeAppCommand("refresh_simbrief_dispatch", { payload });
+    return await invokeAppCommand("refresh_simbrief_dispatch", {
+      payload,
+      debugEnabled: Boolean(debugEnabled)
+    });
   } catch (error) {
     if (error instanceof Error) {
       throw normalizeSimBriefError(error.message);

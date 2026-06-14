@@ -181,6 +181,14 @@ pub(crate) fn append_sync_log(message: &str) {
     let _ = append_app_log_to_path(&log_path, "DVA Sync", message);
 }
 
+pub(crate) fn append_sync_log_debug(debug_enabled: bool, message: &str) {
+    if !debug_enabled {
+        return;
+    }
+
+    append_sync_log(message);
+}
+
 pub(crate) fn append_app_log_text(app: &AppHandle, text: &str) -> Result<(), String> {
     let log_path = resolve_app_log_path(app)?;
     append_app_log_text_to_path(&log_path, text)

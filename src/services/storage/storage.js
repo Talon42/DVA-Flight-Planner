@@ -1,6 +1,7 @@
 import {
   IMPORT_LOG_FILE,
   GETTING_STARTED_STATE_FILE,
+  DEV_TOOLS_STATE_FILE,
   SAVED_SCHEDULE_FILE,
   SIMBRIEF_SETTINGS_FILE,
   UI_STATE_FILE,
@@ -370,6 +371,10 @@ function buildNextLogText(existingText, incomingText) {
   const separator = existing && !existing.endsWith("\n") ? "\n" : "";
   const combined = `${existing}${separator}${incoming}\n`;
   return trimLogTextToLimit(combined, BROWSER_LOG_SIZE_LIMIT_BYTES);
+}
+
+function normalizePersistedBoolean(value) {
+  return typeof value === "boolean" ? value : null;
 }
 
 function uint8ArrayToBase64(bytes) {
@@ -743,6 +748,60 @@ export async function writeSavedUiState(uiState) {
   }
 
   window.localStorage.setItem("flight-planner.ui-state", serialized);
+}
+
+export async function readSavedDevToolsEnabled() {
+  if (isTauriRuntime()) {
+    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
+    const hasFile = await exists(DEV_TOOLS_STATE_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+
+    if (!hasFile) {
+      return null;
+    }
+
+    const text = await readTextFile(DEV_TOOLS_STATE_FILE, {
+      baseDir: BaseDirectory.AppData
+    });
+    if (!text) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(text);
+      return normalizePersistedBoolean(parsed?.enabled);
+    } catch (error) {
+      await quarantineCorruptStorageFile(DEV_TOOLS_STATE_FILE, "dev tools state");
+      logCorruptStorageFileOnce("dev tools state", DEV_TOOLS_STATE_FILE, error);
+      return null;
+    }
+  }
+
+  const text = window.localStorage.getItem("flight-planner.dev-tools-enabled");
+  if (text === "true") {
+    return true;
+  }
+  if (text === "false") {
+    return false;
+  }
+
+  return null;
+}
+
+export async function writeSavedDevToolsEnabled(enabled) {
+  const serialized = JSON.stringify({ enabled: Boolean(enabled) });
+
+  if (isTauriRuntime()) {
+    const { writeTextFile, BaseDirectory } = await loadFsModule();
+    await ensureAppDataRoot();
+    await writeTextFile(DEV_TOOLS_STATE_FILE, serialized, {
+      baseDir: BaseDirectory.AppData
+    });
+    return;
+  }
+
+  window.localStorage.setItem("flight-planner.dev-tools-enabled", enabled ? "true" : "false");
 }
 
 export async function readSimBriefSettings() {
