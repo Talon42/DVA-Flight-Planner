@@ -10,6 +10,7 @@ const airlineIcaoByName = new Map();
 const airlineIcaoByIata = new Map();
 const airlineLogoByIcao = new Map();
 const airlineNameByIata = new Map();
+const darkModeWhiteLogoIcaos = new Set(["AMX", "KAL", "SAS", "SBS"]);
 const airlineLogoOverridesByName = new Map([
   ["DELTA HISTORIC", "DAL-H"],
   ["NORTH CENTRAL AIRLINES", "NCA"],
@@ -128,6 +129,12 @@ export function getAirlineLogo({ airlineName, airlineIata, airlineIcao }) {
   const resolvedIcao = resolveAirlineLogoIcao({ airlineName, airlineIata, airlineIcao });
 
   return resolvedIcao ? airlineLogoByIcao.get(resolvedIcao) || "" : "";
+}
+
+// Returns targeted logo styling overrides for carriers that need better contrast in dark mode.
+export function getAirlineLogoClassName({ airlineName, airlineIata, airlineIcao }) {
+  const resolvedIcao = resolveAirlineLogoIcao({ airlineName, airlineIata, airlineIcao });
+  return darkModeWhiteLogoIcaos.has(resolvedIcao) ? "dark:brightness-0 dark:invert" : "";
 }
 
 export function getAirlineNameByIata(airlineIata) {

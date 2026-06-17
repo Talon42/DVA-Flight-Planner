@@ -1,5 +1,5 @@
 import { formatDistanceNm, formatDuration, formatTimeOnly } from "../../domain/formatting/formatters.js";
-import { getAirlineLogo } from "../../domain/airlines/airlineBranding.js";
+import { getAirlineLogo, getAirlineLogoClassName } from "../../domain/airlines/airlineBranding.js";
 import { isAirportCoveredByVatsim } from "../../domain/vatsim/vatsimCoverage.js";
 import { cn } from "../ui/cn";
 import { bodyMdTextClassName } from "../ui/typography";
@@ -136,12 +136,17 @@ export function AirlineCell({ flight }) {
     airlineIata: flight?.airline,
     airlineIcao: flight?.airlineIcao
   });
+  const logoClassName = getAirlineLogoClassName({
+    airlineName,
+    airlineIata: flight?.airline,
+    airlineIcao: flight?.airlineIcao
+  });
 
   return (
     <span className={cn(BODY_CELL_CONTENT_CLASS, "min-w-0 gap-2 whitespace-nowrap")}>
       {logoSrc ? (
         <img
-          className="h-5 w-5 shrink-0 object-contain"
+          className={cn("h-5 w-5 shrink-0 object-contain", logoClassName)}
           src={logoSrc}
           alt=""
           aria-hidden="true"
