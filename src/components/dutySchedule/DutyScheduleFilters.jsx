@@ -1,6 +1,9 @@
 // Duty Schedule filters keep the feature-specific UI out of FilterBar.jsx.
 import { useEffect, useMemo, useState } from "react";
-import { buildAirportCatalogOptions } from "../../domain/airports/airportCatalog.js";
+import {
+  buildAirportCatalogOptions,
+  resolveAirportCodeToIcao
+} from "../../domain/airports/airportCatalog.js";
 import { buildAircraftProfileSelectOptions } from "../../domain/aircraft/aircraftCatalog.js";
 import { buildAirlineSelectOption, useTransientRangeSlider } from "../ui/filterFields";
 import DutyScheduleFilterPanel from "../../features/dutySchedule/DutyScheduleFilterPanel.jsx";
@@ -67,7 +70,7 @@ export default function DutyScheduleFilters({
             value: airport.icao,
             label: airport.name,
             selectedLabel: airport.name,
-            keywords: `${airport.icao} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
+            keywords: `${airport.icao} ${airport.iata} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
           }))
       ),
     [dutyOriginAirportOptions]
@@ -103,10 +106,10 @@ export default function DutyScheduleFilters({
     dutyFilters.selectedOriginAirport || ""
   );
   const resolvedOriginAirportSelection = useMemo(() => {
-    const normalizedInput = String(originAirportInput || "").trim().toUpperCase();
-    if (normalizedInput) {
+    const resolvedIcao = resolveAirportCodeToIcao(originAirportInput);
+    if (resolvedIcao) {
       const exactMatch = dutyOriginAirportSelectOptions.find(
-        (option) => String(option.value || "").trim().toUpperCase() === normalizedInput
+        (option) => String(option.value || "").trim().toUpperCase() === resolvedIcao
       );
 
       if (exactMatch) {

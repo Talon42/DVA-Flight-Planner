@@ -42,7 +42,7 @@ export default function AccomplishmentSelectorPanel({
   }
 
   function handlePanelClick(event) {
-    if (event.target.closest("button, a, input, select, textarea")) {
+    if (event.target.closest("button, a, input, select, textarea, [role='button']")) {
       return;
     }
 
@@ -51,6 +51,10 @@ export default function AccomplishmentSelectorPanel({
 
   function handlePanelKeyDown(event) {
     if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    if (event.target.closest("button, a, input, select, textarea, [role='button']")) {
       return;
     }
 
@@ -67,11 +71,7 @@ export default function AccomplishmentSelectorPanel({
       onKeyDown={handlePanelKeyDown}
       className={cn(
         "flex min-h-0 flex-col rounded-none border-2 border-[rgba(160,180,202,0.52)] bg-[rgba(14,28,48,0.98)] p-4 dark:border-[color:var(--surface-border)]",
-        isFullHeight
-          ? "h-full overflow-hidden"
-          : isCollapsed
-            ? "max-h-[min(44vh,420px)] overflow-hidden"
-            : "max-h-[min(44vh,420px)] overflow-hidden"
+        isFullHeight ? "h-full overflow-hidden" : "max-h-[min(44vh,420px)] overflow-hidden"
       )}
     >
       <SectionHeader
@@ -127,20 +127,27 @@ export default function AccomplishmentSelectorPanel({
                       title={accomplishment.name}
                       onClick={() => onSelectAccomplishmentName?.(accomplishment.name)}
                     >
-                      <div className="flex min-w-0 items-center justify-between gap-3 pr-16">
-                        <span className={cn("min-w-0 truncate", bodyMdTextClassName, "text-[var(--text-heading)]")}>
-                          {accomplishment.name}
-                        </span>
-                        {accomplishment.isCompleted ? (
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2">
-                            <AccomplishmentStatusBadge label="Completed" />
+                      {/* Keeps the title text and status badge in normal layout flow so they never overlap. */}
+                      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1">
+                        <div className="grid min-w-0 gap-1">
+                          <span
+                            className={cn(
+                              "min-w-0 truncate",
+                              bodyMdTextClassName,
+                              "text-[var(--text-heading)]"
+                            )}
+                          >
+                            {accomplishment.name}
                           </span>
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className={cn("min-w-0 truncate", bodySmTextClassName)}>
+                              {completedLabel}
+                            </span>
+                          </div>
+                        </div>
+                        {accomplishment.isCompleted ? (
+                          <AccomplishmentStatusBadge label="Completed" />
                         ) : null}
-                      </div>
-                      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className={cn("min-w-0 truncate", bodySmTextClassName)}>
-                          {completedLabel}
-                        </span>
                       </div>
                     </button>
                   );

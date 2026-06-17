@@ -1,4 +1,5 @@
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
+import { supportsFlightByBasicAircraftFilterLimits } from "../../domain/aircraft/aircraftCatalog.js";
 import { matchesLocalTimeWindow } from "../../domain/time/clock";
 import { matchesVatsimCoverageMode } from "../../domain/vatsim/vatsimCoverage.js";
 
@@ -129,7 +130,9 @@ export function selectFilteredScheduleFlights({
 
     if (
       filters.equipment.length &&
-      !filters.equipment.some((equipment) => (flight.compatibleEquipment || []).includes(equipment))
+      !filters.equipment.every((equipment) =>
+        supportsFlightByBasicAircraftFilterLimits(flight, equipment)
+      )
     ) {
       return false;
     }

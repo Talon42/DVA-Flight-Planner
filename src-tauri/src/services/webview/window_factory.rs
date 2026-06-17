@@ -10,6 +10,7 @@ use crate::services::deltava::sync_types::{
     DeltaWebDebugMessage, DeltaWebSyncResult, DeltaWebXmlCaptureMessage,
 };
 use crate::{
+    app::state::DeltaSyncFinishOutcome,
     append_sync_log, append_sync_log_debug, services::storage::file_store, DeltaSyncManager,
     DeltaSyncPayload, DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_DOWNLOAD_FILE,
     DELTAVA_SYNC_RESULT_MESSAGE_PREFIX, DELTAVA_XML_MESSAGE_PREFIX,
@@ -19,6 +20,12 @@ pub(crate) const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
 const DELTAVA_LOGIN_URL: &str = "https://www.deltava.org/login.do";
 const DELTAVA_FOCUS_LOSS_RECENT_WINDOW_MILLIS: u64 = 3000;
 const DELTAVA_CLOSE_AFTER_PROMPT_WAIT_SECONDS: u64 = 30;
+
+fn log_ignored_finish(source: &str, outcome: DeltaSyncFinishOutcome) {
+    append_sync_log(&format!(
+        "DVA sync finish ignored: source={source} outcome={outcome:?}"
+    ));
+}
 
 fn is_allowed_deltava_url(url: &tauri::webview::Url) -> bool {
     url.scheme() == "https" && url.domain() == Some("www.deltava.org")
@@ -43,9 +50,12 @@ pub(crate) fn close_deltava_sync_window(app: &AppHandle) {
 async fn wait_for_sync_window_focus_return(
     app: &AppHandle,
     focus_lost_at: &Arc<Mutex<Option<Instant>>>,
-    debug_enabled: bool,
+    _debug_enabled: bool,
 ) {
+    append_sync_log("sync-focus-return-started");
+
     let Some(window) = app.get_webview_window(DELTAVA_SYNC_LABEL) else {
+        append_sync_log("sync-focus-return-succeeded reason=window-missing");
         return;
     };
 
@@ -59,33 +69,44 @@ async fn wait_for_sync_window_focus_return(
         .unwrap_or(false);
 
     if !recently_lost_focus {
+        append_sync_log("sync-focus-return-succeeded reason=no-recent-focus-loss");
         return;
     }
 
-    append_sync_log_debug(debug_enabled, "sync:waiting-for-focus-return");
     let deadline =
         tokio::time::Instant::now() + Duration::from_secs(DELTAVA_CLOSE_AFTER_PROMPT_WAIT_SECONDS);
 
     loop {
         if tokio::time::Instant::now() >= deadline {
-            append_sync_log_debug(debug_enabled, "sync:focus-return-timeout");
+            append_sync_log("sync-focus-return-failed reason=timeout");
             break;
         }
 
         match window.is_focused() {
             Ok(true) => {
-                append_sync_log_debug(debug_enabled, "sync:focus-returned");
+                append_sync_log("sync-focus-return-succeeded");
                 break;
             }
             Ok(false) => {}
             Err(error) => {
-                append_sync_log_debug(debug_enabled, &format!("sync:focus-check-failed {error}"));
+                append_sync_log(&format!("sync-focus-return-failed error={error}"));
                 break;
             }
         }
 
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
+}
+
+/// Runs the Delta sync focus cleanup in the background so sync result delivery never blocks.
+pub(crate) fn spawn_deltava_sync_focus_return_cleanup(
+    app: AppHandle,
+    focus_lost_at: Arc<Mutex<Option<Instant>>>,
+    debug_enabled: bool,
+) {
+    tauri::async_runtime::spawn(async move {
+        wait_for_sync_window_focus_return(&app, &focus_lost_at, debug_enabled).await;
+    });
 }
 
 #[cfg(windows)]
@@ -185,10 +206,13 @@ fn attach_windows_xml_message_handler(
                                                         .as_deref()
                                                         .unwrap_or("Delta Virtual login failed.");
                                                     append_sync_log(&format!("auth-failed error={reason}"));
-                                                    app_handle.state::<DeltaSyncManager>().finish(
+                                                    let outcome = app_handle.state::<DeltaSyncManager>().finish(
                                                         DELTAVA_SYNC_LABEL,
                                                         Err(format!("auth_failed: {reason}")),
                                                     );
+                                                    if outcome != DeltaSyncFinishOutcome::Completed {
+                                                        log_ignored_finish("web-result", outcome);
+                                                    }
                                                     close_deltava_sync_window(&app_handle);
                                                 }
                                             }
@@ -220,14 +244,18 @@ fn attach_windows_xml_message_handler(
                                         )),
                                     };
                                     if result.is_ok() {
+                                        append_sync_log("sync-result-ready");
                                         append_sync_log_debug(debug_enabled, "succeeded stage=sync-result");
                                     } else {
                                         append_sync_log_debug(debug_enabled, "failed stage=sync-result");
                                     }
 
-                                    app_handle
+                                    let outcome = app_handle
                                         .state::<DeltaSyncManager>()
                                         .finish(DELTAVA_SYNC_LABEL, result);
+                                    if outcome != DeltaSyncFinishOutcome::Completed {
+                                        log_ignored_finish("web-result", outcome);
+                                    }
                                 });
                                 return Ok(());
                             }
@@ -276,9 +304,12 @@ fn attach_windows_xml_message_handler(
                                         append_sync_log("failed stage=xml-capture");
                                     }
 
-                                    app_handle
+                                    let outcome = app_handle
                                         .state::<DeltaSyncManager>()
                                         .finish(DELTAVA_SYNC_LABEL, result);
+                                    if outcome != DeltaSyncFinishOutcome::Completed {
+                                        log_ignored_finish("xml-capture", outcome);
+                                    }
                                 });
                             }
 
@@ -419,20 +450,25 @@ pub(crate) fn build_deltava_sync_window(
                         Err("download_failed: Delta Virtual schedule download did not complete.".into())
                     };
 
-                    if let Ok(metadata) = tokio::fs::metadata(&resolved_path).await {
-                        append_sync_log(&format!(
-                            "schedule-fetch-succeeded source=download bytes={}",
-                            metadata.len()
-                        ));
-                    } else if result.is_ok() {
-                        append_sync_log("schedule-fetch-succeeded source=download bytes=0");
+                    if result.is_ok() {
+                        if let Ok(metadata) = tokio::fs::metadata(&resolved_path).await {
+                            append_sync_log(&format!(
+                                "schedule-fetch-succeeded source=download bytes={}",
+                                metadata.len()
+                            ));
+                        } else {
+                            append_sync_log("schedule-fetch-succeeded source=download bytes=0");
+                        }
                     } else {
                         append_sync_log("failed");
                     }
 
-                    app_handle
+                    let outcome = app_handle
                         .state::<DeltaSyncManager>()
                         .finish(DELTAVA_SYNC_LABEL, result);
+                    if outcome != DeltaSyncFinishOutcome::Completed {
+                        log_ignored_finish("download", outcome);
+                    }
                 });
 
                 true
@@ -470,21 +506,16 @@ pub(crate) fn build_deltava_sync_window(
             }
         }
         WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
-            app_for_close.state::<DeltaSyncManager>().finish(
+            let outcome = app_for_close.state::<DeltaSyncManager>().finish(
                 DELTAVA_SYNC_LABEL,
                 Err("cancelled: Delta Virtual sync window was closed before the XML was downloaded.".into()),
             );
+            if outcome != DeltaSyncFinishOutcome::Completed {
+                log_ignored_finish("window-close", outcome);
+            }
         }
         _ => {}
     });
 
     Ok(window)
-}
-
-pub(crate) async fn wait_for_deltava_sync_window_focus_return(
-    app: &AppHandle,
-    focus_lost_at: &Arc<Mutex<Option<Instant>>>,
-    debug_enabled: bool,
-) {
-    wait_for_sync_window_focus_return(app, focus_lost_at, debug_enabled).await;
 }

@@ -3,6 +3,15 @@ use std::sync::Mutex;
 use super::super::DeltaSyncPayload;
 use tokio::sync::oneshot;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DeltaSyncFinishOutcome {
+    Completed,
+    NoActiveSession,
+    LabelMismatch,
+    LockFailed,
+    ReceiverDropped,
+}
+
 #[derive(Default)]
 pub(crate) struct DeltaSyncManager {
     active: Mutex<Option<ActiveDeltaSync>>,
@@ -32,22 +41,27 @@ impl DeltaSyncManager {
         Ok(())
     }
 
-    pub(crate) fn finish(&self, label: &str, result: Result<DeltaSyncPayload, String>) {
-        let sender = self
-            .active
-            .lock()
-            .ok()
-            .and_then(|mut active| match active.take() {
-                Some(session) if session.label == label => Some(session.sender),
+    // Resolves the active sync session and reports why late finish attempts were ignored.
+    pub(crate) fn finish(
+        &self,
+        label: &str,
+        result: Result<DeltaSyncPayload, String>,
+    ) -> DeltaSyncFinishOutcome {
+        let sender = match self.active.lock() {
+            Ok(mut active) => match active.take() {
+                Some(session) if session.label == label => session.sender,
                 Some(session) => {
                     *active = Some(session);
-                    None
+                    return DeltaSyncFinishOutcome::LabelMismatch;
                 }
-                None => None,
-            });
+                None => return DeltaSyncFinishOutcome::NoActiveSession,
+            },
+            Err(_) => return DeltaSyncFinishOutcome::LockFailed,
+        };
 
-        if let Some(sender) = sender {
-            let _ = sender.send(result);
+        match sender.send(result) {
+            Ok(()) => DeltaSyncFinishOutcome::Completed,
+            Err(_) => DeltaSyncFinishOutcome::ReceiverDropped,
         }
     }
 }

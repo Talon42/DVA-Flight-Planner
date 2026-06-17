@@ -13,11 +13,13 @@ function TourStatusBadge({ label }) {
   return (
     <span
       className={cn(
-        "inline-flex w-[5.75rem] shrink-0 items-center justify-center rounded-none border px-1.5 py-[0.625rem] text-[0.62rem] font-semibold uppercase leading-none tracking-[0.16em]",
+        "inline-flex min-w-[6.75rem] shrink-0 items-center justify-center rounded-none border px-2 py-[0.625rem] text-[0.62rem] font-semibold uppercase leading-none tracking-[0.16em]",
         label === "Completed"
           ? "border-[#6EE7B7] bg-[#D1FAE5] text-[#065F46] dark:border-[#10B981] dark:bg-[#052E26] dark:text-[#6EE7B7]"
           : label === "Active"
             ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
+            : label === "Coming Soon"
+              ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
             : "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
       )}
     >
@@ -50,26 +52,25 @@ function TourSelectorRow({ tour, isSelected, onSelectTour }) {
       title={tour?.label || tour?.name || ""}
       onClick={() => onSelectTour?.(tour?.selectionId)}
     >
-      <div className="flex min-w-0 items-center justify-between gap-3 pr-16">
-        <span className={cn("min-w-0 truncate", bodyMdTextClassName, "text-[var(--text-heading)]")}>
-          {String(tour?.label || tour?.name || "").trim()}
-        </span>
+      {/* Keeps the title text and badge in normal layout flow so they never overlap. */}
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1">
+        <div className="grid min-w-0 gap-1">
+          <span className={cn("min-w-0 truncate", bodyMdTextClassName, "text-[var(--text-heading)]")}>
+            {String(tour?.label || tour?.name || "").trim()}
+          </span>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <span className={cn("min-w-0 truncate", bodySmTextClassName)}>{completedLabel}</span>
+          </div>
+        </div>
         {tour?.isCompleted ? (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2">
-            <TourStatusBadge label="Completed" />
-          </span>
+          <TourStatusBadge label="Completed" />
         ) : tour?.isCurrent ? (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2">
-            <TourStatusBadge label="Active" />
-          </span>
+          <TourStatusBadge label="Active" />
+        ) : tour?.isUpcoming ? (
+          <TourStatusBadge label="Coming Soon" />
         ) : tour?.isExpired ? (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2">
-            <TourStatusBadge label="Expired" />
-          </span>
+          <TourStatusBadge label="Expired" />
         ) : null}
-      </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        <span className={cn("min-w-0 truncate", bodySmTextClassName)}>{completedLabel}</span>
       </div>
     </button>
   );

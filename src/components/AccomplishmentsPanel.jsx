@@ -4,8 +4,7 @@ import { cn } from "./ui/cn";
 import {
   bodyMdTextClassName,
   bodySmTextClassName,
-  labelTextClassName,
-  sectionTitleTextClassName
+  labelTextClassName
 } from "./ui/typography";
 import FlightsTable from "./tables/FlightsTable";
 import CompletedStatusCard from "./CompletedStatusCard";
@@ -83,12 +82,10 @@ export default function AccomplishmentsPanel({
   accomplishmentFlightSort,
   hasAccomplishmentFlightSearch = false,
   viewportWidth,
-  timeDisplayMode,
   addonAirports,
   vatsimCoverageIndex,
   selectedFlightRowId,
   onSortAccomplishmentFlights,
-  onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow,
   onShowFlights
@@ -111,7 +108,7 @@ export default function AccomplishmentsPanel({
   if (isAccomplishmentCompleted) {
     return (
       <div className="flex h-full min-h-0 w-full flex-col pt-0">
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[1040px] flex-1 flex-col gap-4 overflow-hidden bp-1920:max-w-[1240px]">
+        <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-4 overflow-hidden">
           <CompletedStatusCard
             subjectName={accomplishment.name}
             subjectLabel="accomplishment"
@@ -125,7 +122,7 @@ export default function AccomplishmentsPanel({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col pt-0">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1040px] flex-1 flex-col gap-2 overflow-hidden bp-1920:max-w-[1240px]">
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-2 overflow-hidden">
         <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden">
           <div
             className={cn(
@@ -178,12 +175,10 @@ export default function AccomplishmentsPanel({
                   rows={accomplishmentFlightRows}
                   selectedRowId={selectedFlightRowId}
                   sort={accomplishmentFlightSort}
-                  timeDisplayMode={timeDisplayMode}
                   viewportWidth={viewportWidth}
                   addonAirports={addonAirports}
                   vatsimCoverageIndex={vatsimCoverageIndex}
                   onSort={onSortAccomplishmentFlights}
-                  onToggleTimeDisplayMode={onToggleTimeDisplayMode}
                   onSelectRow={onSelectRow}
                   onActivateRow={onActivateRow}
                 />

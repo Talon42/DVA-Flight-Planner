@@ -6,18 +6,16 @@ export default function FlightsTable({
   rows,
   selectedRowId,
   sort,
-  timeDisplayMode,
   viewportWidth,
   addonAirports,
   vatsimCoverageIndex,
   onSort,
-  onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow
 }) {
   const columns = useMemo(
-    () => getFlightTableColumns({ addonAirports, timeDisplayMode, viewportWidth, vatsimCoverageIndex }),
-    [addonAirports, timeDisplayMode, viewportWidth, vatsimCoverageIndex]
+    () => getFlightTableColumns({ addonAirports, viewportWidth, vatsimCoverageIndex }),
+    [addonAirports, viewportWidth, vatsimCoverageIndex]
   );
 
   return (
@@ -27,8 +25,6 @@ export default function FlightsTable({
       viewportWidth={viewportWidth}
       sort={sort}
       onSort={onSort}
-      timeDisplayMode={timeDisplayMode}
-      onToggleTimeDisplayMode={onToggleTimeDisplayMode}
       selectedRowId={selectedRowId}
       onSelectRow={onSelectRow}
       onActivateRow={onActivateRow}

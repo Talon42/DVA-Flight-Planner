@@ -63,14 +63,12 @@ export default function ScheduleTablePanel({
   flightRows,
   selectedFlightRowId,
   flightSort,
-  timeDisplayMode,
   addonAirports,
   vatsimNetwork,
   tourRows,
   selectedTourRowId,
   onShowAccomplishmentFlights,
   onSortFlights,
-  onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow,
   tourSyncMessage = "",
@@ -241,13 +239,11 @@ export default function ScheduleTablePanel({
               accomplishmentFlightSort={accomplishmentFlightSort}
               hasAccomplishmentFlightSearch={hasAccomplishmentFlightSearch}
               viewportWidth={viewportWidth}
-              timeDisplayMode={timeDisplayMode}
               addonAirports={addonAirports}
               vatsimCoverageIndex={vatsimNetwork?.vatsimCoverageIndex || null}
               selectedFlightRowId={selectedFlightRowId}
               onSortAccomplishmentFlights={onSortAccomplishmentFlights}
               onShowFlights={onShowAccomplishmentFlights}
-              onToggleTimeDisplayMode={onToggleTimeDisplayMode}
               onSelectRow={onSelectRow}
               onActivateRow={onActivateRow}
             />
@@ -301,12 +297,10 @@ export default function ScheduleTablePanel({
               rows={flightRows}
               selectedRowId={selectedFlightRowId}
               sort={flightSort}
-              timeDisplayMode={timeDisplayMode}
               viewportWidth={viewportWidth}
               addonAirports={addonAirports}
               vatsimCoverageIndex={vatsimNetwork?.vatsimCoverageIndex || null}
               onSort={onSortFlights}
-              onToggleTimeDisplayMode={onToggleTimeDisplayMode}
               onSelectRow={onSelectRow}
               onActivateRow={onActivateRow}
             />

@@ -1,5 +1,4 @@
 import aircraftProfilesData from "../../data/aircraft_profiles.json";
-import { getAirportByIcao } from "../airports/airportCatalog.js";
 import {
   buildGroupedAircraftSelectOptions,
   inferAircraftManufacturer,
@@ -143,10 +142,57 @@ export function resolveAircraftProfileOptionType(value) {
   return aircraftProfileAliasMap.get(normalizedValue) || "";
 }
 
-export function supportsFlightByOperationalLimits(flight, equipmentType) {
-  return supportsFlightByDutyEquipmentLimits(flight, equipmentType);
+function getAircraftRangeAndWeightEligibility(profile, flight) {
+  if (!profile || !flight) {
+    return false;
+  }
+
+  if (!Number.isFinite(profile.maximumRangeNm) || !Number.isFinite(flight.distanceNm)) {
+    return false;
+  }
+
+  if (profile.maximumRangeNm < flight.distanceNm) {
+    return false;
+  }
+
+  if (Number.isFinite(flight.mtow)) {
+    if (!Number.isFinite(profile.maximumTakeoffWeight)) {
+      return false;
+    }
+
+    if (profile.maximumTakeoffWeight > flight.mtow) {
+      return false;
+    }
+  }
+
+  if (Number.isFinite(flight.mlw)) {
+    if (!Number.isFinite(profile.maximumLandingWeight)) {
+      return false;
+    }
+
+    if (profile.maximumLandingWeight > flight.mlw) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
+// Applies the Basic Filters aircraft rule using route range plus imported schedule weight caps.
+export function supportsFlightByBasicAircraftFilterLimits(flight, equipmentType) {
+  ensureAircraftCatalogLoaded();
+
+  const normalizedType = String(equipmentType || "").trim().toUpperCase();
+  if (!normalizedType) {
+    return true;
+  }
+
+  const profile = aircraftProfileMap.get(normalizedType);
+  return getAircraftRangeAndWeightEligibility(profile, flight);
+}
+
+// Mirrors the Basic rule today so Duty Schedule stays behaviorally aligned, but keeps a separate
+// helper in case Duty and Basic filters need to diverge later.
 export function supportsFlightByDutyEquipmentLimits(flight, equipmentType) {
   ensureAircraftCatalogLoaded();
   const normalizedType = String(equipmentType || "").trim().toUpperCase();
@@ -155,44 +201,5 @@ export function supportsFlightByDutyEquipmentLimits(flight, equipmentType) {
   }
 
   const profile = aircraftProfileMap.get(normalizedType);
-  if (!profile || !flight) {
-    return false;
-  }
-
-  const routeDistanceOk =
-    Number.isFinite(profile.maximumRangeNm) &&
-    Number.isFinite(flight.distanceNm) &&
-    profile.maximumRangeNm >= flight.distanceNm;
-
-  // Duty schedules only gate aircraft by route range; airport runway limits are no longer used here.
-  return routeDistanceOk;
-}
-
-export function supportsFlightByRunwayLimits(flight, equipmentType) {
-  ensureAircraftCatalogLoaded();
-  const normalizedType = String(equipmentType || "").trim().toUpperCase();
-  if (!normalizedType) {
-    return true;
-  }
-
-  const profile = aircraftProfileMap.get(normalizedType);
-  if (!profile || !flight) {
-    return false;
-  }
-
-  const fromAirport = getAirportByIcao(flight.from);
-  const toAirport = getAirportByIcao(flight.to);
-
-  // Duty schedule compatibility is runway-based: the airport runway must meet the
-  // aircraft's minimum takeoff/landing runway length for the selected profile.
-  const takeoffRunwayOk =
-    !Number.isFinite(profile.minimumTakeoffRunwayLength) ||
-    !Number.isFinite(fromAirport?.runwayLength) ||
-    profile.minimumTakeoffRunwayLength <= fromAirport.runwayLength;
-  const landingRunwayOk =
-    !Number.isFinite(profile.minimumLandingRunwayLength) ||
-    !Number.isFinite(toAirport?.runwayLength) ||
-    profile.minimumLandingRunwayLength <= toAirport.runwayLength;
-
-  return takeoffRunwayOk && landingRunwayOk;
+  return getAircraftRangeAndWeightEligibility(profile, flight);
 }

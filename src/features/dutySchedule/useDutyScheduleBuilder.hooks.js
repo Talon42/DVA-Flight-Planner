@@ -1,5 +1,8 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { getAircraftProfileOptions, supportsFlightByDutyEquipmentLimits } from "../../domain/aircraft/aircraftCatalog.js";
+import {
+  getAircraftProfileOptions,
+  supportsFlightByDutyEquipmentLimits
+} from "../../domain/aircraft/aircraftCatalog.js";
 import { logAppEvent } from "../../services/logging/appLog.client.js";
 import { DEFAULT_FILTERS } from "../schedule/schedule.constants.js";
 import { normalizeFilters } from "../schedule/scheduleFilters.model.js";
@@ -93,7 +96,7 @@ export function useDutyScheduleBuilder({
       addonAirports,
       qualifyingDutyAirlines,
       hasSchedule: Boolean(schedule),
-      supportsFlightByRunwayLimits: supportsFlightByDutyEquipmentLimits,
+      supportsFlightByAircraftLimits: supportsFlightByDutyEquipmentLimits,
       rng: Math.random,
       filterBounds
     });

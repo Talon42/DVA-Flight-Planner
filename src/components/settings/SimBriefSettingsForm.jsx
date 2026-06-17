@@ -173,8 +173,8 @@ export function SimBriefSettingsForm({
             description="Add a SimBrief internal ID and match it to a DVA aircraft from the identity table."
           />
 
-          <div className={gridClassNames.routing}>
-            <Field label="Custom Airframe Internal ID">
+          <div className="grid gap-3 bp-1024:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)_minmax(0,1.1fr)_auto] bp-1400:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.2fr)_auto]">
+            <Field label="Airframe Internal ID" className="min-w-0">
               <input
                 type="text"
                 className={fieldInputClassName}
@@ -184,7 +184,7 @@ export function SimBriefSettingsForm({
               />
             </Field>
 
-            <Field label="Airframe Name">
+            <Field label="Airframe Name" className="min-w-0">
               <input
                 type="text"
                 className={fieldInputClassName}
@@ -195,6 +195,7 @@ export function SimBriefSettingsForm({
             </Field>
 
             <SearchableMultiSelect
+              className="min-w-0"
               label="Matching Aircraft"
               placeholder="Search aircraft"
               emptyLabel="No matching aircraft"
@@ -209,16 +210,20 @@ export function SimBriefSettingsForm({
               selectedValues={customAirframeDraftMatchType ? [customAirframeDraftMatchType] : []}
               onChange={(values) => onCustomAirframeDraftMatchTypeChange?.(values[0] || "")}
             />
-          </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="ghost"
-              onClick={onAddCustomAirframe}
-              disabled={!customAirframeDraftId.trim() || !customAirframeDraftName.trim() || !customAirframeDraftMatchType}
-            >
-              Add Custom Airframe ID
-            </Button>
+            <div className="flex min-w-0 items-end justify-end">
+              <Button
+                variant="ghost"
+                onClick={onAddCustomAirframe}
+                disabled={
+                  !customAirframeDraftId.trim() ||
+                  !customAirframeDraftName.trim() ||
+                  !customAirframeDraftMatchType
+                }
+              >
+                Add
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-2">

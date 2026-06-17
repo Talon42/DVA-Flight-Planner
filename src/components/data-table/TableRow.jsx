@@ -1,12 +1,25 @@
 import { cn } from "../ui/cn";
 import { bodyMdTextClassName } from "../ui/typography";
 
+// Keeps body cells aligned to the same content edge declared in the column metadata.
+function getCellAlignmentClass(column) {
+  if (column.align === "center") {
+    return "justify-center text-center";
+  }
+
+  if (column.align === "right") {
+    return "justify-end text-right";
+  }
+
+  return "justify-start text-left";
+}
+
 function normalizeCellContent(content, truncate) {
   if (typeof content === "string" || typeof content === "number") {
     return (
       <span
         className={cn(
-          "block min-w-0 overflow-hidden leading-none",
+          "block min-w-0 leading-none",
           truncate ? "truncate" : "whitespace-nowrap"
         )}
       >
@@ -46,6 +59,8 @@ export default function TableRow({
       {renderRowOverlay?.(row) || null}
       {columns.map((column) => {
         const content = column.renderCell ? column.renderCell(row) : row[column.key];
+        const alignClassName = getCellAlignmentClass(column);
+        const overflowClassName = column.allowOverflow ? "overflow-visible" : "overflow-hidden";
 
         return (
           <div key={column.key} className="min-w-0 self-stretch">
@@ -62,10 +77,9 @@ export default function TableRow({
             >
               <span
                 className={cn(
-                  "flex h-full min-h-0 w-full items-center overflow-hidden px-3 leading-none bp-1024:px-2",
-                  column.align === "center" && "justify-center text-center",
-                  column.align === "right" && "justify-end text-right",
-                  column.align !== "center" && column.align !== "right" && "text-left"
+                  "flex h-full min-h-0 w-full items-center px-3 leading-none bp-1024:px-2",
+                  overflowClassName,
+                  alignClassName
                 )}
               >
                 {normalizeCellContent(content, column.truncate)}

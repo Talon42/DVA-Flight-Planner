@@ -2,7 +2,13 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { FixedSizeList as List } from "react-window";
 import TableHeader from "./TableHeader";
 import TableRow from "./TableRow";
-import { buildColumnTemplate, fitColumnsToWidth, resolveColumns } from "./tableUtils";
+import {
+  applyOptionalColumnGroups,
+  buildColumnTemplate,
+  getTablePresetKey,
+  resolveColumnsForPreset,
+  resolvedColumnsFit
+} from "./tableUtils";
 import { TABLE_ROW_HEIGHT } from "./tableWidthPresets";
 import { cn } from "../ui/cn";
 
@@ -58,8 +64,6 @@ export default function DataTable({
   viewportWidth,
   sort,
   onSort,
-  timeDisplayMode,
-  onToggleTimeDisplayMode,
   selectedRowId,
   onSelectRow,
   onActivateRow,
@@ -71,17 +75,31 @@ export default function DataTable({
 }) {
   const tableRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(0);
-  const baseColumns = useMemo(
-    () => resolveColumns(columns, viewportWidth),
-    [columns, viewportWidth]
+  // Uses the measured table width when available so label presets follow the panel, not the window.
+  const tableLayoutWidth = availableWidth || viewportWidth;
+  const activePresetKey = getTablePresetKey(tableLayoutWidth);
+  const fullPresetColumns = useMemo(
+    () => resolveColumnsForPreset(columns, tableLayoutWidth, activePresetKey),
+    [columns, tableLayoutWidth, activePresetKey]
   );
-  const resolvedColumns = useMemo(
-    () => fitColumnsToWidth(baseColumns, availableWidth),
-    [availableWidth, baseColumns]
+  const compactPresetColumns = useMemo(
+    () => resolveColumnsForPreset(columns, tableLayoutWidth, "compact"),
+    [columns, tableLayoutWidth]
   );
+  const resolvedColumns = useMemo(() => {
+    if (resolvedColumnsFit(fullPresetColumns, tableLayoutWidth)) {
+      return fullPresetColumns;
+    }
+
+    if (resolvedColumnsFit(compactPresetColumns, tableLayoutWidth)) {
+      return compactPresetColumns;
+    }
+
+    return applyOptionalColumnGroups(compactPresetColumns, availableWidth, tableLayoutWidth);
+  }, [availableWidth, tableLayoutWidth, fullPresetColumns, compactPresetColumns]);
   const columnTemplate = useMemo(
-    () => buildColumnTemplate(resolvedColumns, availableWidth),
-    [availableWidth, resolvedColumns]
+    () => buildColumnTemplate(resolvedColumns),
+    [resolvedColumns]
   );
   const bodyRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -118,7 +136,7 @@ export default function DataTable({
 
     window.addEventListener("resize", updateAvailableWidth);
     return () => window.removeEventListener("resize", updateAvailableWidth);
-  }, [viewportWidth]);
+  }, []);
 
   useEffect(() => {
     const bodyNode = bodyRef.current;
@@ -220,8 +238,6 @@ export default function DataTable({
           columnTemplate={columnTemplate}
           sort={sort}
           onSort={onSort}
-          timeDisplayMode={timeDisplayMode}
-          onToggleTimeDisplayMode={onToggleTimeDisplayMode}
           scrollbarOffset={headerScrollbarOffset}
         />
       </div>

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDistanceNm } from "../../../domain/formatting/formatters.js";
-import { buildAircraftProfileSelectOptions } from "../../../domain/aircraft/aircraftCatalog.js";
+import {
+  buildAircraftProfileSelectOptions
+} from "../../../domain/aircraft/aircraftCatalog.js";
+import { resolveAirportCodeToIcao } from "../../../domain/airports/airportCatalog.js";
 import { cn } from "../../../components/ui/cn";
 import { SearchableMultiSelect } from "../../../components/ui/SearchableSelect";
 import {
@@ -115,7 +118,7 @@ export default function BasicScheduleFilters({
           value: airport.icao,
           label: airport.name,
           selectedLabel: airport.name,
-          keywords: `${airport.icao} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
+          keywords: `${airport.icao} ${airport.iata} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
         })),
     [airportOptions]
   );
@@ -127,7 +130,7 @@ export default function BasicScheduleFilters({
           value: airport.icao,
           label: airport.name,
           selectedLabel: airport.name,
-          keywords: `${airport.icao} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
+          keywords: `${airport.icao} ${airport.iata} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
         })),
     [airportOptions]
   );
@@ -139,7 +142,7 @@ export default function BasicScheduleFilters({
           value: airport.icao,
           label: airport.name,
           selectedLabel: airport.name,
-          keywords: `${airport.icao} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
+          keywords: `${airport.icao} ${airport.iata} ${airport.name} ${airport.country} ${airport.regionName} ${airport.regionCode}`
         })),
     [airportOptions]
   );
@@ -213,11 +216,8 @@ export default function BasicScheduleFilters({
   }
 
   function commitIcaoFieldValue(key, value, options, setInputValue) {
-    const icao = String(value || "")
-      .toUpperCase()
-      .replace(/[^A-Z]/g, "")
-      .slice(0, 4);
-    const exactMatch = options.find((option) => option.value === icao);
+    const resolvedIcao = resolveAirportCodeToIcao(value);
+    const exactMatch = options.find((option) => option.value === resolvedIcao);
 
     if (exactMatch) {
       setInputValue(exactMatch.value);
@@ -407,7 +407,7 @@ export default function BasicScheduleFilters({
             onFilterChange("origin", value);
           }}
         />
-        <Field label="ICAO" className="filter-block filter-block--icao min-w-0">
+        <Field label="ICAO/IATA" className="filter-block filter-block--icao min-w-0">
           <input
             className={fieldInputClassName}
             type="text"
@@ -447,7 +447,7 @@ export default function BasicScheduleFilters({
             onFilterChange("destination", value);
           }}
         />
-        <Field label="ICAO" className="filter-block filter-block--icao min-w-0">
+        <Field label="ICAO/IATA" className="filter-block filter-block--icao min-w-0">
           <input
             className={fieldInputClassName}
             type="text"
@@ -494,7 +494,7 @@ export default function BasicScheduleFilters({
             onFilterChange("originOrDestination", value);
           }}
         />
-        <Field label="ICAO" className="filter-block filter-block--icao min-w-0">
+        <Field label="ICAO/IATA" className="filter-block filter-block--icao min-w-0">
           <input
             className={fieldInputClassName}
             type="text"

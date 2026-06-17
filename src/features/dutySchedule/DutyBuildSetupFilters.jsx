@@ -35,7 +35,7 @@ export default function DutyBuildSetupFilters({
     <DutyFilterColumn
       step="1"
       title="Build Setup"
-      description="Choose how eligible flights are selected, then set the airline, aircraft, and optional starting airport."
+      description="Choose how eligible flights are selected, then set the airline, optional aircraft, and optional starting airport."
       className={cn(activeDutySection !== "setup" && "hidden bp-1400:flex")}
     >
       <div className="grid gap-0 bp-1400:hidden">
@@ -164,24 +164,24 @@ export default function DutyBuildSetupFilters({
         )}
 
         <DutyCompactInlineRow
-          label="Aircraft"
+          label="Aircraft (Optional)"
           labelSuffix={
             <DutyHelpIcon
               helpKey="aircraft"
-              label="Aircraft"
+              label="Aircraft (Optional)"
               description={DUTY_HELP_COPY.aircraft}
               activeHelp={activeDutyHelp}
               setActiveHelp={setActiveDutyHelp}
             />
           }
         >
-            <SearchableMultiSelect
-              label="Aircraft"
-              hideLabel
-              className="w-full"
-              placeholder="Search aircraft"
-              emptyLabel="No matching aircraft"
-              allLabel="-"
+          <SearchableMultiSelect
+            label="Aircraft (Optional)"
+            hideLabel
+            className="w-full"
+            placeholder="Search aircraft"
+            emptyLabel="No matching aircraft"
+            allLabel="-"
             allowMultiple={false}
             hideChips
             showClearAction={false}
@@ -193,7 +193,7 @@ export default function DutyBuildSetupFilters({
           />
         </DutyCompactInlineRow>
 
-        <DutyCompactInlineRow label="Departure Airport - Optional">
+        <DutyCompactInlineRow label="Departure Airport (Optional)">
           <div className="grid w-full grid-cols-[minmax(0,1fr)_5rem] gap-2">
             <SearchableMultiSelect
               label="Departure Airport"
@@ -352,32 +352,38 @@ export default function DutyBuildSetupFilters({
           </>
         )}
 
-          <SearchableMultiSelect
-            label="Aircraft"
-            className={DUTY_DESKTOP_FIELD_CLASS_NAME}
-            labelSuffix={
-              <DutyHelpIcon
+        <Field
+          label="Aircraft (Optional)"
+          className={DUTY_DESKTOP_FIELD_CLASS_NAME}
+          labelSuffix={
+            <DutyHelpIcon
               helpKey="aircraft"
-              label="Aircraft"
+              label="Aircraft (Optional)"
               description={DUTY_HELP_COPY.aircraft}
               activeHelp={activeDutyHelp}
               setActiveHelp={setActiveDutyHelp}
             />
           }
-          placeholder="Search aircraft"
-          emptyLabel="No matching aircraft"
-          allLabel="-"
-          allowMultiple={false}
-                hideChips
-                showClearAction={false}
-                showOptionMark={false}
-                showSingleSelectedLabel
-                options={dutyEquipmentSelectOptions}
-                selectedValues={dutyFilters.selectedEquipment ? [dutyFilters.selectedEquipment] : []}
-                onChange={(value) => onDutyFilterChange("selectedEquipment", value[0] || "")}
-              />
+        >
+          <SearchableMultiSelect
+            label="Aircraft (Optional)"
+            className="w-full"
+            hideLabel
+            placeholder="Search aircraft"
+            emptyLabel="No matching aircraft"
+            allLabel="-"
+            allowMultiple={false}
+            hideChips
+            showClearAction={false}
+            showOptionMark={false}
+            showSingleSelectedLabel
+            options={dutyEquipmentSelectOptions}
+            selectedValues={dutyFilters.selectedEquipment ? [dutyFilters.selectedEquipment] : []}
+            onChange={(value) => onDutyFilterChange("selectedEquipment", value[0] || "")}
+          />
+        </Field>
 
-        <Field label="Departure Airport - Optional" className={DUTY_DESKTOP_FIELD_CLASS_NAME}>
+        <Field label="Departure Airport (Optional)" className={DUTY_DESKTOP_FIELD_CLASS_NAME}>
           <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
             <SearchableMultiSelect
               label="Departure Airport"

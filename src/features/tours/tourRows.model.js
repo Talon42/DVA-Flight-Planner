@@ -5,7 +5,6 @@ import {
   buildLegacyDvaTourRowId,
   normalizeDvaTourId
 } from "./tourIds.model";
-import { normalizeDvaTourEpochSeconds } from "./tourVisibility.selectors";
 import { parseTourFlightCode, parseTourRoute } from "./tourParsing.model";
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 
@@ -48,73 +47,23 @@ export function isModernTourFlight(row) {
   );
 }
 
-const tourTimezoneLabelCache = new Map();
-
-// Resolves a timezone abbreviation for labels like local departure and arrival times.
-export function getTourTimezoneAbbreviation(timezone, referenceEpochSeconds) {
-  const normalizedTimezone = String(timezone || "").trim();
-  if (!normalizedTimezone) {
-    return "";
-  }
-
-  const cacheKey = `${normalizedTimezone}:${Number.isFinite(referenceEpochSeconds) ? referenceEpochSeconds : 0}`;
-  if (tourTimezoneLabelCache.has(cacheKey)) {
-    return tourTimezoneLabelCache.get(cacheKey);
-  }
-
-  try {
-    const referenceDate = Number.isFinite(referenceEpochSeconds)
-      ? new Date(referenceEpochSeconds * 1000)
-      : new Date();
-    const preferredLocales = normalizedTimezone.startsWith("Europe/")
-      ? ["en-GB", "en-US"]
-      : ["en-US", "en-GB"];
-    let timezoneLabel = "";
-
-    for (const locale of preferredLocales) {
-      const formattedParts = new Intl.DateTimeFormat(locale, {
-        timeZone: normalizedTimezone,
-        timeZoneName: "short"
-      }).formatToParts(referenceDate);
-      timezoneLabel = String(
-        formattedParts.find((part) => part.type === "timeZoneName")?.value || ""
-      ).trim();
-
-      if (timezoneLabel && !/^(GMT|UTC)[+-]?\d*/i.test(timezoneLabel)) {
-        break;
-      }
-    }
-
-    tourTimezoneLabelCache.set(cacheKey, timezoneLabel);
-    return timezoneLabel;
-  } catch {
-    tourTimezoneLabelCache.set(cacheKey, "");
-    return "";
-  }
-}
-
 // Adds a timezone suffix when the label does not already include one.
-export function buildTourLocalTimeLabel(timeLabel, timezone, referenceEpochSeconds) {
+export function buildTourLocalTimeLabel(timeLabel, timezoneLabel) {
   const normalizedTimeLabel = String(timeLabel || "").trim();
   if (!normalizedTimeLabel) {
     return "";
-  }
-
-  const normalizedTimezone = String(timezone || "").trim();
-  if (!normalizedTimezone) {
-    return normalizedTimeLabel;
   }
 
   if (/\s(?:GMT[+-]\d+|UTC[+-]?\d*|[A-Z]{2,5})$/i.test(normalizedTimeLabel)) {
     return normalizedTimeLabel;
   }
 
-  const timezoneLabel = getTourTimezoneAbbreviation(normalizedTimezone, referenceEpochSeconds);
-  if (!timezoneLabel) {
+  const normalizedTimezoneLabel = String(timezoneLabel || "").trim();
+  if (!normalizedTimezoneLabel) {
     return normalizedTimeLabel;
   }
 
-  return `${normalizedTimeLabel} ${timezoneLabel}`;
+  return `${normalizedTimeLabel} ${normalizedTimezoneLabel}`;
 }
 
 // Normalizes tour rows into the UI shape used by the planner and board views.
@@ -126,10 +75,6 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
   const tourId = normalizeDvaTourId(tour);
   const tourLabel = String(tour?.label || tour?.name || "").trim();
   const tourSourceId = String(tour?.sourceId || tour?.id || "").trim();
-  const tourTimeReferenceSeconds =
-    normalizeDvaTourEpochSeconds(
-      tour?.startDate || tour?.start_date || tour?.endDate || tour?.end_date || null
-    ) || Math.floor(Date.now() / 1000);
   const legacyRowIdCounts = rows.reduce((counts, row) => {
     const legacyRowId = buildLegacyDvaTourRowId(tourId, row);
     if (legacyRowId) {
@@ -186,6 +131,8 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
         (airline && flightNumber ? `${airline}${flightNumber}` : "");
       const from = String(row?.from || row?.departure || "").trim().toUpperCase();
       const to = String(row?.to || row?.destination || "").trim().toUpperCase();
+      const departureAirport = getAirportByIcao(from);
+      const arrivalAirport = getAirportByIcao(to);
       const departureTimeLabel = String(
         row?.departureTimeLabel || row?.departureTime || row?.timeD?.text || ""
       ).trim();
@@ -194,16 +141,22 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
       ).trim();
       const departureTimezone =
         String(row?.departureTimezone || row?.timezone || "").trim() ||
-        String(getAirportByIcao(from)?.timezone || "").trim();
+        String(departureAirport?.timezone || "").trim();
       const arrivalTimezone =
         String(row?.arrivalTimezone || row?.timezone || "").trim() ||
-        String(getAirportByIcao(to)?.timezone || "").trim();
+        String(arrivalAirport?.timezone || "").trim();
+      const departureTimezoneLabel =
+        String(row?.departureTimezoneLabel || "").trim() ||
+        String(departureAirport?.timezoneLabel || "").trim();
+      const arrivalTimezoneLabel =
+        String(row?.arrivalTimezoneLabel || "").trim() ||
+        String(arrivalAirport?.timezoneLabel || "").trim();
       const departureLocalTimeLabel =
         String(row?.departureLocalTimeLabel || "").trim() ||
-        buildTourLocalTimeLabel(departureTimeLabel, departureTimezone, tourTimeReferenceSeconds);
+        buildTourLocalTimeLabel(departureTimeLabel, departureTimezoneLabel);
       const arrivalLocalTimeLabel =
         String(row?.arrivalLocalTimeLabel || "").trim() ||
-        buildTourLocalTimeLabel(arrivalTimeLabel, arrivalTimezone, tourTimeReferenceSeconds);
+        buildTourLocalTimeLabel(arrivalTimeLabel, arrivalTimezoneLabel);
       const blockMinutes = Number.isFinite(row?.blockMinutes)
         ? row.blockMinutes
         : Number.isFinite(row?.durationMs)
@@ -241,6 +194,8 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
         arrivalLocalTimeLabel,
         departureTimezone,
         arrivalTimezone,
+        departureTimezoneLabel,
+        arrivalTimezoneLabel,
         timezone: String(row?.timezone || departureTimezone || arrivalTimezone || "").trim(),
         blockMinutes,
         blockTimeLabel,
@@ -291,18 +246,22 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
       ? `${Number(blockMinutesMatch[1])}h ${Number(blockMinutesMatch[2])}m`
       : String(row?.schedule || "").trim();
     const departureTimeLabel = parseTourDepartureTimeLabel(row?.schedule);
+    const departureAirport = getAirportByIcao(parsedRoute.from);
+    const arrivalAirport = getAirportByIcao(parsedRoute.to);
     const departureTimezone = String(row?.departureTimezone || row?.timezone || "").trim();
     const arrivalTimezone = String(row?.arrivalTimezone || row?.timezone || "").trim();
+    const departureTimezoneLabel =
+      String(row?.departureTimezoneLabel || "").trim() ||
+      String(departureAirport?.timezoneLabel || "").trim();
+    const arrivalTimezoneLabel =
+      String(row?.arrivalTimezoneLabel || "").trim() ||
+      String(arrivalAirport?.timezoneLabel || "").trim();
     const departureLocalTimeLabel =
       String(row?.departureLocalTimeLabel || "").trim() ||
-      buildTourLocalTimeLabel(departureTimeLabel, departureTimezone, tourTimeReferenceSeconds);
+      buildTourLocalTimeLabel(departureTimeLabel, departureTimezoneLabel);
     const arrivalLocalTimeLabel =
       String(row?.arrivalLocalTimeLabel || "").trim() ||
-      buildTourLocalTimeLabel(
-        String(row?.arrivalTime || "").trim(),
-        arrivalTimezone,
-        tourTimeReferenceSeconds
-      );
+      buildTourLocalTimeLabel(String(row?.arrivalTime || "").trim(), arrivalTimezoneLabel);
     const flightId = buildDvaTourCanonicalRowId(tourId, {
       ...row,
       airline: parsedFlightCode.airline,
@@ -376,6 +335,8 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
       arrivalLocalTimeLabel,
       departureTimezone,
       arrivalTimezone,
+      departureTimezoneLabel,
+      arrivalTimezoneLabel,
       timezone: String(row?.timezone || departureTimezone || arrivalTimezone || "").trim(),
       distanceNm: null,
       distanceMi: Number.isFinite(row?.distance_mi) ? row.distance_mi : null,

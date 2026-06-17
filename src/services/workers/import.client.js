@@ -36,16 +36,21 @@ export function runScheduleImport(fileName, xmlText, onDebug = () => {}) {
         return;
       }
 
-      onDebug(
-        `worker:crash message=${event.message || "unknown"} file=${event.filename || "n/a"} line=${event.lineno || 0} col=${event.colno || 0}`
-      );
+      const crashMessage = event.message || "Import worker crashed.";
+      const crashDetails = [
+        `message=${crashMessage}`,
+        `file=${event.filename || "n/a"}`,
+        `line=${event.lineno || 0}`,
+        `col=${event.colno || 0}`,
+        event.error?.name ? `error=${event.error.name}` : null,
+        event.error?.stack ? `stack=${event.error.stack}` : null
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      onDebug(`worker:crash ${crashDetails}`);
       worker.terminate();
-      fallbackImport(fileName, xmlText, onDebug)
-        .then(resolve)
-        .catch((fallbackError) => {
-          const workerMessage = event.message || "Import worker crashed.";
-          reject(new Error(`${workerMessage} Fallback import also failed: ${fallbackError.message}`));
-        });
+      reject(new Error(`Schedule import worker crashed. ${crashDetails}`));
     };
 
     worker.postMessage({
@@ -53,12 +58,4 @@ export function runScheduleImport(fileName, xmlText, onDebug = () => {}) {
       xmlText
     });
   });
-}
-
-async function fallbackImport(fileName, xmlText, onDebug) {
-  onDebug("fallback:start main-thread parser");
-  const { parseScheduleImport } = await import("./parseSchedule.js");
-  return parseScheduleImport(fileName, xmlText, (message) =>
-    onDebug(`fallback:${message}`)
-  );
 }

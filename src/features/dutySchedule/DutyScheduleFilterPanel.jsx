@@ -1,5 +1,6 @@
 import { cn } from "../../components/ui/cn";
 import { buttonTextClassName } from "../../components/ui/typography";
+import { resolveAirportCodeToIcao } from "../../domain/airports/airportCatalog.js";
 import DutyBuildSetupFilters from "./DutyBuildSetupFilters.jsx";
 import DutyRuleFilters from "./DutyRuleFilters.jsx";
 import DutyConstraintFilters from "./DutyConstraintFilters.jsx";
@@ -58,11 +59,8 @@ export default function DutyScheduleFilterPanel({
   }
 
   function commitIcaoFieldValue(key, value, options, setInputValue) {
-    const icao = String(value || "")
-      .toUpperCase()
-      .replace(/[^A-Z]/g, "")
-      .slice(0, 4);
-    const exactMatch = options.find((option) => option.value === icao);
+    const resolvedIcao = resolveAirportCodeToIcao(value);
+    const exactMatch = options.find((option) => option.value === resolvedIcao);
 
     if (exactMatch) {
       setInputValue(exactMatch.value);
