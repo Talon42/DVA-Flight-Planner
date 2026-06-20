@@ -88,6 +88,7 @@ export function resolveColumnsForPreset(columns, viewportWidth, presetKey) {
         label,
         minWidth,
         fr,
+        presetKey,
         required: column.required ?? true,
         align: column.align ?? getColumnDefaultAlign(column)
       };

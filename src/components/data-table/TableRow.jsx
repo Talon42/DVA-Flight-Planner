@@ -62,7 +62,7 @@ export default function TableRow({
     >
       {renderRowOverlay?.(row) || null}
       {columns.map((column) => {
-        const content = column.renderCell ? column.renderCell(row) : row[column.key];
+        const content = column.renderCell ? column.renderCell(row, column) : row[column.key];
         const alignClassName = getCellAlignmentClass(column);
         const overflowClassName = column.allowOverflow ? "overflow-visible" : "overflow-hidden";
 

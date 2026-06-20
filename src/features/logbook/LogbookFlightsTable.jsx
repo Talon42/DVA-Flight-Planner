@@ -4,7 +4,6 @@ import { cn } from "../../components/ui/cn";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getLogbookRowClassName } from "./logbookRowStyles.js";
 
-const FULL_DATE_LABEL_MIN_VIEWPORT_WIDTH = 1400;
 const LOGBOOK_SELECTED_ROW_CLASS_NAME = "logbook-row-selected";
 
 function LandingGradeBadge({ grade }) {
@@ -50,7 +49,8 @@ function LogbookFlightCell({ row }) {
   );
 }
 
-function getLogbookColumns(isWideLayout) {
+// Logbook columns stay static so shared table measurement can decide the active preset.
+function getLogbookColumns() {
   return [
     {
       key: "dateSortKey",
@@ -62,7 +62,8 @@ function getLogbookColumns(isWideLayout) {
       minWidth: 108,
       fr: 0.92,
       truncate: true,
-      renderCell: (row) => (isWideLayout ? row.dateDisplay : row.dateDisplayCompact)
+      renderCell: (row, column) =>
+        column.presetKey === "expanded" ? row.dateDisplay : row.dateDisplayCompact
     },
     {
       key: "compactFlightLabel",
@@ -167,10 +168,7 @@ export default function LogbookFlightsTable({
   onSelectRow,
   onActivateRow
 }) {
-  const columns = useMemo(
-    () => getLogbookColumns(viewportWidth >= FULL_DATE_LABEL_MIN_VIEWPORT_WIDTH),
-    [viewportWidth]
-  );
+  const columns = useMemo(() => getLogbookColumns(), []);
 
   return (
     <DataTable
