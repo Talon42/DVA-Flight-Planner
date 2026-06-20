@@ -218,41 +218,18 @@ function normalizeStatus(value) {
   return normalizeText(value) || LOGBOOK_EMPTY_VALUE;
 }
 
-function hasCheckRideMarker(entry) {
-  const fieldsToScan = [
-    entry?.status,
-    entry?.type,
-    entry?.flightType,
-    entry?.leg,
-    entry?.legType,
-    entry?.notes,
-    entry?.note,
-    entry?.comment,
-    entry?.comments,
-    entry?.description,
-    entry?.remarks
-  ];
-
-  return fieldsToScan.some((value) => {
-    const normalizedValue = normalizeUpperText(value);
-    return normalizedValue.includes("CHECK RIDE") || normalizedValue.includes("CHECKRIDE");
-  });
-}
-
 // Returns the logbook row highlight used for status-driven table emphasis.
 export function getLogbookRowClassName(row) {
   const rawStatus = normalizeUpperText(row?.statusRaw);
-  const rawEntry = row?.rawEntry && typeof row.rawEntry === "object" ? row.rawEntry : null;
   const isRejected = rawStatus === "REJECTED";
   const isSubmitted = ["SUBMITTED", "PENDING", "HOLD"].includes(rawStatus);
-  const isCheckRide = Boolean(rawEntry) && hasCheckRideMarker(rawEntry);
 
   if (isRejected) {
     return [
-      "bg-[rgba(200,16,46,0.14)]",
-      "even:bg-[rgba(200,16,46,0.18)]",
-      "hover:bg-[rgba(200,16,46,0.18)]",
-      "text-[var(--text-primary)]",
+      "bg-[rgba(200,16,46,0.18)]",
+      "even:bg-[rgba(200,16,46,0.22)]",
+      "hover:bg-[rgba(200,16,46,0.24)]",
+      "text-[#7F1020]",
       "dark:bg-[rgba(200,16,46,0.20)]",
       "dark:even:bg-[rgba(200,16,46,0.24)]",
       "dark:hover:bg-[rgba(200,16,46,0.24)]",
@@ -260,28 +237,15 @@ export function getLogbookRowClassName(row) {
     ].join(" ");
   }
 
-  if (isCheckRide) {
-    return [
-      "bg-[rgba(47,143,203,0.14)]",
-      "even:bg-[rgba(47,143,203,0.18)]",
-      "hover:bg-[rgba(47,143,203,0.18)]",
-      "text-[var(--text-primary)]",
-      "dark:bg-[rgba(99,179,237,0.16)]",
-      "dark:even:bg-[rgba(99,179,237,0.20)]",
-      "dark:hover:bg-[rgba(99,179,237,0.20)]",
-      "dark:text-white"
-    ].join(" ");
-  }
-
   if (isSubmitted) {
     return [
-      "bg-[rgba(183,121,31,0.14)]",
-      "even:bg-[rgba(183,121,31,0.18)]",
-      "hover:bg-[rgba(183,121,31,0.18)]",
-      "text-[var(--text-primary)]",
-      "dark:bg-[rgba(246,197,109,0.16)]",
-      "dark:even:bg-[rgba(246,197,109,0.20)]",
-      "dark:hover:bg-[rgba(246,197,109,0.20)]",
+      "bg-[rgba(183,121,31,0.20)]",
+      "even:bg-[rgba(183,121,31,0.24)]",
+      "hover:bg-[rgba(183,121,31,0.26)]",
+      "text-[#5F3B00]",
+      "dark:bg-[rgba(246,197,109,0.18)]",
+      "dark:even:bg-[rgba(246,197,109,0.22)]",
+      "dark:hover:bg-[rgba(246,197,109,0.24)]",
       "dark:text-white"
     ].join(" ");
   }
