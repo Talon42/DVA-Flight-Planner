@@ -262,6 +262,27 @@ function isEligibleLogbookStatus(value) {
   return ["SUBMITTED", "HOLD", "OK", "REJECTED"].includes(normalizeUpperText(value));
 }
 
+// Normalizes Delta Virtual logbook ids into the PIREP id format used by the report page.
+function buildDvaPirepId(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  if (/^0x[0-9a-f]+$/i.test(normalized)) {
+    return normalized.toLowerCase();
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    const numeric = Number(normalized);
+    if (Number.isSafeInteger(numeric) && numeric > 0) {
+      return `0x${numeric.toString(16)}`;
+    }
+  }
+
+  return null;
+}
+
 function buildCompactFlightLabel(entry) {
   const airlineCode = normalizeUpperText(entry?.airline || entry?.airlineCode || entry?.airlineIata);
   const flightNumber = normalizeText(entry?.flight || entry?.flightNumber || entry?.flightNo);
@@ -424,6 +445,10 @@ export function normalizeLogbookRows(entries) {
     }
 
     const rawLogbookId = normalizeText(entry.logbookId ?? entry.id);
+    const dvaPirepId = buildDvaPirepId(entry.logbookId ?? entry.id);
+    const dvaPirepUrl = dvaPirepId
+      ? `https://www.deltava.org/pirep.do?id=${dvaPirepId}`
+      : null;
     const compactFlightLabel = buildCompactFlightLabel(entry);
     const flightLabel = buildFlightLabel(entry);
     const airlineCode = normalizeUpperText(entry.airline || entry.airlineCode || entry.airlineIata);
@@ -446,6 +471,8 @@ export function normalizeLogbookRows(entries) {
     const row = {
       id: rawLogbookId || `logbook-row-${sourceIndex}`,
       rawLogbookId: rawLogbookId || null,
+      dvaPirepId,
+      dvaPirepUrl,
       sourceIndex,
       rawEntry: entry,
       dateDisplay: formatDvaDate(entry),

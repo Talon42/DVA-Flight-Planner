@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import DataTable from "../../components/data-table/DataTable.jsx";
 import { cn } from "../../components/ui/cn";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
@@ -37,6 +38,39 @@ function LandingGradeBadge({ grade }) {
 function LogbookFlightCell({ row, column }) {
   const flightLabel = column?.presetKey === "compact" ? row.compactFlightLabel : row.flightLabel || row.compactFlightLabel;
 
+  async function handleOpenPirep(event) {
+    event.stopPropagation();
+
+    try {
+      await openUrl(row.dvaPirepUrl);
+    } catch (error) {
+      console.error("Unable to open DVA PIREP page.", error);
+    }
+  }
+
+  const flightLabelContent = row.dvaPirepUrl ? (
+    <span
+      role="link"
+      tabIndex={0}
+      title={`Open DVA PIREP ${row.dvaPirepId}`}
+      className="min-w-0 truncate leading-none cursor-pointer text-inherit underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+      onClick={handleOpenPirep}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleOpenPirep(event);
+        }
+      }}
+    >
+      {flightLabel}
+    </span>
+  ) : (
+    <span className="min-w-0 truncate leading-none">{flightLabel}</span>
+  );
+
   return (
     <span className="flex min-w-0 items-center gap-2">
       {row.airlineLogoSrc ? (
@@ -46,8 +80,8 @@ function LogbookFlightCell({ row, column }) {
           loading="lazy"
           className={cn("h-4 w-4 shrink-0 object-contain", row.airlineLogoClassName)}
         />
-        ) : null}
-      <span className="min-w-0 truncate leading-none">{flightLabel}</span>
+      ) : null}
+      {flightLabelContent}
     </span>
   );
 }
@@ -83,7 +117,7 @@ function getLogbookColumns() {
     {
       key: "departure",
       label: "Departure",
-      compactLabel: "DEP",
+      compactLabel: "Dep",
       wideLabel: "Departure",
       role: "airportCode",
       compactMinWidth: 72,
@@ -95,7 +129,7 @@ function getLogbookColumns() {
     {
       key: "arrival",
       label: "Arrival",
-      compactLabel: "ARR",
+      compactLabel: "Arr",
       wideLabel: "Arrival",
       role: "airportCode",
       compactMinWidth: 72,
@@ -107,7 +141,7 @@ function getLogbookColumns() {
     {
       key: "equipment",
       label: "Equipment",
-      compactLabel: "EQP",
+      compactLabel: "Eqp",
       wideLabel: "Equipment",
       role: "secondary",
       compactMinWidth: 92,
@@ -119,7 +153,7 @@ function getLogbookColumns() {
     {
       key: "durationMinutes",
       label: "Duration",
-      compactLabel: "TIME",
+      compactLabel: "Time",
       wideLabel: "Duration",
       role: "time",
       compactMinWidth: 94,
