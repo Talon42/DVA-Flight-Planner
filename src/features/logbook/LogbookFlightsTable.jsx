@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import DataTable from "../../components/data-table/DataTable.jsx";
-import { getLogbookRowClassName } from "../../domain/logbook/logbook.model.js";
 import { cn } from "../../components/ui/cn";
+import { getLogbookRowClassName } from "./logbookRowStyles.js";
 
 const COMPACT_LAYOUT_MAX_WIDTH = 900;
 
@@ -142,6 +142,10 @@ export default function LogbookFlightsTable({
     () => getLogbookColumns(viewportWidth >= COMPACT_LAYOUT_MAX_WIDTH),
     [viewportWidth]
   );
+  const getRowClassName = useMemo(
+    () => (row) => getLogbookRowClassName(row, selectedRowId),
+    [selectedRowId]
+  );
 
   return (
     <DataTable
@@ -154,7 +158,7 @@ export default function LogbookFlightsTable({
       onSelectRow={onSelectRow}
       onActivateRow={onActivateRow || onSelectRow}
       getRowId={(row) => row.id}
-      getRowClassName={getLogbookRowClassName}
+      getRowClassName={getRowClassName}
       initialVisibleRows={25}
       visibleRowPage={25}
       visibleRowThreshold={10}

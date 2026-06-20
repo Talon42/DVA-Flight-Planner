@@ -218,41 +218,6 @@ function normalizeStatus(value) {
   return normalizeText(value) || LOGBOOK_EMPTY_VALUE;
 }
 
-// Returns the logbook row highlight used for status-driven table emphasis.
-export function getLogbookRowClassName(row) {
-  const rawStatus = normalizeUpperText(row?.statusRaw);
-  const isRejected = rawStatus === "REJECTED";
-  const isSubmitted = ["SUBMITTED", "PENDING", "HOLD"].includes(rawStatus);
-
-  if (isRejected) {
-    return [
-      "bg-[rgba(200,16,46,0.18)]",
-      "even:bg-[rgba(200,16,46,0.22)]",
-      "hover:bg-[rgba(200,16,46,0.24)]",
-      "text-[#7F1020]",
-      "dark:bg-[rgba(200,16,46,0.20)]",
-      "dark:even:bg-[rgba(200,16,46,0.24)]",
-      "dark:hover:bg-[rgba(200,16,46,0.24)]",
-      "dark:text-white"
-    ].join(" ");
-  }
-
-  if (isSubmitted) {
-    return [
-      "bg-[rgba(183,121,31,0.20)]",
-      "even:bg-[rgba(183,121,31,0.24)]",
-      "hover:bg-[rgba(183,121,31,0.26)]",
-      "text-[#5F3B00]",
-      "dark:bg-[rgba(246,197,109,0.18)]",
-      "dark:even:bg-[rgba(246,197,109,0.22)]",
-      "dark:hover:bg-[rgba(246,197,109,0.24)]",
-      "dark:text-white"
-    ].join(" ");
-  }
-
-  return "";
-}
-
 function isEligibleLogbookStatus(value) {
   return ["SUBMITTED", "HOLD", "OK", "REJECTED"].includes(normalizeUpperText(value));
 }
