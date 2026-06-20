@@ -22,6 +22,16 @@ function getNestedValue(primaryValue, fallbackValue) {
   return primaryValue ?? fallbackValue;
 }
 
+// Keeps passenger counts numeric so the summary card does not show malformed values.
+function formatPassengerCount(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numericValue = Number(String(value).replace(/,/g, "").trim());
+  return Number.isInteger(numericValue) && numericValue >= 0 ? numericValue : null;
+}
+
 function LogbookDetailRow({ label, value, title }) {
   const displayValue = formatDetailValue(value);
 
@@ -91,7 +101,8 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   const summaryItems = [
     { label: "Block Time", value: formatLogbookDuration(entry.blockTime) },
     { label: "Airborne Time", value: formatLogbookDuration(entry.airborneTime) },
-    { label: "Distance", value: selectedLogbookFlight.distanceDisplay, title: selectedLogbookFlight.distanceDisplay }
+    { label: "Distance", value: selectedLogbookFlight.distanceDisplay, title: selectedLogbookFlight.distanceDisplay },
+    { label: "Passengers", value: formatPassengerCount(entry.pax) }
   ];
 
   const departureItems = [

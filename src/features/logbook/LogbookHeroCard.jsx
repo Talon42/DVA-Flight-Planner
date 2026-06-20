@@ -1,3 +1,4 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName, bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
@@ -60,6 +61,61 @@ function HeroAirlineMark({ flight }) {
   return null;
 }
 
+// Reuses the selected row's cached DVA PIREP url so the hero label can open externally.
+function HeroFlightLabel({ flight, className = "" }) {
+  const flightLabel = String(flight?.compactFlightLabel || "").trim() || "N/A";
+  const dvaPirepUrl = String(flight?.dvaPirepUrl || "").trim();
+  const dvaPirepId = String(flight?.dvaPirepId || "").trim();
+
+  async function handleOpenPirep(event) {
+    event.stopPropagation();
+
+    try {
+      await openUrl(dvaPirepUrl);
+    } catch (error) {
+      console.error("Unable to open DVA PIREP page.", error);
+    }
+  }
+
+  if (!dvaPirepUrl) {
+    return (
+      <p
+        className={cn(
+          "m-0 min-w-0 truncate text-[var(--text-heading)]",
+          bodyMdTextClassName,
+          "font-semibold",
+          className
+        )}
+      >
+        {flightLabel}
+      </p>
+    );
+  }
+
+  return (
+    <span
+      role="link"
+      tabIndex={0}
+      title={`Open DVA PIREP ${dvaPirepId}`}
+      className={cn(
+        "block min-w-0 cursor-pointer truncate text-[var(--text-heading)] hover:underline focus-visible:underline focus-visible:outline-none",
+        bodyMdTextClassName,
+        "font-semibold tracking-[-0.03em]",
+        className
+      )}
+      onClick={handleOpenPirep}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleOpenPirep(event);
+        }
+      }}
+    >
+      {flightLabel}
+    </span>
+  );
+}
+
 // Renders the selected-flight hero summary shown above the metric tiles.
 export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
   const flight = selectedLogbookFlight || {};
@@ -74,9 +130,7 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
           <div className="min-w-0 flex-1 bp-1400:hidden">
             <div className="flex min-w-0 flex-wrap items-center justify-center gap-2">
               <HeroAirlineMark flight={flight} />
-              <p className={cn("m-0 min-w-0 truncate text-[var(--text-heading)]", bodyMdTextClassName, "font-semibold")}>
-                {flight.compactFlightLabel || "N/A"}
-              </p>
+              <HeroFlightLabel flight={flight} />
               <span className={cn("shrink-0 text-[var(--text-muted)]", bodySmTextClassName)} aria-hidden="true">
                 •
               </span>
@@ -100,9 +154,7 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
             </div>
           </div>
           <div className="hidden min-w-0 grid gap-1 text-left bp-1400:grid">
-            <p className={cn("m-0 min-w-0 text-[var(--text-heading)]", bodyMdTextClassName, "font-semibold bp-1920:text-[1rem]")}>
-              {flight.compactFlightLabel || "N/A"}
-            </p>
+            <HeroFlightLabel flight={flight} className="bp-1920:text-[1rem]" />
             {String(flight.airlineDisplayName || "").trim() ? (
               <p className={cn("m-0 min-w-0 text-[var(--text-muted)]", bodySmTextClassName)}>
                 {flight.airlineDisplayName}
