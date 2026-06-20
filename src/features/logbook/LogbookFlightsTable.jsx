@@ -59,7 +59,7 @@ function getLogbookColumns() {
       wideLabel: "Date",
       role: "time",
       compactMinWidth: 78,
-      minWidth: 108,
+      minWidth: 96,
       fr: 0.92,
       truncate: true,
       renderCell: (row, column) =>
@@ -84,7 +84,7 @@ function getLogbookColumns() {
       wideLabel: "Departure",
       role: "airportCode",
       compactMinWidth: 72,
-      minWidth: 92,
+      minWidth: 84,
       fr: 0.8,
       truncate: true,
       renderCell: (row) => row.origin
@@ -96,7 +96,7 @@ function getLogbookColumns() {
       wideLabel: "Arrival",
       role: "airportCode",
       compactMinWidth: 72,
-      minWidth: 92,
+      minWidth: 84,
       fr: 0.8,
       truncate: true,
       renderCell: (row) => row.destination
@@ -108,7 +108,7 @@ function getLogbookColumns() {
       wideLabel: "Equipment",
       role: "secondary",
       compactMinWidth: 92,
-      minWidth: 132,
+      minWidth: 118,
       fr: 1,
       truncate: true,
       renderCell: (row) => row.equipment
@@ -130,9 +130,9 @@ function getLogbookColumns() {
     },
     {
       key: "distanceNm",
-      label: "Dist",
+      label: "Distance",
       compactLabel: "Dist",
-      wideLabel: "Dist",
+      wideLabel: "Distance",
       role: "numeric",
       compactMinWidth: 88,
       minWidth: 88,
@@ -150,7 +150,7 @@ function getLogbookColumns() {
       wideLabel: "Landing Rate",
       role: "time",
       compactMinWidth: 86,
-      minWidth: 112,
+      minWidth: 110,
       fr: 0.9,
       truncate: true,
       renderCell: (row) => <LandingGradeBadge grade={row.landingGradeDisplay} />
