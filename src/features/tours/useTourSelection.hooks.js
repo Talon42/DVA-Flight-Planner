@@ -2,6 +2,7 @@ import { startTransition, useEffect, useMemo, useState } from "react";
 import {
   ACCOMPLISHMENT_REQUIREMENTS,
   buildAccomplishmentRowsFromEligibility,
+  mergeAccomplishmentWithLogbookProgress,
   selectAirportAccomplishments
 } from "../accomplishments/accomplishments.model.js";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "../schedule/schedule.constants.js";
@@ -21,6 +22,7 @@ export function useTourSelection({
   deltaVirtualToursCache = null,
   derivedTourProgress = null,
   isDevToolsEnabled = false,
+  logbookAirportProgress = null,
   scheduleView = "flights",
   scheduleFlights = [],
   selectedAccomplishmentName = "",
@@ -88,7 +90,11 @@ export function useTourSelection({
 
   const accomplishmentOptions = useMemo(
     () => {
-      const airportAccomplishments = selectAirportAccomplishments(deltaVirtualAccomplishmentEligibility);
+      const airportAccomplishments = selectAirportAccomplishments(
+        deltaVirtualAccomplishmentEligibility
+      ).map((accomplishment) =>
+        mergeAccomplishmentWithLogbookProgress(accomplishment, logbookAirportProgress)
+      );
 
       return airportAccomplishments.map((accomplishment) => {
         const totalCount =
@@ -115,7 +121,7 @@ export function useTourSelection({
         };
       });
     },
-    [deltaVirtualAccomplishmentEligibility]
+    [deltaVirtualAccomplishmentEligibility, logbookAirportProgress]
   );
 
   const selectedAccomplishment = useMemo(() => {

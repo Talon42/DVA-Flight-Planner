@@ -443,6 +443,7 @@ export default function App() {
     deltaVirtualToursCache,
     derivedTourProgress,
     isDevToolsEnabled,
+    logbookAirportProgress,
     scheduleView,
     scheduleFlights,
     selectedAccomplishmentName,

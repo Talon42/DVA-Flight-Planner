@@ -190,6 +190,27 @@ fn normalize_logbook_key(key: &str) -> String {
         .to_ascii_lowercase()
 }
 
+fn extract_logbook_status(entry: &Value) -> Option<String> {
+    entry
+        .get("status")
+        .and_then(Value::as_str)
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty())
+}
+
+fn is_completed_logbook_status(status: Option<&str>) -> bool {
+    matches!(
+        status.map(str::trim),
+        None
+            | Some("ok")
+            | Some("accepted")
+            | Some("submitted")
+            | Some("approved")
+            | Some("completed")
+            | Some("complete")
+    )
+}
+
 fn collect_airport_codes_from_value(value: &Value, airports: &mut BTreeSet<String>) {
     match value {
         Value::String(text) => {
@@ -453,6 +474,9 @@ pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogb
     let mut arrival_airports = BTreeSet::new();
     if let Some(entries) = find_logbook_entries(&json) {
         for entry in entries {
+            if !is_completed_logbook_status(extract_logbook_status(entry).as_deref()) {
+                continue;
+            }
             collect_logbook_airport_progress(entry, &mut visited_airports, &mut arrival_airports);
         }
     }
@@ -777,6 +801,41 @@ mod tests {
         assert_eq!(
             arrival_airports.into_iter().collect::<Vec<_>>(),
             vec!["KJFK".to_string(), "KSFO".to_string()]
+        );
+    }
+
+    #[test]
+    fn completed_logbook_status_treats_submitted_as_completed() {
+        assert!(is_completed_logbook_status(Some("submitted")));
+        assert!(!is_completed_logbook_status(Some("rejected")));
+    }
+
+    #[test]
+    fn read_progress_filters_out_non_completed_statuses() {
+        let json: Value = serde_json::from_str(
+            r#"{"flights": [
+                {"status":"SUBMITTED","departureAirport":{"icao":"KATL"},"arrivalAirport":{"icao":"KJFK"}},
+                {"status":"REJECTED","departureAirport":{"icao":"KLAX"},"arrivalAirport":{"icao":"KSFO"}}
+            ]}"#,
+        )
+        .expect("json");
+        let mut visited_airports = BTreeSet::new();
+        let mut arrival_airports = BTreeSet::new();
+
+        for entry in find_logbook_entries(&json).expect("entries") {
+            if !is_completed_logbook_status(extract_logbook_status(entry).as_deref()) {
+                continue;
+            }
+            collect_logbook_airport_progress(entry, &mut visited_airports, &mut arrival_airports);
+        }
+
+        assert_eq!(
+            visited_airports.into_iter().collect::<Vec<_>>(),
+            vec!["KATL".to_string(), "KJFK".to_string()]
+        );
+        assert_eq!(
+            arrival_airports.into_iter().collect::<Vec<_>>(),
+            vec!["KJFK".to_string()]
         );
     }
 }

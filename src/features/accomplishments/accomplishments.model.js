@@ -102,6 +102,65 @@ export function selectAirportAccomplishments(eligibility) {
     );
 }
 
+function buildTrackedAirportSet(requirement, logbookAirportProgress) {
+  const normalizedRequirement = normalizeRequirement(requirement);
+  const sourceAirports =
+    normalizedRequirement === ACCOMPLISHMENT_REQUIREMENTS.ARRIVAL_AIRPORT
+      ? logbookAirportProgress?.arrivalAirports
+      : logbookAirportProgress?.visitedAirports;
+
+  return new Set(
+    Array.isArray(sourceAirports) ? sourceAirports.map(normalizeAirportCode).filter(Boolean) : []
+  );
+}
+
+// Merges the saved DVA eligibility snapshot with current logbook airport progress.
+export function mergeAccomplishmentWithLogbookProgress(
+  accomplishment,
+  logbookAirportProgress = null
+) {
+  if (!accomplishment) {
+    return null;
+  }
+
+  const trackedAirports = buildTrackedAirportSet(accomplishment.unit, logbookAirportProgress);
+  const missingAirports = Array.isArray(accomplishment.missing) ? accomplishment.missing : [];
+  const missingIcaoCodes = Array.isArray(accomplishment.missingIcaoCodes)
+    ? accomplishment.missingIcaoCodes
+    : [];
+  const remainingMissing = missingIcaoCodes.reduce(
+    (result, code, index) => {
+      const normalizedCode = normalizeAirportCode(code);
+      if (!normalizedCode || trackedAirports.has(normalizedCode)) {
+        return result;
+      }
+
+      result.labels.push(String(missingAirports[index] || "").trim());
+      result.codes.push(normalizedCode);
+      return result;
+    },
+    { labels: [], codes: [] }
+  );
+  const totalCount =
+    accomplishment.required ??
+    accomplishment.progress ??
+    missingIcaoCodes.length;
+  const fallbackCompletedCount = Math.max(totalCount - missingIcaoCodes.length, 0);
+  const baseCompletedCount = accomplishment.achieved
+    ? totalCount
+    : accomplishment.progress ?? fallbackCompletedCount;
+  const mergedCompletedCount = Math.max(totalCount - remainingMissing.codes.length, baseCompletedCount);
+  const isCompleted = accomplishment.achieved || (totalCount > 0 && mergedCompletedCount >= totalCount);
+
+  return {
+    ...accomplishment,
+    achieved: isCompleted,
+    progress: isCompleted ? totalCount : mergedCompletedCount,
+    missing: isCompleted ? [] : remainingMissing.labels,
+    missingIcaoCodes: isCompleted ? [] : remainingMissing.codes
+  };
+}
+
 // Builds the visible row list for the accomplishment panel using only remaining DVA airports.
 export function buildAccomplishmentRowsFromEligibility(accomplishment) {
   if (!accomplishment || accomplishment.isCompleted) {
