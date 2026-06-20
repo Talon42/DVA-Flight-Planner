@@ -29,7 +29,7 @@ export default function LogbookPanel({
   if (!allRows.length) {
     return (
       <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
-        <div className="w-full min-w-0 border-b-2 border-[color:var(--panel-border)] px-0 pb-0">
+        <div className="w-full min-w-0 px-0 pb-0">
           <div className="flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
             <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
               <button
@@ -83,7 +83,7 @@ export default function LogbookPanel({
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
-      <div className="w-full min-w-0 border-b-2 border-[color:var(--panel-border)] px-0 pb-0">
+      <div className="w-full min-w-0 px-0 pb-0">
         <div className="flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
           <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
             <button
