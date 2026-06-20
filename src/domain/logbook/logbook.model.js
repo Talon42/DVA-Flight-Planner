@@ -488,10 +488,8 @@ export function getLogbookSortValue(row, sortKey) {
       return row.dateSortKey || 0;
     case "compactFlightLabel":
       return normalizeUpperText(row.compactFlightLabel);
-    case "origin":
     case "departure":
       return normalizeUpperText(row.departure);
-    case "destination":
     case "arrival":
       return normalizeUpperText(row.arrival);
     case "equipment":

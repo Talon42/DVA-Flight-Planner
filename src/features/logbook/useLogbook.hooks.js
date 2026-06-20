@@ -18,8 +18,9 @@ import {
 
 function normalizePersistedSort(sort) {
   const rawKey = String(sort?.key || DEFAULT_LOGBOOK_SORT.key).trim();
-  const key = rawKey === "origin" ? "departure" : rawKey === "destination" ? "arrival" : rawKey;
-  const direction = sort?.direction === "asc" ? "asc" : sort?.direction === "desc" ? "desc" : DEFAULT_LOGBOOK_SORT.direction;
+  const key = rawKey;
+  const direction =
+    sort?.direction === "asc" ? "asc" : sort?.direction === "desc" ? "desc" : DEFAULT_LOGBOOK_SORT.direction;
   return { key, direction };
 }
 
