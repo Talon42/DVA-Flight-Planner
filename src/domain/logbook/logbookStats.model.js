@@ -83,8 +83,8 @@ export function buildLogbookPilotStats(rows) {
     incrementCount(simulatorCounts, row.simulator);
     incrementCount(statusCounts, row.statusDisplay);
     incrementCount(airlineCounts, row.airlineDisplayName);
-    incrementCount(departureCounts, row.origin);
-    incrementCount(arrivalCounts, row.destination);
+    incrementCount(departureCounts, row.departure);
+    incrementCount(arrivalCounts, row.arrival);
 
     if (Number.isFinite(row.landingRate)) {
       landingRows.push(row);
@@ -150,7 +150,7 @@ export function buildLogbookPilotStats(rows) {
       .map((row) => ({
         label: `${row.compactFlightLabel} • ${row.dateDisplay}`,
         value: formatUnit(row.landingRate, "fpm"),
-        meta: `${row.origin} -> ${row.destination}`
+        meta: `${row.departure} -> ${row.arrival}`
       })),
     flightsByEquipment: buildCountList(equipmentCounts),
     flightsBySimulator: buildCountList(simulatorCounts),

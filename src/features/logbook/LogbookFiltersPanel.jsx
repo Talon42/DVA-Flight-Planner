@@ -120,36 +120,36 @@ export default function LogbookFiltersPanel({
   onFilterChange,
   onReset
 }) {
-  const [originIcaoInput, setOriginIcaoInput] = useState(filters.origin[0] || "");
-  const [destinationIcaoInput, setDestinationIcaoInput] = useState(filters.destination[0] || "");
+  const [departureIcaoInput, setDepartureIcaoInput] = useState(filters.departure[0] || "");
+  const [arrivalIcaoInput, setArrivalIcaoInput] = useState(filters.arrival[0] || "");
 
   useEffect(() => {
-    setOriginIcaoInput(filters.origin.length === 1 ? filters.origin[0] : "");
-  }, [filters.origin]);
+    setDepartureIcaoInput(filters.departure.length === 1 ? filters.departure[0] : "");
+  }, [filters.departure]);
 
   useEffect(() => {
-    setDestinationIcaoInput(filters.destination.length === 1 ? filters.destination[0] : "");
-  }, [filters.destination]);
+    setArrivalIcaoInput(filters.arrival.length === 1 ? filters.arrival[0] : "");
+  }, [filters.arrival]);
 
-  const originAirportOptions = useMemo(
+  const departureAirportOptions = useMemo(
     () =>
-      filterOptions.origins.map((airport) => ({
+      filterOptions.departures.map((airport) => ({
         value: airport,
         label: airport,
         selectedLabel: airport,
         keywords: airport
       })),
-    [filterOptions.origins]
+    [filterOptions.departures]
   );
-  const destinationAirportOptions = useMemo(
+  const arrivalAirportOptions = useMemo(
     () =>
-      filterOptions.destinations.map((airport) => ({
+      filterOptions.arrivals.map((airport) => ({
         value: airport,
         label: airport,
         selectedLabel: airport,
         keywords: airport
       })),
-    [filterOptions.destinations]
+    [filterOptions.arrivals]
   );
   const effectiveDistanceRange = getEffectiveLogbookDistanceRange(filters, filterBounds);
   const effectiveDurationRange = getEffectiveLogbookDurationRange(filters, filterBounds);
@@ -285,12 +285,12 @@ export default function LogbookFiltersPanel({
               placeholder="Search departure airports"
               emptyLabel="No matching departure airports"
               allLabel="All"
-              filterKey="origin"
-              query={originIcaoInput}
-              options={originAirportOptions}
-              selectedValues={filters.origin}
-              onQueryChange={setOriginIcaoInput}
-              onFilterChange={(value) => onFilterChange("origin", value)}
+              filterKey="departure"
+              query={departureIcaoInput}
+              options={departureAirportOptions}
+              selectedValues={filters.departure}
+              onQueryChange={setDepartureIcaoInput}
+              onFilterChange={(value) => onFilterChange("departure", value)}
             />
 
             <LogbookAirportFilterRow
@@ -298,12 +298,12 @@ export default function LogbookFiltersPanel({
               placeholder="Search arrival airports"
               emptyLabel="No matching arrival airports"
               allLabel="All"
-              filterKey="destination"
-              query={destinationIcaoInput}
-              options={destinationAirportOptions}
-              selectedValues={filters.destination}
-              onQueryChange={setDestinationIcaoInput}
-              onFilterChange={(value) => onFilterChange("destination", value)}
+              filterKey="arrival"
+              query={arrivalIcaoInput}
+              options={arrivalAirportOptions}
+              selectedValues={filters.arrival}
+              onQueryChange={setArrivalIcaoInput}
+              onFilterChange={(value) => onFilterChange("arrival", value)}
             />
           </div>
 

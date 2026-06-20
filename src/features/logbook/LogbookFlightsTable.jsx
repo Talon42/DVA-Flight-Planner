@@ -59,7 +59,7 @@ function getLogbookColumns() {
       wideLabel: "Date",
       role: "time",
       compactMinWidth: 78,
-      minWidth: 96,
+      minWidth: 108,
       fr: 0.92,
       truncate: true,
       renderCell: (row, column) =>
@@ -78,28 +78,28 @@ function getLogbookColumns() {
       renderCell: (row) => <LogbookFlightCell row={row} />
     },
     {
-      key: "origin",
+      key: "departure",
       label: "Departure",
       compactLabel: "DEP",
       wideLabel: "Departure",
       role: "airportCode",
       compactMinWidth: 72,
-      minWidth: 84,
+      minWidth: 92,
       fr: 0.8,
       truncate: true,
-      renderCell: (row) => row.origin
+      renderCell: (row) => row.departure
     },
     {
-      key: "destination",
+      key: "arrival",
       label: "Arrival",
       compactLabel: "ARR",
       wideLabel: "Arrival",
       role: "airportCode",
       compactMinWidth: 72,
-      minWidth: 84,
+      minWidth: 92,
       fr: 0.8,
       truncate: true,
-      renderCell: (row) => row.destination
+      renderCell: (row) => row.arrival
     },
     {
       key: "equipment",
@@ -108,7 +108,7 @@ function getLogbookColumns() {
       wideLabel: "Equipment",
       role: "secondary",
       compactMinWidth: 92,
-      minWidth: 118,
+      minWidth: 132,
       fr: 1,
       truncate: true,
       renderCell: (row) => row.equipment
@@ -150,7 +150,7 @@ function getLogbookColumns() {
       wideLabel: "Landing Rate",
       role: "time",
       compactMinWidth: 86,
-      minWidth: 110,
+      minWidth: 112,
       fr: 0.9,
       truncate: true,
       renderCell: (row) => <LandingGradeBadge grade={row.landingGradeDisplay} />

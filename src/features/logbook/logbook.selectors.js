@@ -38,11 +38,11 @@ export function selectFilteredLogbookRows({ rows, filters }) {
       return false;
     }
 
-    if (normalizedFilters.origin.length && !normalizedFilters.origin.includes(row.origin)) {
+    if (normalizedFilters.departure.length && !normalizedFilters.departure.includes(row.departure)) {
       return false;
     }
 
-    if (normalizedFilters.destination.length && !normalizedFilters.destination.includes(row.destination)) {
+    if (normalizedFilters.arrival.length && !normalizedFilters.arrival.includes(row.arrival)) {
       return false;
     }
 
@@ -91,8 +91,8 @@ export function selectLogbookFilterOptions(rows) {
   return {
     airlines: toSortedValues(activeRows.map((row) => row.airlineDisplayName).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
     equipment: toSortedValues(activeRows.map((row) => row.equipment).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
-    origins: toSortedValues(activeRows.map((row) => row.origin).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
-    destinations: toSortedValues(activeRows.map((row) => row.destination).filter((value) => value !== LOGBOOK_EMPTY_VALUE))
+    departures: toSortedValues(activeRows.map((row) => row.departure).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
+    arrivals: toSortedValues(activeRows.map((row) => row.arrival).filter((value) => value !== LOGBOOK_EMPTY_VALUE))
   };
 }
 

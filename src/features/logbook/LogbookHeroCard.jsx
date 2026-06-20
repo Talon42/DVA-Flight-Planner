@@ -119,8 +119,8 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
         <div className="grid min-w-0 gap-2 bp-1920:gap-3 bp-1400:pt-0">
           <div className="flex min-w-0 items-center justify-between gap-2 bp-1920:gap-3">
             <HeroValue
-              value={flight.origin}
-              title={flight.origin}
+              value={flight.departure}
+              title={flight.departure}
               className="truncate text-[clamp(0.94rem,1.76vw,1.39rem)] bp-1400:text-[clamp(1.25rem,2.35vw,1.85rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
             />
             <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 bp-1920:gap-3">
@@ -134,8 +134,8 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
               <span aria-hidden="true" className={ROUTE_RIGHT_LINE_CLASS} />
             </div>
             <HeroValue
-              value={flight.destination}
-              title={flight.destination}
+              value={flight.arrival}
+              title={flight.arrival}
               className="truncate text-right text-[clamp(0.94rem,1.76vw,1.39rem)] bp-1400:text-[clamp(1.25rem,2.35vw,1.85rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
             />
           </div>

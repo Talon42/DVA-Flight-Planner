@@ -440,8 +440,8 @@ export function normalizeLogbookRows(entries) {
       airlineDisplayName,
       airlineLogoSrc,
       airlineLogoClassName,
-      origin: readAirportCode(entry.airportD) || LOGBOOK_EMPTY_VALUE,
-      destination: readAirportCode(entry.airportA) || LOGBOOK_EMPTY_VALUE,
+      departure: readAirportCode(entry.airportD) || LOGBOOK_EMPTY_VALUE,
+      arrival: readAirportCode(entry.airportA) || LOGBOOK_EMPTY_VALUE,
       equipment:
         normalizeText(entry.eqType || entry?.aircraft?.icao || entry?.aircraft?.name) || LOGBOOK_EMPTY_VALUE,
       durationMinutes,
@@ -489,9 +489,11 @@ export function getLogbookSortValue(row, sortKey) {
     case "compactFlightLabel":
       return normalizeUpperText(row.compactFlightLabel);
     case "origin":
-      return normalizeUpperText(row.origin);
+    case "departure":
+      return normalizeUpperText(row.departure);
     case "destination":
-      return normalizeUpperText(row.destination);
+    case "arrival":
+      return normalizeUpperText(row.arrival);
     case "equipment":
       return normalizeUpperText(row.equipment);
     case "durationMinutes":

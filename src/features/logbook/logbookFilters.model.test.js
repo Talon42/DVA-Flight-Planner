@@ -17,6 +17,8 @@ test("default logbook filters keep date fields blank and sliders at the full ran
 
   assert.equal(normalized.dateStart, "");
   assert.equal(normalized.dateEnd, "");
+  assert.deepStrictEqual(normalized.departure, []);
+  assert.deepStrictEqual(normalized.arrival, []);
   assert.equal(normalized.durationMin, 0);
   assert.equal(normalized.durationMax, null);
   assert.equal(normalized.distanceMin, 0);
@@ -53,6 +55,19 @@ test("legacy search and status fields are ignored during normalization", () => {
   assert.equal(normalized.dateStart, "2024-04-10");
   assert.equal(normalized.dateEnd, "2024-04-10");
   assert.equal(normalized.durationMax, null);
+});
+
+test("legacy origin and destination filter keys still normalize to departure and arrival", () => {
+  const normalized = normalizeLogbookFilters(
+    {
+      origin: ["katl"],
+      destination: ["klax"]
+    },
+    { maxDistanceNm: 0 }
+  );
+
+  assert.deepStrictEqual(normalized.departure, ["KATL"]);
+  assert.deepStrictEqual(normalized.arrival, ["KLAX"]);
 });
 
 test("empty bounds keep null distanceMax and preserve positive persisted max", () => {
