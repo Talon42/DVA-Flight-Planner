@@ -259,33 +259,39 @@
   }
 
   /* Logbook row classes set the background and cell text token together. */
-  .logbook-row-status-rejected,
-  .logbook-row-status-rejected:hover,
-  .logbook-row-status-rejected:nth-child(even) {
+  .logbook-row-status-rejected {
     background: var(--logbook-row-status-rejected-bg) !important;
     --table-row-text: var(--logbook-row-status-rejected-text);
+  }
+
+  .logbook-row-status-rejected:nth-child(even) {
+    background: var(--logbook-row-status-rejected-bg) !important;
   }
 
   .logbook-row-status-rejected:hover {
     background: var(--logbook-row-status-rejected-hover-bg) !important;
   }
 
-  .logbook-row-status-pending,
-  .logbook-row-status-pending:hover,
-  .logbook-row-status-pending:nth-child(even) {
+  .logbook-row-status-pending {
     background: var(--logbook-row-status-pending-bg) !important;
     --table-row-text: var(--logbook-row-status-pending-text);
+  }
+
+  .logbook-row-status-pending:nth-child(even) {
+    background: var(--logbook-row-status-pending-bg) !important;
   }
 
   .logbook-row-status-pending:hover {
     background: var(--logbook-row-status-pending-hover-bg) !important;
   }
 
-  .logbook-row-selected,
-  .logbook-row-selected:hover,
-  .logbook-row-selected:nth-child(even) {
+  .logbook-row-selected {
     background: var(--logbook-row-selected-bg) !important;
     --table-row-text: var(--logbook-row-selected-text);
+  }
+
+  .logbook-row-selected:nth-child(even) {
+    background: var(--logbook-row-selected-bg) !important;
   }
 
   .logbook-row-selected:hover {

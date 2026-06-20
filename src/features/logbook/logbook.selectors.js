@@ -100,10 +100,6 @@ export function selectLogbookFilterBounds(rows) {
   return buildLogbookFilterBounds(rows);
 }
 
-export function selectLogbookStatsInput(rows) {
-  return Array.isArray(rows) ? rows : [];
-}
-
 export function selectLogbookPilotStats(rows) {
-  return buildLogbookPilotStats(selectLogbookStatsInput(rows));
+  return buildLogbookPilotStats(Array.isArray(rows) ? rows : []);
 }

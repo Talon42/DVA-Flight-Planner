@@ -3,7 +3,7 @@ import DataTable from "../../components/data-table/DataTable.jsx";
 import { cn } from "../../components/ui/cn";
 import { getLogbookRowClassName } from "./logbookRowStyles.js";
 
-const COMPACT_LAYOUT_MAX_WIDTH = 900;
+const FULL_DATE_LABEL_MIN_VIEWPORT_WIDTH = 900;
 const LOGBOOK_SELECTED_ROW_CLASS_NAME = "logbook-row-selected";
 
 function LogbookFlightCell({ row }) {
@@ -140,7 +140,7 @@ export default function LogbookFlightsTable({
   onActivateRow
 }) {
   const columns = useMemo(
-    () => getLogbookColumns(viewportWidth >= COMPACT_LAYOUT_MAX_WIDTH),
+    () => getLogbookColumns(viewportWidth >= FULL_DATE_LABEL_MIN_VIEWPORT_WIDTH),
     [viewportWidth]
   );
 
