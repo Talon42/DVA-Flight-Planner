@@ -53,7 +53,7 @@ function LogbookFlightCell({ row, column }) {
       role="link"
       tabIndex={0}
       title={`Open DVA PIREP ${row.dvaPirepId}`}
-      className="min-w-0 truncate leading-none cursor-pointer text-inherit underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+      className="block min-w-0 truncate font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit cursor-pointer underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
       onClick={handleOpenPirep}
       onDoubleClick={(event) => {
         event.stopPropagation();
@@ -68,7 +68,9 @@ function LogbookFlightCell({ row, column }) {
       {flightLabel}
     </span>
   ) : (
-    <span className="min-w-0 truncate leading-none">{flightLabel}</span>
+    <span className="block min-w-0 truncate font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit]">
+      {flightLabel}
+    </span>
   );
 
   return (
