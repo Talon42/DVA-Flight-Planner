@@ -142,10 +142,6 @@ export default function LogbookFlightsTable({
     () => getLogbookColumns(viewportWidth >= COMPACT_LAYOUT_MAX_WIDTH),
     [viewportWidth]
   );
-  const getRowClassName = useMemo(
-    () => (row) => getLogbookRowClassName(row, selectedRowId),
-    [selectedRowId]
-  );
 
   return (
     <DataTable
@@ -158,7 +154,7 @@ export default function LogbookFlightsTable({
       onSelectRow={onSelectRow}
       onActivateRow={onActivateRow || onSelectRow}
       getRowId={(row) => row.id}
-      getRowClassName={getRowClassName}
+      getRowClassName={getLogbookRowClassName}
       initialVisibleRows={25}
       visibleRowPage={25}
       visibleRowThreshold={10}

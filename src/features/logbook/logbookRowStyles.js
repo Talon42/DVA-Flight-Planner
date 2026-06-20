@@ -2,14 +2,9 @@ function normalizeStatus(value) {
   return String(value ?? "").trim().toUpperCase();
 }
 
-// Returns the row highlight used for logbook status emphasis and selection override.
-export function getLogbookRowClassName(row, selectedRowId = null) {
+// Returns the row highlight used for logbook status emphasis.
+export function getLogbookRowClassName(row) {
   const rawStatus = normalizeStatus(row?.statusRaw);
-  const isSelected = selectedRowId != null && String(row?.id ?? "") === String(selectedRowId);
-
-  if (isSelected) {
-    return "bg-[#D7E8F7] text-[#0B1F36] hover:bg-[#D7E8F7] dark:bg-[#1F466E] dark:text-white dark:hover:bg-[#1F466E]";
-  }
 
   if (rawStatus === "REJECTED") {
     return [
