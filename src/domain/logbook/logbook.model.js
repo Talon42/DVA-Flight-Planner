@@ -198,7 +198,7 @@ export function formatLogbookSignedAviationNumber(value, unit, options = {}) {
   return formatSignedAviationNumber(toNumber(value), unit, options);
 }
 
-// Maps landing vertical speed to the human-readable score shown in the details card.
+// Maps landing vertical speed to the four landing quality labels shown in the details card.
 export function formatLandingGrade(value) {
   const numericValue = toNumber(value);
   if (!Number.isFinite(numericValue)) {
@@ -208,26 +208,18 @@ export function formatLandingGrade(value) {
   const absValue = Math.abs(numericValue);
 
   if (absValue < 100) {
-    return "Butter";
+    return "Too Soft";
   }
 
-  if (absValue < 200) {
-    return "Smooth";
+  if (absValue < 350) {
+    return "Optimal";
   }
 
-  if (absValue < 300) {
-    return "Good";
-  }
-
-  if (absValue < 400) {
+  if (absValue < 650) {
     return "Firm";
   }
 
-  if (absValue < 500) {
-    return "Hard";
-  }
-
-  return "Very Hard";
+  return "Damaging";
 }
 
 function readAirportCode(airport) {

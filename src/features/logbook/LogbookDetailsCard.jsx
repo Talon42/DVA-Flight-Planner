@@ -97,31 +97,27 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   const departureItems = [
     { label: "Departure Airport", value: entry.airportD?.name, title: entry.airportD?.name },
     {
+      label: "Start Time",
+      value: formatLogbookTimestamp(entry.startTime)
+    },
+    {
       label: "Takeoff Fuel",
       value: formatLogbookAviationNumber(getNestedValue(takeoff.fuel, entry.takeoffFuel), "lb")
     },
     {
       label: "Takeoff Weight",
       value: formatLogbookAviationNumber(getNestedValue(takeoff.weight, entry.takeoffWeight), "lb")
-    },
-    {
-      label: "Takeoff Speed",
-      value: formatLogbookAviationNumber(getNestedValue(takeoff.speed, entry.takeoffSpeed), "kt")
     }
   ];
 
   const arrivalItems = [
     { label: "Arrival Airport", value: entry.airportA?.name, title: entry.airportA?.name },
+    { label: "End Time", value: formatLogbookTimestamp(getNestedValue(end.time, entry.endTime)) },
     { label: "End Fuel", value: formatLogbookAviationNumber(getNestedValue(end.fuel, entry.endFuel), "lb") },
     {
       label: "End Weight",
       value: formatLogbookAviationNumber(getNestedValue(end.weight, entry.endWeight), "lb")
-    },
-    {
-      label: "Landing Time",
-      value: formatLogbookTimestamp(getNestedValue(landing.time, entry.landingTime))
-    },
-    { label: "End Time", value: formatLogbookTimestamp(getNestedValue(end.time, entry.endTime)) }
+    }
   ];
 
   const landingSummaryItems = [
