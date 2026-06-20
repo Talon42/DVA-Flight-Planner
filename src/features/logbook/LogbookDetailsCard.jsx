@@ -44,7 +44,7 @@ function LogbookDetailRow({ label, value, title }) {
 
 function LogbookDetailSubCard({ title, items }) {
   return (
-    <Panel className="grid min-w-0 gap-2 rounded-none border border-[rgba(160,180,202,0.52)] !bg-transparent p-3 dark:border-[color:var(--surface-border)] dark:!bg-transparent">
+    <Panel className="grid w-full min-w-0 gap-2 rounded-none border border-[rgba(160,180,202,0.52)] !bg-transparent p-2.5 dark:border-[color:var(--surface-border)] dark:!bg-transparent">
       <p className={cn("m-0 text-[var(--eyebrow)]", labelTextClassName, "font-semibold uppercase tracking-[0.08em]")}>
         {title}
       </p>
@@ -147,12 +147,12 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
 
   return (
     <aside className="details-panel min-h-0 min-w-0">
-      <Panel className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] !bg-white dark:border-[color:var(--surface-border)] dark:!bg-[var(--surface-raised)]">
-        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto p-3 bp-1920:p-4">
-          <div className="grid gap-3">
+      <Panel className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] !bg-white dark:border-[color:var(--surface-border)] dark:!bg-[var(--surface-raised)]">
+        <div className="app-scrollbar min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-2 py-3">
+          <div className="grid w-full min-w-0 gap-2">
             <LogbookHeroCard selectedLogbookFlight={selectedLogbookFlight} />
 
-            <div className="grid gap-3 bp-1400:grid-cols-2">
+            <div className="grid w-full min-w-0 gap-2 bp-1920:grid-cols-2">
               <LogbookDetailSubCard title="Summary" items={summaryItems} />
               <LogbookDetailSubCard title="Departure" items={departureItems} />
               <LogbookDetailSubCard title="Arrival" items={arrivalItems} />
