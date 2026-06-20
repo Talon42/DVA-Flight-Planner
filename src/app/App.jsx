@@ -943,8 +943,10 @@ export default function App() {
   const {
     handleCloseDvaSyncWarning,
     handleDeltaVirtualSync,
+    handleRefreshDeltaVirtualLogbook,
     handleResetDeltaVirtualSyncSession,
-    isSyncing
+    isSyncing,
+    isRefreshingLogbook
   } = useDeltaVirtualSync({
     dvaFirstName,
     dvaHasPassword,
@@ -1661,7 +1663,7 @@ export default function App() {
       dvaHasPassword={dvaHasPassword}
       isDvaCredentialsSaving={isDvaCredentialsSaving}
       isImporting={isImporting}
-      isSyncing={isSyncing}
+      isSyncing={isSyncing || isRefreshingLogbook}
       hasDvaCredentialChanges={hasDvaCredentialChanges}
       onFirstNameChange={setDvaFirstNameDraft}
       onLastNameChange={setDvaLastNameDraft}
@@ -1786,20 +1788,23 @@ export default function App() {
   const appShellProps = {
     schedule,
     scheduleView,
-      logbookProps: {
-        allRows: logbook.allRows,
-        filteredRows: logbook.filteredRows,
-        sortedFilteredRows: logbook.sortedFilteredRows,
-        viewportWidth: viewportSize.width,
-        selectedTab: logbook.selectedTab,
-        sort: logbook.sort,
-        selectedRowId: logbook.selectedRowId,
-        pilotStats: logbook.pilotStats,
-        onSelectTab: logbook.setSelectedTab,
-        onSort: logbook.handleSort,
-        onSelectRow: logbook.handleSelectRow,
-        onActivateRow: logbook.handleSelectRow
-      },
+    logbookProps: {
+      allRows: logbook.allRows,
+      filteredRows: logbook.filteredRows,
+      sortedFilteredRows: logbook.sortedFilteredRows,
+      viewportWidth: viewportSize.width,
+      selectedTab: logbook.selectedTab,
+      sort: logbook.sort,
+      selectedRowId: logbook.selectedRowId,
+      pilotStats: logbook.pilotStats,
+      isSyncing,
+      isRefreshingLogbook,
+      onRefreshLogbook: handleRefreshDeltaVirtualLogbook,
+      onSelectTab: logbook.setSelectedTab,
+      onSort: logbook.handleSort,
+      onSelectRow: logbook.handleSelectRow,
+      onActivateRow: logbook.handleSelectRow
+    },
     theme,
     flightBoard,
     activeFlightBoard,
@@ -1896,6 +1901,7 @@ export default function App() {
     isDvaCredentialsSaving,
     isImporting,
     isSyncing,
+    isRefreshingLogbook,
     hasDvaCredentialChanges,
     onDvaFirstNameDraftChange: setDvaFirstNameDraft,
     onDvaLastNameDraftChange: setDvaLastNameDraft,

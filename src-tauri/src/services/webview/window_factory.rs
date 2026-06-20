@@ -7,7 +7,7 @@ use std::{
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 
 use crate::services::deltava::sync_types::{
-    DeltaWebDebugMessage, DeltaWebSyncResult, DeltaWebXmlCaptureMessage,
+    DeltaWebDebugMessage, DeltaWebLogbookRefreshResult, DeltaWebSyncResult, DeltaWebXmlCaptureMessage,
 };
 use crate::{
     app::state::DeltaSyncFinishOutcome,
@@ -15,6 +15,7 @@ use crate::{
     DeltaSyncPayload, DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_DOWNLOAD_FILE,
     DELTAVA_SYNC_RESULT_MESSAGE_PREFIX, DELTAVA_XML_MESSAGE_PREFIX,
 };
+use crate::services::deltava::constants::DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX;
 
 pub(crate) const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
 const DELTAVA_LOGIN_URL: &str = "https://www.deltava.org/login.do";
@@ -255,6 +256,52 @@ fn attach_windows_xml_message_handler(
                                         .finish(DELTAVA_SYNC_LABEL, result);
                                     if outcome != DeltaSyncFinishOutcome::Completed {
                                         log_ignored_finish("web-result", outcome);
+                                    }
+                                });
+                                return Ok(());
+                            }
+
+                            if let Some(payload_text) =
+                                message.strip_prefix(DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX)
+                            {
+                                let payload_text = payload_text.to_string();
+                                let app_handle = app_handle.clone();
+                                let sync_nonce = sync_nonce.clone();
+
+                                tauri::async_runtime::spawn(async move {
+                                    let result = match serde_json::from_str::<DeltaWebLogbookRefreshResult>(&payload_text)
+                                    {
+                                        Ok(web_result) if web_result.nonce == sync_nonce => {
+                                            file_store::build_delta_logbook_refresh_payload_from_web_result(
+                                                &app_handle,
+                                                web_result,
+                                                debug_enabled,
+                                            )
+                                            .await
+                                        }
+                                        Ok(_) => return,
+                                        Err(error) => Err(format!(
+                                            "download_failed: Unable to parse Delta Virtual logbook refresh result: {error}"
+                                        )),
+                                    };
+                                    if result.is_ok() {
+                                        append_sync_log("logbook-refresh-result-ready");
+                                        append_sync_log_debug(
+                                            debug_enabled,
+                                            "succeeded stage=logbook-refresh-result",
+                                        );
+                                    } else {
+                                        append_sync_log_debug(
+                                            debug_enabled,
+                                            "failed stage=logbook-refresh-result",
+                                        );
+                                    }
+
+                                    let outcome = app_handle
+                                        .state::<DeltaSyncManager>()
+                                        .finish(DELTAVA_SYNC_LABEL, result);
+                                    if outcome != DeltaSyncFinishOutcome::Completed {
+                                        log_ignored_finish("logbook-refresh-result", outcome);
                                     }
                                 });
                                 return Ok(());

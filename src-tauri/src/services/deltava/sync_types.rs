@@ -113,6 +113,13 @@ pub(crate) struct DeltaWebLogbookResult {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct DeltaWebLogbookRefreshResult {
+    pub nonce: String,
+    pub logbook: DeltaWebLogbookResult,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct DeltaWebAccomplishmentsResult {
     pub ok: bool,
     pub html_text: Option<String>,

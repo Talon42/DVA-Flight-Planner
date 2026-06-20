@@ -149,6 +149,7 @@ export default function AppOverlayHost({
   availableUpdate,
   onDownloadUpdate,
   isAddonAutoScanning,
+  isRefreshingLogbook,
   dvaSyncWarning,
   isDvaSyncWarningOpen,
   onCloseDvaSyncWarning,
@@ -260,8 +261,8 @@ export default function AppOverlayHost({
             hasSavedPassword: dvaHasPassword,
             isSaving: isDvaCredentialsSaving,
             isSaveDisabled:
-              isDvaCredentialsSaving || isImporting || isSyncing || !hasDvaCredentialChanges,
-            isClearDisabled: isDvaCredentialsSaving || isImporting || isSyncing,
+            isDvaCredentialsSaving || isImporting || isSyncing || isRefreshingLogbook || !hasDvaCredentialChanges,
+            isClearDisabled: isDvaCredentialsSaving || isImporting || isSyncing || isRefreshingLogbook,
             onFirstNameChange: onDvaFirstNameDraftChange,
             onLastNameChange: onDvaLastNameDraftChange,
             onPasswordChange: onDvaPasswordDraftChange,
@@ -484,6 +485,13 @@ export default function AppOverlayHost({
           title="Syncing data from Delta Virtual"
           description="Refreshing your schedule and logbook data."
           ariaLabel="Delta Virtual sync in progress"
+        />
+      ) : isRefreshingLogbook ? (
+        <SpinnerStatusModal
+          eyebrow="Delta Virtual Logbook"
+          title="Refreshing Logbook"
+          description="Refreshing your Delta Virtual logbook data."
+          ariaLabel="Delta Virtual logbook refresh in progress"
         />
       ) : null}
 

@@ -559,6 +559,54 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
     })
 }
 
+/// Builds a logbook-only payload from the dedicated logbook refresh webview result.
+pub(crate) async fn build_delta_logbook_refresh_payload_from_web_result(
+    app: &AppHandle,
+    result: crate::services::deltava::sync_types::DeltaWebLogbookRefreshResult,
+    debug_enabled: bool,
+) -> Result<crate::DeltaSyncPayload, String> {
+    let mut warnings = Vec::new();
+
+    let logbook_json = if result.logbook.ok {
+        let json_text = result.logbook.json_text.unwrap_or_default();
+        append_sync_log_debug(debug_enabled, "logbook-refresh-fetch");
+        match store_logbook_json(app, &json_text, result.logbook.content_type).await {
+            Ok(artifact) => Some(artifact),
+            Err(error) => {
+                warnings.push(error);
+                None
+            }
+        }
+    } else {
+        warnings.push(
+            result
+                .logbook
+                .error
+                .unwrap_or_else(|| "Delta Virtual logbook refresh failed.".into()),
+        );
+        None
+    };
+
+    let Some(logbook_json) = logbook_json else {
+        return Err(format!(
+            "download_failed: Delta Virtual logbook refresh failed. {}",
+            summarize_warnings(&warnings)
+                .unwrap_or_else(|| "No logbook artifact was downloaded.".into())
+        ));
+    };
+
+    Ok(crate::DeltaSyncPayload {
+        file_name: Some(logbook_json.file_name.clone()),
+        xml_text: None,
+        status: "success".to_string(),
+        xml_status: "skipped".to_string(),
+        logbook_status: "success".to_string(),
+        accomplishment_eligibility: None,
+        logbook_json: Some(logbook_json),
+        warnings,
+    })
+}
+
 /// Removes Delta Virtual webview and download data for cleanup flows.
 pub(crate) fn prune_deltava_storage(
     app: &AppHandle,

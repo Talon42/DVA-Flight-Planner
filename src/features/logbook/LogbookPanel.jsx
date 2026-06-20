@@ -1,4 +1,5 @@
 import { cn } from "../../components/ui/cn";
+import Button from "../../components/ui/Button";
 import { getPlannerTabStateClassName, plannerTabClassName, plannerTabsListClassName } from "../../components/ui/forms";
 import { cardFrameClassName } from "../../components/ui/patterns";
 import { bodySmTextClassName } from "../../components/ui/typography";
@@ -15,17 +16,66 @@ export default function LogbookPanel({
   sort,
   selectedRowId,
   pilotStats,
+  isSyncing = false,
+  isRefreshingLogbook = false,
+  onRefreshLogbook,
   onSelectTab,
   onSort,
   onSelectRow,
   onActivateRow
 }) {
+  const isRefreshDisabled = Boolean(isSyncing || isRefreshingLogbook);
+
   if (!allRows.length) {
     return (
-      <div className={cn("grid gap-3 border border-dashed border-[color:var(--line)] p-5", cardFrameClassName)}>
-        <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
-          Logbook data has not been synced yet. Use Sync from Delta Virtual to download your schedule and logbook.
-        </p>
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
+        <div className="w-full min-w-0 border-b-2 border-[color:var(--panel-border)] px-0 pb-0">
+          <div className="flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
+            <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
+              <button
+                type="button"
+                className={cn(
+                  plannerTabClassName,
+                  getPlannerTabStateClassName(selectedTab === "flights")
+                )}
+                role="tab"
+                aria-selected={selectedTab === "flights"}
+                onClick={() => onSelectTab?.("flights")}
+              >
+                Flights
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  plannerTabClassName,
+                  getPlannerTabStateClassName(selectedTab === "pilot-stats")
+                )}
+                role="tab"
+                aria-selected={selectedTab === "pilot-stats"}
+                onClick={() => onSelectTab?.("pilot-stats")}
+              >
+                Pilot Stats
+              </button>
+            </div>
+
+            <Button
+              variant="ghost"
+              type="button"
+              className="shrink-0"
+              onClick={onRefreshLogbook}
+              disabled={isRefreshDisabled}
+            >
+              {isRefreshingLogbook ? "Refreshing..." : "Refresh Logbook"}
+            </Button>
+          </div>
+        </div>
+
+        <div className={cn("grid gap-3 border border-dashed border-[color:var(--line)] p-5", cardFrameClassName)}>
+          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
+            Logbook data has not been synced yet. Use Refresh Logbook or Sync from Delta Virtual to
+            download your logbook and schedule.
+          </p>
+        </div>
       </div>
     );
   }
@@ -33,25 +83,43 @@ export default function LogbookPanel({
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
       <div className="w-full min-w-0 border-b-2 border-[color:var(--panel-border)] px-0 pb-0">
-        <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
-          <button
+        <div className="flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
+          <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
+            <button
+              type="button"
+              className={cn(
+                plannerTabClassName,
+                getPlannerTabStateClassName(selectedTab === "flights")
+              )}
+              role="tab"
+              aria-selected={selectedTab === "flights"}
+              onClick={() => onSelectTab?.("flights")}
+            >
+              Flights
+            </button>
+            <button
+              type="button"
+              className={cn(
+                plannerTabClassName,
+                getPlannerTabStateClassName(selectedTab === "pilot-stats")
+              )}
+              role="tab"
+              aria-selected={selectedTab === "pilot-stats"}
+              onClick={() => onSelectTab?.("pilot-stats")}
+            >
+              Pilot Stats
+            </button>
+          </div>
+
+          <Button
+            variant="ghost"
             type="button"
-            className={cn(plannerTabClassName, getPlannerTabStateClassName(selectedTab === "flights"))}
-            role="tab"
-            aria-selected={selectedTab === "flights"}
-            onClick={() => onSelectTab?.("flights")}
+            className="shrink-0"
+            onClick={onRefreshLogbook}
+            disabled={isRefreshDisabled}
           >
-            Flights
-          </button>
-          <button
-            type="button"
-            className={cn(plannerTabClassName, getPlannerTabStateClassName(selectedTab === "pilot-stats"))}
-            role="tab"
-            aria-selected={selectedTab === "pilot-stats"}
-            onClick={() => onSelectTab?.("pilot-stats")}
-          >
-            Pilot Stats
-          </button>
+            {isRefreshingLogbook ? "Refreshing..." : "Refresh Logbook"}
+          </Button>
         </div>
       </div>
 

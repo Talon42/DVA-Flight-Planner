@@ -14,6 +14,7 @@ pub(crate) fn app_invoke_handler(
         self::storage::append_app_log_text,
         self::deltava_logbook::read_deltava_logbook,
         self::deltava_sync::start_deltava_sync,
+        self::deltava_sync::refresh_deltava_logbook,
         self::deltava_sync::reset_deltava_sync_session,
         self::deltava_tours::sync_delta_virtual_tours,
         self::deltava_sync::close_deltava_sync_window,

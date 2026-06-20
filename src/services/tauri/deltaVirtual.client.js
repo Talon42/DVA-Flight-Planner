@@ -91,6 +91,47 @@ export async function syncScheduleFromDeltaVirtual({
   }
 }
 
+export async function refreshDeltaVirtualLogbook({
+  syncRunId = "",
+  debugEnabled = false
+} = {}) {
+  if (!isTauriRuntime()) {
+    throw new Error("Delta Virtual logbook refresh is only available in the desktop app.");
+  }
+
+  try {
+    const result = await invokeAppCommand("refresh_deltava_logbook", {
+      syncRunId: String(syncRunId || "").trim(),
+      debugEnabled: Boolean(debugEnabled)
+    });
+    const fileName =
+      result?.fileName ??
+      result?.file_name ??
+      result?.logbookJson?.fileName ??
+      result?.logbook_json?.file_name ??
+      null;
+    const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
+    const logbookJson = result?.logbookJson ?? result?.logbook_json ?? null;
+
+    return {
+      fileName,
+      warnings,
+      logbookJson,
+      status: String(result?.status || "").trim(),
+      xmlStatus: String(result?.xmlStatus || result?.xml_status || "").trim(),
+      logbookStatus: String(result?.logbookStatus || result?.logbook_status || "").trim()
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      const normalized = normalizeSyncError(error.message);
+      normalized.syncResult = error.syncResult;
+      throw normalized;
+    }
+
+    throw normalizeSyncError(String(error));
+  }
+}
+
 // Resets only the DVA sync/webview session state without clearing the full app profile.
 export async function resetDeltaVirtualSyncSession() {
   if (!isTauriRuntime()) {
