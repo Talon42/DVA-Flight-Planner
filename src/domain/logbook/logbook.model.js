@@ -1,5 +1,5 @@
 import { DateTime } from "luxon";
-import { getAirlineLogo, getAirlineNameByCode } from "../airlines/airlineBranding.js";
+import { getAirlineLogo, getAirlineLogoClassName, getAirlineNameByCode } from "../airlines/airlineBranding.js";
 
 export const LOGBOOK_EMPTY_VALUE = "\u2014";
 
@@ -377,6 +377,12 @@ export function normalizeLogbookRows(entries) {
       airlineIata: airlineCode,
       airlineIcao: airlineCode
     });
+    // Preserve the shared dark-mode contrast treatment for logo carriers that need it.
+    const airlineLogoClassName = getAirlineLogoClassName({
+      airlineName: airlineDisplayName,
+      airlineIata: airlineCode,
+      airlineIcao: airlineCode
+    });
     const durationMinutes = parseDurationMinutes(entry.duration) ?? parseDurationMinutes(entry.blockTime);
     const airborneMinutes = parseDurationMinutes(entry.airborneTime);
     const distanceNm = toNumber(entry.distance);
@@ -393,6 +399,7 @@ export function normalizeLogbookRows(entries) {
       airlineCode: airlineCode || LOGBOOK_EMPTY_VALUE,
       airlineDisplayName,
       airlineLogoSrc,
+      airlineLogoClassName,
       origin: readAirportCode(entry.airportD) || LOGBOOK_EMPTY_VALUE,
       destination: readAirportCode(entry.airportA) || LOGBOOK_EMPTY_VALUE,
       equipment:

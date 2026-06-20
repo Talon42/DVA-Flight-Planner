@@ -104,7 +104,7 @@ function LogbookFlightCell({ row }) {
           src={row.airlineLogoSrc}
           alt=""
           loading="lazy"
-          className="h-4 w-4 shrink-0 object-contain"
+          className={cn("h-4 w-4 shrink-0 object-contain", row.airlineLogoClassName)}
         />
       ) : null}
       <span className="min-w-0 truncate leading-none">{row.compactFlightLabel}</span>

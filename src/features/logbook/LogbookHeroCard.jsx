@@ -21,11 +21,19 @@ function HeroValue({ value, className = "", title = "" }) {
 
 function HeroAirlineMark({ flight }) {
   const logoSrc = String(flight?.airlineLogoSrc || "").trim();
+  const logoClassName = String(flight?.airlineLogoClassName || "").trim();
   const airlineName = String(flight?.airlineDisplayName || "").trim();
   const airlineCode = String(flight?.airlineCode || "").trim();
 
   if (logoSrc) {
-    return <img src={logoSrc} alt="" aria-hidden="true" className="h-10 w-10 shrink-0 object-contain" />;
+    return (
+      <img
+        src={logoSrc}
+        alt=""
+        aria-hidden="true"
+        className={cn("h-10 w-10 shrink-0 object-contain", logoClassName)}
+      />
+    );
   }
 
   if (airlineCode) {
