@@ -146,9 +146,9 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   ];
 
   return (
-    <aside className="details-panel min-h-0 min-w-0">
-      <Panel className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] !bg-white dark:border-[color:var(--surface-border)] dark:!bg-[var(--surface-raised)]">
-        <div className="app-scrollbar min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-2 py-3">
+    <aside className="min-h-0 min-w-0">
+      <Panel className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-none border border-[rgba(160,180,202,0.52)] !bg-white dark:border-[color:var(--surface-border)] dark:!bg-[var(--surface-raised)]">
+        <div className="app-scrollbar min-h-0 w-full min-w-0 flex-1 overflow-y-auto pl-1 pr-0 py-2">
           <div className="grid w-full min-w-0 gap-2">
             <LogbookHeroCard selectedLogbookFlight={selectedLogbookFlight} />
 
