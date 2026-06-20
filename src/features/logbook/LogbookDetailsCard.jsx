@@ -44,7 +44,7 @@ function LogbookDetailRow({ label, value, title }) {
 
 function LogbookDetailSubCard({ title, items }) {
   return (
-    <Panel className="grid min-w-0 gap-2 rounded-none border border-[color:var(--line)] bg-[var(--surface-table-row-hover)] dark:bg-[var(--surface-raised)] p-3">
+    <Panel className="grid min-w-0 gap-2 rounded-none border border-[rgba(160,180,202,0.52)] !bg-transparent p-3 dark:border-[color:var(--surface-border)] dark:!bg-transparent">
       <p className={cn("m-0 text-[var(--eyebrow)]", labelTextClassName, "font-semibold uppercase tracking-[0.08em]")}>
         {title}
       </p>
@@ -148,7 +148,7 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   return (
     <aside className="details-panel app-scrollbar min-h-0 min-w-0 overflow-y-auto">
       <div className="grid gap-3">
-        <Panel className="relative isolate rounded-none border-2 border-[rgba(160,180,202,0.52)] bg-[var(--surface-table-row-hover)] p-3 dark:border-[color:var(--surface-border)] dark:bg-[var(--surface-raised)] bp-1920:p-4">
+        <Panel className="relative isolate rounded-none border-2 border-[rgba(160,180,202,0.52)] !bg-white p-3 dark:border-[color:var(--surface-border)] dark:!bg-[var(--surface-raised)] bp-1920:p-4">
           <div className="grid gap-3">
             <LogbookHeroCard selectedLogbookFlight={selectedLogbookFlight} />
 
