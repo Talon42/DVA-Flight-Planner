@@ -102,7 +102,7 @@ function formatDvaDateCompact(entry) {
     year: parts.year,
     month: parts.month,
     day: parts.day
-  }).toFormat("MMddyy");
+  }).toFormat("M/d/yy");
 }
 
 function buildDateSortKey(entry) {
