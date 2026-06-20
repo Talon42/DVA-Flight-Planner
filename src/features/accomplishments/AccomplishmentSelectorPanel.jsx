@@ -117,10 +117,10 @@ export default function AccomplishmentSelectorPanel({
                       key={accomplishment.name}
                       type="button"
                       className={cn(
-                        "relative grid min-h-[3.5rem] gap-1 border border-[color:var(--line)] px-4 py-3 text-left transition-colors",
+                        "relative grid min-h-[3.5rem] gap-1 border border-[color:var(--line)] px-4 py-3 text-left",
                         isSelected
                           ? "bg-[var(--surface-table-row-hover)] text-[var(--text-heading)] before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-[var(--delta-red)] before:content-[''] dark:bg-[rgba(31,70,110,0.22)]"
-                          : "bg-[var(--surface-table-row)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)]"
+                          : "bg-[var(--surface-table-row)] text-[var(--text-muted)]"
                       )}
                       aria-current={isSelected ? "true" : undefined}
                       aria-label={`Select accomplishment ${accomplishment.name}`}
