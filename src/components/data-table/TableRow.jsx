@@ -40,6 +40,7 @@ export default function TableRow({
   enableRowSelection = false,
   isSelected,
   selectedRowClassName = "",
+  selectedCellClassName = "",
   onSelectRow,
   onActivateRow,
   getRowClassName,
@@ -73,7 +74,7 @@ export default function TableRow({
               className={cn(
                 "block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[var(--text-primary)] outline-none dark:text-[rgb(255,255,255)]",
                 bodyMdTextClassName,
-                isSelectableSelected && "text-[var(--delta-blue-deep)] dark:text-[var(--delta-blue-deep)]"
+                isSelectableSelected && selectedCellClassName
               )}
               onClick={() => {
                 if (enableRowSelection) {
