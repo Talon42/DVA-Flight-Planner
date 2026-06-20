@@ -11,7 +11,7 @@ import {
   shouldIncludeLogbookDistanceRow
 } from "./logbookFilters.model.js";
 
-// Filters the normalized logbook rows without touching the lazy-reveal slice.
+// Filters the normalized logbook rows against the active logbook filters.
 export function selectFilteredLogbookRows({ rows, filters }) {
   const activeRows = Array.isArray(rows) ? rows : [];
   if (!activeRows.length) {
@@ -79,12 +79,6 @@ export function selectSortedLogbookRows({ rows, sort }) {
 
     return right.sourceIndex - left.sourceIndex;
   });
-}
-
-// Slices the sorted rows for the flights table's incremental reveal behavior.
-export function selectVisibleLogbookRows({ rows, visibleRowCount }) {
-  const activeRows = Array.isArray(rows) ? rows : [];
-  return activeRows.slice(0, visibleRowCount);
 }
 
 // Builds the filter select options from the current cached logbook rows.

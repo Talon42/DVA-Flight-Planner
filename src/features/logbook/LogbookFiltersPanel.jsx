@@ -171,9 +171,9 @@ export default function LogbookFiltersPanel({
   );
   const collapseToggle = (
     <Button
-      variant="ghost"
+      variant="primary"
       size="sm"
-      className="w-9 rounded-none !px-0 !bg-[var(--delta-blue)] !text-white hover:!bg-[var(--delta-blue)] dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F]"
+      className="w-9 px-0"
       onClick={(event) => {
         event.stopPropagation();
         onToggleCollapsed?.();
@@ -211,9 +211,8 @@ export default function LogbookFiltersPanel({
         <div className="flex items-center gap-2">
           {collapseToggle}
           <Button
-            variant="ghost"
+            variant="primary"
             size="sm"
-            className="rounded-none !bg-[var(--delta-blue)] !text-white hover:!bg-[var(--delta-blue)] dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F]"
             onClick={onReset}
             aria-label="Reset logbook filters"
           >

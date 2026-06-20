@@ -5,8 +5,6 @@ import { getLogbookRowClassName } from "./logbookRowStyles.js";
 
 const COMPACT_LAYOUT_MAX_WIDTH = 900;
 const LOGBOOK_SELECTED_ROW_CLASS_NAME = "logbook-row-selected";
-const LOGBOOK_SELECTED_CELL_CLASS_NAME =
-  "!text-white dark:!text-white";
 
 function LogbookFlightCell({ row }) {
   return (
@@ -156,7 +154,6 @@ export default function LogbookFlightsTable({
       enableRowSelection
       selectedRowId={selectedRowId}
       selectedRowClassName={LOGBOOK_SELECTED_ROW_CLASS_NAME}
-      selectedCellClassName={LOGBOOK_SELECTED_CELL_CLASS_NAME}
       onSelectRow={onSelectRow}
       onActivateRow={onActivateRow}
       getRowId={(row) => row.id}

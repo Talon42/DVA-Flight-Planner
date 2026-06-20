@@ -54,7 +54,6 @@ function RowRenderer({ index, style, data }) {
       enableRowSelection={data.enableRowSelection}
       isSelected={isSelected}
       selectedRowClassName={data.selectedRowClassName}
-      selectedCellClassName={data.selectedCellClassName}
       onSelectRow={data.onSelectRow}
       onActivateRow={data.onActivateRow}
       getRowClassName={data.getRowClassName}
@@ -73,7 +72,6 @@ export default function DataTable({
   selectedRowId,
   enableRowSelection = false,
   selectedRowClassName = "",
-  selectedCellClassName = "",
   onSelectRow,
   onActivateRow,
   getRowId = (row) => row.id,
@@ -225,7 +223,6 @@ export default function DataTable({
       getRowId,
       enableRowSelection,
       selectedRowClassName,
-      selectedCellClassName,
       getRowClassName,
       renderRowOverlay
     }),
@@ -239,7 +236,6 @@ export default function DataTable({
       getRowId,
       enableRowSelection,
       selectedRowClassName,
-      selectedCellClassName,
       getRowClassName,
       renderRowOverlay
     ]
@@ -296,7 +292,6 @@ export default function DataTable({
                 enableRowSelection={enableRowSelection}
                 isSelected={enableRowSelection && selectedRowId != null && selectedRowId === rowId}
                 selectedRowClassName={selectedRowClassName}
-                selectedCellClassName={selectedCellClassName}
                 onSelectRow={onSelectRow}
                 onActivateRow={onActivateRow}
                 getRowClassName={getRowClassName}

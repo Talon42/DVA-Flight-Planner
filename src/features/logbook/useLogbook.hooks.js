@@ -13,12 +13,8 @@ import {
   selectLogbookFilterBounds,
   selectLogbookFilterOptions,
   selectLogbookPilotStats,
-  selectSortedLogbookRows,
-  selectVisibleLogbookRows
+  selectSortedLogbookRows
 } from "./logbook.selectors.js";
-
-const INITIAL_VISIBLE_ROWS = 25;
-const VISIBLE_ROW_PAGE = 25;
 
 function normalizePersistedSort(sort) {
   const key = String(sort?.key || DEFAULT_LOGBOOK_SORT.key).trim();
@@ -26,7 +22,7 @@ function normalizePersistedSort(sort) {
   return { key, direction };
 }
 
-// Owns cached-logbook loading, filtering, stats, sorting, and incremental reveal outside App.jsx.
+// Owns cached-logbook loading, filtering, stats, and sorting outside App.jsx.
 export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) {
   const [cacheResult, setCacheResult] = useState({
     dateIso: null,
@@ -40,7 +36,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const [filters, setFilters] = useState(DEFAULT_LOGBOOK_FILTERS);
   const [sort, setSort] = useState(DEFAULT_LOGBOOK_SORT);
   const [selectedRowId, setSelectedRowId] = useState(null);
-  const [visibleRowCount, setVisibleRowCount] = useState(INITIAL_VISIBLE_ROWS);
   const hasHydratedPersistedStateRef = useRef(false);
 
   const allRows = useMemo(() => normalizeLogbookRows(cacheResult.entries), [cacheResult.entries]);
@@ -100,15 +95,9 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     () => selectSortedLogbookRows({ rows: filteredRows, sort }),
     [filteredRows, sort]
   );
-  const visibleRows = useMemo(
-    () => selectVisibleLogbookRows({ rows: sortedFilteredRows, visibleRowCount }),
-    [sortedFilteredRows, visibleRowCount]
-  );
-  const hasMoreRows = visibleRows.length < sortedFilteredRows.length;
   const filterOptions = useMemo(() => selectLogbookFilterOptions(allRows), [allRows]);
 
   useEffect(() => {
-    setVisibleRowCount(INITIAL_VISIBLE_ROWS);
     setSelectedRowId(null);
   }, [filters, sort]);
 
@@ -143,14 +132,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     setSelectedRowId((current) => (current === rowId ? current : rowId));
   }, []);
 
-  const handleLoadMoreRows = useCallback(() => {
-    if (sortedFilteredRows.length <= visibleRowCount) {
-      return;
-    }
-
-    setVisibleRowCount((current) => Math.min(sortedFilteredRows.length, current + VISIBLE_ROW_PAGE));
-  }, [sortedFilteredRows.length, visibleRowCount]);
-
   return {
     cacheResult,
     isLoading,
@@ -158,9 +139,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     allRows,
     filteredRows,
     sortedFilteredRows,
-    visibleRows,
-    visibleRowCount,
-    hasMoreRows,
     selectedTab,
     setSelectedTab,
     filters,
@@ -172,7 +150,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     handleFilterChange,
     handleResetFilters,
     handleSort,
-    handleSelectRow,
-    handleLoadMoreRows
+    handleSelectRow
   };
 }

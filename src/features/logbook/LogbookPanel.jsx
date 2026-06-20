@@ -6,6 +6,54 @@ import { bodySmTextClassName } from "../../components/ui/typography";
 import LogbookFlightsTable from "./LogbookFlightsTable.jsx";
 import LogbookPilotStats from "./LogbookPilotStats.jsx";
 
+// Reuses the same header row for the empty and populated logbook states.
+function LogbookPanelHeader({
+  selectedTab,
+  isRefreshDisabled,
+  isRefreshingLogbook,
+  onRefreshLogbook,
+  onSelectTab
+}) {
+  return (
+    <div className="flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
+      <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
+        <button
+          type="button"
+          className={cn(plannerTabClassName, getPlannerTabStateClassName(selectedTab === "flights"))}
+          role="tab"
+          aria-selected={selectedTab === "flights"}
+          onClick={() => onSelectTab?.("flights")}
+        >
+          Flights
+        </button>
+        <button
+          type="button"
+          className={cn(
+            plannerTabClassName,
+            getPlannerTabStateClassName(selectedTab === "pilot-stats")
+          )}
+          role="tab"
+          aria-selected={selectedTab === "pilot-stats"}
+          onClick={() => onSelectTab?.("pilot-stats")}
+        >
+          Pilot Stats
+        </button>
+      </div>
+
+      <Button
+        variant="primary"
+        size="md"
+        type="button"
+        className="shrink-0 bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
+        onClick={onRefreshLogbook}
+        disabled={isRefreshDisabled}
+      >
+        {isRefreshingLogbook ? "Refreshing..." : "Refresh Logbook"}
+      </Button>
+    </div>
+  );
+}
+
 // Renders the logbook workspace shell inside the main schedule panel body.
 export default function LogbookPanel({
   allRows,
@@ -30,45 +78,13 @@ export default function LogbookPanel({
     return (
       <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
         <div className="w-full min-w-0 px-0 pb-0">
-          <div className="flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
-            <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
-              <button
-                type="button"
-                className={cn(
-                  plannerTabClassName,
-                  getPlannerTabStateClassName(selectedTab === "flights")
-                )}
-                role="tab"
-                aria-selected={selectedTab === "flights"}
-                onClick={() => onSelectTab?.("flights")}
-              >
-                Flights
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  plannerTabClassName,
-                  getPlannerTabStateClassName(selectedTab === "pilot-stats")
-                )}
-                role="tab"
-                aria-selected={selectedTab === "pilot-stats"}
-                onClick={() => onSelectTab?.("pilot-stats")}
-              >
-                Pilot Stats
-              </button>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="md"
-              type="button"
-              className="shrink-0 bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
-              onClick={onRefreshLogbook}
-              disabled={isRefreshDisabled}
-            >
-              {isRefreshingLogbook ? "Refreshing..." : "Refresh Logbook"}
-            </Button>
-          </div>
+          <LogbookPanelHeader
+            selectedTab={selectedTab}
+            isRefreshDisabled={isRefreshDisabled}
+            isRefreshingLogbook={isRefreshingLogbook}
+            onRefreshLogbook={onRefreshLogbook}
+            onSelectTab={onSelectTab}
+          />
         </div>
 
         <div className={cn("grid gap-3 border border-dashed border-[color:var(--line)] p-5", cardFrameClassName)}>
@@ -84,45 +100,13 @@ export default function LogbookPanel({
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
       <div className="w-full min-w-0 px-0 pb-0">
-        <div className="flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
-          <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
-            <button
-              type="button"
-              className={cn(
-                plannerTabClassName,
-                getPlannerTabStateClassName(selectedTab === "flights")
-              )}
-              role="tab"
-              aria-selected={selectedTab === "flights"}
-              onClick={() => onSelectTab?.("flights")}
-            >
-              Flights
-            </button>
-            <button
-              type="button"
-              className={cn(
-                plannerTabClassName,
-                getPlannerTabStateClassName(selectedTab === "pilot-stats")
-              )}
-              role="tab"
-              aria-selected={selectedTab === "pilot-stats"}
-              onClick={() => onSelectTab?.("pilot-stats")}
-            >
-              Pilot Stats
-            </button>
-          </div>
-
-          <Button
-            variant="ghost"
-            size="md"
-            type="button"
-            className="shrink-0 bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
-            onClick={onRefreshLogbook}
-            disabled={isRefreshDisabled}
-          >
-            {isRefreshingLogbook ? "Refreshing..." : "Refresh Logbook"}
-          </Button>
-        </div>
+        <LogbookPanelHeader
+          selectedTab={selectedTab}
+          isRefreshDisabled={isRefreshDisabled}
+          isRefreshingLogbook={isRefreshingLogbook}
+          onRefreshLogbook={onRefreshLogbook}
+          onSelectTab={onSelectTab}
+        />
       </div>
 
       <div className="min-h-0 w-full min-w-0 flex-1">
