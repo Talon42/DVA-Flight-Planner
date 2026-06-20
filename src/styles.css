@@ -239,6 +239,19 @@
   .app-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
+
+  /* Logbook selection needs to override status highlight rows in both themes. */
+  .logbook-row-selected,
+  .logbook-row-selected:hover,
+  .logbook-row-selected:nth-child(even) {
+    background: #0064bf !important;
+  }
+
+  :root[data-theme="dark"] .logbook-row-selected,
+  :root[data-theme="dark"] .logbook-row-selected:hover,
+  :root[data-theme="dark"] .logbook-row-selected:nth-child(even) {
+    background: #1f466e !important;
+  }
 }
 
 .range-input {

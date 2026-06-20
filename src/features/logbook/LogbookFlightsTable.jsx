@@ -4,16 +4,9 @@ import { cn } from "../../components/ui/cn";
 import { getLogbookRowClassName } from "./logbookRowStyles.js";
 
 const COMPACT_LAYOUT_MAX_WIDTH = 900;
-const LOGBOOK_SELECTED_ROW_CLASS_NAME = [
-  "bg-[var(--delta-blue)]",
-  "even:bg-[var(--delta-blue)]",
-  "hover:bg-[var(--delta-blue)]",
-  "dark:bg-[#1F466E]",
-  "dark:even:bg-[#1F466E]",
-  "dark:hover:bg-[#27547F]"
-].join(" ");
+const LOGBOOK_SELECTED_ROW_CLASS_NAME = "logbook-row-selected";
 const LOGBOOK_SELECTED_CELL_CLASS_NAME =
-  "text-white dark:text-white";
+  "!text-white dark:!text-white";
 
 function LogbookFlightCell({ row }) {
   return (
