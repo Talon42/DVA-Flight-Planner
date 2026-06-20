@@ -277,6 +277,21 @@ function buildCompactFlightLabel(entry) {
   return normalizeText(entry?.flightCode) || LOGBOOK_EMPTY_VALUE;
 }
 
+function buildFlightLabel(entry) {
+  const airlineCode = normalizeUpperText(entry?.airline || entry?.airlineCode || entry?.airlineIata);
+  const flightNumber = normalizeText(entry?.flight || entry?.flightNumber || entry?.flightNo);
+
+  if (airlineCode && flightNumber) {
+    return `${airlineCode} ${flightNumber}`;
+  }
+
+  if (flightNumber) {
+    return flightNumber;
+  }
+
+  return normalizeText(entry?.flightCode) || LOGBOOK_EMPTY_VALUE;
+}
+
 function readNestedValue(preferredValue, nestedValue) {
   return preferredValue ?? nestedValue;
 }
@@ -410,6 +425,7 @@ export function normalizeLogbookRows(entries) {
 
     const rawLogbookId = normalizeText(entry.logbookId ?? entry.id);
     const compactFlightLabel = buildCompactFlightLabel(entry);
+    const flightLabel = buildFlightLabel(entry);
     const airlineCode = normalizeUpperText(entry.airline || entry.airlineCode || entry.airlineIata);
     const airlineDisplayName = getAirlineNameByCode(airlineCode) || airlineCode || LOGBOOK_EMPTY_VALUE;
     const airlineLogoSrc = getAirlineLogo({
@@ -435,6 +451,7 @@ export function normalizeLogbookRows(entries) {
       dateDisplay: formatDvaDate(entry),
       dateDisplayCompact: formatDvaDateCompact(entry),
       dateSortKey: buildDateSortKey(entry),
+      flightLabel,
       compactFlightLabel,
       airlineCode: airlineCode || LOGBOOK_EMPTY_VALUE,
       airlineDisplayName,

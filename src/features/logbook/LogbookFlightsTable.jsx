@@ -33,7 +33,10 @@ function LandingGradeBadge({ grade }) {
   );
 }
 
-function LogbookFlightCell({ row }) {
+// Uses the wider preset to show a fuller flight label while preserving the compact label in tight layouts.
+function LogbookFlightCell({ row, column }) {
+  const flightLabel = column?.presetKey === "compact" ? row.compactFlightLabel : row.flightLabel || row.compactFlightLabel;
+
   return (
     <span className="flex min-w-0 items-center gap-2">
       {row.airlineLogoSrc ? (
@@ -43,8 +46,8 @@ function LogbookFlightCell({ row }) {
           loading="lazy"
           className={cn("h-4 w-4 shrink-0 object-contain", row.airlineLogoClassName)}
         />
-      ) : null}
-      <span className="min-w-0 truncate leading-none">{row.compactFlightLabel}</span>
+        ) : null}
+      <span className="min-w-0 truncate leading-none">{flightLabel}</span>
     </span>
   );
 }
@@ -71,11 +74,11 @@ function getLogbookColumns() {
       compactLabel: "Flight",
       wideLabel: "Flight",
       role: "primaryText",
-      compactMinWidth: 104,
-      minWidth: 118,
-      fr: 1,
+      compactMinWidth: 118,
+      minWidth: 136,
+      fr: 1.1,
       truncate: true,
-      renderCell: (row) => <LogbookFlightCell row={row} />
+      renderCell: (row, column) => <LogbookFlightCell row={row} column={column} />
     },
     {
       key: "departure",
@@ -149,9 +152,9 @@ function getLogbookColumns() {
       compactLabel: "Landing",
       wideLabel: "Landing Rate",
       role: "time",
-      compactMinWidth: 86,
-      minWidth: 112,
-      fr: 0.9,
+      compactMinWidth: 120,
+      minWidth: 120,
+      fr: 1.05,
       truncate: true,
       renderCell: (row) => <LandingGradeBadge grade={row.landingGradeDisplay} />
     }
