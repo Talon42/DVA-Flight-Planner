@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../../components/ui/cn";
 import { labelTextClassName, bodyMdTextClassName } from "../../components/ui/typography";
-import { buildColumnTemplate, fitColumnsToWidth } from "../../components/data-table/tableUtils.js";
+import { buildColumnTemplate } from "../../components/data-table/tableUtils.js";
 
 const COMPACT_LAYOUT_MAX_WIDTH = 900;
 
@@ -91,8 +91,7 @@ function getLogbookColumns(isWideLayout) {
     label: isWideLayout ? column.wideLabel : column.compactLabel,
     accessibleLabel: column.accessibleLabel || column.wideLabel || column.compactLabel,
     minWidth: isWideLayout ? column.wideMinWidth : column.compactMinWidth,
-    flexWeight: column.flexWeight,
-    width: isWideLayout ? column.wideMinWidth : column.compactMinWidth,
+    fr: column.flexWeight,
     renderCell: column.renderCell ? (row) => column.renderCell(row, isWideLayout) : undefined
   }));
 }
@@ -229,13 +228,10 @@ export default function LogbookFlightsTable({
       }),
     [useWideLayout]
   );
-  const fittedColumns = useMemo(
-    () => fitColumnsToWidth(visibleColumns, targetWidth),
-    [targetWidth, visibleColumns]
-  );
+  const fittedColumns = visibleColumns;
   const columnTemplate = useMemo(
-    () => buildColumnTemplate(fittedColumns, targetWidth),
-    [targetWidth, fittedColumns]
+    () => buildColumnTemplate(fittedColumns),
+    [fittedColumns]
   );
 
   useEffect(() => {

@@ -26,16 +26,11 @@ export function normalizeDvaTourEpochSeconds(value) {
 
 // Derives the visibility flags used to group and label tours in the planner UI.
 export function buildDvaTourVisibilityMetadata(tour, nowSeconds = Math.floor(Date.now() / 1000)) {
-  const active = Boolean(tour?.active);
   const startDate = normalizeDvaTourEpochSeconds(tour?.startDate ?? tour?.start_date ?? null);
   const endDate = normalizeDvaTourEpochSeconds(tour?.endDate ?? tour?.end_date ?? null);
   const isExpired = endDate !== null && endDate > 0 && endDate < nowSeconds;
-  const isCurrent =
-    active &&
-    !isExpired &&
-    (startDate === null || startDate <= nowSeconds) &&
-    (endDate === null || endDate >= nowSeconds);
-  const isUpcoming = active && !isExpired && !isCurrent && startDate !== null && startDate > nowSeconds;
+  const isCurrent = !isExpired && (startDate === null || startDate <= nowSeconds) && (endDate === null || endDate >= nowSeconds);
+  const isUpcoming = !isExpired && startDate !== null && startDate > nowSeconds;
 
   return {
     startDate,

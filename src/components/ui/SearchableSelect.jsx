@@ -36,6 +36,7 @@ function isPromptOption(option) {
 function renderOptionLabel(option, fallbackText = "") {
   const labelText = String(option?.selectedLabel || option?.label || fallbackText || "").trim();
   const logoSrc = String(option?.logoSrc || "").trim();
+  const logoClassName = String(option?.logoClassName || "").trim();
 
   if (!logoSrc) {
     return <span className="min-w-0 flex-1 truncate">{labelText}</span>;
@@ -43,7 +44,12 @@ function renderOptionLabel(option, fallbackText = "") {
 
   return (
     <span className="flex min-w-0 flex-1 items-center gap-3">
-      <img className="h-5 w-5 shrink-0 object-contain" src={logoSrc} alt="" aria-hidden="true" />
+      <img
+        className={cn("h-5 w-5 shrink-0 object-contain", logoClassName)}
+        src={logoSrc}
+        alt=""
+        aria-hidden="true"
+      />
       <span className="min-w-0 flex-1 truncate">{labelText}</span>
     </span>
   );

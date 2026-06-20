@@ -29,7 +29,6 @@ export default function AppMainWorkspace({
   viewportSize,
   flightRows,
   sort,
-  timeDisplayMode,
   addonAirports,
   vatsimNetwork,
   tourRows,
@@ -38,7 +37,6 @@ export default function AppMainWorkspace({
   onShowAccomplishmentFlights,
   onSortAccomplishmentFlights,
   onSortFlights,
-  onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow,
   plannerMode,
@@ -109,7 +107,6 @@ export default function AppMainWorkspace({
           flightRows={flightRows}
           selectedFlightRowId={selectedFlightId}
           flightSort={sort}
-          timeDisplayMode={timeDisplayMode}
           addonAirports={addonAirports}
           vatsimNetwork={vatsimNetwork}
           tourRows={tourRows}
@@ -118,7 +115,6 @@ export default function AppMainWorkspace({
           onShowAccomplishmentFlights={onShowAccomplishmentFlights}
           onSortAccomplishmentFlights={onSortAccomplishmentFlights}
           onSortFlights={onSortFlights}
-          onToggleTimeDisplayMode={onToggleTimeDisplayMode}
           onSelectRow={onSelectRow}
           onActivateRow={onActivateRow}
           plannerMode={plannerMode}

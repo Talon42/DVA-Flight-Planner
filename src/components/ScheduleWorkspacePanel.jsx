@@ -32,7 +32,6 @@ export default function ScheduleWorkspacePanel({
   flightRows,
   selectedFlightRowId,
   flightSort,
-  timeDisplayMode,
   addonAirports,
   vatsimNetwork,
   tourRows,
@@ -41,7 +40,6 @@ export default function ScheduleWorkspacePanel({
   onShowAccomplishmentFlights,
   onSortAccomplishmentFlights,
   onSortFlights,
-  onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow,
   plannerMode,
@@ -100,7 +98,6 @@ export default function ScheduleWorkspacePanel({
               flightRows={flightRows}
               selectedFlightRowId={selectedFlightRowId}
               flightSort={flightSort}
-              timeDisplayMode={timeDisplayMode}
               addonAirports={addonAirports}
               vatsimNetwork={vatsimNetwork}
               tourRows={tourRows}
@@ -109,7 +106,6 @@ export default function ScheduleWorkspacePanel({
               onShowAccomplishmentFlights={onShowAccomplishmentFlights}
               onSortAccomplishmentFlights={onSortAccomplishmentFlights}
               onSortFlights={onSortFlights}
-              onToggleTimeDisplayMode={onToggleTimeDisplayMode}
               onSelectRow={onSelectRow}
               onActivateRow={onActivateRow}
               dutyFilters={dutyFilters}

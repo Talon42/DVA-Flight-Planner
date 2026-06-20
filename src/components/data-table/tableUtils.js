@@ -1,11 +1,11 @@
-import { TABLE_BREAKPOINTS, TABLE_WIDTH_PRESETS } from "./tableWidthPresets";
+import { TABLE_WIDTH_THRESHOLDS, TABLE_WIDTH_PRESETS } from "./tableWidthPresets";
 
 export function getTablePresetKey(viewportWidth = 0) {
-  if (viewportWidth >= TABLE_BREAKPOINTS.expanded) {
+  if (viewportWidth >= TABLE_WIDTH_THRESHOLDS.expanded) {
     return "expanded";
   }
 
-  if (viewportWidth >= TABLE_BREAKPOINTS.standard) {
+  if (viewportWidth >= TABLE_WIDTH_THRESHOLDS.standard) {
     return "standard";
   }
 
@@ -36,138 +36,198 @@ export function resolveColumnLabel(column, presetKey) {
   return column.label;
 }
 
-export function resolveColumns(columns, viewportWidth) {
-  const presetKey = getTablePresetKey(viewportWidth);
-  const widths = TABLE_WIDTH_PRESETS[presetKey];
+function getColumnRolePreset(role) {
+  return TABLE_WIDTH_PRESETS[role] || TABLE_WIDTH_PRESETS.secondary;
+}
 
+function getColumnMinWidth(column, presetKey) {
+  const compactMinWidth = Number(column.compactMinWidth);
+  const minWidth = Number(column.minWidth);
+
+  if (presetKey === "compact" && Number.isFinite(compactMinWidth) && compactMinWidth > 0) {
+    return compactMinWidth;
+  }
+
+  if (Number.isFinite(minWidth) && minWidth > 0) {
+    return minWidth;
+  }
+
+  return getColumnRolePreset(column.role).minWidth;
+}
+
+function getColumnFr(column) {
+  const fr = Number(column.fr);
+
+  if (Number.isFinite(fr) && fr > 0) {
+    return fr;
+  }
+
+  return getColumnRolePreset(column.role).fr;
+}
+
+function getColumnDefaultAlign(column) {
+  if (column.role === "time" || column.role === "numeric") {
+    return "left";
+  }
+
+  return getColumnRolePreset(column.role).align || "left";
+}
+
+export function resolveColumnsForPreset(columns, viewportWidth, presetKey) {
   return columns
     .filter((column) => shouldShowColumn(column, viewportWidth))
     .map((column) => {
-      const rolePreset = widths[column.role] || widths.secondary;
+      const fullLabel = column.label;
+      const label = resolveColumnLabel(column, presetKey);
+      const minWidth = getColumnMinWidth(column, presetKey);
+      const fr = getColumnFr(column);
 
       return {
         ...column,
-        label: resolveColumnLabel(column, presetKey),
-        minWidth: column.minWidth || rolePreset.minWidth,
-        flexWeight: column.flexWeight || rolePreset.flexWeight,
-        width: column.width || column.minWidth || rolePreset.minWidth
+        fullLabel,
+        label,
+        minWidth,
+        fr,
+        required: column.required ?? true,
+        align: column.align ?? getColumnDefaultAlign(column)
       };
     });
 }
 
-export function fitColumnsToWidth(columns, targetWidth) {
-  if (!columns.length || !(targetWidth > 0)) {
-    return columns;
+// Resolves shared sizing and visibility metadata for the active viewport preset.
+export function resolveColumns(columns, viewportWidth) {
+  return resolveColumnsForPreset(columns, viewportWidth, getTablePresetKey(viewportWidth));
+}
+
+export function getResolvedColumnsMinWidth(columns) {
+  return columns.reduce((sum, column) => sum + Math.max(1, Number(column.minWidth) || 1), 0);
+}
+
+export function resolvedColumnsFit(columns, availableWidth, safetyReserve = 8) {
+  const measurementWidth = Math.max(0, Math.floor(availableWidth) || 0);
+
+  if (!(measurementWidth > 0)) {
+    return false;
   }
 
-  const totalMinWidth = columns.reduce(
-    (sum, column) => sum + Math.max(1, Number(column.minWidth) || Number(column.width) || 1),
-    0
-  );
+  return getResolvedColumnsMinWidth(columns) <= Math.max(0, measurementWidth - safetyReserve);
+}
 
-  if (!(totalMinWidth > 0)) {
-    return columns;
-  }
+function getOptionalGroupKey(column) {
+  return String(column.optionalGroup || "").trim();
+}
 
-  if (targetWidth <= totalMinWidth) {
-    const scale = targetWidth / totalMinWidth;
-    const compressedColumns = columns.map((column) => ({
-      ...column,
-      width: Math.max(
-        1,
-        Math.floor((Math.max(1, Number(column.minWidth) || Number(column.width) || 1)) * scale)
-      )
-    }));
+function getOptionalGroupPriority(columns) {
+  return columns.reduce((lowestPriority, column) => {
+    const priority = Number(column.optionalPriority);
 
-    let compressedWidth = getTotalColumnWidth(compressedColumns);
-    let compressionRemainder = Math.floor(targetWidth) - compressedWidth;
-    let compressionIndex = 0;
-
-    while (compressionRemainder > 0 && compressedColumns.length) {
-      compressedColumns[compressionIndex % compressedColumns.length].width += 1;
-      compressionRemainder -= 1;
-      compressionIndex += 1;
+    if (!Number.isFinite(priority)) {
+      return lowestPriority;
     }
 
-    while (compressionRemainder < 0 && compressedColumns.length) {
-      const column = compressedColumns[compressionIndex % compressedColumns.length];
-      if (column.width > 1) {
-        column.width -= 1;
-        compressionRemainder += 1;
+    return lowestPriority === null ? priority : Math.min(lowestPriority, priority);
+  }, null);
+}
+
+function getOptionalGroupMinWidth(columns) {
+  return columns.reduce((sum, column) => sum + Math.max(1, Number(column.minWidth) || 1), 0);
+}
+
+function getRequiredTableMinWidth(columns) {
+  return columns.reduce((sum, column) => {
+    if (column.required === false) {
+      return sum;
+    }
+
+    return sum + Math.max(1, Number(column.minWidth) || 1);
+  }, 0);
+}
+
+function getOptionalGroupReserve(viewportWidth) {
+  return viewportWidth >= TABLE_WIDTH_THRESHOLDS.standard ? 160 : 64;
+}
+
+// Hides optional groups unless the measured table width can support them as a whole.
+export function applyOptionalColumnGroups(columns, availableWidth, viewportWidth = 0) {
+  if (!columns.length) {
+    return columns;
+  }
+
+  const measurementWidth = Math.max(0, Math.floor(availableWidth) || Math.floor(viewportWidth) || 0);
+
+  if (!(measurementWidth > 0)) {
+    return columns;
+  }
+
+  const groups = new Map();
+  const requiredColumns = [];
+
+  for (const column of columns) {
+    const groupKey = getOptionalGroupKey(column);
+
+    if (column.required !== false || !groupKey) {
+      requiredColumns.push(column);
+      continue;
+    }
+
+    const group = groups.get(groupKey) || [];
+    group.push(column);
+    groups.set(groupKey, group);
+  }
+
+  if (!groups.size) {
+    return columns;
+  }
+
+  const visibleGroupKeys = new Set();
+  const orderedGroups = [...groups.entries()]
+    .map(([groupKey, groupColumns]) => ({
+      groupKey,
+      groupColumns,
+      priority: getOptionalGroupPriority(groupColumns),
+      minWidth: getOptionalGroupMinWidth(groupColumns)
+    }))
+    .sort((left, right) => {
+      const leftPriority = Number.isFinite(left.priority) ? left.priority : Number.POSITIVE_INFINITY;
+      const rightPriority = Number.isFinite(right.priority) ? right.priority : Number.POSITIVE_INFINITY;
+
+      if (leftPriority !== rightPriority) {
+        return leftPriority - rightPriority;
       }
-      compressionIndex += 1;
-    }
 
-    return compressedColumns;
+      return left.minWidth - right.minWidth;
+    });
+
+  let remainingBudget = measurementWidth - getRequiredTableMinWidth(requiredColumns) - getOptionalGroupReserve(viewportWidth);
+
+  for (const group of orderedGroups) {
+    if (group.minWidth <= remainingBudget) {
+      visibleGroupKeys.add(group.groupKey);
+      remainingBudget -= group.minWidth;
+    }
   }
 
-  const extraWidth = Math.floor(targetWidth - totalMinWidth);
-  const totalFlexWeight = columns.reduce(
-    (sum, column) => sum + Math.max(0.1, Number(column.flexWeight) || 1),
-    0
-  );
-  let assignedExtraWidth = 0;
-  const expandedColumns = columns.map((column) => {
-    const width =
-      Math.max(1, Number(column.minWidth) || Number(column.width) || 1) +
-      Math.floor((extraWidth * Math.max(0.1, Number(column.flexWeight) || 1)) / totalFlexWeight);
+  return columns.filter((column) => {
+    const groupKey = getOptionalGroupKey(column);
 
-    assignedExtraWidth += width - Math.max(1, Number(column.minWidth) || Number(column.width) || 1);
+    if (!groupKey) {
+      return true;
+    }
 
-    return {
-      ...column,
-      width
-    };
+    return visibleGroupKeys.has(groupKey);
   });
-
-  let remainder = extraWidth - assignedExtraWidth;
-  let index = 0;
-
-  while (remainder > 0 && expandedColumns.length) {
-    expandedColumns[index % expandedColumns.length].width += 1;
-    remainder -= 1;
-    index += 1;
-  }
-
-  while (remainder < 0 && expandedColumns.length) {
-    const column = expandedColumns[index % expandedColumns.length];
-    if (column.width > 1) {
-      column.width -= 1;
-      remainder += 1;
-    }
-    index += 1;
-  }
-
-  return expandedColumns;
 }
 
-function getTotalMinWidth(columns) {
-  return columns.reduce(
-    (sum, column) => sum + Math.max(1, Number(column.minWidth) || Number(column.width) || 1),
-    0
-  );
-}
-
-export function buildColumnTemplate(columns, targetWidth = 0) {
+export function buildColumnTemplate(columns) {
   if (!columns.length) {
     return "";
   }
 
-  const totalMinWidth = getTotalMinWidth(columns);
-
-  if (targetWidth > totalMinWidth) {
-    return columns
-      .map((column) => {
-        const minWidth = Math.max(1, Number(column.minWidth) || Number(column.width) || 1);
-        const flexWeight = Math.max(0.1, Number(column.flexWeight) || 1);
-        return `minmax(${minWidth}px, ${flexWeight}fr)`;
-      })
-      .join(" ");
-  }
-
-  return columns.map((column) => `minmax(0, ${column.width}px)`).join(" ");
-}
-
-export function getTotalColumnWidth(columns) {
-  return columns.reduce((sum, column) => sum + column.width, 0);
+  return columns
+    .map((column) => {
+      const minWidth = Math.max(1, Number(column.minWidth) || 1);
+      const fr = Math.max(0.01, Number(column.fr) || 0.01);
+      return `minmax(${minWidth}px, ${fr}fr)`;
+    })
+    .join(" ");
 }

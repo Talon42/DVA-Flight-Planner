@@ -198,7 +198,7 @@ export function useScheduleImport({
   );
 
   const processImportedSchedule = useCallback(
-    async (pickedFile, sourceLabel) => {
+    async (scheduleFile, sourceLabel) => {
       const logStartedAt = new Date().toISOString();
       const startedAtMs = Date.now();
       let importIssuesText = "";
@@ -216,16 +216,16 @@ export function useScheduleImport({
       };
 
       setIsImporting(true);
-      setStatusMessage?.(`Importing ${pickedFile.fileName}...`);
+      setStatusMessage?.(`Importing ${scheduleFile.fileName}...`);
       await logAppEvent("import-start", {
         source: sourceLabel,
-        file: pickedFile.fileName
+        file: scheduleFile.fileName
       });
 
       try {
         const imported = await runScheduleImport(
-          pickedFile.fileName,
-          pickedFile.xmlText,
+          scheduleFile.fileName,
+          scheduleFile.xmlText,
           appendDebug
         );
         importIssuesText = imported.importLog || "";
@@ -290,13 +290,13 @@ export function useScheduleImport({
         setStatusMessage?.(
           persistedSuccessfully
             ? staleBoardEntries
-              ? `Imported ${formatNumber(imported.flights.length)} flights from ${pickedFile.fileName}. ${formatNumber(staleBoardEntries)} board flights need repair.`
-              : `Imported ${formatNumber(imported.flights.length)} flights from ${pickedFile.fileName}.`
+              ? `Imported ${formatNumber(imported.flights.length)} flights from ${scheduleFile.fileName}. ${formatNumber(staleBoardEntries)} board flights need repair.`
+              : `Imported ${formatNumber(imported.flights.length)} flights from ${scheduleFile.fileName}.`
             : "Imported schedule, but it could not be saved for next launch. Check the app log."
         );
         await logAppEvent("import-success", {
           source: sourceLabel,
-          file: pickedFile.fileName,
+          file: scheduleFile.fileName,
           importedRows: imported.importSummary?.importedRows ?? imported.flights.length,
           omittedRows: imported.importSummary?.omittedRows ?? 0,
           incompatibleRoutes: imported.importSummary?.incompatibleRoutes ?? 0,
@@ -307,14 +307,14 @@ export function useScheduleImport({
         setStatusMessage?.(error.message || "Import failed.");
         await logAppError("import-failed", error, {
           source: sourceLabel,
-          file: pickedFile.fileName,
+          file: scheduleFile.fileName,
           durationMs: Date.now() - startedAtMs
         });
       } finally {
         try {
           const sessionEndedAt = new Date().toISOString();
           const logSections = [
-            `=== Import Session (${sourceLabel}) ===\nStart: ${logStartedAt}\nEnd: ${sessionEndedAt}\nSource: ${pickedFile.fileName}`
+            `=== Import Session (${sourceLabel}) ===\nStart: ${logStartedAt}\nEnd: ${sessionEndedAt}\nSource: ${scheduleFile.fileName}`
           ];
           if (importIssuesText) {
             logSections.push(`--- Import Issues ---\n${importIssuesText.trim()}`);

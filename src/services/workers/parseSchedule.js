@@ -7,6 +7,12 @@ import equipmentTypeData from "../../data/equipment_type.json";
 import { normalizeEquipmentTypeValue, unwrapEquipmentTypeRows } from "../../domain/aircraft/equipmentTypes.js";
 
 const DATE_FORMAT = "MM/dd/yyyy HH:mm";
+const SHORT_ROUTE_SCHEDULE_SPEED_KTS = 325;
+const LONG_ROUTE_SCHEDULE_SPEED_KTS = 400;
+const MAX_SCHEDULE_GROUND_SPEED_KTS = 425;
+const EASTBOUND_TAILWIND_BOOST_KTS = 25;
+const LONG_ROUTE_SPEED_START_NM = 1000;
+const LONG_ROUTE_SPEED_FULL_NM = 2000;
 
 function normalizeText(value) {
   return String(value ?? "").trim();
@@ -178,14 +184,17 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         });
       }
 
-      const staLocal = normalizeArrivalDate(stdLocal, rawStaLocal, distanceNm);
+      const effectiveSpeedKts = calculateScheduleGroundSpeedKts(distanceNm, fromAirport, toAirport);
+      const estimatedBlockMinutes = estimateBlockMinutes(distanceNm, effectiveSpeedKts);
+      const staLocal = Number.isFinite(estimatedBlockMinutes)
+        ? stdLocal.plus({ minutes: estimatedBlockMinutes })
+        : normalizeArrivalDate(stdLocal, rawStaLocal, distanceNm);
 
       const airlineName =
         airlineMap.get(rawFlight.airline) || `${rawFlight.airline} (not in airline map)`;
-      const blockMinutes = Math.max(
-        0,
-        Math.round(staLocal.toUTC().diff(stdLocal.toUTC(), "minutes").minutes)
-      );
+      const blockMinutes = Number.isFinite(estimatedBlockMinutes)
+        ? estimatedBlockMinutes
+        : Math.max(0, Math.round(staLocal.toUTC().diff(stdLocal.toUTC(), "minutes").minutes));
       const compatibility = resolveRouteCompatibility(rawFlight, distanceNm);
       const airlineIcao = airlineIcaoMap.get(rawFlight.airline) || "";
       const flightNumber = String(rawFlight.flightNumber || "").trim();
@@ -345,15 +354,47 @@ function buildAircraftCatalog() {
   return catalog;
 }
 
-function resolveRouteCompatibility(rawFlight, distanceNm) {
-  const compatibleProfiles = aircraftCatalog.filter((profile) => {
-    const rangeOk =
-      Number.isFinite(profile.maximumRangeNm) &&
-      Number.isFinite(distanceNm) &&
-      profile.maximumRangeNm >= distanceNm;
+// Keeps parse-time compatibility aligned with the runtime aircraft filter rules.
+function supportsRouteCompatibility(profile, rawFlight, distanceNm) {
+  if (!profile) {
+    return false;
+  }
 
-    return rangeOk;
-  });
+  if (!Number.isFinite(profile.maximumRangeNm) || !Number.isFinite(distanceNm)) {
+    return false;
+  }
+
+  if (profile.maximumRangeNm < distanceNm) {
+    return false;
+  }
+
+  if (Number.isFinite(rawFlight.mtow)) {
+    if (!Number.isFinite(profile.maximumTakeoffWeight)) {
+      return false;
+    }
+
+    if (profile.maximumTakeoffWeight > rawFlight.mtow) {
+      return false;
+    }
+  }
+
+  if (Number.isFinite(rawFlight.mlw)) {
+    if (!Number.isFinite(profile.maximumLandingWeight)) {
+      return false;
+    }
+
+    if (profile.maximumLandingWeight > rawFlight.mlw) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function resolveRouteCompatibility(rawFlight, distanceNm) {
+  const compatibleProfiles = aircraftCatalog.filter((profile) =>
+    supportsRouteCompatibility(profile, rawFlight, distanceNm)
+  );
 
   const compatibleEquipment = [...new Set(compatibleProfiles.map((profile) => profile.equipmentType))].sort();
   const compatibleFamilies = [...new Set(compatibleProfiles.map((profile) => profile.family))]
@@ -368,8 +409,8 @@ function resolveRouteCompatibility(rawFlight, distanceNm) {
     compatibilityCount: compatibleEquipment.length,
     compatibilityStatus: compatibleEquipment.length ? "compatible" : "none",
     compatibilityReason: compatibleEquipment.length
-      ? `${compatibleEquipment.length} equipment profiles are within the route range.`
-      : "No aircraft profiles are within the route range."
+      ? `${compatibleEquipment.length} equipment profiles fit within route range and imported schedule weight caps.`
+      : "No aircraft profiles fit within route range and imported schedule weight caps."
   };
 }
 
@@ -490,12 +531,107 @@ function normalizeArrivalDate(stdLocal, staLocal, distanceNm) {
   return candidates[0].dateTime;
 }
 
-function estimateBlockMinutes(distanceNm) {
-  if (!Number.isFinite(distanceNm) || distanceNm <= 0) {
+function estimateBlockMinutes(distanceNm, effectiveSpeedKts = SHORT_ROUTE_SCHEDULE_SPEED_KTS) {
+  if (!Number.isFinite(distanceNm) || distanceNm < 0) {
     return null;
   }
 
-  return Math.max(30, Math.round((distanceNm / 430) * 60 + 25));
+  if (!Number.isFinite(effectiveSpeedKts) || effectiveSpeedKts <= 0) {
+    return null;
+  }
+
+  return Math.round((distanceNm / effectiveSpeedKts) * 60);
+}
+
+function calculateScheduleGroundSpeedKts(distanceNm, fromAirport, toAirport) {
+  const baseSpeedKts = calculateBaseScheduleGroundSpeedKts(distanceNm);
+  const fromLatitude = fromAirport?.latitude;
+  const fromLongitude = fromAirport?.longitude;
+  const toLatitude = toAirport?.latitude;
+  const toLongitude = toAirport?.longitude;
+  const longitudeDelta = getWrappedLongitudeDelta(fromLongitude, toLongitude);
+
+  if (
+    !Number.isFinite(fromLatitude) ||
+    !Number.isFinite(fromLongitude) ||
+    !Number.isFinite(toLatitude) ||
+    !Number.isFinite(toLongitude)
+  ) {
+    return baseSpeedKts;
+  }
+
+  if (!Number.isFinite(longitudeDelta) || longitudeDelta <= 0) {
+    return baseSpeedKts;
+  }
+
+  const bearingDegrees = calculateInitialBearingDegrees(
+    fromLatitude,
+    fromLongitude,
+    toLatitude,
+    longitudeDelta
+  );
+
+  if (!Number.isFinite(bearingDegrees)) {
+    return baseSpeedKts;
+  }
+
+  const angleFromDueEast = Math.abs((((bearingDegrees - 90) % 360) + 540) % 360 - 180);
+  const eastboundFactor = Math.max(0, 1 - angleFromDueEast / 90);
+  const eastboundBoostKts = EASTBOUND_TAILWIND_BOOST_KTS * eastboundFactor;
+
+  return Math.min(MAX_SCHEDULE_GROUND_SPEED_KTS, baseSpeedKts + eastboundBoostKts);
+}
+
+function calculateBaseScheduleGroundSpeedKts(distanceNm) {
+  if (!Number.isFinite(distanceNm) || distanceNm < 0) {
+    return SHORT_ROUTE_SCHEDULE_SPEED_KTS;
+  }
+
+  if (distanceNm <= LONG_ROUTE_SPEED_START_NM) {
+    return SHORT_ROUTE_SCHEDULE_SPEED_KTS;
+  }
+
+  if (distanceNm >= LONG_ROUTE_SPEED_FULL_NM) {
+    return LONG_ROUTE_SCHEDULE_SPEED_KTS;
+  }
+
+  const progress = (distanceNm - LONG_ROUTE_SPEED_START_NM) / (LONG_ROUTE_SPEED_FULL_NM - LONG_ROUTE_SPEED_START_NM);
+  return SHORT_ROUTE_SCHEDULE_SPEED_KTS + (LONG_ROUTE_SCHEDULE_SPEED_KTS - SHORT_ROUTE_SCHEDULE_SPEED_KTS) * progress;
+}
+
+function calculateInitialBearingDegrees(fromLatitude, fromLongitude, toLatitude, wrappedLongitudeDelta) {
+  const lat1 = degreesToRadians(fromLatitude);
+  const lat2 = degreesToRadians(toLatitude);
+  const deltaLon = degreesToRadians(wrappedLongitudeDelta);
+  const y = Math.sin(deltaLon) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return null;
+  }
+
+  const bearingRadians = Math.atan2(y, x);
+  return ((bearingRadians * 180) / Math.PI + 360) % 360;
+}
+
+function getWrappedLongitudeDelta(fromLongitude, toLongitude) {
+  if (!Number.isFinite(fromLongitude) || !Number.isFinite(toLongitude)) {
+    return null;
+  }
+
+  let delta = toLongitude - fromLongitude;
+
+  while (delta > 180) {
+    delta -= 360;
+  }
+
+  while (delta < -180) {
+    delta += 360;
+  }
+
+  return delta;
 }
 
 function calculateShortestClockGapMinutes(stdLocal, staLocal) {

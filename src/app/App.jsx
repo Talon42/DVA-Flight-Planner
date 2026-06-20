@@ -119,7 +119,6 @@ export default function App() {
   const [expandedBoardFlightId, setExpandedBoardFlightId] = useState(null);
   const [pendingMapFlightPathViewMode, setPendingMapFlightPathViewMode] = useState(null);
   const [pendingMapFitToRoute, setPendingMapFitToRoute] = useState(false);
-  const [scheduleTableTimeDisplayMode, setScheduleTableTimeDisplayMode] = useState("local");
   const [scheduleView, setScheduleView] = useState("flights");
   const [plannerMode, setPlannerMode] = useState("basic");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -374,7 +373,6 @@ export default function App() {
     setPlannerControlsCollapsed,
     setPlannerMode,
     setSchedule,
-    setScheduleTableTimeDisplayMode,
     setScheduleView,
     setSelectedAccomplishmentName,
     setSelectedFlightId,
@@ -455,6 +453,7 @@ export default function App() {
     deltaVirtualToursCache,
     derivedTourProgress,
     isDevToolsEnabled,
+    logbookAirportProgress,
     scheduleView,
     scheduleFlights,
     selectedAccomplishmentName,
@@ -787,7 +786,6 @@ export default function App() {
         plannerControlsCollapsed,
         basicAdvancedFiltersOpen,
         basicAddonFiltersOpen,
-        scheduleTableTimeDisplayMode,
         sort,
         selectedFlightId,
         scheduleView,
@@ -816,7 +814,6 @@ export default function App() {
       plannerControlsCollapsed,
       basicAdvancedFiltersOpen,
       basicAddonFiltersOpen,
-      scheduleTableTimeDisplayMode,
       sort,
       selectedFlightId,
       selectedTourPath,
@@ -922,7 +919,6 @@ export default function App() {
     flightBoards,
     plannerControlsCollapsed,
     plannerMode,
-    scheduleTableTimeDisplayMode,
     scheduleView,
     selectedAccomplishmentName,
     selectedFlightId,
@@ -1520,7 +1516,6 @@ export default function App() {
       setActiveFlightBoardId(defaultBoard.id);
       setSelectedFlightId(null);
       setExpandedBoardFlightId(null);
-      setScheduleTableTimeDisplayMode("local");
       setPlannerMode("basic");
       setFilters(DEFAULT_FILTERS);
       setDutyFilters(DEFAULT_DUTY_FILTERS);
@@ -1830,7 +1825,6 @@ export default function App() {
     viewportSize,
     flightRows: sortedFlights,
     sort,
-    timeDisplayMode: scheduleTableTimeDisplayMode,
     addonAirports,
     vatsimNetwork: vatsimCoverage,
     tourRows: sortedTourRows,
@@ -1839,8 +1833,6 @@ export default function App() {
     onShowAccomplishmentFlights: handleShowAccomplishmentFlights,
     onSortAccomplishmentFlights: handleSortAccomplishmentFlights,
     onSortFlights: handleSort,
-    onToggleTimeDisplayMode: () =>
-      setScheduleTableTimeDisplayMode((current) => (current === "local" ? "utc" : "local")),
     onSelectRow: handleSelectFlight,
     onActivateRow: handleActivateRow,
     plannerMode,

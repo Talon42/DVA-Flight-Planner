@@ -1,11 +1,12 @@
 {
   "name": "flight-planner-app",
   "private": true,
-  "version": "0.7.3-beta",
+  "version": "0.8.0-beta",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 1420",
     "build:vatsim-boundaries": "node scripts/build-vatsim-boundary-catalog.mjs",
+    "lint:airports": "node scripts/audit-airport-timezone-labels.mjs",
     "build": "vite build",
     "lint": "eslint . --cache --cache-location .eslintcache",
     "preview": "vite preview",

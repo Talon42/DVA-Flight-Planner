@@ -2,7 +2,13 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { FixedSizeList as List } from "react-window";
 import TableHeader from "./TableHeader";
 import TableRow from "./TableRow";
-import { buildColumnTemplate, fitColumnsToWidth, resolveColumns } from "./tableUtils";
+import {
+  applyOptionalColumnGroups,
+  buildColumnTemplate,
+  getTablePresetKey,
+  resolveColumnsForPreset,
+  resolvedColumnsFit
+} from "./tableUtils";
 import { TABLE_ROW_HEIGHT } from "./tableWidthPresets";
 import { cn } from "../ui/cn";
 
@@ -43,6 +49,7 @@ function RowRenderer({ index, style, data }) {
       style={style}
       columns={data.columns}
       columnTemplate={data.columnTemplate}
+      isSelected={data.selectedRowId === rowId}
       onSelectRow={data.onSelectRow}
       onActivateRow={data.onActivateRow}
       getRowClassName={data.getRowClassName}
@@ -51,14 +58,14 @@ function RowRenderer({ index, style, data }) {
   );
 }
 
+// Renders the shared measured table shell used by schedule, tours, and logbook views.
 export default function DataTable({
   rows,
   columns,
   viewportWidth,
   sort,
   onSort,
-  timeDisplayMode,
-  onToggleTimeDisplayMode,
+  selectedRowId,
   onSelectRow,
   onActivateRow,
   getRowId = (row) => row.id,
@@ -69,17 +76,31 @@ export default function DataTable({
 }) {
   const tableRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(0);
-  const baseColumns = useMemo(
-    () => resolveColumns(columns, viewportWidth),
-    [columns, viewportWidth]
+  // Uses the measured table width when available so label presets follow the panel, not the window.
+  const tableLayoutWidth = availableWidth || viewportWidth;
+  const activePresetKey = getTablePresetKey(tableLayoutWidth);
+  const fullPresetColumns = useMemo(
+    () => resolveColumnsForPreset(columns, tableLayoutWidth, activePresetKey),
+    [columns, tableLayoutWidth, activePresetKey]
   );
-  const resolvedColumns = useMemo(
-    () => fitColumnsToWidth(baseColumns, availableWidth),
-    [availableWidth, baseColumns]
+  const compactPresetColumns = useMemo(
+    () => resolveColumnsForPreset(columns, tableLayoutWidth, "compact"),
+    [columns, tableLayoutWidth]
   );
+  const resolvedColumns = useMemo(() => {
+    if (resolvedColumnsFit(fullPresetColumns, tableLayoutWidth)) {
+      return fullPresetColumns;
+    }
+
+    if (resolvedColumnsFit(compactPresetColumns, tableLayoutWidth)) {
+      return compactPresetColumns;
+    }
+
+    return applyOptionalColumnGroups(compactPresetColumns, availableWidth, tableLayoutWidth);
+  }, [availableWidth, tableLayoutWidth, fullPresetColumns, compactPresetColumns]);
   const columnTemplate = useMemo(
-    () => buildColumnTemplate(resolvedColumns, availableWidth),
-    [availableWidth, resolvedColumns]
+    () => buildColumnTemplate(resolvedColumns),
+    [resolvedColumns]
   );
   const bodyRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -116,7 +137,7 @@ export default function DataTable({
 
     window.addEventListener("resize", updateAvailableWidth);
     return () => window.removeEventListener("resize", updateAvailableWidth);
-  }, [viewportWidth]);
+  }, []);
 
   useEffect(() => {
     const bodyNode = bodyRef.current;
@@ -187,6 +208,7 @@ export default function DataTable({
       rows: visibleRows,
       columns: resolvedColumns,
       columnTemplate,
+      selectedRowId,
       onSelectRow,
       onActivateRow,
       getRowId,
@@ -197,6 +219,7 @@ export default function DataTable({
       visibleRows,
       resolvedColumns,
       columnTemplate,
+      selectedRowId,
       onSelectRow,
       onActivateRow,
       getRowId,
@@ -216,8 +239,6 @@ export default function DataTable({
           columnTemplate={columnTemplate}
           sort={sort}
           onSort={onSort}
-          timeDisplayMode={timeDisplayMode}
-          onToggleTimeDisplayMode={onToggleTimeDisplayMode}
           scrollbarOffset={headerScrollbarOffset}
         />
       </div>
@@ -252,12 +273,13 @@ export default function DataTable({
                 key={rowId}
                 row={row}
                 rowId={rowId}
-                style={{ height: rowHeight }}
-                columns={resolvedColumns}
-                columnTemplate={columnTemplate}
-                onSelectRow={onSelectRow}
-                onActivateRow={onActivateRow}
-                getRowClassName={getRowClassName}
+              style={{ height: rowHeight }}
+              columns={resolvedColumns}
+              columnTemplate={columnTemplate}
+              isSelected={selectedRowId === rowId}
+              onSelectRow={onSelectRow}
+              onActivateRow={onActivateRow}
+              getRowClassName={getRowClassName}
                 renderRowOverlay={renderRowOverlay}
               />
             );

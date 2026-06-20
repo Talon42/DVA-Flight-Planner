@@ -1,5 +1,6 @@
 // Duty candidate helpers keep scoring and flight-pool building out of App.jsx.
 import { flightTouchesDutyLocation } from "./dutyLocation";
+import { supportsFlightByDutyEquipmentLimits } from "../../domain/aircraft/aircraftCatalog.js";
 import {
   getActiveDutyAirline,
   hasActiveDutyLocationSelection,
@@ -32,14 +33,6 @@ function matchesAddonAirport(flight, addonAirports, matchMode) {
   }
 }
 
-// Falls back to the imported compatibility hint when range limits are unavailable.
-function supportsEquipmentHint(flight, selectedEquipment) {
-  const compatibleEquipment = Array.isArray(flight?.compatibleEquipment)
-    ? flight.compatibleEquipment
-    : [];
-  return compatibleEquipment.length ? compatibleEquipment.includes(selectedEquipment) : true;
-}
-
 function shuffleFlights(flights, rng = Math.random) {
   const nextFlights = [...(flights || [])];
   for (let index = nextFlights.length - 1; index > 0; index -= 1) {
@@ -60,9 +53,9 @@ function buildDutyFlightPoolState(flights, dutyFilters = {}, addonAirports = new
       ? options.flightTouchesDutyLocation
       : flightTouchesDutyLocation;
   const supportsEquipmentLimit =
-    typeof options.supportsFlightByRunwayLimits === "function"
-      ? options.supportsFlightByRunwayLimits
-      : supportsEquipmentHint;
+    typeof options.supportsFlightByAircraftLimits === "function"
+      ? options.supportsFlightByAircraftLimits
+      : supportsFlightByDutyEquipmentLimits;
   const dutyAirline = getActiveDutyAirline(normalizedFilters);
   const hasLocationSelection = hasActiveDutyLocationSelection(normalizedFilters);
   const sourceFlights = Array.isArray(flights) ? flights : [];

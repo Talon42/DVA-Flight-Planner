@@ -211,7 +211,7 @@ export default function WhatsNewModal({
               cardFrameClassName,
               isTextCard
                 ? "h-full min-h-0 w-full overflow-hidden rounded-none"
-                : "h-[26rem] max-h-[54vh] min-h-[18rem] w-full overflow-hidden rounded-none bp-1024:h-[22rem] bp-1024:min-h-[16rem] bp-1024:max-h-[48vh]"
+                : "aspect-video w-full overflow-hidden rounded-none"
             )}
           >
             {/* Text cards reuse the same fixed frame so the modal does not jump. */}
@@ -231,7 +231,7 @@ export default function WhatsNewModal({
               <img
                 src={activeCard.imageSrc}
                 alt={activeCard.imageAlt}
-                className="block h-full w-full object-cover object-top"
+                className="block h-full w-full object-cover object-center"
               />
             ) : (
               <div

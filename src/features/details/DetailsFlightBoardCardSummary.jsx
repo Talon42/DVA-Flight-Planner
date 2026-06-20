@@ -1,5 +1,5 @@
 import { formatDistanceNm, formatDuration, formatNumber, formatUtc } from "../../domain/formatting/formatters.js";
-import { getAirlineLogo } from "../../domain/airlines/airlineBranding.js";
+import { getAirlineLogo, getAirlineLogoClassName } from "../../domain/airlines/airlineBranding.js";
 import planeLight from "../../data/images/plane_light.png";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, bodyMdTextClassName, labelTextClassName } from "../../components/ui/typography";
@@ -54,6 +54,11 @@ function FlightBoardAirline({ flight, selectedAccomplishment }) {
     airlineIata: flight?.airline,
     airlineIcao: flight?.airlineIcao
   });
+  const logoClassName = getAirlineLogoClassName({
+    airlineName: flight?.airlineName,
+    airlineIata: flight?.airline,
+    airlineIcao: flight?.airlineIcao
+  });
   const flightLabel = flight?.isTourFlight
     ? String(flight?.flightCode || flight?.tourFlightNumber || flight?.flightNumber || "").trim()
     : String(flight?.flightCode || "").trim();
@@ -93,7 +98,7 @@ function FlightBoardAirline({ flight, selectedAccomplishment }) {
     <div className="flex min-w-0 items-center gap-2">
       {logoSrc ? (
         <img
-          className="h-6 w-6 shrink-0 object-contain"
+          className={cn("h-6 w-6 shrink-0 object-contain", logoClassName)}
           src={logoSrc}
           alt=""
           aria-hidden="true"

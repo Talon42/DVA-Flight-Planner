@@ -25,10 +25,6 @@ function buildDutyBuildWarnings(dutyFilters, qualifyingDutyAirlines = [], hasSch
     warnings.push("No qualifying airlines were found for the selected location.");
   }
 
-  if (!dutyFilters?.selectedEquipment) {
-    warnings.push("Select one aircraft.");
-  }
-
   return warnings;
 }
 

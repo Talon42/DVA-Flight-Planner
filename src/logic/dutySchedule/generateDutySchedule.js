@@ -45,7 +45,7 @@ function buildLocationAirlineSelection({
   dutyFilters = {},
   addonAirports = new Set(),
   filterBounds = { maxBlockMinutes: 0, maxDistanceNm: 0 },
-  supportsFlightByRunwayLimits,
+  supportsFlightByAircraftLimits,
   rng = Math.random
 } = {}) {
   const selectedOriginAirport = String(dutyFilters?.selectedOriginAirport || "").trim().toUpperCase();
@@ -57,7 +57,7 @@ function buildLocationAirlineSelection({
   const candidateFlights = buildDutyFlightPool(scheduleFlights, selectionFilters, addonAirports, {
     filterBounds,
     flightTouchesDutyLocation,
-    supportsFlightByRunwayLimits
+    supportsFlightByAircraftLimits
   });
 
   const airlineStats = new Map();
@@ -188,7 +188,7 @@ export function prepareDutyScheduleBuild({
   addonAirports = new Set(),
   qualifyingDutyAirlines = [],
   hasSchedule = false,
-  supportsFlightByRunwayLimits,
+  supportsFlightByAircraftLimits,
   rng = Math.random,
   filterBounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }
 } = {}) {
@@ -201,7 +201,7 @@ export function prepareDutyScheduleBuild({
           dutyFilters: activeDutyFilters,
           addonAirports,
           filterBounds,
-          supportsFlightByRunwayLimits,
+          supportsFlightByAircraftLimits,
           rng
         })
       : {
@@ -227,7 +227,7 @@ export function prepareDutyScheduleBuild({
         {
           filterBounds,
           flightTouchesDutyLocation,
-          supportsFlightByRunwayLimits
+          supportsFlightByAircraftLimits
         }
       ),
       buildResult: null,
@@ -261,7 +261,7 @@ export function prepareDutyScheduleBuild({
         filterBounds,
         respectOriginAirport: false,
         flightTouchesDutyLocation,
-        supportsFlightByRunwayLimits
+        supportsFlightByAircraftLimits
       });
   const dutyFlightPoolDiagnostics = buildDutyFlightPoolDiagnostics(
     scheduleFlights,
@@ -270,7 +270,7 @@ export function prepareDutyScheduleBuild({
     {
       filterBounds,
       flightTouchesDutyLocation,
-      supportsFlightByRunwayLimits
+      supportsFlightByAircraftLimits
     }
   );
 

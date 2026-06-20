@@ -37,7 +37,7 @@ export const DUTY_HELP_COPY = {
   addons:
     "Force Addons limits the generator to airports with detected scenery addons. Use the matching dropdown to apply this to departure, arrival, or both.",
   aircraft:
-    "Limits eligible flights based on the selected aircraft's operational range and performance constraints."
+    "When selected, limits eligible flights based on the aircraft's range and schedule weight constraints."
 };
 
 export const DUTY_CARD_HEADER_CLASS_NAME =

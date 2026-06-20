@@ -1,6 +1,6 @@
 // Shared filter field controls used by Basic Filters and Duty Schedule.
 import { Children, isValidElement, useEffect, useMemo, useRef, useState } from "react";
-import { getAirlineLogo } from "../../domain/airlines/airlineBranding.js";
+import { getAirlineLogo, getAirlineLogoClassName } from "../../domain/airlines/airlineBranding.js";
 import { SearchableMultiSelect } from "./SearchableSelect";
 import {
   fieldBodyClassName,
@@ -318,6 +318,7 @@ export function buildAirlineSelectOption(airline) {
     label: airlineName,
     selectedLabel: airlineName,
     keywords: airlineName,
-    logoSrc: getAirlineLogo({ airlineName })
+    logoSrc: getAirlineLogo({ airlineName }),
+    logoClassName: getAirlineLogoClassName({ airlineName })
   };
 }

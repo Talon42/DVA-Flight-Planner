@@ -43,6 +43,7 @@ function ensureAirportCatalogLoaded() {
       country: String(row.countryName || "").trim(),
       state: String(row.stateTerritory || "").trim(),
       timezone: String(row.timezone || "").trim(),
+      timezoneLabel: String(row.timezoneLabel || "").trim(),
       latitude: parseCoordinate(row.lat),
       longitude: parseCoordinate(row.lng),
       runwayLength: parseNumeric(row.runwayLength),
@@ -71,6 +72,22 @@ export function getAirportByIata(iata) {
   return airportByIata.get(String(iata || "").trim().toUpperCase()) || null;
 }
 
+// Resolves either an ICAO or IATA airport code to the canonical ICAO value.
+export function resolveAirportCodeToIcao(value) {
+  ensureAirportCatalogLoaded();
+
+  const normalized = String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
+
+  if (!normalized) {
+    return "";
+  }
+
+  return airportByIcao.get(normalized)?.icao || airportByIata.get(normalized)?.icao || "";
+}
+
 // Builds the full airport catalog used by airport pickers and filters.
 export function buildAirportCatalogOptions() {
   ensureAirportCatalogLoaded();
@@ -78,10 +95,12 @@ export function buildAirportCatalogOptions() {
   return [...airportCatalog]
     .map((airport) => ({
       icao: airport.icao,
+      iata: airport.iata,
       name: airport.name,
       country: airport.country,
       state: airport.state,
       timezone: airport.timezone,
+      timezoneLabel: airport.timezoneLabel,
       latitude: airport.latitude,
       longitude: airport.longitude,
       runwayLength: airport.runwayLength,
@@ -118,9 +137,11 @@ export function buildAirportOptions(flights) {
       const existing = optionByIcao.get(normalizedIcao) || {
         icao: normalizedIcao,
         name: airport?.name || normalizedIcao,
+        iata: airport?.iata || "",
         country: airport?.country || "",
         state: airport?.state || "",
         timezone: airport?.timezone || "",
+        timezoneLabel: airport?.timezoneLabel || "",
         latitude: airport?.latitude ?? null,
         longitude: airport?.longitude ?? null,
         runwayLength: airport?.runwayLength ?? null,
