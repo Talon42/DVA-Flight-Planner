@@ -65,7 +65,7 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
   const flight = selectedLogbookFlight || {};
 
   return (
-    <Panel className="relative isolate rounded-none border border-[rgba(160,180,202,0.52)] bg-[var(--surface-table-row-hover)] p-3 dark:border-[color:var(--surface-border)] dark:bg-[var(--surface-raised)] bp-1920:p-4">
+    <Panel className="relative isolate rounded-none border border-[rgba(160,180,202,0.52)] !bg-white p-3 dark:border-[color:var(--surface-border)] dark:!bg-[var(--surface-raised)] bp-1920:p-4">
       <div className="grid min-w-0 gap-3 bp-1920:gap-4 bp-1400:grid-cols-[minmax(9rem,0.6fr)_minmax(0,2fr)] bp-1920:grid-cols-[minmax(10rem,0.82fr)_minmax(0,1.6fr)]">
         <div className="flex min-w-0 items-center gap-3 border-b border-[color:var(--line)] pb-3 bp-1400:border-b-0 bp-1400:border-r bp-1400:pr-3 bp-1400:pb-0">
           <div className="hidden shrink-0 bp-1400:flex">
