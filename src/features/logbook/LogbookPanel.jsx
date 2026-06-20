@@ -60,8 +60,9 @@ export default function LogbookPanel({
 
             <Button
               variant="ghost"
+              size="md"
               type="button"
-              className="shrink-0"
+              className="shrink-0 bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
               onClick={onRefreshLogbook}
               disabled={isRefreshDisabled}
             >
@@ -113,8 +114,9 @@ export default function LogbookPanel({
 
           <Button
             variant="ghost"
+            size="md"
             type="button"
-            className="shrink-0"
+            className="shrink-0 bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
             onClick={onRefreshLogbook}
             disabled={isRefreshDisabled}
           >
