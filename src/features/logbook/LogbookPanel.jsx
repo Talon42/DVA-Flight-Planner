@@ -9,8 +9,7 @@ import LogbookPilotStats from "./LogbookPilotStats.jsx";
 export default function LogbookPanel({
   allRows,
   filteredRows,
-  visibleRows,
-  hasMoreRows,
+  sortedFilteredRows,
   viewportWidth = 0,
   selectedTab,
   sort,
@@ -19,7 +18,7 @@ export default function LogbookPanel({
   onSelectTab,
   onSort,
   onSelectRow,
-  onLoadMoreRows
+  onActivateRow
 }) {
   if (!allRows.length) {
     return (
@@ -61,14 +60,13 @@ export default function LogbookPanel({
           <LogbookPilotStats rows={filteredRows} stats={pilotStats} />
         ) : (
           <LogbookFlightsTable
-            rows={visibleRows}
-            hasMoreRows={hasMoreRows}
+            rows={sortedFilteredRows}
             viewportWidth={viewportWidth}
             sort={sort}
             selectedRowId={selectedRowId}
             onSort={onSort}
             onSelectRow={onSelectRow}
-            onLoadMoreRows={onLoadMoreRows}
+            onActivateRow={onActivateRow}
           />
         )}
       </div>

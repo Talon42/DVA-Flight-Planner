@@ -1789,8 +1789,7 @@ export default function App() {
       logbookProps: {
         allRows: logbook.allRows,
         filteredRows: logbook.filteredRows,
-        visibleRows: logbook.visibleRows,
-        hasMoreRows: logbook.hasMoreRows,
+        sortedFilteredRows: logbook.sortedFilteredRows,
         viewportWidth: viewportSize.width,
         selectedTab: logbook.selectedTab,
         sort: logbook.sort,
@@ -1799,7 +1798,7 @@ export default function App() {
         onSelectTab: logbook.setSelectedTab,
         onSort: logbook.handleSort,
         onSelectRow: logbook.handleSelectRow,
-        onLoadMoreRows: logbook.handleLoadMoreRows
+        onActivateRow: logbook.handleSelectRow
       },
     theme,
     flightBoard,

@@ -72,7 +72,10 @@ export default function DataTable({
   getRowClassName,
   renderRowOverlay,
   rowHeight = TABLE_ROW_HEIGHT,
-  virtualized = true
+  virtualized = true,
+  initialVisibleRows = INITIAL_VISIBLE_ROWS,
+  visibleRowPage = VISIBLE_ROW_PAGE,
+  visibleRowThreshold = VISIBLE_ROW_THRESHOLD
 }) {
   const tableRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(0);
@@ -107,14 +110,14 @@ export default function DataTable({
   const firstRowId = rows[0] ? getRowId(rows[0]) : "";
   const lastRowId = rows[rows.length - 1] ? getRowId(rows[rows.length - 1]) : "";
   const [visibleRowCount, setVisibleRowCount] = useState(() =>
-    Math.min(rows.length, INITIAL_VISIBLE_ROWS)
+    Math.min(rows.length, initialVisibleRows)
   );
   const [listHeight, setListHeight] = useState(320);
   const [headerScrollbarOffset, setHeaderScrollbarOffset] = useState(0);
 
   useEffect(() => {
-    setVisibleRowCount(Math.min(rows.length, INITIAL_VISIBLE_ROWS));
-  }, [rows.length, firstRowId, lastRowId]);
+    setVisibleRowCount(Math.min(rows.length, initialVisibleRows));
+  }, [rows.length, firstRowId, lastRowId, initialVisibleRows]);
 
   useEffect(() => {
     const tableNode = tableRef.current;
@@ -195,13 +198,13 @@ export default function DataTable({
 
   function handleItemsRendered({ visibleStopIndex }) {
     if (
-      visibleStopIndex < visibleRowCount - VISIBLE_ROW_THRESHOLD ||
+      visibleStopIndex < visibleRowCount - visibleRowThreshold ||
       visibleRowCount >= rows.length
     ) {
       return;
     }
 
-    setVisibleRowCount((current) => Math.min(rows.length, current + VISIBLE_ROW_PAGE));
+    setVisibleRowCount((current) => Math.min(rows.length, current + visibleRowPage));
   }
   const itemData = useMemo(
     () => ({
