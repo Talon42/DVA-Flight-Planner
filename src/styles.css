@@ -73,8 +73,8 @@
   --logbook-row-status-rejected-bg: rgba(200, 16, 46, 0.52);
   --logbook-row-status-rejected-hover-bg: rgba(200, 16, 46, 0.6);
   --logbook-row-status-rejected-text: #ffffff;
-  --logbook-row-status-pending-bg: rgba(246, 197, 109, 0.54);
-  --logbook-row-status-pending-hover-bg: rgba(246, 197, 109, 0.62);
+  --logbook-row-status-pending-bg: rgba(246, 197, 109, 0.34);
+  --logbook-row-status-pending-hover-bg: rgba(246, 197, 109, 0.48);
   --logbook-row-status-pending-text: var(--delta-blue-deep);
   --surface-option: rgba(226, 235, 245, 0.99);
   --surface-option-selected: rgba(0, 58, 112, 0.14);
@@ -142,8 +142,8 @@
   --logbook-row-status-rejected-bg: rgba(200, 16, 46, 0.2);
   --logbook-row-status-rejected-hover-bg: rgba(200, 16, 46, 0.24);
   --logbook-row-status-rejected-text: #ffffff;
-  --logbook-row-status-pending-bg: rgba(246, 197, 109, 0.18);
-  --logbook-row-status-pending-hover-bg: rgba(246, 197, 109, 0.22);
+  --logbook-row-status-pending-bg: rgba(248, 187, 72, 0.25);
+  --logbook-row-status-pending-hover-bg: rgba(246, 197, 109, 0.35);
   --logbook-row-status-pending-text: #ffffff;
   --surface-option: rgba(13, 29, 48, 0.99);
   --surface-option-selected: rgba(0, 58, 112, 0.22);

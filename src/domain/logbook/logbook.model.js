@@ -182,6 +182,54 @@ function formatSignedAviationNumber(value, unit, options = {}) {
   return `${formatter.format(value)} ${unit}`.replace("+", "");
 }
 
+export function formatLogbookDuration(value) {
+  return formatMinutes(parseDurationMinutes(value));
+}
+
+export function formatLogbookTimestamp(value) {
+  return formatTimestamp(value);
+}
+
+export function formatLogbookAviationNumber(value, unit, options = {}) {
+  return formatAviationNumber(toNumber(value), unit, options);
+}
+
+export function formatLogbookSignedAviationNumber(value, unit, options = {}) {
+  return formatSignedAviationNumber(toNumber(value), unit, options);
+}
+
+// Maps landing vertical speed to the human-readable score shown in the details card.
+export function formatLandingGrade(value) {
+  const numericValue = toNumber(value);
+  if (!Number.isFinite(numericValue)) {
+    return LOGBOOK_EMPTY_VALUE;
+  }
+
+  const absValue = Math.abs(numericValue);
+
+  if (absValue < 100) {
+    return "Butter";
+  }
+
+  if (absValue < 200) {
+    return "Smooth";
+  }
+
+  if (absValue < 300) {
+    return "Good";
+  }
+
+  if (absValue < 400) {
+    return "Firm";
+  }
+
+  if (absValue < 500) {
+    return "Hard";
+  }
+
+  return "Very Hard";
+}
+
 function readAirportCode(airport) {
   if (airport && typeof airport === "object") {
     return normalizeUpperText(airport.icao || airport.iata || airport.code) || "";
@@ -415,6 +463,7 @@ export function normalizeLogbookRows(entries) {
       simulator: readSimulator(entry),
       landingRate,
       landingRateDisplay: formatSignedAviationNumber(landingRate, "fpm"),
+      landingGradeDisplay: formatLandingGrade(landingRate),
       submittedOnDisplay: formatTimestamp(entry.submittedOn),
       disposedOnDisplay: formatTimestamp(entry.disposedOn),
       searchText: [
