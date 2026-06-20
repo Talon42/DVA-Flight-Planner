@@ -68,7 +68,7 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
 
   if (!hasSelection) {
     return (
-      <aside className="details-panel app-scrollbar min-h-0 min-w-0 overflow-y-auto">
+      <aside className="details-panel min-h-0 min-w-0">
         <div className="grid h-full min-h-[10rem] content-start gap-2">
           <div className="grid gap-2 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3">
             <p className={cn("m-0 text-[var(--text-heading)]", bodyMdTextClassName, "font-semibold")}>
@@ -146,9 +146,9 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   ];
 
   return (
-    <aside className="details-panel app-scrollbar min-h-0 min-w-0 overflow-y-auto">
-      <div className="grid gap-3">
-        <Panel className="relative isolate rounded-none border-2 border-[rgba(160,180,202,0.52)] !bg-white p-3 dark:border-[color:var(--surface-border)] dark:!bg-[var(--surface-raised)] bp-1920:p-4">
+    <aside className="details-panel min-h-0 min-w-0">
+      <Panel className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] !bg-white dark:border-[color:var(--surface-border)] dark:!bg-[var(--surface-raised)]">
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto p-3 bp-1920:p-4">
           <div className="grid gap-3">
             <LogbookHeroCard selectedLogbookFlight={selectedLogbookFlight} />
 
@@ -159,8 +159,8 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
               <LogbookDetailSubCard title="Landing Summary" items={landingSummaryItems} />
             </div>
           </div>
-        </Panel>
-      </div>
+        </div>
+      </Panel>
     </aside>
   );
 }
