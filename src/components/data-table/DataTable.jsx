@@ -41,6 +41,8 @@ function RowRenderer({ index, style, data }) {
   }
 
   const rowId = data.getRowId(row);
+  const isSelected =
+    data.enableRowSelection && data.selectedRowId != null && data.selectedRowId === rowId;
 
   return (
     <TableRow
@@ -49,7 +51,9 @@ function RowRenderer({ index, style, data }) {
       style={style}
       columns={data.columns}
       columnTemplate={data.columnTemplate}
-      isSelected={data.selectedRowId === rowId}
+      enableRowSelection={data.enableRowSelection}
+      isSelected={isSelected}
+      selectedRowClassName={data.selectedRowClassName}
       onSelectRow={data.onSelectRow}
       onActivateRow={data.onActivateRow}
       getRowClassName={data.getRowClassName}
@@ -66,6 +70,8 @@ export default function DataTable({
   sort,
   onSort,
   selectedRowId,
+  enableRowSelection = false,
+  selectedRowClassName = "",
   onSelectRow,
   onActivateRow,
   getRowId = (row) => row.id,
@@ -215,6 +221,8 @@ export default function DataTable({
       onSelectRow,
       onActivateRow,
       getRowId,
+      enableRowSelection,
+      selectedRowClassName,
       getRowClassName,
       renderRowOverlay
     }),
@@ -226,6 +234,8 @@ export default function DataTable({
       onSelectRow,
       onActivateRow,
       getRowId,
+      enableRowSelection,
+      selectedRowClassName,
       getRowClassName,
       renderRowOverlay
     ]
@@ -276,13 +286,15 @@ export default function DataTable({
                 key={rowId}
                 row={row}
                 rowId={rowId}
-              style={{ height: rowHeight }}
-              columns={resolvedColumns}
-              columnTemplate={columnTemplate}
-              isSelected={selectedRowId === rowId}
-              onSelectRow={onSelectRow}
-              onActivateRow={onActivateRow}
-              getRowClassName={getRowClassName}
+                style={{ height: rowHeight }}
+                columns={resolvedColumns}
+                columnTemplate={columnTemplate}
+                enableRowSelection={enableRowSelection}
+                isSelected={enableRowSelection && selectedRowId != null && selectedRowId === rowId}
+                selectedRowClassName={selectedRowClassName}
+                onSelectRow={onSelectRow}
+                onActivateRow={onActivateRow}
+                getRowClassName={getRowClassName}
                 renderRowOverlay={renderRowOverlay}
               />
             );

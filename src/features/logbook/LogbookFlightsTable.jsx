@@ -4,6 +4,16 @@ import { cn } from "../../components/ui/cn";
 import { getLogbookRowClassName } from "./logbookRowStyles.js";
 
 const COMPACT_LAYOUT_MAX_WIDTH = 900;
+const LOGBOOK_SELECTED_ROW_CLASS_NAME = [
+  "bg-[linear-gradient(90deg,rgba(0,58,112,0.18),rgba(11,31,54,0.08)),rgba(255,255,255,0.84)]",
+  "even:bg-[linear-gradient(90deg,rgba(0,58,112,0.18),rgba(11,31,54,0.08)),rgba(255,255,255,0.84)]",
+  "hover:bg-[linear-gradient(90deg,rgba(0,58,112,0.18),rgba(11,31,54,0.08)),rgba(255,255,255,0.84)]",
+  "dark:bg-[linear-gradient(90deg,rgba(0,58,112,0.18),rgba(11,31,54,0.08)),rgba(255,255,255,0.84)]",
+  "dark:even:bg-[linear-gradient(90deg,rgba(0,58,112,0.18),rgba(11,31,54,0.08)),rgba(255,255,255,0.84)]",
+  "dark:hover:bg-[linear-gradient(90deg,rgba(0,58,112,0.18),rgba(11,31,54,0.08)),rgba(255,255,255,0.84)]",
+  "text-[var(--delta-blue-deep)]",
+  "dark:text-[var(--delta-blue-deep)]"
+].join(" ");
 
 function LogbookFlightCell({ row }) {
   return (
@@ -150,9 +160,11 @@ export default function LogbookFlightsTable({
       viewportWidth={viewportWidth}
       sort={sort}
       onSort={onSort}
+      enableRowSelection
       selectedRowId={selectedRowId}
+      selectedRowClassName={LOGBOOK_SELECTED_ROW_CLASS_NAME}
       onSelectRow={onSelectRow}
-      onActivateRow={onActivateRow || onSelectRow}
+      onActivateRow={onActivateRow}
       getRowId={(row) => row.id}
       getRowClassName={getLogbookRowClassName}
       initialVisibleRows={25}

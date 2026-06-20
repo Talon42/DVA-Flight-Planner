@@ -37,19 +37,22 @@ export default function TableRow({
   style,
   columns,
   columnTemplate,
+  enableRowSelection = false,
   isSelected,
+  selectedRowClassName = "",
   onSelectRow,
   onActivateRow,
   getRowClassName,
   renderRowOverlay
 }) {
+  const isSelectableSelected = Boolean(enableRowSelection && isSelected && selectedRowClassName);
+
   return (
     <div
       className={cn(
         "relative grid h-full w-full min-w-0 items-stretch border-b border-[color:var(--line)] bg-[var(--surface-table-row)] transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[var(--surface-table-row-hover)]",
         getRowClassName?.(row),
-        isSelected &&
-          "bg-[var(--surface-table-row-selected)] even:bg-[var(--surface-table-row-selected)] hover:bg-[var(--surface-table-row-selected)] text-[var(--text-heading)] dark:bg-[var(--surface-table-row-selected)] dark:even:bg-[var(--surface-table-row-selected)] dark:hover:bg-[var(--surface-table-row-selected)] dark:text-white"
+        isSelectableSelected && selectedRowClassName
       )}
       style={{
         ...style,
@@ -69,12 +72,15 @@ export default function TableRow({
               type="button"
               className={cn(
                 "block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[var(--text-primary)] outline-none dark:text-[rgb(255,255,255)]",
-                bodyMdTextClassName
+                bodyMdTextClassName,
+                isSelectableSelected && "text-[var(--delta-blue-deep)] dark:text-[var(--delta-blue-deep)]"
               )}
-              onClick={() => onSelectRow?.(rowId, row)}
-              onDoubleClick={() =>
-                onActivateRow ? onActivateRow(rowId, row) : onSelectRow?.(rowId, row)
-              }
+              onClick={() => {
+                if (enableRowSelection) {
+                  onSelectRow?.(rowId, row);
+                }
+              }}
+              onDoubleClick={() => onActivateRow?.(rowId, row)}
             >
               <span
                 className={cn(
