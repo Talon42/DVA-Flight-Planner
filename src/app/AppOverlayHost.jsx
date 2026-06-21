@@ -485,6 +485,7 @@ export default function AppOverlayHost({
           title="Syncing data from Delta Virtual"
           description="Refreshing your schedule and logbook data."
           ariaLabel="Delta Virtual sync in progress"
+          panelClassName="border-[color:#94A3B8] dark:border-[color:#64748B]"
         />
       ) : isRefreshingLogbook ? (
         <SpinnerStatusModal
@@ -492,6 +493,7 @@ export default function AppOverlayHost({
           title="Refreshing Logbook"
           description="Refreshing your Delta Virtual logbook data."
           ariaLabel="Delta Virtual logbook refresh in progress"
+          panelClassName="border-[color:#94A3B8] dark:border-[color:#64748B]"
         />
       ) : null}
 
