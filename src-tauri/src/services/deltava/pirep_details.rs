@@ -134,7 +134,7 @@ fn parse_runway_details(raw: &str) -> RunwayDetails {
         .unwrap_or_default();
 
     let display = if !runway.is_empty() && !length.is_empty() {
-        format!("{runway} - {length}")
+        format!("{runway} · {length}")
     } else if !runway.is_empty() {
         runway.clone()
     } else {
@@ -349,13 +349,13 @@ mod tests {
         let runway = parse_runway_details("08R (Asphalt - 10,495 feet)");
         assert_eq!(runway.runway, "08R");
         assert_eq!(runway.length, "10,495 feet");
-        assert_eq!(runway.display, "08R - 10,495 feet");
+        assert_eq!(runway.display, "08R · 10,495 feet");
         assert_eq!(runway.threshold_distance, "");
 
         let runway = parse_runway_details("12L (was 12) (Asphalt - 9,171 feet)");
         assert_eq!(runway.runway, "12L");
         assert_eq!(runway.length, "9,171 feet");
-        assert_eq!(runway.display, "12L - 9,171 feet");
+        assert_eq!(runway.display, "12L · 9,171 feet");
         assert_eq!(runway.threshold_distance, "");
     }
 
@@ -375,13 +375,13 @@ mod tests {
         let runway = parse_runway_details("08 (Asphalt - 7,210 feet, 703 feet from threshold)");
         assert_eq!(runway.runway, "08");
         assert_eq!(runway.length, "7,210 feet");
-        assert_eq!(runway.display, "08 - 7,210 feet");
+        assert_eq!(runway.display, "08 · 7,210 feet");
         assert_eq!(runway.threshold_distance, "703 feet");
 
         let runway = parse_runway_details("08R (Asphalt - 10,495 feet, takeoff run 6,153 feet)");
         assert_eq!(runway.runway, "08R");
         assert_eq!(runway.length, "10,495 feet");
-        assert_eq!(runway.display, "08R - 10,495 feet");
+        assert_eq!(runway.display, "08R · 10,495 feet");
         assert_eq!(runway.threshold_distance, "");
 
         let runway = parse_runway_details("27L");

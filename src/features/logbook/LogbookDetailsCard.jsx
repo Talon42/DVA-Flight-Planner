@@ -30,6 +30,58 @@ function buildScrapedDetailValue(value, { isLoading = false, hasError = false } 
   return hasError ? "Unavailable" : LOGBOOK_EMPTY_VALUE;
 }
 
+function formatRunwayLength(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.replace(/\bfeet\b/i, "ft");
+}
+
+function buildRunwayDisplay(runway, length) {
+  const normalizedRunway = String(runway || "").trim();
+  const normalizedLength = formatRunwayLength(length);
+
+  if (normalizedRunway && normalizedLength) {
+    return `${normalizedRunway} · ${normalizedLength}`;
+  }
+
+  if (normalizedRunway) {
+    return normalizedRunway;
+  }
+
+  return "";
+}
+
+function getLandingGradePaletteClassName(grade) {
+  const normalizedGrade = String(grade || "").trim();
+
+  if (normalizedGrade === "Damaging") {
+    return "text-[#991B1B] dark:text-[#FCA5A5]";
+  }
+
+  if (normalizedGrade === "Firm") {
+    return "text-[#9A3412] dark:text-[#FDBA74]";
+  }
+
+  if (normalizedGrade === "Optimal") {
+    return "text-[#166534] dark:text-[#86EFAC]";
+  }
+
+  return "text-[#1D4ED8] dark:text-[#93C5FD]";
+}
+
+function LandingGradeText({ grade }) {
+  const normalizedGrade = String(grade || "").trim();
+
+  if (!normalizedGrade || normalizedGrade === LOGBOOK_EMPTY_VALUE) {
+    return <span className="text-[var(--text-muted)]">{LOGBOOK_EMPTY_VALUE}</span>;
+  }
+
+  return <span className={cn("font-semibold", getLandingGradePaletteClassName(normalizedGrade))}>{normalizedGrade}</span>;
+}
+
 function getNestedValue(primaryValue, fallbackValue) {
   return primaryValue ?? fallbackValue;
 }
@@ -119,20 +171,10 @@ export default function LogbookDetailsCard({
     isLoading: pirepDetailsLoading,
     hasError: hasPirepDetailsError
   });
-  const departureRunwayDisplay = buildScrapedDetailValue(
-    pirepDetails?.departureRunwayDisplay || pirepDetails?.departureRunway,
-    {
-      isLoading: pirepDetailsLoading,
-      hasError: hasPirepDetailsError
-    }
-  );
-  const arrivalRunwayDisplay = buildScrapedDetailValue(
-    pirepDetails?.arrivalRunwayDisplay || pirepDetails?.arrivalRunway,
-    {
-      isLoading: pirepDetailsLoading,
-      hasError: hasPirepDetailsError
-    }
-  );
+  const departureRunway = String(pirepDetails?.departureRunway || "").trim();
+  const departureRunwayLength = String(pirepDetails?.departureRunwayLength || "").trim();
+  const arrivalRunway = String(pirepDetails?.arrivalRunway || "").trim();
+  const arrivalRunwayLength = String(pirepDetails?.arrivalRunwayLength || "").trim();
   const arrivalThresholdDistanceValue = String(pirepDetails?.arrivalRunwayThresholdDistance || "").trim();
   const arrivalThresholdDistanceDisplay = buildScrapedDetailValue(arrivalThresholdDistanceValue, {
     isLoading: pirepDetailsLoading,
@@ -151,11 +193,11 @@ export default function LogbookDetailsCard({
     { label: "Departure Airport", value: entry.airportD?.name, title: entry.airportD?.name },
     {
       label: "Runway",
-      value: departureRunwayDisplay,
+      value: buildRunwayDisplay(departureRunway, departureRunwayLength) || departureRunway,
       title:
         pirepDetails?.departureRunwayRaw ||
-        pirepDetails?.departureRunwayDisplay ||
-        departureRunwayDisplay
+        buildRunwayDisplay(departureRunway, departureRunwayLength) ||
+        departureRunway
     },
     {
       label: "Start Time",
@@ -175,8 +217,11 @@ export default function LogbookDetailsCard({
     { label: "Arrival Airport", value: entry.airportA?.name, title: entry.airportA?.name },
     {
       label: "Runway",
-      value: arrivalRunwayDisplay,
-      title: pirepDetails?.arrivalRunwayRaw || pirepDetails?.arrivalRunwayDisplay || arrivalRunwayDisplay
+      value: buildRunwayDisplay(arrivalRunway, arrivalRunwayLength) || arrivalRunway,
+      title:
+        pirepDetails?.arrivalRunwayRaw ||
+        buildRunwayDisplay(arrivalRunway, arrivalRunwayLength) ||
+        arrivalRunway
     },
     { label: "End Time", value: formatLogbookTimestamp(getNestedValue(end.time, entry.endTime)) },
     { label: "End Fuel", value: formatLogbookAviationNumber(getNestedValue(end.fuel, entry.endFuel), "lb") },
@@ -210,7 +255,7 @@ export default function LogbookDetailsCard({
     },
     {
       label: "Landing Grade",
-      value: selectedLogbookFlight.landingGradeDisplay
+      value: <LandingGradeText grade={selectedLogbookFlight.landingGradeDisplay} />
     }
   ].filter(Boolean);
 
@@ -224,7 +269,7 @@ export default function LogbookDetailsCard({
           <div className="grid w-full min-w-0 gap-2">
             <LogbookHeroCard selectedLogbookFlight={selectedLogbookFlight} />
 
-            <div className="grid w-full min-w-0 gap-2 bp-1920:grid-cols-2">
+            <div className="grid w-full min-w-0 gap-2">
               <LogbookDetailSubCard title="Summary" items={summaryItems} />
               <LogbookDetailSubCard title="Departure" items={departureItems} />
               <LogbookDetailSubCard title="Arrival" items={arrivalItems} />
