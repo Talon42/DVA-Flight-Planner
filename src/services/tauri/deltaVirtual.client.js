@@ -1,3 +1,4 @@
+import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
 import { invokeAppCommand } from "./invoke.client.js";
 
 function isTauriRuntime() {
@@ -27,6 +28,73 @@ export async function fetchDeltaVirtualTourBriefing(briefingUrl) {
       }
     }
   );
+}
+
+// Loads the selected Delta Virtual PIREP detail page and returns the scraped route/runway fields.
+export async function fetchDeltaVirtualPirepDetails(pirepId) {
+  if (!isTauriRuntime()) {
+    throw new Error("Delta Virtual PIREP detail requests are only available in the desktop app.");
+  }
+
+  const normalizedPirepId = buildDvaPirepId(pirepId);
+  if (!normalizedPirepId) {
+    throw new Error("validation_failed: Delta Virtual PIREP id was missing or invalid.");
+  }
+
+  try {
+    const result = await invokeAppCommand(
+      "fetch_delta_virtual_pirep_details",
+      {
+        request: {
+          pirepId: normalizedPirepId
+        }
+      },
+      {
+        subsystem: "DVA PIREP",
+        event: "pirep-details-failed",
+        metadata: {
+          hasPirepId: Boolean(normalizedPirepId)
+        }
+      }
+    );
+
+    return {
+      id: String(result?.id || normalizedPirepId).trim(),
+      numericId: Number(result?.numericId ?? result?.numeric_id ?? 0) || null,
+      sourceUrl: String(result?.sourceUrl ?? result?.source_url ?? "").trim(),
+      departureRoute: String(result?.departureRoute ?? result?.departure_route ?? "").trim(),
+      flightRoute: String(result?.flightRoute ?? result?.flight_route ?? "").trim(),
+      arrivalRoute: String(result?.arrivalRoute ?? result?.arrival_route ?? "").trim(),
+      routeSummary: String(result?.routeSummary ?? result?.route_summary ?? "").trim(),
+      departureRunway: String(result?.departureRunway ?? result?.departure_runway ?? "").trim(),
+      departureRunwayRaw: String(
+        result?.departureRunwayRaw ?? result?.departure_runway_raw ?? ""
+      ).trim(),
+      arrivalRunway: String(result?.arrivalRunway ?? result?.arrival_runway ?? "").trim(),
+      arrivalRunwayRaw: String(result?.arrivalRunwayRaw ?? result?.arrival_runway_raw ?? "").trim(),
+      fetchedAt: String(result?.fetchedAt ?? result?.fetched_at ?? "").trim()
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      const normalized = normalizePirepDetailsError(error.message);
+      normalized.kind = error.kind || normalized.kind;
+      throw normalized;
+    }
+
+    throw normalizePirepDetailsError(String(error));
+  }
+}
+
+function normalizePirepDetailsError(message) {
+  if (!message) {
+    return new Error("Delta Virtual PIREP details failed.");
+  }
+
+  const [kind, ...rest] = String(message).split(":");
+  const normalizedMessage = rest.length ? rest.join(":").trim() : String(message);
+  const error = new Error(normalizedMessage || "Delta Virtual PIREP details failed.");
+  error.kind = rest.length ? kind : "download_failed";
+  return error;
 }
 
 function normalizeSyncError(message) {

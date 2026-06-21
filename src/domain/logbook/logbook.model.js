@@ -263,7 +263,7 @@ function isEligibleLogbookStatus(value) {
 }
 
 // Normalizes Delta Virtual logbook ids into the PIREP id format used by the report page.
-function buildDvaPirepId(value) {
+export function buildDvaPirepId(value) {
   const normalized = normalizeText(value);
   if (!normalized) {
     return null;

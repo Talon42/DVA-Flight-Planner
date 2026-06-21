@@ -20,6 +20,9 @@ export default function AppRightColumn({
   logbookFilterOptions,
   logbookFilters,
   selectedLogbookFlight,
+  logbookPirepDetails,
+  logbookPirepDetailsLoading,
+  logbookPirepDetailsError,
   airlines,
   airportOptions,
   geoOptions,
@@ -147,7 +150,12 @@ export default function AppRightColumn({
           onReset={onResetLogbookFilters}
         />
         {logbookFiltersCollapsed ? (
-          <LogbookDetailsCard selectedLogbookFlight={selectedLogbookFlight} />
+          <LogbookDetailsCard
+            selectedLogbookFlight={selectedLogbookFlight}
+            pirepDetails={logbookPirepDetails}
+            pirepDetailsLoading={logbookPirepDetailsLoading}
+            pirepDetailsError={logbookPirepDetailsError}
+          />
         ) : null}
       </div>
     );

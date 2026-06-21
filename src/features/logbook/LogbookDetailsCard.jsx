@@ -18,6 +18,18 @@ function formatDetailValue(value) {
   return value;
 }
 
+function buildScrapedDetailValue(value, { isLoading = false, hasError = false } = {}) {
+  if (isLoading) {
+    return "Loading...";
+  }
+
+  if (value) {
+    return value;
+  }
+
+  return hasError ? "Unavailable" : LOGBOOK_EMPTY_VALUE;
+}
+
 function getNestedValue(primaryValue, fallbackValue) {
   return primaryValue ?? fallbackValue;
 }
@@ -73,7 +85,12 @@ function LogbookDetailSubCard({ title, items }) {
 }
 
 // Renders the selected logbook flight summary card in the right column.
-export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
+export default function LogbookDetailsCard({
+  selectedLogbookFlight = null,
+  pirepDetails = null,
+  pirepDetailsLoading = false,
+  pirepDetailsError = ""
+}) {
   const hasSelection = Boolean(selectedLogbookFlight);
 
   if (!hasSelection) {
@@ -97,8 +114,22 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   const takeoff = entry.takeoff || {};
   const landing = entry.landing || {};
   const end = entry.end || {};
+  const hasPirepDetailsError = Boolean(String(pirepDetailsError || "").trim());
+  const routeSummary = buildScrapedDetailValue(pirepDetails?.routeSummary, {
+    isLoading: pirepDetailsLoading,
+    hasError: hasPirepDetailsError
+  });
+  const departureRunway = buildScrapedDetailValue(pirepDetails?.departureRunway, {
+    isLoading: pirepDetailsLoading,
+    hasError: hasPirepDetailsError
+  });
+  const arrivalRunway = buildScrapedDetailValue(pirepDetails?.arrivalRunway, {
+    isLoading: pirepDetailsLoading,
+    hasError: hasPirepDetailsError
+  });
 
   const summaryItems = [
+    { label: "Route", value: routeSummary, title: pirepDetails?.routeSummary || routeSummary },
     { label: "Block Time", value: formatLogbookDuration(entry.blockTime) },
     { label: "Airborne Time", value: formatLogbookDuration(entry.airborneTime) },
     { label: "Distance", value: selectedLogbookFlight.distanceDisplay, title: selectedLogbookFlight.distanceDisplay },
@@ -106,6 +137,11 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   ];
 
   const departureItems = [
+    {
+      label: "Runway",
+      value: departureRunway,
+      title: pirepDetails?.departureRunwayRaw || pirepDetails?.departureRunway || departureRunway
+    },
     { label: "Departure Airport", value: entry.airportD?.name, title: entry.airportD?.name },
     {
       label: "Start Time",
@@ -122,6 +158,11 @@ export default function LogbookDetailsCard({ selectedLogbookFlight = null }) {
   ];
 
   const arrivalItems = [
+    {
+      label: "Runway",
+      value: arrivalRunway,
+      title: pirepDetails?.arrivalRunwayRaw || pirepDetails?.arrivalRunway || arrivalRunway
+    },
     { label: "Arrival Airport", value: entry.airportA?.name, title: entry.airportA?.name },
     { label: "End Time", value: formatLogbookTimestamp(getNestedValue(end.time, entry.endTime)) },
     { label: "End Fuel", value: formatLogbookAviationNumber(getNestedValue(end.fuel, entry.endFuel), "lb") },

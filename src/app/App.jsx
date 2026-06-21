@@ -44,6 +44,7 @@ import { useTourSelection } from "../features/tours/useTourSelection.hooks.js";
 import { useDutyScheduleBuilder } from "../features/dutySchedule/useDutyScheduleBuilder.hooks.js";
 import { useVatsimCoverage } from "../features/vatsim/useVatsimCoverage.hooks.js";
 import { useLogbook } from "../features/logbook/useLogbook.hooks.js";
+import { useLogbookPirepDetails } from "../features/logbook/useLogbookPirepDetails.hooks.js";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "../features/schedule/schedule.constants.js";
 import { DEFAULT_DUTY_FILTERS } from "../logic/dutySchedule/dutySchedule.constants.js";
 import { buildDefaultDutyFilters } from "../logic/dutySchedule/dutyFilters";
@@ -402,6 +403,7 @@ export default function App() {
     () => logbook.allRows.find((row) => row.id === logbook.selectedRowId) || null,
     [logbook.allRows, logbook.selectedRowId]
   );
+  const logbookPirepDetails = useLogbookPirepDetails(selectedLogbookFlight);
   // Keep the derived flight list stable so downstream hooks can read it safely.
   const scheduleFlights = useMemo(() => schedule?.flights || [], [schedule]);
   const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
@@ -1726,6 +1728,9 @@ export default function App() {
       logbookFilterBounds={logbook.filterBounds}
       logbookFilterOptions={logbook.filterOptions}
       selectedLogbookFlight={selectedLogbookFlight}
+      logbookPirepDetails={logbookPirepDetails.details}
+      logbookPirepDetailsLoading={logbookPirepDetails.isLoading}
+      logbookPirepDetailsError={logbookPirepDetails.error}
       airlines={airlines}
       airportOptions={airportOptions}
       geoOptions={geoOptions}
