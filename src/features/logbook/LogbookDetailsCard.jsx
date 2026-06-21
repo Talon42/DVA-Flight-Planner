@@ -184,9 +184,9 @@ export default function LogbookDetailsCard({
   const summaryItems = [
     { label: "Flight Time", value: formatLogbookDuration(entry.airborneTime) },
     { label: "Total Time", value: formatLogbookDuration(entry.blockTime) },
-    { label: "Route", value: routeSummary, title: pirepDetails?.routeSummary || routeSummary },
     { label: "Distance", value: selectedLogbookFlight.distanceDisplay, title: selectedLogbookFlight.distanceDisplay },
-    { label: "Passengers", value: formatPassengerCount(entry.pax) }
+    { label: "Passengers", value: formatPassengerCount(entry.pax) },
+    { label: "Route", value: routeSummary, title: pirepDetails?.routeSummary || routeSummary }
   ];
 
   const departureItems = [
