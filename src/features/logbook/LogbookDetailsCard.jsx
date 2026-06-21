@@ -119,11 +119,22 @@ export default function LogbookDetailsCard({
     isLoading: pirepDetailsLoading,
     hasError: hasPirepDetailsError
   });
-  const departureRunway = buildScrapedDetailValue(pirepDetails?.departureRunway, {
-    isLoading: pirepDetailsLoading,
-    hasError: hasPirepDetailsError
-  });
-  const arrivalRunway = buildScrapedDetailValue(pirepDetails?.arrivalRunway, {
+  const departureRunwayDisplay = buildScrapedDetailValue(
+    pirepDetails?.departureRunwayDisplay || pirepDetails?.departureRunway,
+    {
+      isLoading: pirepDetailsLoading,
+      hasError: hasPirepDetailsError
+    }
+  );
+  const arrivalRunwayDisplay = buildScrapedDetailValue(
+    pirepDetails?.arrivalRunwayDisplay || pirepDetails?.arrivalRunway,
+    {
+      isLoading: pirepDetailsLoading,
+      hasError: hasPirepDetailsError
+    }
+  );
+  const arrivalThresholdDistanceValue = String(pirepDetails?.arrivalRunwayThresholdDistance || "").trim();
+  const arrivalThresholdDistanceDisplay = buildScrapedDetailValue(arrivalThresholdDistanceValue, {
     isLoading: pirepDetailsLoading,
     hasError: hasPirepDetailsError
   });
@@ -140,8 +151,11 @@ export default function LogbookDetailsCard({
     { label: "Departure Airport", value: entry.airportD?.name, title: entry.airportD?.name },
     {
       label: "Runway",
-      value: departureRunway,
-      title: pirepDetails?.departureRunwayRaw || pirepDetails?.departureRunway || departureRunway
+      value: departureRunwayDisplay,
+      title:
+        pirepDetails?.departureRunwayRaw ||
+        pirepDetails?.departureRunwayDisplay ||
+        departureRunwayDisplay
     },
     {
       label: "Start Time",
@@ -161,8 +175,8 @@ export default function LogbookDetailsCard({
     { label: "Arrival Airport", value: entry.airportA?.name, title: entry.airportA?.name },
     {
       label: "Runway",
-      value: arrivalRunway,
-      title: pirepDetails?.arrivalRunwayRaw || pirepDetails?.arrivalRunway || arrivalRunway
+      value: arrivalRunwayDisplay,
+      title: pirepDetails?.arrivalRunwayRaw || pirepDetails?.arrivalRunwayDisplay || arrivalRunwayDisplay
     },
     { label: "End Time", value: formatLogbookTimestamp(getNestedValue(end.time, entry.endTime)) },
     { label: "End Fuel", value: formatLogbookAviationNumber(getNestedValue(end.fuel, entry.endFuel), "lb") },
@@ -181,6 +195,13 @@ export default function LogbookDetailsCard({
       label: "Landing Vertical Speed",
       value: formatLogbookSignedAviationNumber(landing.vSpeed ?? entry.landingVSpeed, "fpm")
     },
+    arrivalThresholdDistanceValue
+      ? {
+          label: "Threshold Distance",
+          value: arrivalThresholdDistanceDisplay,
+          title: arrivalThresholdDistanceValue || arrivalThresholdDistanceDisplay
+        }
+      : null,
     {
       label: "Landing G Force",
       value: formatLogbookAviationNumber(getNestedValue(landing.gForce, landing.g), "g", {
@@ -191,7 +212,7 @@ export default function LogbookDetailsCard({
       label: "Landing Grade",
       value: selectedLogbookFlight.landingGradeDisplay
     }
-  ];
+  ].filter(Boolean);
 
   return (
     <aside className="min-h-0 min-w-0">

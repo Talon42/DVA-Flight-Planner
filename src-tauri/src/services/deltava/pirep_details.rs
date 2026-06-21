@@ -24,10 +24,24 @@ pub struct DeltaVirtualPirepDetailsResult {
     pub arrival_route: String,
     pub route_summary: String,
     pub departure_runway: String,
+    pub departure_runway_length: String,
+    pub departure_runway_display: String,
     pub departure_runway_raw: String,
     pub arrival_runway: String,
+    pub arrival_runway_length: String,
+    pub arrival_runway_display: String,
+    pub arrival_runway_threshold_distance: String,
     pub arrival_runway_raw: String,
     pub fetched_at: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct RunwayDetails {
+    runway: String,
+    length: String,
+    threshold_distance: String,
+    display: String,
+    raw: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -37,6 +51,8 @@ struct ParsedPirepDetails {
     arrival_route: String,
     departure_runway_raw: String,
     arrival_runway_raw: String,
+    departure_runway_details: RunwayDetails,
+    arrival_runway_details: RunwayDetails,
     found_departure_route: bool,
     found_flight_route: bool,
     found_arrival_route: bool,
@@ -90,17 +106,48 @@ fn normalize_cell_text(raw: &str) -> String {
     normalize_text(raw)
 }
 
-fn normalize_runway_value(raw: &str) -> String {
+fn parse_runway_details(raw: &str) -> RunwayDetails {
     let normalized = normalize_text(raw);
-    let Ok(regex) = regex::Regex::new(r"^([0-9]{1,2}[LCR]?|[A-Z0-9]{1,4}[LCR]?)\b") else {
-        return normalized;
-    };
+    if normalized.is_empty() {
+        return RunwayDetails::default();
+    }
 
-    regex
-        .captures(&normalized)
+    let runway = regex::Regex::new(r"^([0-9]{1,2}[LCR]?|[A-Z0-9]{1,4}[LCR]?)\b")
+        .ok()
+        .and_then(|regex| regex.captures(&normalized))
         .and_then(|captures| captures.get(1))
         .map(|match_value| match_value.as_str().to_string())
-        .unwrap_or(normalized)
+        .unwrap_or_default();
+
+    let length = regex::Regex::new(r"\([^)]*-\s*([0-9,]+\s*feet)\b")
+        .ok()
+        .and_then(|regex| regex.captures(&normalized))
+        .and_then(|captures| captures.get(1))
+        .map(|match_value| normalize_text(match_value.as_str()))
+        .unwrap_or_default();
+
+    let threshold_distance = regex::Regex::new(r"\b([0-9,]+\s*feet)\s+from threshold\b")
+        .ok()
+        .and_then(|regex| regex.captures(&normalized))
+        .and_then(|captures| captures.get(1))
+        .map(|match_value| normalize_text(match_value.as_str()))
+        .unwrap_or_default();
+
+    let display = if !runway.is_empty() && !length.is_empty() {
+        format!("{runway} - {length}")
+    } else if !runway.is_empty() {
+        runway.clone()
+    } else {
+        normalized.clone()
+    };
+
+    RunwayDetails {
+        runway,
+        length,
+        threshold_distance,
+        display,
+        raw: normalized,
+    }
 }
 
 fn build_route_summary(departure_route: &str, flight_route: &str, arrival_route: &str) -> String {
@@ -143,10 +190,12 @@ fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
             }
             "Takeoff Runway" => {
                 parsed.departure_runway_raw = value;
+                parsed.departure_runway_details = parse_runway_details(&parsed.departure_runway_raw);
                 parsed.found_takeoff_runway = true;
             }
             "Landing Runway" => {
                 parsed.arrival_runway_raw = value;
+                parsed.arrival_runway_details = parse_runway_details(&parsed.arrival_runway_raw);
                 parsed.found_landing_runway = true;
             }
             _ => {}
@@ -167,8 +216,6 @@ fn build_result_from_html(
         &parsed.flight_route,
         &parsed.arrival_route,
     );
-    let departure_runway = normalize_runway_value(&parsed.departure_runway_raw);
-    let arrival_runway = normalize_runway_value(&parsed.arrival_runway_raw);
 
     let has_any_fields = parsed.found_departure_route
         || parsed.found_flight_route
@@ -191,10 +238,15 @@ fn build_result_from_html(
         flight_route: parsed.flight_route,
         arrival_route: parsed.arrival_route,
         route_summary,
-        departure_runway,
-        departure_runway_raw: parsed.departure_runway_raw,
-        arrival_runway,
-        arrival_runway_raw: parsed.arrival_runway_raw,
+        departure_runway: parsed.departure_runway_details.runway,
+        departure_runway_length: parsed.departure_runway_details.length,
+        departure_runway_display: parsed.departure_runway_details.display,
+        departure_runway_raw: parsed.departure_runway_details.raw,
+        arrival_runway: parsed.arrival_runway_details.runway,
+        arrival_runway_length: parsed.arrival_runway_details.length,
+        arrival_runway_display: parsed.arrival_runway_details.display,
+        arrival_runway_threshold_distance: parsed.arrival_runway_details.threshold_distance,
+        arrival_runway_raw: parsed.arrival_runway_details.raw,
         fetched_at: Utc::now().to_rfc3339(),
     })
 }
@@ -294,9 +346,17 @@ mod tests {
 
     #[test]
     fn normalizes_runway_tokens() {
-        assert_eq!(normalize_runway_value("08R (Asphalt - 10,495 feet)"), "08R");
-        assert_eq!(normalize_runway_value("12L (was 12) (Asphalt - 9,171 feet)"), "12L");
-        assert_eq!(normalize_runway_value("36"), "36");
+        let runway = parse_runway_details("08R (Asphalt - 10,495 feet)");
+        assert_eq!(runway.runway, "08R");
+        assert_eq!(runway.length, "10,495 feet");
+        assert_eq!(runway.display, "08R - 10,495 feet");
+        assert_eq!(runway.threshold_distance, "");
+
+        let runway = parse_runway_details("12L (was 12) (Asphalt - 9,171 feet)");
+        assert_eq!(runway.runway, "12L");
+        assert_eq!(runway.length, "9,171 feet");
+        assert_eq!(runway.display, "12L - 9,171 feet");
+        assert_eq!(runway.threshold_distance, "");
     }
 
     #[test]
@@ -308,6 +368,27 @@ mod tests {
         assert_eq!(parsed.found_arrival_route, false);
         assert_eq!(parsed.found_takeoff_runway, false);
         assert_eq!(parsed.found_landing_runway, false);
+    }
+
+    #[test]
+    fn parse_runway_details_extracts_threshold_distance() {
+        let runway = parse_runway_details("08 (Asphalt - 7,210 feet, 703 feet from threshold)");
+        assert_eq!(runway.runway, "08");
+        assert_eq!(runway.length, "7,210 feet");
+        assert_eq!(runway.display, "08 - 7,210 feet");
+        assert_eq!(runway.threshold_distance, "703 feet");
+
+        let runway = parse_runway_details("08R (Asphalt - 10,495 feet, takeoff run 6,153 feet)");
+        assert_eq!(runway.runway, "08R");
+        assert_eq!(runway.length, "10,495 feet");
+        assert_eq!(runway.display, "08R - 10,495 feet");
+        assert_eq!(runway.threshold_distance, "");
+
+        let runway = parse_runway_details("27L");
+        assert_eq!(runway.runway, "27L");
+        assert_eq!(runway.length, "");
+        assert_eq!(runway.display, "27L");
+        assert_eq!(runway.threshold_distance, "");
     }
 
     #[test]

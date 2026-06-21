@@ -67,10 +67,23 @@ export async function fetchDeltaVirtualPirepDetails(pirepId) {
       arrivalRoute: String(result?.arrivalRoute ?? result?.arrival_route ?? "").trim(),
       routeSummary: String(result?.routeSummary ?? result?.route_summary ?? "").trim(),
       departureRunway: String(result?.departureRunway ?? result?.departure_runway ?? "").trim(),
+      departureRunwayLength: String(
+        result?.departureRunwayLength ?? result?.departure_runway_length ?? ""
+      ).trim(),
+      departureRunwayDisplay: String(
+        result?.departureRunwayDisplay ?? result?.departure_runway_display ?? ""
+      ).trim(),
       departureRunwayRaw: String(
         result?.departureRunwayRaw ?? result?.departure_runway_raw ?? ""
       ).trim(),
       arrivalRunway: String(result?.arrivalRunway ?? result?.arrival_runway ?? "").trim(),
+      arrivalRunwayLength: String(result?.arrivalRunwayLength ?? result?.arrival_runway_length ?? "").trim(),
+      arrivalRunwayDisplay: String(
+        result?.arrivalRunwayDisplay ?? result?.arrival_runway_display ?? ""
+      ).trim(),
+      arrivalRunwayThresholdDistance: String(
+        result?.arrivalRunwayThresholdDistance ?? result?.arrival_runway_threshold_distance ?? ""
+      ).trim(),
       arrivalRunwayRaw: String(result?.arrivalRunwayRaw ?? result?.arrival_runway_raw ?? "").trim(),
       fetchedAt: String(result?.fetchedAt ?? result?.fetched_at ?? "").trim()
     };
