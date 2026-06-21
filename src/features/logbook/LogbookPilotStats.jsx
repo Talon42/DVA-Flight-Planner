@@ -39,7 +39,7 @@ function RankedListPanel({ title, items }) {
 export default function LogbookPilotStats({ rows, stats }) {
   if (!rows.length) {
     return (
-      <div className={cn("grid gap-3 p-3", cardFrameClassName)}>
+      <div className={cn("grid gap-3 px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2", cardFrameClassName)}>
         <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
           No logbook flights match the current filters.
         </p>
@@ -48,7 +48,7 @@ export default function LogbookPilotStats({ rows, stats }) {
   }
 
   return (
-    <div className="app-scrollbar min-h-0 overflow-y-auto px-2.5 pb-2 bp-1024:px-3 bp-1024:pb-2">
+    <div className="px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
       <div className="grid gap-3 py-0.5">
         <div className="grid gap-3 bp-1024:grid-cols-2 bp-1400:grid-cols-3">
           {stats.cards.map((card) => (

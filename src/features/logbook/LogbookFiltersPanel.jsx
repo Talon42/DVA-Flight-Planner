@@ -6,6 +6,7 @@ import { Field, RangeSlider, useTransientRangeSlider } from "../../components/ui
 import { fieldInputClassName } from "../../components/ui/forms";
 import { Eyebrow } from "../../components/ui/SectionHeader";
 import { useEffect, useMemo, useState } from "react";
+import { resolveAirportCodeToIcao } from "../../domain/airports/airportCatalog.js";
 import {
   getEffectiveLogbookDistanceRange,
   getEffectiveLogbookDurationRange
@@ -30,7 +31,7 @@ function LogbookDateField({ label, value, min, max, onChange }) {
   );
 }
 
-// Renders a departure/arrival pair with the same ICAO textbox behavior used in basic filters.
+// Renders a departure/arrival pair with the same ICAO/IATA textbox behavior used in basic filters.
 function LogbookAirportFilterRow({
   label,
   placeholder,
@@ -53,12 +54,12 @@ function LogbookAirportFilterRow({
   }
 
   function commitIcaoValue(value) {
-    const icao = normalizeIcao(value);
-    const exactMatch = options.find((option) => option.value === icao);
+    const icao = resolveAirportCodeToIcao(value) || normalizeIcao(value);
+    const exactMatch = options.find((airport) => airport.icao === icao);
 
     if (exactMatch) {
-      onQueryChange(exactMatch.value);
-      onFilterChange([exactMatch.value]);
+      onQueryChange(exactMatch.icao);
+      onFilterChange([exactMatch.icao]);
       return;
     }
 
@@ -78,14 +79,19 @@ function LogbookAirportFilterRow({
         showClearAction={false}
         showSingleSelectedLabel
         filterQuery={query}
-        options={options}
+        options={options.map((airport) => ({
+          value: airport.icao,
+          label: airport.name || airport.icao,
+          selectedLabel: airport.name || airport.icao,
+          keywords: `${airport.icao} ${airport.iata} ${airport.name} ${airport.country} ${airport.regionCode} ${airport.regionName}`.trim()
+        }))}
         selectedValues={selectedValues}
         onChange={(value) => {
           onQueryChange(value.length === 1 ? value[0] : "");
           onFilterChange(value);
         }}
       />
-      <Field label="ICAO" className="filter-block filter-block--icao min-w-0">
+      <Field label="ICAO/IATA" className="filter-block filter-block--icao min-w-0">
         <input
           id={inputId}
           className={fieldInputClassName}
@@ -133,22 +139,12 @@ export default function LogbookFiltersPanel({
 
   const departureAirportOptions = useMemo(
     () =>
-      filterOptions.departures.map((airport) => ({
-        value: airport,
-        label: airport,
-        selectedLabel: airport,
-        keywords: airport
-      })),
+      filterOptions.departures,
     [filterOptions.departures]
   );
   const arrivalAirportOptions = useMemo(
     () =>
-      filterOptions.arrivals.map((airport) => ({
-        value: airport,
-        label: airport,
-        selectedLabel: airport,
-        keywords: airport
-      })),
+      filterOptions.arrivals,
     [filterOptions.arrivals]
   );
   const effectiveDistanceRange = getEffectiveLogbookDistanceRange(filters, filterBounds);

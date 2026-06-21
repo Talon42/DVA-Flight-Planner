@@ -3,6 +3,7 @@ import {
   getLogbookSortValue,
   LOGBOOK_EMPTY_VALUE
 } from "../../domain/logbook/logbook.model.js";
+import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import {
   buildLogbookFilterBounds,
   normalizeLogbookFilters,
@@ -88,11 +89,39 @@ export function selectLogbookFilterOptions(rows) {
   const toSortedValues = (values) =>
     [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
 
+  const toAirportFilterOptions = (values) =>
+    toSortedValues(values)
+      .map((icao) => {
+        const airport = getAirportByIcao(icao);
+        return airport
+          ? {
+              icao: airport.icao,
+              iata: airport.iata,
+              name: airport.name,
+              country: airport.country,
+              regionCode: airport.regionCode,
+              regionName: airport.regionName
+            }
+          : {
+              icao,
+              iata: "",
+              name: icao,
+              country: "",
+              regionCode: "",
+              regionName: ""
+            };
+      })
+      .filter((airport) => airport.icao);
+
   return {
     airlines: toSortedValues(activeRows.map((row) => row.airlineDisplayName).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
     equipment: toSortedValues(activeRows.map((row) => row.equipment).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
-    departures: toSortedValues(activeRows.map((row) => row.departure).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
-    arrivals: toSortedValues(activeRows.map((row) => row.arrival).filter((value) => value !== LOGBOOK_EMPTY_VALUE))
+    departures: toAirportFilterOptions(
+      activeRows.map((row) => row.departure).filter((value) => value !== LOGBOOK_EMPTY_VALUE)
+    ),
+    arrivals: toAirportFilterOptions(
+      activeRows.map((row) => row.arrival).filter((value) => value !== LOGBOOK_EMPTY_VALUE)
+    )
   };
 }
 

@@ -111,7 +111,9 @@ export default function LogbookPanel({
 
       <div className="min-h-0 w-full min-w-0 flex-1">
         {selectedTab === "pilot-stats" ? (
-          <LogbookPilotStats rows={filteredRows} stats={pilotStats} />
+          <div className="app-scrollbar h-full min-h-0 overflow-y-auto">
+            <LogbookPilotStats rows={filteredRows} stats={pilotStats} />
+          </div>
         ) : (
           <LogbookFlightsTable
             rows={sortedFilteredRows}
