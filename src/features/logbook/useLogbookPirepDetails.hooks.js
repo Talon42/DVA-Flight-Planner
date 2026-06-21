@@ -41,7 +41,7 @@ function buildCachedDetails(details) {
 }
 
 // Owns the lazy Delta Virtual PIREP detail fetch for the selected logbook row.
-export function useLogbookPirepDetails(selectedLogbookFlight) {
+export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true } = {}) {
   const [details, setDetails] = useState(EMPTY_PIREP_DETAILS);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -52,7 +52,7 @@ export function useLogbookPirepDetails(selectedLogbookFlight) {
     requestIdRef.current += 1;
     const requestId = requestIdRef.current;
 
-    if (!pirepId) {
+    if (!enabled || !pirepId) {
       setDetails(EMPTY_PIREP_DETAILS);
       setIsLoading(false);
       setError("");
@@ -82,13 +82,13 @@ export function useLogbookPirepDetails(selectedLogbookFlight) {
         pirepDetailsCache.set(pirepId, normalizedDetails);
         setDetails(normalizedDetails);
         setError("");
-      } catch (fetchError) {
+      } catch {
         if (requestIdRef.current !== requestId) {
           return;
         }
 
         setDetails(EMPTY_PIREP_DETAILS);
-        setError(fetchError instanceof Error ? fetchError.message : String(fetchError || ""));
+        setError("PIREP details unavailable.");
       } finally {
         if (requestIdRef.current === requestId) {
           setIsLoading(false);
@@ -99,7 +99,7 @@ export function useLogbookPirepDetails(selectedLogbookFlight) {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [selectedLogbookFlight]);
+  }, [enabled, selectedLogbookFlight]);
 
   return {
     details,

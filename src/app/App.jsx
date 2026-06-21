@@ -403,7 +403,9 @@ export default function App() {
     () => logbook.allRows.find((row) => row.id === logbook.selectedRowId) || null,
     [logbook.allRows, logbook.selectedRowId]
   );
-  const logbookPirepDetails = useLogbookPirepDetails(selectedLogbookFlight);
+  const logbookPirepDetails = useLogbookPirepDetails(selectedLogbookFlight, {
+    enabled: scheduleView === "logbook"
+  });
   // Keep the derived flight list stable so downstream hooks can read it safely.
   const scheduleFlights = useMemo(() => schedule?.flights || [], [schedule]);
   const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);

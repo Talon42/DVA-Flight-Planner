@@ -129,20 +129,20 @@ export default function LogbookDetailsCard({
   });
 
   const summaryItems = [
+    { label: "Flight Time", value: formatLogbookDuration(entry.airborneTime) },
+    { label: "Total Time", value: formatLogbookDuration(entry.blockTime) },
     { label: "Route", value: routeSummary, title: pirepDetails?.routeSummary || routeSummary },
-    { label: "Block Time", value: formatLogbookDuration(entry.blockTime) },
-    { label: "Airborne Time", value: formatLogbookDuration(entry.airborneTime) },
     { label: "Distance", value: selectedLogbookFlight.distanceDisplay, title: selectedLogbookFlight.distanceDisplay },
     { label: "Passengers", value: formatPassengerCount(entry.pax) }
   ];
 
   const departureItems = [
+    { label: "Departure Airport", value: entry.airportD?.name, title: entry.airportD?.name },
     {
       label: "Runway",
       value: departureRunway,
       title: pirepDetails?.departureRunwayRaw || pirepDetails?.departureRunway || departureRunway
     },
-    { label: "Departure Airport", value: entry.airportD?.name, title: entry.airportD?.name },
     {
       label: "Start Time",
       value: formatLogbookTimestamp(entry.startTime)
@@ -158,12 +158,12 @@ export default function LogbookDetailsCard({
   ];
 
   const arrivalItems = [
+    { label: "Arrival Airport", value: entry.airportA?.name, title: entry.airportA?.name },
     {
       label: "Runway",
       value: arrivalRunway,
       title: pirepDetails?.arrivalRunwayRaw || pirepDetails?.arrivalRunway || arrivalRunway
     },
-    { label: "Arrival Airport", value: entry.airportA?.name, title: entry.airportA?.name },
     { label: "End Time", value: formatLogbookTimestamp(getNestedValue(end.time, entry.endTime)) },
     { label: "End Fuel", value: formatLogbookAviationNumber(getNestedValue(end.fuel, entry.endFuel), "lb") },
     {
