@@ -144,6 +144,73 @@ export default function App() {
     });
   const [mapOptions, setMapOptions] = useState(DEFAULT_MAP_OPTIONS);
   const [theme, setTheme] = useState(readSavedTheme);
+  const uiStateSnapshotRef = useRef({
+    plannerMode: "basic",
+    filters: DEFAULT_FILTERS,
+    dutyFilters: DEFAULT_DUTY_FILTERS,
+    flightBoards: [createFlightBoard()],
+    activeFlightBoardId: "",
+    flightBoard: null,
+    plannerControlsCollapsed: false,
+    basicAdvancedFiltersOpen: false,
+    basicAddonFiltersOpen: false,
+    sort: DEFAULT_SORT,
+    selectedFlightId: null,
+    scheduleView: "flights",
+    selectedTourPath: "",
+    selectedAccomplishmentName: "",
+    mapOptions: DEFAULT_MAP_OPTIONS,
+    logbookSubTab: "flights",
+    logbookFilters: {},
+    logbookSort: null,
+    tourProgress: {}
+  });
+  // Builds the current UI-state payload so the debounced save and immediate map writes stay in sync.
+  const buildCurrentUiStatePayload = useCallback(
+    (overrides = {}) => {
+      const currentState = uiStateSnapshotRef.current;
+      const nextMapOptions =
+        overrides.mapOptions !== undefined
+          ? normalizeMapOptions(overrides.mapOptions)
+          : currentState.mapOptions;
+
+      return {
+        ...currentState,
+        ...overrides,
+        mapOptions: nextMapOptions
+      };
+    },
+    []
+  );
+  // Writes the current UI state immediately so preference toggles cannot be lost on exit.
+  const handleSetMapOptions = useCallback(
+    (updater) => {
+      setMapOptions((currentMapOptions) => {
+        const previousMapOptions = normalizeMapOptions(currentMapOptions);
+        const nextMapOptions = normalizeMapOptions(
+          typeof updater === "function" ? updater(previousMapOptions) : updater
+        );
+
+        void logAppEvent("map-options-changed", {
+          previousMapOptions,
+          nextMapOptions
+        }).catch(() => {});
+        void logAppEvent("persist-ui-state-map-options", {
+          mapOptions: nextMapOptions
+        }).catch(() => {});
+
+        writeSavedUiState(buildCurrentUiStatePayload({ mapOptions: nextMapOptions })).catch(
+          (error) => {
+            setStatusMessage(error.message || "Unable to persist the current planner state.");
+            logAppError("persist-ui-state-failed", error).catch(() => {});
+          }
+        );
+
+        return nextMapOptions;
+      });
+    },
+    [buildCurrentUiStatePayload]
+  );
   const {
     viewportSize,
     plannerControlsCollapsed,
@@ -533,6 +600,27 @@ export default function App() {
     handleRenameFlightBoard,
     handleDeleteFlightBoard
   } = boardState;
+  uiStateSnapshotRef.current = {
+    plannerMode,
+    filters,
+    dutyFilters,
+    flightBoards,
+    activeFlightBoardId,
+    flightBoard,
+    plannerControlsCollapsed,
+    basicAdvancedFiltersOpen,
+    basicAddonFiltersOpen,
+    sort,
+    selectedFlightId,
+    scheduleView,
+    selectedTourPath,
+    selectedAccomplishmentName,
+    mapOptions,
+    logbookSubTab: logbook.selectedTab,
+    logbookFilters: logbook.filters,
+    logbookSort: logbook.sort,
+    tourProgress
+  };
   const handleToggleAccomplishmentSelectorCollapsed = useCallback((nextCollapsed) => {
     setIsAccomplishmentSelectorCollapsed(nextCollapsed);
   }, []);
@@ -776,89 +864,6 @@ export default function App() {
       version: APP_BUILD_GIT_TAG
     }).catch(() => {});
   }, []);
-
-  // Builds the current UI-state payload so the debounced save and immediate map writes stay in sync.
-  const buildCurrentUiStatePayload = useCallback(
-    (overrides = {}) => {
-      const nextMapOptions =
-        overrides.mapOptions !== undefined
-          ? normalizeMapOptions(overrides.mapOptions)
-          : mapOptions;
-
-      return {
-        plannerMode,
-        filters,
-        dutyFilters,
-        flightBoards,
-        activeFlightBoardId,
-        flightBoard,
-        plannerControlsCollapsed,
-        basicAdvancedFiltersOpen,
-        basicAddonFiltersOpen,
-        sort,
-        selectedFlightId,
-        scheduleView,
-        selectedTourPath,
-        selectedAccomplishmentName,
-        mapOptions: nextMapOptions,
-        logbookSubTab: logbook.selectedTab,
-        logbookFilters: logbook.filters,
-        logbookSort: logbook.sort,
-        tourProgress
-      };
-    },
-    [
-      activeFlightBoardId,
-      basicAddonFiltersOpen,
-      basicAdvancedFiltersOpen,
-      dutyFilters,
-      filters,
-      flightBoard,
-      flightBoards,
-      logbook.filters,
-      logbook.selectedTab,
-      logbook.sort,
-      mapOptions,
-      plannerControlsCollapsed,
-      plannerMode,
-      scheduleView,
-      selectedAccomplishmentName,
-      selectedFlightId,
-      selectedTourPath,
-      sort,
-      tourProgress
-    ]
-  );
-
-  // Writes the current UI state immediately so preference toggles cannot be lost on exit.
-  const handleSetMapOptions = useCallback(
-    (updater) => {
-      setMapOptions((currentMapOptions) => {
-        const previousMapOptions = normalizeMapOptions(currentMapOptions);
-        const nextMapOptions = normalizeMapOptions(
-          typeof updater === "function" ? updater(previousMapOptions) : updater
-        );
-
-        void logAppEvent("map-options-changed", {
-          previousMapOptions,
-          nextMapOptions
-        }).catch(() => {});
-        void logAppEvent("persist-ui-state-map-options", {
-          mapOptions: nextMapOptions
-        }).catch(() => {});
-
-        writeSavedUiState(buildCurrentUiStatePayload({ mapOptions: nextMapOptions })).catch(
-          (error) => {
-            setStatusMessage(error.message || "Unable to persist the current planner state.");
-            logAppError("persist-ui-state-failed", error).catch(() => {});
-          }
-        );
-
-        return nextMapOptions;
-      });
-    },
-    [buildCurrentUiStatePayload]
-  );
 
   useDebouncedEffect(
     () => {
