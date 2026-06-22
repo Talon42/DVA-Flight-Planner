@@ -172,7 +172,6 @@ export function useAppBootstrap({
   setPlannerControlsCollapsed,
   setPlannerMode,
   setSchedule,
-  setScheduleTableTimeDisplayMode,
   setScheduleView,
   setSelectedAccomplishmentName,
   setSelectedFlightId,
@@ -311,9 +310,6 @@ export function useAppBootstrap({
         )
       );
       setPlannerMode(savedUiState.plannerMode === "duty" ? "duty" : "basic");
-      setScheduleTableTimeDisplayMode(
-        savedUiState.scheduleTableTimeDisplayMode === "utc" ? "utc" : "local"
-      );
       setSort(savedUiState.sort || DEFAULT_SORT);
       setScheduleView(savedUiState.scheduleView === "logbook" ? "logbook" : "flights");
       setSelectedTourPath(String(savedUiState.selectedTourPath || "").trim());
@@ -380,7 +376,6 @@ export function useAppBootstrap({
     setPlannerControlsCollapsed,
     setPlannerMode,
     setSchedule,
-    setScheduleTableTimeDisplayMode,
     setScheduleView,
     setSelectedAccomplishmentName,
     setSelectedFlightId,
