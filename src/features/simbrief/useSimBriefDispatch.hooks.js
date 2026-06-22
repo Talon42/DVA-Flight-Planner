@@ -19,6 +19,7 @@ import {
   resolveSimBriefAircraftCompatibility,
   startSimBriefDispatch
 } from "../../services/tauri/simbrief.client.js";
+import { normalizeSimBriefDepartureOffsetMinutes } from "../../services/storage/storage.js";
 import { resolveDraftSimBriefId } from "../../domain/deltaVirtual/draftReport.js";
 
 function normalizeSimBriefAircraftTypeOption(value) {
@@ -75,17 +76,21 @@ function buildSimBriefAircraftTypeSummary({
   return summary;
 }
 
-// Returns the dispatch timestamp and SimBrief departure date in UTC.
-function deriveSimBriefDepartureDateTimeUtc(flight, useCurrentUtc = false) {
-  const fallbackUtc = DateTime.utc().set({ second: 0, millisecond: 0 });
+// Returns the dispatch timestamp and SimBrief departure date in UTC after applying the offset.
+function deriveSimBriefDepartureDateTimeUtc(flight, useCurrentUtc = false, departureOffsetMinutes = 0) {
+  const normalizedOffsetMinutes = normalizeSimBriefDepartureOffsetMinutes(departureOffsetMinutes);
+  const fallbackUtc = DateTime.utc();
   const scheduleUtc = !useCurrentUtc
     ? DateTime.fromISO(String(flight?.stdUtc || "").trim(), { zone: "utc" })
     : null;
 
-  const departureUtc =
+  const startingUtc =
     scheduleUtc?.isValid === true
-      ? scheduleUtc.set({ second: 0, millisecond: 0 }).toUTC()
+      ? scheduleUtc.toUTC()
       : fallbackUtc;
+  const departureUtc = startingUtc
+    .plus({ minutes: normalizedOffsetMinutes })
+    .set({ second: 0, millisecond: 0 });
 
   return {
     departureTimeUtc: departureUtc.toISO(),
@@ -148,6 +153,7 @@ export function useSimBriefDispatch({
   setStatusMessage,
   simBriefCustomAirframes = [],
   simBriefDispatchUnits,
+  simBriefDepartureOffsetMinutes = 0,
   simBriefPilotId,
   simBriefUsername,
   simBriefUseCurrentUtcForDispatchTime = false,
@@ -303,6 +309,9 @@ export function useSimBriefDispatch({
     const hasSimBriefPlan = Boolean(existingStaticId);
     const username = String(simBriefUsername || "").trim();
     const pilotId = String(simBriefPilotId || "").trim();
+    const departureOffsetMinutes = normalizeSimBriefDepartureOffsetMinutes(
+      simBriefDepartureOffsetMinutes
+    );
     const dispatchMode = forceNewDispatch ? "regenerate" : hasSimBriefPlan ? "refresh" : "generate";
     if (!username && !pilotId) {
       const message =
@@ -414,7 +423,8 @@ export function useSimBriefDispatch({
         const callsign = deriveCallsign(dispatchFlight);
         const { departureTimeUtc, departureDate } = deriveSimBriefDepartureDateTimeUtc(
           dispatchFlight,
-          simBriefUseCurrentUtcForDispatchTime
+          simBriefUseCurrentUtcForDispatchTime,
+          departureOffsetMinutes
         );
 
         if (!flightNumber || !callsign || !departureTimeUtc || !departureDate) {
@@ -443,7 +453,8 @@ export function useSimBriefDispatch({
             destination: selectedShortlistFlight.to,
             departureDate,
             departureTimeUtc,
-            useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime
+            useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime,
+            departureOffsetMinutes
           }
         );
         await logSystemDebug("SimBrief", "dispatch-debug", {
@@ -673,6 +684,7 @@ export function useSimBriefDispatch({
     setStatusMessage,
     simBriefCustomAirframes,
     simBriefDispatchUnits,
+    simBriefDepartureOffsetMinutes,
     simBriefPilotId,
     simBriefUsername,
     simBriefUseCurrentUtcForDispatchTime,

@@ -39,6 +39,7 @@ export default function AppSettingsContent({
   simBriefPilotIdDraft,
   simBriefUseCurrentUtcForDispatchTime,
   simBriefDispatchUnits,
+  simBriefDepartureOffsetMinutes,
   simBriefCustomAirframesDraft,
   simBriefCustomAirframeIdDraft,
   simBriefCustomAirframeNameDraft,
@@ -51,6 +52,7 @@ export default function AppSettingsContent({
   onPilotIdChange,
   onDispatchUnitsChange,
   onDispatchTimeModeChange,
+  onDepartureOffsetChange,
   onCustomAirframeDraftIdChange,
   onCustomAirframeDraftNameChange,
   onCustomAirframeDraftMatchTypeChange,
@@ -99,6 +101,7 @@ export default function AppSettingsContent({
           pilotId={simBriefPilotIdDraft}
           useCurrentUtcForDispatchTime={simBriefUseCurrentUtcForDispatchTime}
           dispatchUnits={simBriefDispatchUnits}
+          departureOffsetMinutes={simBriefDepartureOffsetMinutes}
           customAirframes={simBriefCustomAirframesDraft}
           customAirframeDraftId={simBriefCustomAirframeIdDraft}
           customAirframeDraftName={simBriefCustomAirframeNameDraft}
@@ -111,6 +114,7 @@ export default function AppSettingsContent({
           onPilotIdChange={onPilotIdChange}
           onDispatchUnitsChange={onDispatchUnitsChange}
           onDispatchTimeModeChange={onDispatchTimeModeChange}
+          onDepartureOffsetChange={onDepartureOffsetChange}
           onCustomAirframeDraftIdChange={onCustomAirframeDraftIdChange}
           onCustomAirframeDraftNameChange={onCustomAirframeDraftNameChange}
           onCustomAirframeDraftMatchTypeChange={onCustomAirframeDraftMatchTypeChange}

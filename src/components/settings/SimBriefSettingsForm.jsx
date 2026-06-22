@@ -18,6 +18,7 @@ export function SimBriefSettingsForm({
   pilotId,
   useCurrentUtcForDispatchTime,
   dispatchUnits,
+  departureOffsetMinutes = 0,
   customAirframes,
   customAirframeDraftId,
   customAirframeDraftName,
@@ -25,6 +26,7 @@ export function SimBriefSettingsForm({
   isSaving,
   onDispatchUnitsChange,
   onDispatchTimeModeChange,
+  onDepartureOffsetChange,
   onCustomAirframeDraftIdChange,
   onCustomAirframeDraftNameChange,
   onCustomAirframeDraftMatchTypeChange,
@@ -37,6 +39,12 @@ export function SimBriefSettingsForm({
   const customAirframeMatchOptions = buildCustomAirframeMatchOptions();
   const simBriefOptionButtonClassName = (active) =>
     cn(toggleButtonClassName(active), "h-8 min-h-0 px-3 py-2 text-[0.9rem] leading-none");
+  const departureOffsetOptions = [
+    { label: "None", value: 0 },
+    { label: "30 Minutes", value: 30 },
+    { label: "45 Minutes", value: 45 },
+    { label: "60 Minutes", value: 60 }
+  ];
   const [usernameValue, setUsernameValue] = useState(username);
   const [pilotIdValue, setPilotIdValue] = useState(pilotId);
 
@@ -80,7 +88,7 @@ export function SimBriefSettingsForm({
         <SectionHeader
           eyebrow="SimBrief"
           title="Configure SimBrief integration"
-          description="Save your Navigraph alias, Pilot ID, dispatch units, and any custom airframes."
+          description="Save your Navigraph alias, Pilot ID, dispatch units, departure offset, and any custom airframes."
         />
       ) : (
         <div className={cn("grid gap-1", supportCopyTextClassName, compact && "gap-0.5")}>
@@ -117,7 +125,7 @@ export function SimBriefSettingsForm({
       </div>
 
       {!isOnboardingMode ? (
-        <div className={gridClassNames.twoColumn}>
+        <div className="grid gap-3 bp-1024:grid-cols-3">
           <Field label="Dispatch Units" className="simbrief-units-toggle">
             <div className="toggle-row flex flex-wrap gap-2">
               <button
@@ -154,6 +162,21 @@ export function SimBriefSettingsForm({
                 Current UTC
               </button>
             </div>
+          </Field>
+
+          <Field label="Departure Offset">
+            <select
+              className={fieldInputClassName}
+              value={departureOffsetMinutes}
+              onChange={(event) => onDepartureOffsetChange?.(Number(event.target.value))}
+              disabled={isSaving}
+            >
+              {departureOffsetOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
       ) : null}

@@ -144,6 +144,11 @@ function buildAddonScanSummary(addonScan) {
   };
 }
 
+// Normalizes hydrated SimBrief offset values so legacy settings fall back safely.
+function normalizeLoadedDepartureOffsetMinutes(value) {
+  return value === 30 || value === 45 || value === 60 ? value : 0;
+}
+
 // Owns the first startup hydration pass that restores saved schedules and UI state.
 export function useAppBootstrap({
   setActiveFlightBoardId,
@@ -177,7 +182,9 @@ export function useAppBootstrap({
   setStatusMessage,
   setLogbookAirportProgress,
   setMapOptions,
+  setSimBriefDepartureOffsetMinutes,
   setSavedSimBriefDispatchUnits,
+  setSavedSimBriefDepartureOffsetMinutes,
   setSimBriefCustomAirframes,
   setSimBriefCustomAirframesDraft,
   setSimBriefDispatchUnits,
@@ -424,6 +431,9 @@ export function useAppBootstrap({
           String(simBriefResult.value?.dispatchUnits || "").trim().toUpperCase() === "KGS"
             ? "KGS"
             : "LBS";
+        const departureOffsetMinutes = normalizeLoadedDepartureOffsetMinutes(
+          Number(simBriefResult.value?.departureOffsetMinutes || 0)
+        );
         const customAirframes = Array.isArray(simBriefResult.value?.customAirframes)
           ? simBriefResult.value.customAirframes.map(normalizeSimBriefCustomAirframe).filter(Boolean)
           : [];
@@ -434,6 +444,8 @@ export function useAppBootstrap({
         setSimBriefUseCurrentUtcForDispatchTime?.(useCurrentUtcForDispatchTime);
         setSimBriefDispatchUnits?.(dispatchUnits);
         setSavedSimBriefDispatchUnits?.(dispatchUnits);
+        setSimBriefDepartureOffsetMinutes?.(departureOffsetMinutes);
+        setSavedSimBriefDepartureOffsetMinutes?.(departureOffsetMinutes);
         setSimBriefCustomAirframes?.(customAirframes);
         setSimBriefCustomAirframesDraft?.(customAirframes);
         await logAppEvent("SimBrief", "settings-loaded", {
@@ -441,6 +453,7 @@ export function useAppBootstrap({
           hasPilotId: Boolean(pilotId),
           useCurrentUtcForDispatchTime,
           dispatchUnits,
+          departureOffsetMinutes,
           customAirframeCount: customAirframes.length
         });
       } else {
@@ -472,9 +485,11 @@ export function useAppBootstrap({
     setDvaLastNameDraft,
     setIsDvaPasswordEditing,
     setSavedSimBriefDispatchUnits,
+    setSavedSimBriefDepartureOffsetMinutes,
     setSimBriefCustomAirframes,
     setSimBriefCustomAirframesDraft,
     setSimBriefDispatchUnits,
+    setSimBriefDepartureOffsetMinutes,
     setSimBriefPilotId,
     setSimBriefPilotIdDraft,
     setSimBriefUsername,

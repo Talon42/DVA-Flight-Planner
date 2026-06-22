@@ -9,7 +9,10 @@ import {
   getDefaultDeltaVirtualCredentials,
   saveDeltaVirtualCredentials
 } from "../services/tauri/deltaVirtualCredentials.client.js";
-import { writeSimBriefSettings } from "../services/storage/storage.js";
+import {
+  normalizeSimBriefDepartureOffsetMinutes,
+  writeSimBriefSettings
+} from "../services/storage/storage.js";
 import { normalizeSimBriefCustomAirframe } from "../services/tauri/simbrief.client.js";
 
 // Owns settings persistence workflows so App can keep the modal state and tab selection only.
@@ -21,8 +24,10 @@ export function useAppSettingsPersistence({
   dvaPasswordDraft,
   isDvaCredentialsSaving,
   isSimBriefSaving,
+  savedSimBriefDepartureOffsetMinutes,
   savedSimBriefDispatchUnits,
   simBriefCustomAirframes,
+  simBriefDepartureOffsetMinutes,
   setDvaFirstName,
   setDvaFirstNameDraft,
   setDvaHasPassword,
@@ -33,11 +38,13 @@ export function useAppSettingsPersistence({
   setIsDvaPasswordEditing,
   setIsSimBriefSaving,
   setSavedSimBriefDispatchUnits,
+  setSavedSimBriefDepartureOffsetMinutes,
   setSimBriefCustomAirframeIdDraft,
   setSimBriefCustomAirframeMatchTypeDraft,
   setSimBriefCustomAirframeNameDraft,
   setSimBriefCustomAirframes,
   setSimBriefCustomAirframesDraft,
+  setSimBriefDepartureOffsetMinutes,
   setSimBriefDispatchUnits,
   setSimBriefPilotId,
   setSimBriefPilotIdDraft,
@@ -56,6 +63,40 @@ export function useAppSettingsPersistence({
   simBriefUsernameDraft,
   simBriefUsername
 } = {}) {
+  // Serializes the current SimBrief draft state into the persisted profile shape.
+  function buildSimBriefSettingsPayload(overrides = {}) {
+    const nextUsername =
+      overrides.username !== undefined ? String(overrides.username || "") : simBriefUsernameDraft;
+    const nextPilotId =
+      overrides.pilotId !== undefined ? String(overrides.pilotId || "") : simBriefPilotIdDraft;
+    const nextUseCurrentUtcForDispatchTime =
+      overrides.useCurrentUtcForDispatchTime !== undefined
+        ? Boolean(overrides.useCurrentUtcForDispatchTime)
+        : Boolean(simBriefUseCurrentUtcForDispatchTime);
+    const nextDispatchUnits = overrides.dispatchUnits !== undefined
+      ? String(overrides.dispatchUnits || "").trim().toUpperCase() === "KGS"
+        ? "KGS"
+        : "LBS"
+      : simBriefDispatchUnits;
+    const nextDepartureOffsetMinutes =
+      overrides.departureOffsetMinutes !== undefined
+        ? normalizeSimBriefDepartureOffsetMinutes(overrides.departureOffsetMinutes)
+        : normalizeSimBriefDepartureOffsetMinutes(simBriefDepartureOffsetMinutes);
+    const nextCustomAirframes =
+      overrides.customAirframes !== undefined ? overrides.customAirframes : simBriefCustomAirframesDraft;
+
+    return {
+      username: String(nextUsername || "").trim(),
+      pilotId: String(nextPilotId || "").trim(),
+      useCurrentUtcForDispatchTime: nextUseCurrentUtcForDispatchTime,
+      dispatchUnits: nextDispatchUnits,
+      departureOffsetMinutes: nextDepartureOffsetMinutes,
+      customAirframes: Array.isArray(nextCustomAirframes)
+        ? nextCustomAirframes.map(normalizeSimBriefCustomAirframe).filter(Boolean)
+        : []
+    };
+  }
+
   // Saves Delta Virtual credentials while preserving the existing masked-password workflow.
   async function handleSaveDeltaVirtualCredentials(overrides = {}) {
     if (isDvaCredentialsSaving) {
@@ -141,15 +182,13 @@ export function useAppSettingsPersistence({
       return false;
     }
 
-    const nextUsername = String(
-      overrides.username !== undefined ? overrides.username : simBriefUsernameDraft || ""
-    ).trim();
-    const nextPilotId = String(
-      overrides.pilotId !== undefined ? overrides.pilotId : simBriefPilotIdDraft || ""
-    ).trim();
-    const nextCustomAirframes = simBriefCustomAirframesDraft
-      .map(normalizeSimBriefCustomAirframe)
-      .filter(Boolean);
+    const nextSettings = buildSimBriefSettingsPayload({
+      username: overrides.username,
+      pilotId: overrides.pilotId,
+      customAirframes: simBriefCustomAirframesDraft
+    });
+    const { username: nextUsername, pilotId: nextPilotId, customAirframes: nextCustomAirframes } =
+      nextSettings;
 
     if (
       nextUsername === simBriefUsername &&
@@ -162,18 +201,13 @@ export function useAppSettingsPersistence({
     setIsSimBriefSaving(true);
 
     try {
-      await writeSimBriefSettings({
-        username: nextUsername,
-        pilotId: nextPilotId,
-        useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime,
-        dispatchUnits: simBriefDispatchUnits,
-        customAirframes: nextCustomAirframes
-      });
+      await writeSimBriefSettings(nextSettings);
       setSimBriefUsername(nextUsername);
       setSimBriefUsernameDraft(nextUsername);
       setSimBriefPilotId(nextPilotId);
       setSimBriefPilotIdDraft(nextPilotId);
       setSavedSimBriefDispatchUnits(simBriefDispatchUnits);
+      setSavedSimBriefDepartureOffsetMinutes(simBriefDepartureOffsetMinutes);
       setSimBriefCustomAirframes(nextCustomAirframes);
       setSimBriefCustomAirframesDraft(nextCustomAirframes);
       setStatusMessage(
@@ -185,6 +219,7 @@ export function useAppSettingsPersistence({
         hasUsername: Boolean(nextUsername),
         hasPilotId: Boolean(nextPilotId),
         dispatchUnits: simBriefDispatchUnits,
+        departureOffsetMinutes: simBriefDepartureOffsetMinutes,
         customAirframeCount: nextCustomAirframes.length
       });
       return true;
@@ -209,28 +244,25 @@ export function useAppSettingsPersistence({
     setIsSimBriefSaving(true);
 
     try {
-      const nextUsername = String(simBriefUsernameDraft || "").trim();
-      const nextPilotId = String(simBriefPilotIdDraft || "").trim();
-      const nextCustomAirframes = simBriefCustomAirframesDraft
-        .map(normalizeSimBriefCustomAirframe)
-        .filter(Boolean);
-      await writeSimBriefSettings({
-        username: nextUsername,
-        pilotId: nextPilotId,
-        useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime,
+      const nextSettings = buildSimBriefSettingsPayload({
         dispatchUnits: normalizedUnits,
-        customAirframes: nextCustomAirframes
+        customAirframes: simBriefCustomAirframesDraft
       });
+      const { username: nextUsername, pilotId: nextPilotId, customAirframes: nextCustomAirframes } =
+        nextSettings;
+      await writeSimBriefSettings(nextSettings);
       setSimBriefUsername(nextUsername);
       setSimBriefUsernameDraft(nextUsername);
       setSimBriefPilotId(nextPilotId);
       setSimBriefPilotIdDraft(nextPilotId);
       setSavedSimBriefDispatchUnits(normalizedUnits);
+      setSavedSimBriefDepartureOffsetMinutes(simBriefDepartureOffsetMinutes);
       setSimBriefCustomAirframes(nextCustomAirframes);
       setSimBriefCustomAirframesDraft(nextCustomAirframes);
       setStatusMessage(`SimBrief dispatch units set to ${normalizedUnits}.`);
       await logSystemEvent("SimBrief", "dispatch-units-saved", {
-        dispatchUnits: normalizedUnits
+        dispatchUnits: normalizedUnits,
+        departureOffsetMinutes: simBriefDepartureOffsetMinutes
       });
     } catch (error) {
       setSimBriefDispatchUnits(savedSimBriefDispatchUnits);
@@ -277,20 +309,17 @@ export function useAppSettingsPersistence({
     setIsSimBriefSaving(true);
 
     try {
-      const nextUsername = String(simBriefUsernameDraft || "").trim();
-      const nextPilotId = String(simBriefPilotIdDraft || "").trim();
-      await writeSimBriefSettings({
-        username: nextUsername,
-        pilotId: nextPilotId,
-        useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime,
-        dispatchUnits: simBriefDispatchUnits,
+      const nextSettings = buildSimBriefSettingsPayload({
         customAirframes: nextCustomAirframes
       });
+      const { username: nextUsername, pilotId: nextPilotId } = nextSettings;
+      await writeSimBriefSettings(nextSettings);
       setSimBriefUsername(nextUsername);
       setSimBriefUsernameDraft(nextUsername);
       setSimBriefPilotId(nextPilotId);
       setSimBriefPilotIdDraft(nextPilotId);
       setSavedSimBriefDispatchUnits(simBriefDispatchUnits);
+      setSavedSimBriefDepartureOffsetMinutes(simBriefDepartureOffsetMinutes);
       setSimBriefCustomAirframes(nextCustomAirframes);
       setSimBriefCustomAirframesDraft(nextCustomAirframes);
       setSimBriefCustomAirframeIdDraft("");
@@ -324,20 +353,17 @@ export function useAppSettingsPersistence({
     setIsSimBriefSaving(true);
 
     try {
-      const nextUsername = String(simBriefUsernameDraft || "").trim();
-      const nextPilotId = String(simBriefPilotIdDraft || "").trim();
-      await writeSimBriefSettings({
-        username: nextUsername,
-        pilotId: nextPilotId,
-        useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime,
-        dispatchUnits: simBriefDispatchUnits,
+      const nextSettings = buildSimBriefSettingsPayload({
         customAirframes: nextCustomAirframes
       });
+      const { username: nextUsername, pilotId: nextPilotId } = nextSettings;
+      await writeSimBriefSettings(nextSettings);
       setSimBriefUsername(nextUsername);
       setSimBriefUsernameDraft(nextUsername);
       setSimBriefPilotId(nextPilotId);
       setSimBriefPilotIdDraft(nextPilotId);
       setSavedSimBriefDispatchUnits(simBriefDispatchUnits);
+      setSavedSimBriefDepartureOffsetMinutes(simBriefDepartureOffsetMinutes);
       setSimBriefCustomAirframes(nextCustomAirframes);
       setSimBriefCustomAirframesDraft(nextCustomAirframes);
       setStatusMessage("Custom SimBrief airframe removed.");
@@ -370,23 +396,19 @@ export function useAppSettingsPersistence({
     setIsSimBriefSaving(true);
 
     try {
-      const nextUsername = String(simBriefUsernameDraft || "").trim();
-      const nextPilotId = String(simBriefPilotIdDraft || "").trim();
-      const nextCustomAirframes = simBriefCustomAirframesDraft
-        .map(normalizeSimBriefCustomAirframe)
-        .filter(Boolean);
-      await writeSimBriefSettings({
-        username: nextUsername,
-        pilotId: nextPilotId,
+      const nextSettings = buildSimBriefSettingsPayload({
         useCurrentUtcForDispatchTime: nextUseCurrentUtcForDispatchTime,
-        dispatchUnits: simBriefDispatchUnits,
-        customAirframes: nextCustomAirframes
+        customAirframes: simBriefCustomAirframesDraft
       });
+      const { username: nextUsername, pilotId: nextPilotId, customAirframes: nextCustomAirframes } =
+        nextSettings;
+      await writeSimBriefSettings(nextSettings);
       setSimBriefUsername(nextUsername);
       setSimBriefUsernameDraft(nextUsername);
       setSimBriefPilotId(nextPilotId);
       setSimBriefPilotIdDraft(nextPilotId);
       setSavedSimBriefDispatchUnits(simBriefDispatchUnits);
+      setSavedSimBriefDepartureOffsetMinutes(simBriefDepartureOffsetMinutes);
       setSimBriefCustomAirframes(nextCustomAirframes);
       setSimBriefCustomAirframesDraft(nextCustomAirframes);
       setStatusMessage(
@@ -395,13 +417,64 @@ export function useAppSettingsPersistence({
         }.`
       );
       await logSystemEvent("SimBrief", "dispatch-time-saved", {
-        useCurrentUtcForDispatchTime: nextUseCurrentUtcForDispatchTime
+        useCurrentUtcForDispatchTime: nextUseCurrentUtcForDispatchTime,
+        departureOffsetMinutes: simBriefDepartureOffsetMinutes
       });
     } catch (error) {
       setSimBriefUseCurrentUtcForDispatchTime(previousUseCurrentUtcForDispatchTime);
       setStatusMessage(error.message || "Unable to save SimBrief dispatch time.");
       await logSystemError("SimBrief", "dispatch-time-save-failed", error, {
-        useCurrentUtcForDispatchTime: nextUseCurrentUtcForDispatchTime
+        useCurrentUtcForDispatchTime: nextUseCurrentUtcForDispatchTime,
+        departureOffsetMinutes: simBriefDepartureOffsetMinutes
+      });
+    } finally {
+      setIsSimBriefSaving(false);
+    }
+  }
+
+  // Saves the departure offset immediately so dispatch timing stays in sync with the stored profile.
+  async function handleSimBriefDepartureOffsetChange(nextOffsetMinutes) {
+    const normalizedOffsetMinutes = normalizeSimBriefDepartureOffsetMinutes(nextOffsetMinutes);
+    setSimBriefDepartureOffsetMinutes(normalizedOffsetMinutes);
+
+    if (
+      normalizedOffsetMinutes === savedSimBriefDepartureOffsetMinutes ||
+      isSimBriefSaving
+    ) {
+      return;
+    }
+
+    setIsSimBriefSaving(true);
+
+    try {
+      const nextSettings = buildSimBriefSettingsPayload({
+        departureOffsetMinutes: normalizedOffsetMinutes,
+        customAirframes: simBriefCustomAirframesDraft
+      });
+      const { username: nextUsername, pilotId: nextPilotId, customAirframes: nextCustomAirframes } =
+        nextSettings;
+      await writeSimBriefSettings(nextSettings);
+      setSimBriefUsername(nextUsername);
+      setSimBriefUsernameDraft(nextUsername);
+      setSimBriefPilotId(nextPilotId);
+      setSimBriefPilotIdDraft(nextPilotId);
+      setSavedSimBriefDispatchUnits(simBriefDispatchUnits);
+      setSavedSimBriefDepartureOffsetMinutes(normalizedOffsetMinutes);
+      setSimBriefCustomAirframes(nextCustomAirframes);
+      setSimBriefCustomAirframesDraft(nextCustomAirframes);
+      setStatusMessage(
+        normalizedOffsetMinutes
+          ? `SimBrief departure offset set to ${normalizedOffsetMinutes} minutes.`
+          : "SimBrief departure offset set to none."
+      );
+      await logSystemEvent("SimBrief", "departure-offset-saved", {
+        departureOffsetMinutes: normalizedOffsetMinutes
+      });
+    } catch (error) {
+      setSimBriefDepartureOffsetMinutes(savedSimBriefDepartureOffsetMinutes);
+      setStatusMessage(error.message || "Unable to save SimBrief departure offset.");
+      await logSystemError("SimBrief", "departure-offset-save-failed", error, {
+        departureOffsetMinutes: normalizedOffsetMinutes
       });
     } finally {
       setIsSimBriefSaving(false);
@@ -414,6 +487,7 @@ export function useAppSettingsPersistence({
     handleSaveSimBriefCredentials,
     handleSimBriefDispatchUnitsChange,
     handleSimBriefDispatchTimeModeChange,
+    handleSimBriefDepartureOffsetChange,
     handleAddCustomAirframeDraft,
     handleRemoveCustomAirframeDraft
   };

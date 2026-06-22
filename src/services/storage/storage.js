@@ -94,8 +94,17 @@ function getDefaultSimBriefSettings() {
     pilotId: "",
     useCurrentUtcForDispatchTime: false,
     dispatchUnits: "LBS",
+    departureOffsetMinutes: 0,
     customAirframes: []
   };
+}
+
+// Normalizes the saved SimBrief departure offset to the allowed discrete values.
+export function normalizeSimBriefDepartureOffsetMinutes(value) {
+  const normalizedValue = Number(value);
+  return normalizedValue === 30 || normalizedValue === 45 || normalizedValue === 60
+    ? normalizedValue
+    : 0;
 }
 
 function buildCompactLabel(values, visibleCount) {
@@ -816,6 +825,9 @@ export async function readSimBriefSettings() {
       pilotId: String(parsed?.pilotId || "").trim(),
       useCurrentUtcForDispatchTime: Boolean(parsed?.useCurrentUtcForDispatchTime),
       dispatchUnits: dispatchUnits === "KGS" ? "KGS" : "LBS",
+      departureOffsetMinutes: normalizeSimBriefDepartureOffsetMinutes(
+        parsed?.departureOffsetMinutes
+      ),
       customAirframes: Array.isArray(parsed?.customAirframes)
         ? parsed.customAirframes.map(normalizeCustomAirframe).filter(Boolean)
         : []
@@ -871,6 +883,9 @@ export async function writeSimBriefSettings(settings) {
     dispatchUnits: String(settings?.dispatchUnits || "LBS").trim().toUpperCase() === "KGS"
       ? "KGS"
       : "LBS",
+    departureOffsetMinutes: normalizeSimBriefDepartureOffsetMinutes(
+      settings?.departureOffsetMinutes
+    ),
     customAirframes: Array.isArray(settings?.customAirframes)
       ? settings.customAirframes
           .map(normalizeAircraftCustomAirframe)
