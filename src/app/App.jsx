@@ -90,6 +90,7 @@ import {
 } from "../features/flightBoard/flightBoard.model";
 import {
   DEFAULT_MAP_OPTIONS,
+  normalizeMapOptions,
 } from "../components/map/mapOptions.model.js";
 import {
   getAircraftDisplayName,
@@ -389,7 +390,7 @@ export default function App() {
     setSelectedTourPath,
     setSelectedTourRowId,
     setLogbookAirportProgress,
-    setMapOptions,
+    setMapOptions: handleSetMapOptions,
     setSavedSimBriefDispatchUnits,
     setSavedSimBriefDepartureOffsetMinutes,
     setSort,
@@ -776,13 +777,15 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
-  useDebouncedEffect(
-    () => {
-      if (isHydrating) {
-        return;
-      }
+  // Builds the current UI-state payload so the debounced save and immediate map writes stay in sync.
+  const buildCurrentUiStatePayload = useCallback(
+    (overrides = {}) => {
+      const nextMapOptions =
+        overrides.mapOptions !== undefined
+          ? normalizeMapOptions(overrides.mapOptions)
+          : mapOptions;
 
-      writeSavedUiState({
+      return {
         plannerMode,
         filters,
         dutyFilters,
@@ -797,37 +800,79 @@ export default function App() {
         scheduleView,
         selectedTourPath,
         selectedAccomplishmentName,
-        mapOptions,
+        mapOptions: nextMapOptions,
         logbookSubTab: logbook.selectedTab,
         logbookFilters: logbook.filters,
         logbookSort: logbook.sort,
         tourProgress
-      }).catch((error) => {
+      };
+    },
+    [
+      activeFlightBoardId,
+      basicAddonFiltersOpen,
+      basicAdvancedFiltersOpen,
+      dutyFilters,
+      filters,
+      flightBoard,
+      flightBoards,
+      logbook.filters,
+      logbook.selectedTab,
+      logbook.sort,
+      mapOptions,
+      plannerControlsCollapsed,
+      plannerMode,
+      scheduleView,
+      selectedAccomplishmentName,
+      selectedFlightId,
+      selectedTourPath,
+      sort,
+      tourProgress
+    ]
+  );
+
+  // Writes the current UI state immediately so preference toggles cannot be lost on exit.
+  const handleSetMapOptions = useCallback(
+    (updater) => {
+      setMapOptions((currentMapOptions) => {
+        const previousMapOptions = normalizeMapOptions(currentMapOptions);
+        const nextMapOptions = normalizeMapOptions(
+          typeof updater === "function" ? updater(previousMapOptions) : updater
+        );
+
+        void logAppEvent("map-options-changed", {
+          previousMapOptions,
+          nextMapOptions
+        }).catch(() => {});
+        void logAppEvent("persist-ui-state-map-options", {
+          mapOptions: nextMapOptions
+        }).catch(() => {});
+
+        writeSavedUiState(buildCurrentUiStatePayload({ mapOptions: nextMapOptions })).catch(
+          (error) => {
+            setStatusMessage(error.message || "Unable to persist the current planner state.");
+            logAppError("persist-ui-state-failed", error).catch(() => {});
+          }
+        );
+
+        return nextMapOptions;
+      });
+    },
+    [buildCurrentUiStatePayload]
+  );
+
+  useDebouncedEffect(
+    () => {
+      if (isHydrating) {
+        return;
+      }
+
+      writeSavedUiState(buildCurrentUiStatePayload()).catch((error) => {
         setStatusMessage(error.message || "Unable to persist the current planner state.");
         logAppError("persist-ui-state-failed", error).catch(() => {});
       });
     },
     [
-      plannerMode,
-      filters,
-      dutyFilters,
-      flightBoards,
-      activeFlightBoardId,
-      flightBoard,
-      plannerControlsCollapsed,
-      basicAdvancedFiltersOpen,
-      basicAddonFiltersOpen,
-      sort,
-      selectedFlightId,
-      selectedTourPath,
-      selectedAccomplishmentName,
-      mapOptions,
-      logbook.allRows.length,
-      scheduleView,
-      logbook.selectedTab,
-      logbook.filters,
-      logbook.sort,
-      tourProgress,
+      buildCurrentUiStatePayload,
       isHydrating
     ],
     350
@@ -1561,7 +1606,7 @@ export default function App() {
       setSimBriefCustomAirframeMatchTypeDraft("");
       setLogbookAirportProgress({ dateIso: null, visitedAirports: [], arrivalAirports: [] });
       setDeltaVirtualAccomplishmentEligibility({ lastSyncAt: null, sourceUrl: null, rows: [] });
-      setMapOptions(DEFAULT_MAP_OPTIONS);
+      handleSetMapOptions(DEFAULT_MAP_OPTIONS);
       setSimBriefDispatchState({
         flightId: "",
         isDispatching: false,
@@ -1827,7 +1872,7 @@ export default function App() {
     pendingMapFlightPathViewMode,
     pendingMapFitToRoute,
     onConsumePendingMapFitToRoute: () => setPendingMapFitToRoute(false),
-    setMapOptions,
+    setMapOptions: handleSetMapOptions,
     availableTours,
     selectedTourPath,
     selectedTour,
