@@ -15,8 +15,8 @@ function LogbookPanelHeader({
   onSelectTab
 }) {
   return (
-    <div className="flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
-      <div className={plannerTabsListClassName} role="tablist" aria-label="Logbook views">
+    <div className="logbook-panel__header flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
+      <div className={cn(plannerTabsListClassName, "logbook-panel__tabs-row")} role="tablist" aria-label="Logbook views">
         <button
           type="button"
           className={cn(plannerTabClassName, getPlannerTabStateClassName(selectedTab === "flights"))}
@@ -44,7 +44,7 @@ function LogbookPanelHeader({
         variant="primary"
         size="md"
         type="button"
-        className="shrink-0 bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
+        className="logbook-panel__refresh shrink-0 bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
         onClick={onRefreshLogbook}
         disabled={isRefreshDisabled}
       >
@@ -77,7 +77,7 @@ export default function LogbookPanel({
 
   if (!allRows.length) {
     return (
-      <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
+      <div className="logbook-panel flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
         <div className="w-full min-w-0 px-0 pb-0">
           <LogbookPanelHeader
             selectedTab={selectedTab}
@@ -99,7 +99,7 @@ export default function LogbookPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
+    <div className="logbook-panel flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
       <div className="w-full min-w-0 px-0 pb-0">
         <LogbookPanelHeader
           selectedTab={selectedTab}

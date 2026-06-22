@@ -14,7 +14,7 @@ function formatFlightsLabel(count) {
   return `${Number.isFinite(numericCount) ? numericCount : 0} flights`;
 }
 
-function SummaryAirlineMark({ airline }) {
+function SummaryAirlineMark({ airline, className = "" }) {
   const logoSrc = String(airline?.airlineLogoSrc || "").trim();
   const logoClassName = String(airline?.airlineLogoClassName || "").trim();
   const airlineName = String(airline?.displayName || airline?.label || "").trim();
@@ -26,13 +26,13 @@ function SummaryAirlineMark({ airline }) {
         src={logoSrc}
         alt=""
         aria-hidden="true"
-        className={cn("mx-auto h-28 w-28 shrink-0 object-contain bp-1024:h-24 bp-1024:w-24", logoClassName)}
+        className={cn("logbook-pilot-stats__airline-mark mx-auto h-28 w-28 shrink-0 object-contain bp-1024:h-24 bp-1024:w-24", logoClassName, className)}
       />
     );
   }
 
   return (
-    <div className="mx-auto flex h-28 w-28 shrink-0 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-heading)] bp-1024:h-24 bp-1024:w-24">
+    <div className="logbook-pilot-stats__airline-mark mx-auto flex h-28 w-28 shrink-0 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-heading)] bp-1024:h-24 bp-1024:w-24">
       <span className={cn("truncate px-1 text-center text-[0.72rem] font-semibold", labelTextClassName)}>
         {airlineCode || (airlineName ? airlineName.slice(0, 3).toUpperCase() : "?")}
       </span>
@@ -42,7 +42,7 @@ function SummaryAirlineMark({ airline }) {
 
 function SummaryMetricCard({ label, value, className = "", children = null }) {
   return (
-    <div className={cn("grid gap-1.5 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", className)}>
+    <div className={cn("logbook-pilot-stats__metric grid gap-1.5 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", className)}>
       <p className={cn("m-0 text-[var(--text-muted)]", labelTextClassName)}>{label}</p>
       {children || <p className={cn("m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>{value}</p>}
     </div>
@@ -67,7 +67,7 @@ function SummaryLandingRateMetric({ value, grade }) {
 
 function RankedListPanel({ title, items }) {
   return (
-    <section className={cn("grid gap-3 p-3", cardFrameClassName)}>
+    <section className={cn("logbook-pilot-stats__panel grid gap-3 p-3", cardFrameClassName)}>
       <p className={cn("m-0 text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
       {items?.length ? (
         <div className="grid gap-2">
@@ -101,12 +101,12 @@ function PilotStatsSummaryCard({ summary }) {
   const airlineCountLabel = airline?.count ?? 0;
 
   return (
-    <Panel className={cn("grid gap-3 p-3", cardFrameClassName)}>
-      <div className="grid gap-3 bp-1024:grid-cols-[minmax(12rem,15.5rem)_minmax(0,1fr)] bp-1400:grid-cols-[minmax(13rem,16.5rem)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col items-center justify-center gap-2 border-b border-[color:var(--line)] pb-3 text-center bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0">
+    <Panel className={cn("logbook-pilot-stats__panel logbook-pilot-stats__hero grid gap-3 p-3", cardFrameClassName)}>
+      <div className="logbook-pilot-stats__hero-grid grid gap-3 bp-1024:grid-cols-[minmax(12rem,15.5rem)_minmax(0,1fr)] bp-1400:grid-cols-[minmax(13rem,16.5rem)_minmax(0,1fr)]">
+        <div className="logbook-pilot-stats__airline-card flex min-w-0 flex-col items-center justify-center gap-2 border-b border-[color:var(--line)] pb-3 text-center bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0">
           <SummaryAirlineMark airline={airline} />
           <div className="grid min-w-0 gap-0.5">
-            <p className="m-0 min-w-0 truncate text-[1.32rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
+            <p className="logbook-pilot-stats__airline-name m-0 min-w-0 truncate text-[1.32rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
               {airlineLabel}
             </p>
             {/* Keeps the most-flown label and flight count stacked as simple metadata under the airline name. */}
@@ -119,8 +119,10 @@ function PilotStatsSummaryCard({ summary }) {
           </div>
         </div>
 
-        <div className="grid gap-2">
-          <p className={cn("m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>Logbook Summary</p>
+        <div className="logbook-pilot-stats__summary-grid grid gap-2">
+          <p className={cn("logbook-pilot-stats__summary-heading m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>
+            Logbook Summary
+          </p>
           <div className="grid gap-2 bp-1024:grid-cols-2 bp-1400:grid-cols-3 bp-1920:grid-cols-5">
             <SummaryMetricCard label="Total Flights" value={summary?.totalFlights || LOGBOOK_EMPTY_VALUE} />
             <SummaryMetricCard label="Total Distance" value={summary?.totalDistance || LOGBOOK_EMPTY_VALUE} />
@@ -142,7 +144,7 @@ export default function LogbookPilotStats({ rows, stats, summaryStats }) {
   const summary = summaryStats?.summary || null;
 
   return (
-    <div className="px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
+    <div className="logbook-pilot-stats px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
       <div className="grid gap-3 py-0.5">
         {summary ? <PilotStatsSummaryCard summary={summary} /> : null}
 

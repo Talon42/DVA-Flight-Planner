@@ -297,6 +297,80 @@
   .logbook-row-selected:hover {
     background: var(--logbook-row-selected-hover-bg) !important;
   }
+
+  /* Compress the logbook pilot-stats shell only on short viewports so the 900px+ layout stays unchanged. */
+  @media (max-height: 899px) {
+    .logbook-panel {
+      gap: 0.5rem !important;
+    }
+
+    .logbook-panel__header {
+      align-items: center !important;
+      gap: 0.5rem !important;
+      flex-wrap: nowrap !important;
+    }
+
+    .logbook-panel__tabs-row {
+      gap: 0.25rem !important;
+    }
+
+    .logbook-panel__refresh {
+      min-height: 2.25rem !important;
+      padding: 0.4rem 0.75rem !important;
+      font-size: 0.76rem !important;
+    }
+
+    .logbook-pilot-stats {
+      gap: 0.5rem !important;
+      padding-top: 0 !important;
+      padding-bottom: 0.25rem !important;
+    }
+
+    .logbook-pilot-stats__hero {
+      padding: 0.75rem !important;
+    }
+
+    .logbook-pilot-stats__hero-grid {
+      gap: 0.5rem !important;
+    }
+
+    .logbook-pilot-stats__airline-card {
+      gap: 0.35rem !important;
+      padding-bottom: 0.5rem !important;
+    }
+
+    .logbook-pilot-stats__airline-mark {
+      width: 4rem !important;
+      height: 4rem !important;
+    }
+
+    .logbook-pilot-stats__airline-name {
+      font-size: 1.05rem !important;
+      line-height: 1.1 !important;
+    }
+
+    .logbook-pilot-stats__summary-grid {
+      gap: 0.5rem !important;
+    }
+
+    .logbook-pilot-stats__summary-heading {
+      display: none !important;
+    }
+
+    .logbook-pilot-stats__metric {
+      gap: 0.35rem !important;
+      padding: 0.6rem !important;
+    }
+
+    .logbook-pilot-stats__panel {
+      padding: 0.75rem !important;
+    }
+
+    .logbook-pilot-stats__scroll-panel {
+      gap: 0.5rem !important;
+      padding: 0.75rem !important;
+    }
+  }
 }
 
 .range-input {
