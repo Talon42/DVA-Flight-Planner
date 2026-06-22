@@ -93,6 +93,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     [allRows, filters]
   );
   const pilotStats = useMemo(() => selectLogbookPilotStats(filteredRows), [filteredRows]);
+  const allRowsPilotStats = useMemo(() => selectLogbookPilotStats(allRows), [allRows]);
   const sortedFilteredRows = useMemo(
     () => selectSortedLogbookRows({ rows: filteredRows, sort }),
     [filteredRows, sort]
@@ -149,6 +150,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     filterBounds,
     filterOptions,
     pilotStats,
+    allRowsPilotStats,
     handleFilterChange,
     handleResetFilters,
     handleSort,

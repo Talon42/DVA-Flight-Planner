@@ -1804,6 +1804,7 @@ export default function App() {
       sort: logbook.sort,
       selectedRowId: logbook.selectedRowId,
       pilotStats: logbook.pilotStats,
+      summaryStats: logbook.allRowsPilotStats,
       isSyncing,
       isRefreshingLogbook,
       onRefreshLogbook: handleRefreshDeltaVirtualLogbook,

@@ -1,4 +1,4 @@
-import { LOGBOOK_EMPTY_VALUE } from "./logbook.model.js";
+import { LOGBOOK_EMPTY_VALUE, formatLandingGrade } from "./logbook.model.js";
 
 function formatNumber(value, options = {}) {
   return new Intl.NumberFormat("en-US", {
@@ -47,6 +47,54 @@ function incrementCount(counterMap, key) {
   counterMap.set(key, (counterMap.get(key) || 0) + 1);
 }
 
+function incrementCountWithRow(counterMap, orderMap, rowMap, key, row) {
+  if (!key || key === LOGBOOK_EMPTY_VALUE) {
+    return;
+  }
+
+  if (!counterMap.has(key)) {
+    orderMap.set(key, orderMap.size);
+    rowMap.set(key, row);
+  }
+
+  counterMap.set(key, (counterMap.get(key) || 0) + 1);
+}
+
+function selectTopCountEntry(counterMap, orderMap, rowMap) {
+  let topKey = "";
+  let topCount = 0;
+
+  for (const [key, count] of counterMap.entries()) {
+    if (
+      !topKey ||
+      count > topCount ||
+      (count === topCount && (orderMap.get(key) ?? Number.POSITIVE_INFINITY) < (orderMap.get(topKey) ?? Number.POSITIVE_INFINITY))
+    ) {
+      topKey = key;
+      topCount = count;
+    }
+  }
+
+  if (!topKey) {
+    return null;
+  }
+
+  const row = rowMap.get(topKey) || null;
+  const displayName = String(row?.airlineDisplayName || topKey || "").trim();
+  const airlineCode = String(row?.airlineCode || "").trim();
+  const resolvedDisplayName =
+    displayName && displayName !== airlineCode ? displayName : "Unknown Airline";
+
+  return {
+    label: resolvedDisplayName,
+    displayName: resolvedDisplayName,
+    airlineCode,
+    airlineLogoSrc: String(row?.airlineLogoSrc || "").trim(),
+    airlineLogoClassName: String(row?.airlineLogoClassName || "").trim(),
+    count: topCount
+  };
+}
+
 // Builds the Pilot Stats cards and ranked lists from the filtered logbook rows only.
 export function buildLogbookPilotStats(rows) {
   const activeRows = Array.isArray(rows) ? rows : [];
@@ -54,6 +102,8 @@ export function buildLogbookPilotStats(rows) {
   const simulatorCounts = new Map();
   const statusCounts = new Map();
   const airlineCounts = new Map();
+  const airlineFirstSeenOrder = new Map();
+  const airlineRowsByKey = new Map();
   const departureCounts = new Map();
   const arrivalCounts = new Map();
   const landingRows = [];
@@ -82,7 +132,7 @@ export function buildLogbookPilotStats(rows) {
     incrementCount(equipmentCounts, row.equipment);
     incrementCount(simulatorCounts, row.simulator);
     incrementCount(statusCounts, row.statusDisplay);
-    incrementCount(airlineCounts, row.airlineDisplayName);
+    incrementCountWithRow(airlineCounts, airlineFirstSeenOrder, airlineRowsByKey, row.airlineDisplayName, row);
     incrementCount(departureCounts, row.departure);
     incrementCount(arrivalCounts, row.arrival);
 
@@ -109,11 +159,24 @@ export function buildLogbookPilotStats(rows) {
           (left, right) => left.landingRate - right.landingRate || right.dateSortKey - left.dateSortKey
         )[0]
       : null;
-  const topAirline =
-    sortByCount(Array.from(airlineCounts.entries()).map(([label, count]) => ({ label, count })))[0] || null;
+  const topAirline = selectTopCountEntry(airlineCounts, airlineFirstSeenOrder, airlineRowsByKey);
 
   return {
     totalFlights: activeRows.length,
+    summary: {
+      topAirline,
+      totalFlights: formatNumber(activeRows.length),
+      totalDistance: formatUnit(totalDistance, "nm"),
+      totalDuration: formatMinutes(totalDuration),
+      totalAirborneTime: formatMinutes(totalAirborne),
+      averageLandingRate:
+        averageLandingRate === null
+          ? LOGBOOK_EMPTY_VALUE
+          : formatUnit(averageLandingRate, "fpm", { maximumFractionDigits: 0 }),
+      averageLandingRateValue: averageLandingRate,
+      averageLandingRateGrade:
+        averageLandingRate === null ? LOGBOOK_EMPTY_VALUE : formatLandingGrade(averageLandingRate)
+    },
     cards: [
       { label: "Total Flights", value: formatNumber(activeRows.length) },
       { label: "Total Distance", value: formatUnit(totalDistance, "nm") },
