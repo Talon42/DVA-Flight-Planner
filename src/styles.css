@@ -298,8 +298,8 @@
     background: var(--logbook-row-selected-hover-bg) !important;
   }
 
-  /* Compress the logbook pilot-stats shell only on short viewports so the 900px+ layout stays unchanged. */
-  @media (max-height: 899px) {
+  /* Compress the logbook pilot-stats shell below the 1400px breakpoint so the wider layout stays unchanged. */
+  @media (max-width: 1399px) {
     .logbook-panel {
       gap: 0.5rem !important;
     }
@@ -397,7 +397,7 @@
   background: var(--range-thumb-max);
 }
 
-@media (max-width: 1399px) and (max-height: 850px) {
+@media (max-width: 1399px) {
   .duty-schedule-filters--compactable {
     gap: 0.5rem;
   }
@@ -432,12 +432,6 @@
   }
 
   .duty-status-card--compact-collapsed .duty-status-card__body {
-    display: none;
-  }
-}
-
-@media (max-height: 899px) {
-  .duty-status-card {
     display: none;
   }
 }
