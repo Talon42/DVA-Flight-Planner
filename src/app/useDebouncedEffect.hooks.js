@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 // Used to batch persistence writes without changing the saved payload shape.
 export function useDebouncedEffect(effect, dependencies, delayMs) {
   const effectRef = useRef(effect);
+  const timeoutRef = useRef(null);
   const dependenciesRef = useRef([]);
 
   useEffect(() => {
@@ -22,12 +23,30 @@ export function useDebouncedEffect(effect, dependencies, delayMs) {
 
     dependenciesRef.current = dependencies;
 
-    const timeoutHandle = window.setTimeout(() => {
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = window.setTimeout(() => {
+      timeoutRef.current = null;
       effectRef.current();
     }, delayMs);
 
     return () => {
-      window.clearTimeout(timeoutHandle);
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
   });
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+        effectRef.current();
+      }
+    };
+  }, []);
 }

@@ -146,7 +146,7 @@ function buildAddonScanSummary(addonScan) {
 
 // Normalizes hydrated SimBrief offset values so legacy settings fall back safely.
 function normalizeLoadedDepartureOffsetMinutes(value) {
-  return value === 30 || value === 45 || value === 60 ? value : 0;
+  return value === 30 || value === 45 || value === 60 || value === 90 ? value : 0;
 }
 
 // Owns the first startup hydration pass that restores saved schedules and UI state.
