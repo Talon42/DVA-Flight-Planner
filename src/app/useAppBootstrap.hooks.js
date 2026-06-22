@@ -246,6 +246,7 @@ export function useAppBootstrap({
       }
 
       if (scheduleResult.status !== "fulfilled" || !scheduleResult.value?.flights?.length) {
+        setMapOptions?.(normalizeMapOptions(restoredSavedUiState?.mapOptions));
         if (restoredSavedUiState?.scheduleView === "logbook") {
           setScheduleView("logbook");
         }
