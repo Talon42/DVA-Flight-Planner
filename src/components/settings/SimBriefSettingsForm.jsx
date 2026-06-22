@@ -44,7 +44,8 @@ export function SimBriefSettingsForm({
     { label: "None", value: 0 },
     { label: "30 Minutes", value: 30 },
     { label: "45 Minutes", value: 45 },
-    { label: "60 Minutes", value: 60 }
+    { label: "60 Minutes", value: 60 },
+    { label: "90 Minutes", value: 90 }
   ];
   const dispatchTimeSourceOptions = [
     { label: "Schedule UTC", value: "schedule-utc" },

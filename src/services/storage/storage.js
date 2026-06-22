@@ -102,7 +102,7 @@ function getDefaultSimBriefSettings() {
 // Normalizes the saved SimBrief departure offset to the allowed discrete values.
 export function normalizeSimBriefDepartureOffsetMinutes(value) {
   const normalizedValue = Number(value);
-  return normalizedValue === 30 || normalizedValue === 45 || normalizedValue === 60
+  return normalizedValue === 30 || normalizedValue === 45 || normalizedValue === 60 || normalizedValue === 90
     ? normalizedValue
     : 0;
 }
