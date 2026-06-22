@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import Button from "../ui/Button";
 import Panel from "../ui/Panel";
 import { cn } from "../ui/cn";
-import { fieldInputClassName, gridClassNames, toggleButtonClassName } from "../ui/forms";
+import {
+  fieldBodyClassName,
+  fieldInputClassName,
+  gridClassNames
+} from "../ui/forms";
 import { insetPanelClassName, mutedTextClassName } from "../ui/patterns";
 import SectionHeader from "../ui/SectionHeader";
 import { bodySmTextClassName, supportCopyTextClassName } from "../ui/typography";
@@ -37,13 +41,19 @@ export function SimBriefSettingsForm({
 }) {
   const isOnboardingMode = mode === "onboarding";
   const customAirframeMatchOptions = buildCustomAirframeMatchOptions();
-  const simBriefOptionButtonClassName = (active) =>
-    cn(toggleButtonClassName(active), "h-8 min-h-0 px-3 py-2 text-[0.9rem] leading-none");
+  const dispatchDefaultSelectClassName = cn(
+    fieldBodyClassName,
+    "w-full appearance-none pr-10 text-left dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]"
+  );
   const departureOffsetOptions = [
     { label: "None", value: 0 },
     { label: "30 Minutes", value: 30 },
     { label: "45 Minutes", value: 45 },
     { label: "60 Minutes", value: 60 }
+  ];
+  const dispatchTimeSourceOptions = [
+    { label: "Schedule UTC", value: "schedule-utc" },
+    { label: "Current UTC", value: "current-utc" }
   ];
   const [usernameValue, setUsernameValue] = useState(username);
   const [pilotIdValue, setPilotIdValue] = useState(pilotId);
@@ -125,59 +135,103 @@ export function SimBriefSettingsForm({
       </div>
 
       {!isOnboardingMode ? (
-        <div className="grid gap-3 bp-1024:grid-cols-3">
-          <Field label="Dispatch Units" className="simbrief-units-toggle">
-            <div className="toggle-row flex flex-wrap gap-2">
-              <button
-                className={simBriefOptionButtonClassName(dispatchUnits === "LBS")}
-                type="button"
-                onClick={() => onDispatchUnitsChange?.("LBS")}
-              >
-                LBS
-              </button>
-              <button
-                className={simBriefOptionButtonClassName(dispatchUnits === "KGS")}
-                type="button"
-                onClick={() => onDispatchUnitsChange?.("KGS")}
-              >
-                KGS
-              </button>
-            </div>
-          </Field>
+        <div className="grid gap-3">
+          <SectionHeader title="Dispatch Defaults" />
 
-          <Field label="Dispatch Time">
-            <div className="toggle-row flex flex-wrap gap-2">
-              <button
-                className={simBriefOptionButtonClassName(!useCurrentUtcForDispatchTime)}
-                type="button"
-                onClick={() => onDispatchTimeModeChange?.("schedule-utc")}
-              >
-                Schedule UTC
-              </button>
-              <button
-                className={simBriefOptionButtonClassName(useCurrentUtcForDispatchTime)}
-                type="button"
-                onClick={() => onDispatchTimeModeChange?.("current-utc")}
-              >
-                Current UTC
-              </button>
-            </div>
-          </Field>
+          <div className="grid gap-3 bp-1024:grid-cols-3">
+            <Field label="Dispatch Units">
+              <div className="relative min-w-0">
+                <select
+                  className={dispatchDefaultSelectClassName}
+                  value={dispatchUnits}
+                  onChange={(event) => onDispatchUnitsChange?.(event.target.value)}
+                  disabled={isSaving}
+                >
+                  <option value="LBS">LBS</option>
+                  <option value="KGS">KGS</option>
+                </select>
+                <span
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
+                    <path
+                      d="M4 6.5 8 10.5 12 6.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.75"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </Field>
 
-          <Field label="Departure Offset">
-            <select
-              className={fieldInputClassName}
-              value={departureOffsetMinutes}
-              onChange={(event) => onDepartureOffsetChange?.(Number(event.target.value))}
-              disabled={isSaving}
-            >
-              {departureOffsetOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </Field>
+            <Field label="Dispatch Time Source">
+              <div className="relative min-w-0">
+                <select
+                  className={dispatchDefaultSelectClassName}
+                  value={useCurrentUtcForDispatchTime ? "current-utc" : "schedule-utc"}
+                  onChange={(event) => onDispatchTimeModeChange?.(event.target.value)}
+                  disabled={isSaving}
+                >
+                  {dispatchTimeSourceOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
+                    <path
+                      d="M4 6.5 8 10.5 12 6.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.75"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </Field>
+
+            <Field label="Departure Offset">
+              <div className="relative min-w-0">
+                <select
+                  className={dispatchDefaultSelectClassName}
+                  value={departureOffsetMinutes}
+                  onChange={(event) => onDepartureOffsetChange?.(Number(event.target.value))}
+                  disabled={isSaving}
+                >
+                  {departureOffsetOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
+                    <path
+                      d="M4 6.5 8 10.5 12 6.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.75"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </Field>
+          </div>
         </div>
       ) : null}
 
