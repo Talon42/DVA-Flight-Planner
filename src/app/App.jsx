@@ -782,15 +782,6 @@ export default function App() {
         return;
       }
 
-      const shouldPersistUiState =
-        Boolean(schedule) ||
-        scheduleView === "logbook" ||
-        logbook.allRows.length > 0;
-
-      if (!shouldPersistUiState) {
-        return;
-      }
-
       writeSavedUiState({
         plannerMode,
         filters,
@@ -817,9 +808,6 @@ export default function App() {
       });
     },
     [
-      schedule,
-      scheduleView,
-      logbook.allRows.length,
       plannerMode,
       filters,
       dutyFilters,
@@ -834,6 +822,8 @@ export default function App() {
       selectedTourPath,
       selectedAccomplishmentName,
       mapOptions,
+      logbook.allRows.length,
+      scheduleView,
       logbook.selectedTab,
       logbook.filters,
       logbook.sort,
