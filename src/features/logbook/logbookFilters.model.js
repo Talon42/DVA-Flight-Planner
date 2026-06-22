@@ -11,6 +11,7 @@ export const DEFAULT_LOGBOOK_FILTERS = {
   dateEnd: "",
   airline: [],
   equipment: [],
+  departureOrArrival: [],
   departure: [],
   arrival: [],
   durationMin: 0,
@@ -129,6 +130,9 @@ export function normalizeLogbookFilters(savedFilters, bounds = DEFAULT_DISTANCE_
     dateEnd: normalizeDateString(savedFilters?.dateEnd),
     airline: toSelectionArray(savedFilters?.airline),
     equipment: toSelectionArray(savedFilters?.equipment),
+    departureOrArrival: toSelectionArray(savedFilters?.departureOrArrival).map((value) =>
+      value.toUpperCase()
+    ),
     departure: toSelectionArray(savedFilters?.departure).map((value) => value.toUpperCase()),
     arrival: toSelectionArray(savedFilters?.arrival).map((value) => value.toUpperCase()),
     durationMin: savedFilters?.durationMin,

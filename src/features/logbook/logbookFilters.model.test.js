@@ -17,6 +17,7 @@ test("default logbook filters keep date fields blank and sliders at the full ran
 
   assert.equal(normalized.dateStart, "");
   assert.equal(normalized.dateEnd, "");
+  assert.deepStrictEqual(normalized.departureOrArrival, []);
   assert.deepStrictEqual(normalized.departure, []);
   assert.deepStrictEqual(normalized.arrival, []);
   assert.equal(normalized.durationMin, 0);

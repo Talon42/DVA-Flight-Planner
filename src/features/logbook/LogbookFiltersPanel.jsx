@@ -126,8 +126,17 @@ export default function LogbookFiltersPanel({
   onFilterChange,
   onReset
 }) {
+  const [departureOrArrivalIcaoInput, setDepartureOrArrivalIcaoInput] = useState(
+    filters.departureOrArrival[0] || ""
+  );
   const [departureIcaoInput, setDepartureIcaoInput] = useState(filters.departure[0] || "");
   const [arrivalIcaoInput, setArrivalIcaoInput] = useState(filters.arrival[0] || "");
+
+  useEffect(() => {
+    setDepartureOrArrivalIcaoInput(
+      filters.departureOrArrival.length === 1 ? filters.departureOrArrival[0] : ""
+    );
+  }, [filters.departureOrArrival]);
 
   useEffect(() => {
     setDepartureIcaoInput(filters.departure.length === 1 ? filters.departure[0] : "");
@@ -141,6 +150,11 @@ export default function LogbookFiltersPanel({
     () =>
       filterOptions.departures,
     [filterOptions.departures]
+  );
+  const departureOrArrivalAirportOptions = useMemo(
+    () =>
+      filterOptions.departureOrArrival,
+    [filterOptions.departureOrArrival]
   );
   const arrivalAirportOptions = useMemo(
     () =>
@@ -276,6 +290,19 @@ export default function LogbookFiltersPanel({
           </div>
 
           <div className="grid gap-3">
+            <LogbookAirportFilterRow
+              label="Departure or Arrival"
+              placeholder="Search airports"
+              emptyLabel="No matching airports"
+              allLabel="All"
+              filterKey="departureOrArrival"
+              query={departureOrArrivalIcaoInput}
+              options={departureOrArrivalAirportOptions}
+              selectedValues={filters.departureOrArrival}
+              onQueryChange={setDepartureOrArrivalIcaoInput}
+              onFilterChange={(value) => onFilterChange("departureOrArrival", value)}
+            />
+
             <LogbookAirportFilterRow
               label="Departure"
               placeholder="Search departure airports"

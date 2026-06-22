@@ -47,6 +47,14 @@ export function selectFilteredLogbookRows({ rows, filters }) {
       return false;
     }
 
+    if (
+      normalizedFilters.departureOrArrival.length &&
+      !normalizedFilters.departureOrArrival.includes(row.departure) &&
+      !normalizedFilters.departureOrArrival.includes(row.arrival)
+    ) {
+      return false;
+    }
+
     if (!shouldIncludeLogbookDistanceRow(row.distanceNm, filters, filterBounds)) {
       return false;
     }
@@ -113,6 +121,11 @@ export function selectLogbookFilterOptions(rows) {
       })
       .filter((airport) => airport.icao);
 
+  const combinedAirportValues = new Set([
+    ...activeRows.map((row) => row.departure).filter((value) => value !== LOGBOOK_EMPTY_VALUE),
+    ...activeRows.map((row) => row.arrival).filter((value) => value !== LOGBOOK_EMPTY_VALUE)
+  ]);
+
   return {
     airlines: toSortedValues(activeRows.map((row) => row.airlineDisplayName).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
     equipment: toSortedValues(activeRows.map((row) => row.equipment).filter((value) => value !== LOGBOOK_EMPTY_VALUE)),
@@ -121,6 +134,9 @@ export function selectLogbookFilterOptions(rows) {
     ),
     arrivals: toAirportFilterOptions(
       activeRows.map((row) => row.arrival).filter((value) => value !== LOGBOOK_EMPTY_VALUE)
+    ),
+    departureOrArrival: toAirportFilterOptions(
+      [...combinedAirportValues].filter((value) => value !== LOGBOOK_EMPTY_VALUE)
     )
   };
 }
