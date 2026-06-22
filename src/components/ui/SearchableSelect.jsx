@@ -156,6 +156,14 @@ function CenteredFilterOverlay({ children, onClick, compact = false }) {
   );
 }
 
+function AnchoredFilterOverlay({ children, onClick }) {
+  return (
+    <div className="fixed inset-0 z-[60]" role="presentation" onClick={onClick}>
+      {children}
+    </div>
+  );
+}
+
 // Reusable searchable select that preserves the existing modal overlay and selection UX.
 export function SearchableSelect({
   label,
@@ -206,6 +214,7 @@ export function SearchableSelect({
     positionMode: "fixed"
   });
   const isPopover = presentation === "popover";
+  const isAnchoredPopover = presentation === "anchored";
   void filterQuery;
   // Portal into the nearest local host so popovers stay aligned with the control's workspace column.
   const overlayHost =
@@ -353,22 +362,76 @@ export function SearchableSelect({
       showPinnedSelectedOption
     ]
   );
-  // Measure the local overlay panel against the nearest host so dropdowns center within their card/column.
+  // Measure the local overlay panel against the nearest host or trigger so dropdowns stay aligned.
   useLayoutEffect(() => {
-    if (!isOpen || !overlayHost || !panelRef.current || !optionsRef.current) {
+    if (!isOpen || !panelRef.current || !optionsRef.current || (!isAnchoredPopover && !overlayHost)) {
       setOverlayLayout({
         compact: false,
         panelMaxHeight: null,
         optionsMaxHeight: null,
         popoverStyle: null,
-        portalTarget: overlayHost || null,
+        portalTarget: typeof document !== "undefined" ? document.body : null,
         positionMode: "fixed"
       });
       return undefined;
     }
 
     function updateOverlayLayout() {
-      if (!overlayHost || !panelRef.current || !optionsRef.current) {
+      if (!panelRef.current || !optionsRef.current) {
+        return;
+      }
+
+      const panelRect = panelRef.current.getBoundingClientRect();
+      const optionsRect = optionsRef.current.getBoundingClientRect();
+
+      if (isAnchoredPopover) {
+        const triggerRect = triggerRef.current?.getBoundingClientRect();
+        if (!triggerRect) {
+          return;
+        }
+
+        const viewportPadding = 8;
+        const verticalGap = 6;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const availableWidth = Math.max(viewportWidth - viewportPadding * 2, 320);
+        const panelWidth = Math.min(Math.max(triggerRect.width, 240), availableWidth);
+        let left = triggerRect.left;
+
+        if (left + panelWidth > viewportWidth - viewportPadding) {
+          left = Math.max(viewportWidth - viewportPadding - panelWidth, viewportPadding);
+        }
+
+        if (left < viewportPadding) {
+          left = viewportPadding;
+        }
+
+        const panelHeight = Math.max(panelRect.height, 0);
+        const availableBelow = Math.max(viewportHeight - triggerRect.bottom - viewportPadding, 220);
+        const availableAbove = Math.max(triggerRect.top - viewportPadding, 220);
+        const openAbove = panelHeight > availableBelow && availableAbove > availableBelow;
+        const top = openAbove
+          ? Math.max(triggerRect.top - verticalGap - panelHeight, viewportPadding)
+          : triggerRect.bottom + verticalGap;
+        const availableHeight = openAbove ? availableAbove : availableBelow;
+        const panelChromeHeight = Math.max(panelRect.height - optionsRect.height, 0);
+        const nextOptionsMaxHeight = Math.max(
+          Math.min(availableHeight - panelChromeHeight, optionsRect.height),
+          140
+        );
+
+        setOverlayLayout({
+          compact: false,
+          panelMaxHeight: availableHeight,
+          optionsMaxHeight: nextOptionsMaxHeight,
+          popoverStyle: {
+            left: `${left}px`,
+            top: `${top}px`,
+            width: `${panelWidth}px`
+          },
+          portalTarget: typeof document !== "undefined" ? document.body : null,
+          positionMode: "fixed"
+        });
         return;
       }
 
@@ -376,8 +439,6 @@ export function SearchableSelect({
       const hostRect = overlayHost.getBoundingClientRect();
       const verticalPadding = isSmallViewport ? 32 : 24;
       const availableHeight = Math.max(hostRect.height - verticalPadding, 220);
-      const panelRect = panelRef.current.getBoundingClientRect();
-      const optionsRect = optionsRef.current.getBoundingClientRect();
       const panelChromeHeight = Math.max(panelRect.height - optionsRect.height, 0);
       const nextOptionsMaxHeight = Math.max(
         Math.min(availableHeight - panelChromeHeight, optionsRect.height),
@@ -403,6 +464,7 @@ export function SearchableSelect({
   }, [
     isOpen,
     overlayHost,
+    isAnchoredPopover,
     orderedOptions.length,
     query,
     searchable,
@@ -426,6 +488,7 @@ export function SearchableSelect({
         ? renderSelectedContent(activeSingleOption)
         : renderOptionLabel(activeSingleOption, selectionLabel)
       : <span className="min-w-0 truncate">{selectionLabel}</span>;
+  const showMenuHeader = !isAnchoredPopover;
 
   function toggleValue(value) {
     if (!allowMultiple) {
@@ -449,27 +512,29 @@ export function SearchableSelect({
 
   const menuContent = (
     <>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className={fieldTitleClassName}>{label}</div>
-        </div>
-        <div className="flex items-center gap-2">
-          {showHeaderClearAction ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-none"
-              onClick={() => onChange([])}
-              disabled={!selectedValues.length}
-            >
-              Clear
+      {showMenuHeader ? (
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className={fieldTitleClassName}>{label}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            {showHeaderClearAction ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-none"
+                onClick={() => onChange([])}
+                disabled={!selectedValues.length}
+              >
+                Clear
+              </Button>
+            ) : null}
+            <Button variant="ghost" size="sm" className="rounded-none" onClick={() => setIsOpen(false)}>
+              Close
             </Button>
-          ) : null}
-          <Button variant="ghost" size="sm" className="rounded-none" onClick={() => setIsOpen(false)}>
-            Close
-          </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {searchable ? (
         <input
@@ -672,27 +737,51 @@ export function SearchableSelect({
       </div>
       {isOpen && portalTarget
         ? createPortal(
-            <CenteredFilterOverlay compact={overlayLayout.compact} onClick={() => setIsOpen(false)}>
-              <Panel
-                ref={panelRef}
-                className={cn(
-                  overlayHost
-                    ? `relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full ${dropdownPanelClassName} bp-1024:w-[min(560px,calc(100%-1.5rem))]`
-                    : `${modalPanelClassName} relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full overflow-hidden border-2 border-[rgba(160,180,202,0.52)] p-5 dark:border-[color:var(--surface-border)] bp-1024:w-[min(560px,calc(100%-1.5rem))] bp-1024:p-4`
-                )}
-                role="dialog"
-                aria-modal={overlayHost ? "false" : "true"}
-                aria-label={`Select ${label}`}
-                onClick={(event) => event.stopPropagation()}
-                style={
-                  overlayLayout.panelMaxHeight != null
-                    ? { maxHeight: `${overlayLayout.panelMaxHeight}px` }
-                    : undefined
-                }
-              >
-                {menuContent}
-              </Panel>
-            </CenteredFilterOverlay>,
+            isAnchoredPopover ? (
+              <AnchoredFilterOverlay onClick={() => setIsOpen(false)}>
+                <Panel
+                  ref={panelRef}
+                  className={cn(
+                    "fixed z-[61] max-h-full w-[min(640px,calc(100vw-16px))] overflow-hidden border-2 border-[rgba(160,180,202,0.52)] bg-[#eef5fb] p-4 shadow-none dark:border-[color:var(--surface-border)] dark:bg-[#10243B] bp-1024:w-[min(560px,calc(100vw-12px))]",
+                    dropdownPanelClassName
+                  )}
+                  role="dialog"
+                  aria-modal="false"
+                  aria-label={`Select ${label}`}
+                  onClick={(event) => event.stopPropagation()}
+                  style={{
+                    ...(overlayLayout.popoverStyle || {}),
+                    ...(overlayLayout.panelMaxHeight != null
+                      ? { maxHeight: `${overlayLayout.panelMaxHeight}px` }
+                      : {})
+                  }}
+                >
+                  {menuContent}
+                </Panel>
+              </AnchoredFilterOverlay>
+            ) : (
+              <CenteredFilterOverlay compact={overlayLayout.compact} onClick={() => setIsOpen(false)}>
+                <Panel
+                  ref={panelRef}
+                  className={cn(
+                    overlayHost
+                      ? `relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full ${dropdownPanelClassName} bp-1024:w-[min(560px,calc(100%-1.5rem))]`
+                      : `${modalPanelClassName} relative z-[61] w-[min(640px,calc(100%-2rem))] max-h-full overflow-hidden border-2 border-[rgba(160,180,202,0.52)] p-5 dark:border-[color:var(--surface-border)] bp-1024:w-[min(560px,calc(100%-1.5rem))] bp-1024:p-4`
+                  )}
+                  role="dialog"
+                  aria-modal={overlayHost ? "false" : "true"}
+                  aria-label={`Select ${label}`}
+                  onClick={(event) => event.stopPropagation()}
+                  style={
+                    overlayLayout.panelMaxHeight != null
+                      ? { maxHeight: `${overlayLayout.panelMaxHeight}px` }
+                      : undefined
+                  }
+                >
+                  {menuContent}
+                </Panel>
+              </CenteredFilterOverlay>
+            ),
             portalTarget
           )
         : null}

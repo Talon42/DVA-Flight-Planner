@@ -41,6 +41,7 @@ export function SelectField({
   className = "",
   helper = null,
   allLabel = null,
+  presentation = "popover",
   children,
   ...props
 }) {
@@ -109,6 +110,7 @@ export function SelectField({
       showOptionMark={false}
       showPinnedSelectedBlock={false}
       showSingleSelectedLabel
+      presentation={presentation}
       options={selectOptions}
       selectedValues={selectedValues}
       onChange={(values) => props.onChange?.({ target: { value: values[0] || "" } })}

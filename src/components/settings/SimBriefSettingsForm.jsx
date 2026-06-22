@@ -3,14 +3,13 @@ import Button from "../ui/Button";
 import Panel from "../ui/Panel";
 import { cn } from "../ui/cn";
 import {
-  fieldBodyClassName,
   fieldInputClassName,
   gridClassNames
 } from "../ui/forms";
 import { insetPanelClassName, mutedTextClassName } from "../ui/patterns";
 import SectionHeader from "../ui/SectionHeader";
 import { bodySmTextClassName, supportCopyTextClassName } from "../ui/typography";
-import { Field } from "../ui/filterFields";
+import { Field, SelectField } from "../ui/filterFields";
 import { SearchableMultiSelect } from "../ui/SearchableSelect";
 import { buildCustomAirframeMatchOptions } from "../../domain/aircraft/aircraftIdentity.js";
 
@@ -41,10 +40,6 @@ export function SimBriefSettingsForm({
 }) {
   const isOnboardingMode = mode === "onboarding";
   const customAirframeMatchOptions = buildCustomAirframeMatchOptions();
-  const dispatchDefaultSelectClassName = cn(
-    fieldBodyClassName,
-    "w-full appearance-none pr-10 text-left dark:hover:!bg-[#0D1D31] dark:focus-visible:!bg-[#10243B]"
-  );
   const departureOffsetOptions = [
     { label: "None", value: 0 },
     { label: "30 Minutes", value: 30 },
@@ -139,98 +134,44 @@ export function SimBriefSettingsForm({
           <SectionHeader title="Dispatch Defaults" />
 
           <div className="grid gap-3 bp-1024:grid-cols-3">
-            <Field label="Dispatch Units">
-              <div className="relative min-w-0">
-                <select
-                  className={dispatchDefaultSelectClassName}
-                  value={dispatchUnits}
-                  onChange={(event) => onDispatchUnitsChange?.(event.target.value)}
-                  disabled={isSaving}
-                >
-                  <option value="LBS">LBS</option>
-                  <option value="KGS">KGS</option>
-                </select>
-                <span
-                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-                  aria-hidden="true"
-                >
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
-                    <path
-                      d="M4 6.5 8 10.5 12 6.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.75"
-                    />
-                  </svg>
-                </span>
-              </div>
-            </Field>
+            <SelectField
+              label="Dispatch Units"
+              presentation="anchored"
+              value={dispatchUnits}
+              onChange={(event) => onDispatchUnitsChange?.(event.target.value)}
+              disabled={isSaving}
+            >
+              <option value="LBS">LBS</option>
+              <option value="KGS">KGS</option>
+            </SelectField>
 
-            <Field label="Dispatch Time Source">
-              <div className="relative min-w-0">
-                <select
-                  className={dispatchDefaultSelectClassName}
-                  value={useCurrentUtcForDispatchTime ? "current-utc" : "schedule-utc"}
-                  onChange={(event) => onDispatchTimeModeChange?.(event.target.value)}
-                  disabled={isSaving}
-                >
-                  {dispatchTimeSourceOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <span
-                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-                  aria-hidden="true"
-                >
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
-                    <path
-                      d="M4 6.5 8 10.5 12 6.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.75"
-                    />
-                  </svg>
-                </span>
-              </div>
-            </Field>
+            <SelectField
+              label="Dispatch Time Source"
+              presentation="anchored"
+              value={useCurrentUtcForDispatchTime ? "current-utc" : "schedule-utc"}
+              onChange={(event) => onDispatchTimeModeChange?.(event.target.value)}
+              disabled={isSaving}
+            >
+              {dispatchTimeSourceOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </SelectField>
 
-            <Field label="Departure Offset">
-              <div className="relative min-w-0">
-                <select
-                  className={dispatchDefaultSelectClassName}
-                  value={departureOffsetMinutes}
-                  onChange={(event) => onDepartureOffsetChange?.(Number(event.target.value))}
-                  disabled={isSaving}
-                >
-                  {departureOffsetOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <span
-                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-                  aria-hidden="true"
-                >
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
-                    <path
-                      d="M4 6.5 8 10.5 12 6.5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.75"
-                    />
-                  </svg>
-                </span>
-              </div>
-            </Field>
+            <SelectField
+              label="Departure Offset"
+              presentation="anchored"
+              value={departureOffsetMinutes}
+              onChange={(event) => onDepartureOffsetChange?.(Number(event.target.value))}
+              disabled={isSaving}
+            >
+              {departureOffsetOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </SelectField>
           </div>
         </div>
       ) : null}
