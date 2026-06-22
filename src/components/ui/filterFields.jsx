@@ -43,7 +43,10 @@ export function SelectField({
   allLabel = null,
   presentation = "popover",
   children,
-  ...props
+  value,
+  selectedValues: selectedValuesProp,
+  onChange,
+  ...selectProps
 }) {
   const selectOptions = useMemo(() => {
     const flattenedOptions = [];
@@ -87,9 +90,9 @@ export function SelectField({
     return flattenedOptions;
   }, [children]);
 
-  const selectedValue = String(props.value ?? "");
-  const selectedValues = Array.isArray(props.selectedValues)
-    ? props.selectedValues
+  const selectedValue = String(value ?? "");
+  const selectedValues = Array.isArray(selectedValuesProp)
+    ? selectedValuesProp
     : selectedValue
       ? [selectedValue]
       : [];
@@ -111,9 +114,10 @@ export function SelectField({
       showPinnedSelectedBlock={false}
       showSingleSelectedLabel
       presentation={presentation}
+      {...selectProps}
       options={selectOptions}
       selectedValues={selectedValues}
-      onChange={(values) => props.onChange?.({ target: { value: values[0] || "" } })}
+      onChange={(values) => onChange?.({ target: { value: values[0] || "" } })}
     />
   );
 }

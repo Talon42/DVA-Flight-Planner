@@ -137,6 +137,7 @@ export function SimBriefSettingsForm({
             <SelectField
               label="Dispatch Units"
               presentation="anchored"
+              prioritizeSelectedOptions={false}
               value={dispatchUnits}
               onChange={(event) => onDispatchUnitsChange?.(event.target.value)}
               disabled={isSaving}
@@ -148,6 +149,7 @@ export function SimBriefSettingsForm({
             <SelectField
               label="Dispatch Time Source"
               presentation="anchored"
+              prioritizeSelectedOptions={false}
               value={useCurrentUtcForDispatchTime ? "current-utc" : "schedule-utc"}
               onChange={(event) => onDispatchTimeModeChange?.(event.target.value)}
               disabled={isSaving}
@@ -162,6 +164,7 @@ export function SimBriefSettingsForm({
             <SelectField
               label="Departure Offset"
               presentation="anchored"
+              prioritizeSelectedOptions={false}
               value={departureOffsetMinutes}
               onChange={(event) => onDepartureOffsetChange?.(Number(event.target.value))}
               disabled={isSaving}
