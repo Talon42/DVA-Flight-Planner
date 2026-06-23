@@ -105,7 +105,7 @@ function PilotStatsSummaryCard({ summary }) {
       <div className="logbook-pilot-stats__hero-grid grid gap-3 bp-1024:grid-cols-[minmax(12rem,15.5rem)_minmax(0,1fr)] bp-1400:grid-cols-[minmax(13rem,16.5rem)_minmax(0,1fr)]">
         <div className="logbook-pilot-stats__airline-card flex min-w-0 flex-col items-center justify-center gap-2 border-b border-[color:var(--line)] pb-3 text-center bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0">
           <SummaryAirlineMark airline={airline} />
-          <div className="grid min-w-0 gap-0.5">
+          <div className="logbook-pilot-stats__airline-meta grid min-w-0 gap-0.5">
             <p className="logbook-pilot-stats__airline-name m-0 min-w-0 truncate text-[1.32rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
               {airlineLabel}
             </p>
@@ -123,7 +123,7 @@ function PilotStatsSummaryCard({ summary }) {
           <p className={cn("logbook-pilot-stats__summary-heading m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>
             Logbook Summary
           </p>
-          <div className="grid gap-2 bp-1024:grid-cols-2 bp-1400:grid-cols-3 bp-1920:grid-cols-5">
+          <div className="logbook-pilot-stats__summary-metrics grid gap-2 bp-1024:grid-cols-2 bp-1400:grid-cols-3 bp-1920:grid-cols-5">
             <SummaryMetricCard label="Total Flights" value={summary?.totalFlights || LOGBOOK_EMPTY_VALUE} />
             <SummaryMetricCard label="Total Distance" value={summary?.totalDistance || LOGBOOK_EMPTY_VALUE} />
             <SummaryMetricCard label="Total Duration" value={summary?.totalDuration || LOGBOOK_EMPTY_VALUE} />

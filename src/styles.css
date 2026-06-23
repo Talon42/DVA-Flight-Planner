@@ -327,30 +327,38 @@
     }
 
     .logbook-pilot-stats__hero {
-      padding: 0.75rem !important;
+      padding: 0.6rem !important;
     }
 
     .logbook-pilot-stats__hero-grid {
-      gap: 0.5rem !important;
+      gap: 0.4rem !important;
     }
 
     .logbook-pilot-stats__airline-card {
-      gap: 0.35rem !important;
-      padding-bottom: 0.5rem !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 0.65rem !important;
+      padding-bottom: 0.35rem !important;
+      text-align: left !important;
     }
 
     .logbook-pilot-stats__airline-mark {
-      width: 4rem !important;
-      height: 4rem !important;
+      width: 3.25rem !important;
+      height: 3.25rem !important;
     }
 
     .logbook-pilot-stats__airline-name {
-      font-size: 1.05rem !important;
+      font-size: 0.98rem !important;
       line-height: 1.1 !important;
     }
 
+    .logbook-pilot-stats__airline-meta {
+      gap: 0.15rem !important;
+    }
+
     .logbook-pilot-stats__summary-grid {
-      gap: 0.5rem !important;
+      gap: 0.4rem !important;
     }
 
     .logbook-pilot-stats__summary-heading {
@@ -358,8 +366,12 @@
     }
 
     .logbook-pilot-stats__metric {
-      gap: 0.35rem !important;
-      padding: 0.6rem !important;
+      gap: 0.25rem !important;
+      padding: 0.45rem 0.55rem !important;
+    }
+
+    .logbook-pilot-stats__summary-metrics {
+      gap: 0.4rem !important;
     }
 
     .logbook-pilot-stats__panel {
