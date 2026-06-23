@@ -55,8 +55,10 @@ export function useFlightBoards({
   expandedBoardFlightId = null,
   flightBoards = [],
   isDevToolsEnabled = false,
+  isScheduleCurrent = true,
   schedule = null,
   scheduleView = "flights",
+  onOpenStaleScheduleBlocked = null,
   setActiveFlightBoardId,
   setExpandedBoardFlightId,
   setFlightBoards,
@@ -214,6 +216,12 @@ export function useFlightBoards({
   }
 
   function handleAddToFlightBoard(flightId, clickedRow = null) {
+    if (!isScheduleCurrent) {
+      // Block new board entries until the active schedule has been refreshed.
+      onOpenStaleScheduleBlocked?.();
+      return false;
+    }
+
     if (scheduleView === "tours") {
       const normalizedFlightId = String(flightId || "").trim();
       const matchedTourFlight =

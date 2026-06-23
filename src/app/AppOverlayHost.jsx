@@ -143,6 +143,9 @@ export default function AppOverlayHost({
   isSimBriefDispatchBlockedOpen,
   simBriefDispatchBlockedMessage,
   onCloseSimBriefDispatchBlocked,
+  isStaleScheduleBlockedOpen,
+  onCloseStaleScheduleBlocked,
+  onSyncStaleSchedule,
   isUpdatePromptOpen,
   isNoUpdatePromptOpen,
   onCloseUpdatePrompt,
@@ -407,6 +410,38 @@ export default function AppOverlayHost({
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={onCloseSimBriefDispatchBlocked}>
                 Close
+              </Button>
+            </div>
+          </Panel>
+        </ModalBackdrop>
+      ) : null}
+
+      {isStaleScheduleBlockedOpen ? (
+        <ModalBackdrop onClick={onCloseStaleScheduleBlocked}>
+          <Panel
+            as="section"
+            padding="lg"
+            className={cn(modalPanelClassName, "!w-[min(620px,100%)]")}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Schedule out of date"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader eyebrow="Schedule" title="Schedule Out of Date" />
+
+            <p className={mutedTextClassName}>Please click <b>Sync Now</b> to add flights to the flight board.</p>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={onCloseStaleScheduleBlocked}>
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  onCloseStaleScheduleBlocked?.();
+                  void onSyncStaleSchedule?.();
+                }}
+              >
+                Sync Now
               </Button>
             </div>
           </Panel>

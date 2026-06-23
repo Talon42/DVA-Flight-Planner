@@ -6,6 +6,7 @@ export function useAppModals() {
   const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
   const [isDutyBoardOverwriteConfirmOpen, setIsDutyBoardOverwriteConfirmOpen] = useState(false);
   const [isSimBriefDispatchBlockedOpen, setIsSimBriefDispatchBlockedOpen] = useState(false);
+  const [isStaleScheduleBlockedOpen, setIsStaleScheduleBlockedOpen] = useState(false);
   const [simBriefDispatchBlockedMessage, setSimBriefDispatchBlockedMessage] = useState("");
   const deleteUserDataConfirmResolverRef = useRef(null);
   const dutyBoardOverwriteConfirmResolverRef = useRef(null);
@@ -48,6 +49,15 @@ export function useAppModals() {
     setSimBriefDispatchBlockedMessage("");
   }
 
+  // Keeps stale schedule blocking separate from the app's other confirmation popups.
+  function handleOpenStaleScheduleBlocked() {
+    setIsStaleScheduleBlockedOpen(true);
+  }
+
+  function handleCloseStaleScheduleBlocked() {
+    setIsStaleScheduleBlockedOpen(false);
+  }
+
   return {
     isReadmeOpen,
     setIsReadmeOpen,
@@ -68,6 +78,10 @@ export function useAppModals() {
     setSimBriefDispatchBlockedMessage,
     handleOpenSimBriefDispatchBlocked,
     handleCloseSimBriefDispatchBlocked,
+    isStaleScheduleBlockedOpen,
+    setIsStaleScheduleBlockedOpen,
+    handleOpenStaleScheduleBlocked,
+    handleCloseStaleScheduleBlocked,
     deleteUserDataConfirmResolverRef,
     dutyBoardOverwriteConfirmResolverRef
   };
