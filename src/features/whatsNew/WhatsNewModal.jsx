@@ -84,7 +84,8 @@ function renderTextCardDescription(description) {
     }
 
     blocks.push(
-      <ul key={`bullets-${blockIndex++}`} className="m-0 grid gap-2 pl-5">
+      // Restore visible list markers because the app's CSS reset removes them by default.
+      <ul key={`bullets-${blockIndex++}`} className="m-0 grid list-disc gap-2 pl-5">
         {bulletItems.map((item, itemIndex) => (
           <li key={`bullet-${blockIndex}-${itemIndex}`}>{parseInlineFormatting(item)}</li>
         ))}
