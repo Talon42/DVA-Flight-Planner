@@ -343,7 +343,7 @@
       padding: 0.65rem !important;
     }
 
-    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-hero-grid {
+  .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-hero-grid {
       display: grid;
       grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.65fr);
       gap: 0.6rem;
@@ -372,32 +372,12 @@
       gap: 0.15rem;
     }
 
-    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-panels {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-metrics {
-      display: grid;
+    .logbook-pilot-stats__layout-standard .logbook-pilot-stats__standard-stat-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 0.45rem;
     }
 
-    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-kpi {
-      min-height: 4.15rem;
-      padding: 0.6rem 0.7rem;
-    }
-
-    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-kpi--landing {
-      grid-column: span 2;
-    }
-
-    .logbook-pilot-stats__panel {
-      padding: 0.75rem !important;
-    }
-
-    .logbook-pilot-stats__scroll-panel {
-      gap: 0.5rem !important;
-      padding: 0.75rem !important;
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-stat-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .logbook-pilot-stats__layout-compact .logbook-pilot-stats__summary-heading {
@@ -408,14 +388,6 @@
   @media (max-width: 1099px) {
     .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-hero-grid {
       grid-template-columns: 1fr;
-    }
-
-    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-metrics {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-kpi--landing {
-      grid-column: span 2;
     }
   }
 }
