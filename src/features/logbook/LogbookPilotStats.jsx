@@ -40,6 +40,15 @@ function SummaryAirlineMark({ airline, className = "" }) {
   );
 }
 
+function SummaryMetricCard({ label, value, className = "", children = null }) {
+  return (
+    <div className={cn("logbook-pilot-stats__metric grid gap-1.5 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", className)}>
+      <p className={cn("m-0 text-[var(--text-muted)]", labelTextClassName)}>{label}</p>
+      {children || <p className={cn("m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>{value}</p>}
+    </div>
+  );
+}
+
 function CompactSummaryMetricCard({ label, value, className = "", children = null }) {
   return (
     <div
@@ -56,15 +65,6 @@ function CompactSummaryMetricCard({ label, value, className = "", children = nul
   );
 }
 
-function SummaryMetricCard({ label, value, className = "", children = null }) {
-  return (
-    <div className={cn("logbook-pilot-stats__metric grid gap-1.5 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", className)}>
-      <p className={cn("m-0 text-[var(--text-muted)]", labelTextClassName)}>{label}</p>
-      {children || <p className={cn("m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>{value}</p>}
-    </div>
-  );
-}
-
 function SummaryLandingRateMetric({ value, grade }) {
   return (
     <SummaryMetricCard
@@ -74,6 +74,24 @@ function SummaryLandingRateMetric({ value, grade }) {
       children={
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <span className={cn("min-w-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>{value}</span>
+          <LandingGradeBadge grade={grade} />
+        </div>
+      }
+    />
+  );
+}
+
+function CompactLandingRateMetric({ value, grade }) {
+  return (
+    <CompactSummaryMetricCard
+      label="Average Landing Rate"
+      value={value}
+      className="logbook-pilot-stats__compact-kpi--landing min-w-0"
+      children={
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="min-w-0 truncate text-[0.95rem] font-semibold leading-[1.05] text-[var(--text-heading)]">
+            {value}
+          </span>
           <LandingGradeBadge grade={grade} />
         </div>
       }
@@ -111,19 +129,34 @@ function RankedListPanel({ title, items }) {
   );
 }
 
-function PilotStatsStandardHero({ airline, summary }) {
+function PilotStatsPanels({ stats, className = "" }) {
+  return (
+    <div className={cn("grid gap-3", className)}>
+      <RankedListPanel title="Landing Rates" items={stats.landingRates} />
+      <RankedListPanel title="Last 10 Landing Rates" items={stats.lastTenLandingRates} />
+      <RankedListPanel title="Flights by Equipment" items={stats.flightsByEquipment} />
+      <RankedListPanel title="Flights by Simulator" items={stats.flightsBySimulator} />
+      <RankedListPanel title="Flights by Status" items={stats.flightsByStatus} />
+      <RankedListPanel title="Flights by Airline" items={stats.flightsByAirline} />
+      <RankedListPanel title="Top Departure Airports" items={stats.topDepartureAirports} />
+      <RankedListPanel title="Top Arrival Airports" items={stats.topArrivalAirports} />
+    </div>
+  );
+}
+
+function StandardPilotStatsHero({ airline, summary }) {
   const airlineLabel = airline?.displayName || airline?.label || "Unknown Airline";
   const airlineCountLabel = airline?.count ?? 0;
 
   return (
-    <Panel className={cn("logbook-pilot-stats__panel logbook-pilot-stats__hero-standard grid gap-3 p-3", cardFrameClassName)}>
-      <div className="logbook-pilot-stats__hero-grid grid gap-3 bp-1024:grid-cols-[minmax(12rem,15.5rem)_minmax(0,1fr)] bp-1400:grid-cols-[minmax(13rem,16.5rem)_minmax(0,1fr)]">
-        <div className="logbook-pilot-stats__airline-card flex min-w-0 flex-col items-center justify-center gap-2 border-b border-[color:var(--line)] pb-3 text-center bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0">
+    <Panel className={cn("logbook-pilot-stats__panel logbook-pilot-stats__standard-hero grid gap-3 p-3", cardFrameClassName)}>
+      <div className="logbook-pilot-stats__standard-hero-grid grid gap-3 bp-1024:grid-cols-[minmax(12rem,15.5rem)_minmax(0,1fr)] bp-1400:grid-cols-[minmax(13rem,16.5rem)_minmax(0,1fr)]">
+        <div className="logbook-pilot-stats__standard-airline flex min-w-0 flex-col items-center justify-center gap-2 border-b border-[color:var(--line)] pb-3 text-center bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0">
           <div className="mx-auto">
             <SummaryAirlineMark airline={airline} />
           </div>
-          <div className="logbook-pilot-stats__airline-meta grid min-w-0 gap-0.5">
-            <p className="logbook-pilot-stats__airline-name m-0 min-w-0 truncate text-[1.32rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
+          <div className="grid min-w-0 gap-0.5">
+            <p className="m-0 min-w-0 truncate text-[1.32rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
               {airlineLabel}
             </p>
             <p className="m-0 min-w-0 truncate text-[0.5rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -135,11 +168,11 @@ function PilotStatsStandardHero({ airline, summary }) {
           </div>
         </div>
 
-        <div className="logbook-pilot-stats__summary-grid grid gap-2">
-          <p className={cn("logbook-pilot-stats__summary-heading m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>
+        <div className="grid gap-2">
+          <p className={cn("logbook-pilot-stats__standard-summary-heading m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>
             Logbook Summary
           </p>
-          <div className="logbook-pilot-stats__summary-metrics grid gap-2 bp-1024:grid-cols-2 bp-1400:grid-cols-3 bp-1920:grid-cols-5">
+          <div className="logbook-pilot-stats__standard-summary-metrics grid gap-2 bp-1024:grid-cols-2 bp-1400:grid-cols-3 bp-1920:grid-cols-5">
             <SummaryMetricCard label="Total Flights" value={summary?.totalFlights || LOGBOOK_EMPTY_VALUE} />
             <SummaryMetricCard label="Total Distance" value={summary?.totalDistance || LOGBOOK_EMPTY_VALUE} />
             <SummaryMetricCard label="Total Duration" value={summary?.totalDuration || LOGBOOK_EMPTY_VALUE} />
@@ -155,62 +188,60 @@ function PilotStatsStandardHero({ airline, summary }) {
   );
 }
 
-function PilotStatsCompactHero({ airline, summary }) {
+function CompactPilotStatsHero({ airline, summary }) {
   const airlineLabel = airline?.displayName || airline?.label || "Unknown Airline";
   const airlineCountLabel = airline?.count ?? 0;
 
   return (
-    <Panel className={cn("logbook-pilot-stats__panel logbook-pilot-stats__hero-compact grid gap-3 p-3", cardFrameClassName)}>
-      <div className="logbook-pilot-stats__compact-layout">
-        <div className="logbook-pilot-stats__compact-airline">
-          <SummaryAirlineMark airline={airline} className="logbook-pilot-stats__compact-airline-logo" />
-          <div className="logbook-pilot-stats__compact-airline-copy">
-            <p className="m-0 min-w-0 truncate text-[0.98rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
-              {airlineLabel}
-            </p>
-            <p className="m-0 min-w-0 truncate text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-              Most flown airline{" · "} {formatFlightsLabel(airlineCountLabel)}
-            </p>
+    <Panel className={cn("logbook-pilot-stats__panel logbook-pilot-stats__compact-hero grid gap-3 p-3", cardFrameClassName)}>
+      <div className="logbook-pilot-stats__compact-hero-grid grid gap-3">
+        <div className="logbook-pilot-stats__compact-airline border border-[color:var(--line)] bg-[var(--surface-raised)] p-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <SummaryAirlineMark airline={airline} className="logbook-pilot-stats__compact-airline-logo" />
+            <div className="logbook-pilot-stats__compact-airline-copy min-w-0 grid gap-0.5">
+              <p className="m-0 min-w-0 truncate text-[0.98rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
+                {airlineLabel}
+              </p>
+              <p className="m-0 min-w-0 truncate text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                Most flown airline{" · "} {formatFlightsLabel(airlineCountLabel)}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="logbook-pilot-stats__compact-kpis">
-          <CompactSummaryMetricCard label="Total Flights" value={summary?.totalFlights || LOGBOOK_EMPTY_VALUE} />
-          <CompactSummaryMetricCard label="Total Distance" value={summary?.totalDistance || LOGBOOK_EMPTY_VALUE} />
-          <CompactSummaryMetricCard label="Total Duration" value={summary?.totalDuration || LOGBOOK_EMPTY_VALUE} />
-          <CompactSummaryMetricCard label="Total Airborne Time" value={summary?.totalAirborneTime || LOGBOOK_EMPTY_VALUE} />
-          <CompactSummaryMetricCard
-            label="Average Landing Rate"
-            value={summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE}
-            className="logbook-pilot-stats__compact-kpi--landing"
-            children={
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                <span className="min-w-0 truncate text-[0.95rem] font-semibold leading-[1.05] text-[var(--text-heading)]">
-                  {summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE}
-                </span>
-                <LandingGradeBadge grade={summary?.averageLandingRateGrade || LOGBOOK_EMPTY_VALUE} />
-              </div>
-            }
-          />
+        <div className="logbook-pilot-stats__compact-summary grid gap-2">
+          <div className="logbook-pilot-stats__compact-metrics grid gap-2">
+            <CompactSummaryMetricCard label="Total Flights" value={summary?.totalFlights || LOGBOOK_EMPTY_VALUE} />
+            <CompactSummaryMetricCard label="Total Distance" value={summary?.totalDistance || LOGBOOK_EMPTY_VALUE} />
+            <CompactSummaryMetricCard label="Total Duration" value={summary?.totalDuration || LOGBOOK_EMPTY_VALUE} />
+            <CompactSummaryMetricCard label="Total Airborne Time" value={summary?.totalAirborneTime || LOGBOOK_EMPTY_VALUE} />
+            <CompactLandingRateMetric
+              value={summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE}
+              grade={summary?.averageLandingRateGrade || LOGBOOK_EMPTY_VALUE}
+            />
+          </div>
         </div>
       </div>
     </Panel>
   );
 }
 
-function PilotStatsHero({ summary }) {
-  const airline = summary?.topAirline || null;
-
+function PilotStatsStandardLayout({ summary, stats }) {
   return (
-    <>
-      <PilotStatsStandardHero airline={airline} summary={summary} />
-      <PilotStatsCompactHero airline={airline} summary={summary} />
-    </>
+    <section className="logbook-pilot-stats__layout logbook-pilot-stats__layout-standard grid gap-3">
+      <StandardPilotStatsHero airline={summary?.topAirline || null} summary={summary} />
+      <PilotStatsPanels stats={stats} className="logbook-pilot-stats__standard-panels grid gap-3 bp-1400:grid-cols-2" />
+    </section>
   );
 }
 
-function PilotStatsSummaryCard({ summary }) {
-  return <PilotStatsHero summary={summary} />;
+function PilotStatsCompactLayout({ summary, stats }) {
+  return (
+    <section className="logbook-pilot-stats__layout logbook-pilot-stats__layout-compact grid gap-3">
+      <CompactPilotStatsHero airline={summary?.topAirline || null} summary={summary} />
+      <PilotStatsPanels stats={stats} className="logbook-pilot-stats__compact-panels grid gap-3 grid-cols-2" />
+    </section>
+  );
 }
 
 // Renders the Pilot Stats summary card plus the filtered breakdown sections.
@@ -220,22 +251,10 @@ export default function LogbookPilotStats({ rows, stats, summaryStats }) {
   return (
     <div className="logbook-pilot-stats px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
       <div className="grid gap-3 py-0.5">
-        {summary ? <PilotStatsSummaryCard summary={summary} /> : null}
+        {summary ? <PilotStatsStandardLayout summary={summary} stats={stats} /> : null}
+        {summary ? <PilotStatsCompactLayout summary={summary} stats={stats} /> : null}
 
-        {rows.length ? (
-          <>
-            <div className="grid gap-3 bp-1400:grid-cols-2">
-              <RankedListPanel title="Landing Rates" items={stats.landingRates} />
-              <RankedListPanel title="Last 10 Landing Rates" items={stats.lastTenLandingRates} />
-              <RankedListPanel title="Flights by Equipment" items={stats.flightsByEquipment} />
-              <RankedListPanel title="Flights by Simulator" items={stats.flightsBySimulator} />
-              <RankedListPanel title="Flights by Status" items={stats.flightsByStatus} />
-              <RankedListPanel title="Flights by Airline" items={stats.flightsByAirline} />
-              <RankedListPanel title="Top Departure Airports" items={stats.topDepartureAirports} />
-              <RankedListPanel title="Top Arrival Airports" items={stats.topArrivalAirports} />
-            </div>
-          </>
-        ) : (
+        {rows.length ? null : (
           <Panel className={cn("grid gap-2 p-3", cardFrameClassName)}>
             <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
               No logbook flights match the current filters.

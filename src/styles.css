@@ -298,7 +298,7 @@
     background: var(--logbook-row-selected-hover-bg) !important;
   }
 
-  .logbook-pilot-stats__hero-compact {
+  .logbook-pilot-stats__layout-compact {
     display: none;
   }
 
@@ -330,24 +330,27 @@
       padding-bottom: 0.25rem !important;
     }
 
-    .logbook-pilot-stats__hero-standard {
+    .logbook-pilot-stats__layout-standard {
       display: none !important;
     }
 
-    .logbook-pilot-stats__hero-compact {
+    .logbook-pilot-stats__layout-compact {
       display: grid !important;
       gap: 0.6rem !important;
+    }
+
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-hero {
       padding: 0.65rem !important;
     }
 
-    .logbook-pilot-stats__compact-layout {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-hero-grid {
       display: grid;
       grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.65fr);
       gap: 0.6rem;
       align-items: stretch;
     }
 
-    .logbook-pilot-stats__compact-airline {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-airline {
       display: flex;
       align-items: center;
       gap: 0.65rem;
@@ -357,30 +360,34 @@
       background: var(--surface-raised);
     }
 
-    .logbook-pilot-stats__compact-airline-logo {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-airline-logo {
       width: 3.25rem;
       height: 3.25rem;
       flex: 0 0 auto;
     }
 
-    .logbook-pilot-stats__compact-airline-copy {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-airline-copy {
       min-width: 0;
       display: grid;
       gap: 0.15rem;
     }
 
-    .logbook-pilot-stats__compact-kpis {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-panels {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-metrics {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 0.45rem;
     }
 
-    .logbook-pilot-stats__compact-kpi {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-kpi {
       min-height: 4.15rem;
       padding: 0.6rem 0.7rem;
     }
 
-    .logbook-pilot-stats__compact-kpi--landing {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-kpi--landing {
       grid-column: span 2;
     }
 
@@ -393,21 +400,21 @@
       padding: 0.75rem !important;
     }
 
-    .logbook-pilot-stats__summary-heading {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__summary-heading {
       display: none !important;
     }
   }
 
   @media (max-width: 1099px) {
-    .logbook-pilot-stats__compact-layout {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-hero-grid {
       grid-template-columns: 1fr;
     }
 
-    .logbook-pilot-stats__compact-kpis {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-metrics {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .logbook-pilot-stats__compact-kpi--landing {
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-kpi--landing {
       grid-column: span 2;
     }
   }
