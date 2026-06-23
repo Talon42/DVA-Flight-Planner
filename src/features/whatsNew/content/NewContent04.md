@@ -14,4 +14,4 @@ layout: text
 
 ## Functionality
 
-- Users will now be unable to add flights to their flight board if the schedule is out of date. This is to prevent generating PIREPs for expired flights accidentally. Users will be required to Sync their schedule to continue.
+- Users will be unable to add flights to their flight board if the schedule is out of date. This is to prevent generating PIREPs for expired flights accidentally. Users will be required to Sync their schedule to continue.
