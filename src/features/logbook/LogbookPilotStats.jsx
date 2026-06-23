@@ -26,16 +26,32 @@ function SummaryAirlineMark({ airline, className = "" }) {
         src={logoSrc}
         alt=""
         aria-hidden="true"
-        className={cn("logbook-pilot-stats__airline-mark mx-auto h-28 w-28 shrink-0 object-contain bp-1024:h-24 bp-1024:w-24", logoClassName, className)}
+        className={cn("logbook-pilot-stats__airline-mark h-28 w-28 shrink-0 object-contain bp-1024:h-24 bp-1024:w-24", logoClassName, className)}
       />
     );
   }
 
   return (
-    <div className="logbook-pilot-stats__airline-mark mx-auto flex h-28 w-28 shrink-0 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-heading)] bp-1024:h-24 bp-1024:w-24">
+    <div className="logbook-pilot-stats__airline-mark flex h-28 w-28 shrink-0 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-heading)] bp-1024:h-24 bp-1024:w-24">
       <span className={cn("truncate px-1 text-center text-[0.72rem] font-semibold", labelTextClassName)}>
         {airlineCode || (airlineName ? airlineName.slice(0, 3).toUpperCase() : "?")}
       </span>
+    </div>
+  );
+}
+
+function CompactSummaryMetricCard({ label, value, className = "", children = null }) {
+  return (
+    <div
+      className={cn(
+        "logbook-pilot-stats__compact-kpi grid gap-0.5 border border-[color:var(--line)] bg-[var(--surface-raised)] p-2",
+        className
+      )}
+    >
+      <p className="m-0 truncate text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+        {label}
+      </p>
+      {children || <p className="m-0 truncate text-[0.95rem] font-semibold leading-[1.05] text-[var(--text-heading)]">{value}</p>}
     </div>
   );
 }
@@ -95,21 +111,21 @@ function RankedListPanel({ title, items }) {
   );
 }
 
-function PilotStatsSummaryCard({ summary }) {
-  const airline = summary?.topAirline || null;
+function PilotStatsStandardHero({ airline, summary }) {
   const airlineLabel = airline?.displayName || airline?.label || "Unknown Airline";
   const airlineCountLabel = airline?.count ?? 0;
 
   return (
-    <Panel className={cn("logbook-pilot-stats__panel logbook-pilot-stats__hero grid gap-3 p-3", cardFrameClassName)}>
+    <Panel className={cn("logbook-pilot-stats__panel logbook-pilot-stats__hero-standard grid gap-3 p-3", cardFrameClassName)}>
       <div className="logbook-pilot-stats__hero-grid grid gap-3 bp-1024:grid-cols-[minmax(12rem,15.5rem)_minmax(0,1fr)] bp-1400:grid-cols-[minmax(13rem,16.5rem)_minmax(0,1fr)]">
         <div className="logbook-pilot-stats__airline-card flex min-w-0 flex-col items-center justify-center gap-2 border-b border-[color:var(--line)] pb-3 text-center bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0">
-          <SummaryAirlineMark airline={airline} />
+          <div className="mx-auto">
+            <SummaryAirlineMark airline={airline} />
+          </div>
           <div className="logbook-pilot-stats__airline-meta grid min-w-0 gap-0.5">
             <p className="logbook-pilot-stats__airline-name m-0 min-w-0 truncate text-[1.32rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
               {airlineLabel}
             </p>
-            {/* Keeps the most-flown label and flight count stacked as simple metadata under the airline name. */}
             <p className="m-0 min-w-0 truncate text-[0.5rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
               Most Flown Airline
             </p>
@@ -137,6 +153,64 @@ function PilotStatsSummaryCard({ summary }) {
       </div>
     </Panel>
   );
+}
+
+function PilotStatsCompactHero({ airline, summary }) {
+  const airlineLabel = airline?.displayName || airline?.label || "Unknown Airline";
+  const airlineCountLabel = airline?.count ?? 0;
+
+  return (
+    <Panel className={cn("logbook-pilot-stats__panel logbook-pilot-stats__hero-compact grid gap-3 p-3", cardFrameClassName)}>
+      <div className="logbook-pilot-stats__compact-layout">
+        <div className="logbook-pilot-stats__compact-airline">
+          <SummaryAirlineMark airline={airline} className="logbook-pilot-stats__compact-airline-logo" />
+          <div className="logbook-pilot-stats__compact-airline-copy">
+            <p className="m-0 min-w-0 truncate text-[0.98rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
+              {airlineLabel}
+            </p>
+            <p className="m-0 min-w-0 truncate text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Most flown airline{" · "} {formatFlightsLabel(airlineCountLabel)}
+            </p>
+          </div>
+        </div>
+
+        <div className="logbook-pilot-stats__compact-kpis">
+          <CompactSummaryMetricCard label="Total Flights" value={summary?.totalFlights || LOGBOOK_EMPTY_VALUE} />
+          <CompactSummaryMetricCard label="Total Distance" value={summary?.totalDistance || LOGBOOK_EMPTY_VALUE} />
+          <CompactSummaryMetricCard label="Total Duration" value={summary?.totalDuration || LOGBOOK_EMPTY_VALUE} />
+          <CompactSummaryMetricCard label="Total Airborne Time" value={summary?.totalAirborneTime || LOGBOOK_EMPTY_VALUE} />
+          <CompactSummaryMetricCard
+            label="Average Landing Rate"
+            value={summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE}
+            className="logbook-pilot-stats__compact-kpi--landing"
+            children={
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <span className="min-w-0 truncate text-[0.95rem] font-semibold leading-[1.05] text-[var(--text-heading)]">
+                  {summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE}
+                </span>
+                <LandingGradeBadge grade={summary?.averageLandingRateGrade || LOGBOOK_EMPTY_VALUE} />
+              </div>
+            }
+          />
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function PilotStatsHero({ summary }) {
+  const airline = summary?.topAirline || null;
+
+  return (
+    <>
+      <PilotStatsStandardHero airline={airline} summary={summary} />
+      <PilotStatsCompactHero airline={airline} summary={summary} />
+    </>
+  );
+}
+
+function PilotStatsSummaryCard({ summary }) {
+  return <PilotStatsHero summary={summary} />;
 }
 
 // Renders the Pilot Stats summary card plus the filtered breakdown sections.
