@@ -1,6 +1,6 @@
 {
     "productName":  "DVA Flight Planner",
-    "version":  "0.8.0-beta",
+    "version":  "0.8.1-beta",
     "identifier":  "dvaflightplanner",
     "build":  {
                   "beforeDevCommand":  "npm run dev",

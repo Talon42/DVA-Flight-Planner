@@ -114,6 +114,10 @@ function buildTrackedAirportSet(requirement, logbookAirportProgress) {
   );
 }
 
+function isGulfBreezeClubAccomplishment(accomplishment) {
+  return String(accomplishment?.name || "").trim().toLowerCase() === "gulf breeze club";
+}
+
 // Merges the saved DVA eligibility snapshot with current logbook airport progress.
 export function mergeAccomplishmentWithLogbookProgress(
   accomplishment,
@@ -128,10 +132,20 @@ export function mergeAccomplishmentWithLogbookProgress(
   const missingIcaoCodes = Array.isArray(accomplishment.missingIcaoCodes)
     ? accomplishment.missingIcaoCodes
     : [];
+  const isGulfBreezeClub = isGulfBreezeClubAccomplishment(accomplishment);
+  const optionalArrivalCodes = isGulfBreezeClub ? new Set(["KECP", "KPFN"]) : null;
+  const hasGulfBreezeCompletion = isGulfBreezeClub
+    ? [...optionalArrivalCodes].some((code) => trackedAirports.has(code))
+    : false;
   const remainingMissing = missingIcaoCodes.reduce(
     (result, code, index) => {
       const normalizedCode = normalizeAirportCode(code);
-      if (!normalizedCode || trackedAirports.has(normalizedCode)) {
+      const isOptionalGulfBreezeCode =
+        optionalArrivalCodes?.has(normalizedCode) &&
+        optionalArrivalCodes.size > 0 &&
+        trackedAirports.has(normalizedCode);
+
+      if (!normalizedCode || trackedAirports.has(normalizedCode) || isOptionalGulfBreezeCode) {
         return result;
       }
 
@@ -141,15 +155,18 @@ export function mergeAccomplishmentWithLogbookProgress(
     },
     { labels: [], codes: [] }
   );
-  const totalCount =
-    accomplishment.required ??
-    accomplishment.progress ??
-    missingIcaoCodes.length;
+  const totalCount = isGulfBreezeClub
+    ? 1
+    : accomplishment.required ?? accomplishment.progress ?? missingIcaoCodes.length;
   const fallbackCompletedCount = Math.max(totalCount - missingIcaoCodes.length, 0);
   const baseCompletedCount = accomplishment.achieved
     ? totalCount
     : accomplishment.progress ?? fallbackCompletedCount;
-  const mergedCompletedCount = Math.max(totalCount - remainingMissing.codes.length, baseCompletedCount);
+  const mergedCompletedCount = isGulfBreezeClub
+    ? hasGulfBreezeCompletion
+      ? 1
+      : 0
+    : Math.max(totalCount - remainingMissing.codes.length, baseCompletedCount);
   const isCompleted = accomplishment.achieved || (totalCount > 0 && mergedCompletedCount >= totalCount);
 
   return {

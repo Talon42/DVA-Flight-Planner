@@ -296,6 +296,9 @@ export default function App() {
     simBriefDispatchBlockedMessage,
     handleOpenSimBriefDispatchBlocked,
     handleCloseSimBriefDispatchBlocked,
+    isStaleScheduleBlockedOpen,
+    handleOpenStaleScheduleBlocked,
+    handleCloseStaleScheduleBlocked,
     deleteUserDataConfirmResolverRef,
     dutyBoardOverwriteConfirmResolverRef
   } = appModals;
@@ -488,6 +491,7 @@ export default function App() {
   // Keep the derived flight list stable so downstream hooks can read it safely.
   const scheduleFlights = useMemo(() => schedule?.flights || [], [schedule]);
   const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
+  const isScheduleOutOfDate = Boolean(schedule?.flights?.length) && scheduleDateInfo.isCurrent === false;
   const scheduleDateLabel = scheduleDateInfo.label;
   const logbookDateLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
   // Tracks which rows are already assigned to any board so the schedule tables only show available work.
@@ -571,8 +575,10 @@ export default function App() {
     expandedBoardFlightId,
     flightBoards,
     isDevToolsEnabled,
+    isScheduleCurrent: !isScheduleOutOfDate,
     schedule,
     scheduleView,
+    onOpenStaleScheduleBlocked: handleOpenStaleScheduleBlocked,
     setActiveFlightBoardId,
     setExpandedBoardFlightId,
     setFlightBoards,
@@ -2031,6 +2037,9 @@ export default function App() {
     isSimBriefDispatchBlockedOpen,
     simBriefDispatchBlockedMessage,
     onCloseSimBriefDispatchBlocked: handleCloseSimBriefDispatchBlocked,
+    isStaleScheduleBlockedOpen,
+    onCloseStaleScheduleBlocked: handleCloseStaleScheduleBlocked,
+    onSyncStaleSchedule: handleDeltaVirtualSync,
     isUpdatePromptOpen,
     isNoUpdatePromptOpen,
     onCloseUpdatePrompt: handleCloseUpdatePrompt,
