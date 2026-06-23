@@ -221,7 +221,7 @@ function CompactPilotStatsHero({ airline, summary }) {
 
 function StandardPilotStatsPanels({ stats }) {
   return (
-    <div className="logbook-pilot-stats__standard-panel-grid grid min-h-0 flex-1 items-stretch gap-3">
+    <div className="logbook-pilot-stats__standard-panel-grid grid min-h-0 flex-1 items-stretch gap-3 bp-1400:grid-cols-3">
       <RankedListPanel title="Flights by Airline" items={stats.flightsByAirline} />
       <RankedListPanel title="Flights by Equipment" items={stats.flightsByEquipment} />
       <RankedListPanel title="Last 10 Landing Rates" items={stats.lastTenLandingRates} />
