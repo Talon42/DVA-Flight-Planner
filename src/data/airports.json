@@ -10299,7 +10299,7 @@
       "icao": "KDXZ",
       "iata": "DXZ",
       "name": "St. George-Municipal  UT",
-      "actualName": "St. George Regional Airport",
+      "actualName": "St. George Municipal Airport",
       "country": "US",
       "lat": 37.095278,
       "lng": -113.599167,
@@ -10308,12 +10308,18 @@
       "isSchengen": false,
       "utcOffset": -21600,
       "stateTerritory": "Utah",
-      "runwayLength": 9293,
+      "runwayLength": 6606,
       "countryName": "United States",
       "timezone": "America/Denver",
       "timezoneLabel": "MT",
-      "takeoffRunways": [],
-      "landingRunways": [],
+      "takeoffRunways": [
+        "Runway 16, (6,606 feet)",
+        "Runway 34, (6,606 feet)"
+      ],
+      "landingRunways": [
+        "Runway 16, (6,606 feet)",
+        "Runway 34, (9,606 feet)"
+      ],
       "otherRunways": []
     },
     {
