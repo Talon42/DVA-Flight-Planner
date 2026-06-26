@@ -82,6 +82,7 @@ import {
   writeGettingStartedState,
   writeSavedUiState
 } from "../services/storage/storage.js";
+import { openDesktopUrl } from "../services/tauri/desktopShell.client.js";
 import {
   DEFAULT_FLIGHT_BOARD_NAME,
   createFlightBoard,
@@ -1747,8 +1748,7 @@ export default function App() {
 
     try {
       if (isDesktopAddonScanAvailable) {
-        const { openUrl } = await import("@tauri-apps/plugin-opener");
-        await openUrl(simBriefUrl);
+        await openDesktopUrl(simBriefUrl);
       } else {
         window.open(simBriefUrl, "_blank", "noopener,noreferrer");
       }

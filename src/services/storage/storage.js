@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import {
   IMPORT_LOG_FILE,
   GETTING_STARTED_STATE_FILE,
@@ -7,6 +8,10 @@ import {
   UI_STATE_FILE,
   WHATS_NEW_STATE_FILE
 } from "./storage.constants.js";
+import {
+  openDesktopPath,
+  revealDesktopPath
+} from "../tauri/desktopShell.client.js";
 import {
   deriveCallsign,
   deriveFlightNumber
@@ -1111,7 +1116,6 @@ async function appendLogFile(relativePath, storageKey, logText) {
     }
 
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const normalized = normalizeLogEntryText(logText);
       if (!normalized) {
         return null;
@@ -1159,14 +1163,13 @@ async function ensureLogFile(relativePath, storageKey) {
 
 async function openLogFile(relativePath, storageKey) {
   if (isTauriRuntime()) {
-    const { openPath, revealItemInDir } = await import("@tauri-apps/plugin-opener");
     const fullPath = await ensureLogFile(relativePath, storageKey);
     try {
-      await openPath(fullPath);
+      await openDesktopPath(fullPath);
       return;
     } catch (error) {
       try {
-        await revealItemInDir(fullPath);
+        await revealDesktopPath(fullPath);
       } catch {
         // no-op: we'll throw the original open error below
       }
@@ -1226,7 +1229,6 @@ export async function confirmDeleteUserData() {
 
 export async function deleteStoredUserData() {
   if (isTauriRuntime()) {
-    const { invoke } = await import("@tauri-apps/api/core");
     await invoke("clear_user_data");
   }
 

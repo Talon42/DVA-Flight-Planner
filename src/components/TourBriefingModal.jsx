@@ -6,6 +6,7 @@ import { modalBackdropClassName } from "./ui/patterns";
 import SectionHeader from "./ui/SectionHeader";
 import { bodySmTextClassName, supportCopyTextClassName } from "./ui/typography";
 import { fetchDeltaVirtualTourBriefing } from "../services/tauri/deltaVirtual.client.js";
+import { openDesktopUrl } from "../services/tauri/desktopShell.client.js";
 
 function decodeBase64ToBlobUrl(base64, contentType) {
   const normalizedBase64 = String(base64 || "").trim();
@@ -134,8 +135,7 @@ async function openBriefingInBrowser(briefingUrl) {
   }
 
   try {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(normalizedUrl);
+    await openDesktopUrl(normalizedUrl);
   } catch {
     window.open(normalizedUrl, "_blank", "noopener,noreferrer");
   }

@@ -1,8 +1,8 @@
-import { openUrl } from "@tauri-apps/plugin-opener";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName, bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
 import planeLight from "../../data/images/plane_light.png";
+import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
 
 const ROUTE_LEFT_LINE_CLASS =
   "block h-[2px] w-full bg-gradient-to-r from-transparent from-0% via-[rgba(200,16,46,0.7)] via-60% to-[rgba(200,16,46,1)] to-100%";
@@ -71,7 +71,7 @@ function HeroFlightLabel({ flight, className = "" }) {
     event.stopPropagation();
 
     try {
-      await openUrl(dvaPirepUrl);
+      await openDesktopUrl(dvaPirepUrl);
     } catch (error) {
       console.error("Unable to open DVA PIREP page.", error);
     }

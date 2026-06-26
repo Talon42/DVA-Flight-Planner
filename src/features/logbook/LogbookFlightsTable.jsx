@@ -1,9 +1,9 @@
 import { useMemo } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import DataTable from "../../components/data-table/DataTable.jsx";
 import { cn } from "../../components/ui/cn";
 import { getLogbookRowClassName } from "./logbookRowStyles.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
+import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
 
 const LOGBOOK_SELECTED_ROW_CLASS_NAME = "logbook-row-selected";
 
@@ -15,7 +15,7 @@ function LogbookFlightCell({ row, column }) {
     event.stopPropagation();
 
     try {
-      await openUrl(row.dvaPirepUrl);
+      await openDesktopUrl(row.dvaPirepUrl);
     } catch (error) {
       console.error("Unable to open DVA PIREP page.", error);
     }

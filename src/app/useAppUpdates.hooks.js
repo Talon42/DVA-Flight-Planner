@@ -4,6 +4,7 @@ import {
   GITHUB_LATEST_EXE_DOWNLOAD_URL
 } from "../services/updates/updateCheck.client.js";
 import { logAppError, logAppEvent, logSystemError, logSystemEvent } from "../services/logging/appLog.client.js";
+import { openDesktopUrl } from "../services/tauri/desktopShell.client.js";
 
 const APP_BUILD_GIT_TAG = String(import.meta.env.VITE_BUILD_GIT_TAG || "").trim() || "local-dev";
 
@@ -113,8 +114,7 @@ export function useAppUpdates({
 
     try {
       if (isDesktopAddonScanAvailable) {
-        const { openUrl } = await import("@tauri-apps/plugin-opener");
-        await openUrl(downloadUrl);
+        await openDesktopUrl(downloadUrl);
       } else {
         window.open(downloadUrl, "_blank", "noopener,noreferrer");
       }
