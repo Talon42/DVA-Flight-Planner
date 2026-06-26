@@ -84,6 +84,7 @@ export default function TableRow({
               type="button"
               className={cn(
                 "block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[color:var(--table-row-text,var(--text-primary))] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)] dark:text-[rgb(255,255,255)]",
+                column.onCellClick ? "cursor-pointer" : "cursor-default",
                 bodyMdTextClassName
               )}
               onClick={(event) => handleCellClick(column, event)}
