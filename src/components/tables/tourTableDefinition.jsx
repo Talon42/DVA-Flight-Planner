@@ -15,7 +15,12 @@ function getDurationLabel(row) {
 }
 
 // Mirrors the simplified flight table sizing while preserving the tour-specific columns.
-export function getTourTableColumns({ addonAirports, vatsimCoverageIndex }) {
+export function getTourTableColumns({
+  addonAirports,
+  vatsimCoverageIndex,
+  onAirportSelect,
+  sourceView = "tours"
+}) {
   return [
     {
       key: "tourLeg",
@@ -79,6 +84,11 @@ export function getTourTableColumns({ addonAirports, vatsimCoverageIndex }) {
       minWidth: 128,
       fr: 0.75,
       align: "left",
+      onCellClick: (row) =>
+        onAirportSelect?.({ airportIcao: row.from, side: "departure", row, sourceView }),
+      stopRowSelectOnClick: true,
+      cellAriaLabel: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
+      cellTitle: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.from}
@@ -101,6 +111,11 @@ export function getTourTableColumns({ addonAirports, vatsimCoverageIndex }) {
       minWidth: 112,
       fr: 0.75,
       align: "left",
+      onCellClick: (row) =>
+        onAirportSelect?.({ airportIcao: row.to, side: "arrival", row, sourceView }),
+      stopRowSelectOnClick: true,
+      cellAriaLabel: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
+      cellTitle: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.to}

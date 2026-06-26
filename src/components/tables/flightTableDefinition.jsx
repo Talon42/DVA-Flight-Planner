@@ -166,7 +166,12 @@ function formatFlightCode(flightCode) {
   return stripped || flightCode;
 }
 
-export function getFlightTableColumns({ addonAirports, vatsimCoverageIndex = null }) {
+export function getFlightTableColumns({
+  addonAirports,
+  vatsimCoverageIndex = null,
+  onAirportSelect,
+  sourceView = "flights"
+}) {
   return [
     {
       key: "airlineName",
@@ -208,6 +213,11 @@ export function getFlightTableColumns({ addonAirports, vatsimCoverageIndex = nul
       allowOverflow: true,
       sortable: true,
       sortKey: "from",
+      onCellClick: (row) =>
+        onAirportSelect?.({ airportIcao: row.from, side: "departure", row, sourceView }),
+      stopRowSelectOnClick: true,
+      cellAriaLabel: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
+      cellTitle: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.from}
@@ -233,6 +243,11 @@ export function getFlightTableColumns({ addonAirports, vatsimCoverageIndex = nul
       allowOverflow: true,
       sortable: true,
       sortKey: "to",
+      onCellClick: (row) =>
+        onAirportSelect?.({ airportIcao: row.to, side: "arrival", row, sourceView }),
+      stopRowSelectOnClick: true,
+      cellAriaLabel: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
+      cellTitle: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.to}
