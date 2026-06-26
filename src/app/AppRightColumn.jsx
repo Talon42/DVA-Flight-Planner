@@ -7,6 +7,7 @@ import LogbookDetailsCard from "../features/logbook/LogbookDetailsCard.jsx";
 import AccomplishmentSelectorPanel from "../features/accomplishments/AccomplishmentSelectorPanel.jsx";
 import TourSelectorPanel from "../features/tours/TourSelectorPanel.jsx";
 import { normalizeFilters } from "../features/schedule/scheduleFilters.model";
+import AirportInfoTray from "../features/details/AirportInfoTray.jsx";
 
 // Renders the right-hand workspace column without owning any planner state.
 export default function AppRightColumn({
@@ -45,6 +46,8 @@ export default function AppRightColumn({
   accomplishmentOptions,
   selectedAccomplishmentName,
   onSelectAccomplishmentName,
+  selectedAirportInfo,
+  onCloseAirportInfo,
   isAccomplishmentSelectorCollapsed,
   onToggleAccomplishmentSelectorCollapsed,
   isTourSelectorCollapsed,
@@ -86,6 +89,8 @@ export default function AppRightColumn({
 
   const isAccomplishmentsView = scheduleView === "accomplishments";
   const isToursView = scheduleView === "tours";
+  const isFlightsView = scheduleView === "flights";
+  const showAirportInfo = Boolean(selectedAirportInfo) && (isFlightsView || isToursView || isAccomplishmentsView);
   const showAccomplishmentFlightBoard = isAccomplishmentsView && isAccomplishmentSelectorCollapsed;
   const showTourFlightBoard = isToursView && isTourSelectorCollapsed;
 
@@ -166,7 +171,10 @@ export default function AppRightColumn({
       <div
         className={cn(
           "grid h-full min-h-0 gap-3 bp-1024:gap-2.5",
-          showAccomplishmentFlightBoard ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)]"
+          showAccomplishmentFlightBoard && showAirportInfo && "grid-rows-[auto_minmax(0,0.5fr)_minmax(220px,0.5fr)]",
+          showAccomplishmentFlightBoard && !showAirportInfo && "grid-rows-[auto_minmax(0,1fr)]",
+          !showAccomplishmentFlightBoard && showAirportInfo && "grid-rows-[minmax(0,0.5fr)_minmax(220px,0.5fr)]",
+          !showAccomplishmentFlightBoard && !showAirportInfo && "grid-rows-[minmax(0,1fr)]"
         )}
       >
         <AccomplishmentSelectorPanel
@@ -178,6 +186,11 @@ export default function AppRightColumn({
           isFullHeight={!isAccomplishmentSelectorCollapsed}
         />
         {showAccomplishmentFlightBoard ? detailsPanel : null}
+        {showAirportInfo ? (
+          <div className="min-h-0">
+            <AirportInfoTray selection={selectedAirportInfo} onClose={onCloseAirportInfo} />
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -187,7 +200,10 @@ export default function AppRightColumn({
       <div
         className={cn(
           "grid h-full min-h-0 gap-3 bp-1024:gap-2.5",
-          showTourFlightBoard ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)]"
+          showTourFlightBoard && showAirportInfo && "grid-rows-[auto_minmax(0,0.5fr)_minmax(220px,0.5fr)]",
+          showTourFlightBoard && !showAirportInfo && "grid-rows-[auto_minmax(0,1fr)]",
+          !showTourFlightBoard && showAirportInfo && "grid-rows-[minmax(0,0.5fr)_minmax(220px,0.5fr)]",
+          !showTourFlightBoard && !showAirportInfo && "grid-rows-[minmax(0,1fr)]"
         )}
       >
         <TourSelectorPanel
@@ -199,6 +215,11 @@ export default function AppRightColumn({
           isFullHeight={!isTourSelectorCollapsed}
         />
         {showTourFlightBoard ? detailsPanel : null}
+        {showAirportInfo ? (
+          <div className="min-h-0">
+            <AirportInfoTray selection={selectedAirportInfo} onClose={onCloseAirportInfo} />
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -211,9 +232,10 @@ export default function AppRightColumn({
     <div
       className={cn(
         "grid h-full min-w-0 min-h-0 gap-3 bp-1024:gap-2.5",
-        isPlannerControlsInlineCollapsed
-          ? "[grid-template-rows:auto_minmax(0,1fr)]"
-          : "grid-rows-[minmax(0,1fr)]"
+        isPlannerControlsInlineCollapsed && showAirportInfo && "[grid-template-rows:auto_minmax(0,0.5fr)_minmax(220px,0.5fr)]",
+        isPlannerControlsInlineCollapsed && !showAirportInfo && "[grid-template-rows:auto_minmax(0,1fr)]",
+        !isPlannerControlsInlineCollapsed && showAirportInfo && "grid-rows-[minmax(0,0.5fr)_minmax(220px,0.5fr)]",
+        !isPlannerControlsInlineCollapsed && !showAirportInfo && "grid-rows-[minmax(0,1fr)]"
       )}
     >
       <div
@@ -243,6 +265,12 @@ export default function AppRightColumn({
       </div>
 
       {isPlannerControlsInlineCollapsed ? detailsPanel : null}
+
+      {showAirportInfo ? (
+        <div className="min-h-0">
+          <AirportInfoTray selection={selectedAirportInfo} onClose={onCloseAirportInfo} />
+        </div>
+      ) : null}
     </div>
   );
 }

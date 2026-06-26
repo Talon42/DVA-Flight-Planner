@@ -21,12 +21,19 @@ export default function ToursTable({
   viewportWidth,
   addonAirports,
   vatsimCoverageIndex,
+  onAirportSelect,
   onSelectRow,
   onActivateRow
 }) {
   const columns = useMemo(
-    () => getTourTableColumns({ viewportWidth, addonAirports, vatsimCoverageIndex }),
-    [viewportWidth, addonAirports, vatsimCoverageIndex]
+    () => getTourTableColumns({
+      viewportWidth,
+      addonAirports,
+      vatsimCoverageIndex,
+      onAirportSelect,
+      sourceView: "tours"
+    }),
+    [viewportWidth, addonAirports, vatsimCoverageIndex, onAirportSelect]
   );
 
   return (

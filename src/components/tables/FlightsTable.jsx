@@ -9,13 +9,21 @@ export default function FlightsTable({
   viewportWidth,
   addonAirports,
   vatsimCoverageIndex,
+  sourceView = "flights",
+  onAirportSelect,
   onSort,
   onSelectRow,
   onActivateRow
 }) {
   const columns = useMemo(
-    () => getFlightTableColumns({ addonAirports, viewportWidth, vatsimCoverageIndex }),
-    [addonAirports, viewportWidth, vatsimCoverageIndex]
+    () => getFlightTableColumns({
+      addonAirports,
+      viewportWidth,
+      vatsimCoverageIndex,
+      onAirportSelect,
+      sourceView
+    }),
+    [addonAirports, viewportWidth, vatsimCoverageIndex, onAirportSelect, sourceView]
   );
 
   return (

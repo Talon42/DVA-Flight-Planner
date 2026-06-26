@@ -118,6 +118,7 @@ export default function App() {
   const [activeFlightBoardId, setActiveFlightBoardId] = useState("");
   const [selectedFlightId, setSelectedFlightId] = useState(null);
   const [selectedTourRowId, setSelectedTourRowId] = useState(null);
+  const [selectedAirportInfo, setSelectedAirportInfo] = useState(null);
   const [expandedBoardFlightId, setExpandedBoardFlightId] = useState(null);
   const [pendingMapFlightPathViewMode, setPendingMapFlightPathViewMode] = useState(null);
   const [pendingMapFitToRoute, setPendingMapFitToRoute] = useState(false);
@@ -633,6 +634,36 @@ export default function App() {
 
   const handleToggleTourSelectorCollapsed = useCallback((nextCollapsed) => {
     setIsTourSelectorCollapsed(nextCollapsed);
+  }, []);
+
+  // Opens the transient airport tray from a schedule table DEP/ARR cell.
+  const handleSelectAirportInfo = useCallback(({ airportIcao, side, row, sourceView }) => {
+    const normalizedAirportIcao = String(airportIcao || "").trim().toUpperCase();
+
+    if (!normalizedAirportIcao) {
+      setSelectedAirportInfo(null);
+      return;
+    }
+
+    const flightCode = String(
+      row?.flightCode || row?.tourFlightNumber || row?.flightNumber || ""
+    ).trim();
+    const from = String(row?.from || "").trim().toUpperCase();
+    const to = String(row?.to || "").trim().toUpperCase();
+    const routeLabel = from && to ? `${from} → ${to}` : "";
+
+    setSelectedAirportInfo({
+      airportIcao: normalizedAirportIcao,
+      side: side === "arrival" ? "arrival" : "departure",
+      sourceView: String(sourceView || "flights").trim() || "flights",
+      flightId: String(row?.flightId || row?.tourRowId || "").trim(),
+      flightCode,
+      routeLabel
+    });
+  }, []);
+
+  const handleCloseAirportInfo = useCallback(() => {
+    setSelectedAirportInfo(null);
   }, []);
 
   const handleActivateRow = useCallback(
@@ -1224,6 +1255,7 @@ export default function App() {
   function handlePrimaryViewChange(nextView) {
     if (nextView === "duty") {
       setPlannerMode("duty");
+      setSelectedAirportInfo(null);
       return;
     }
 
@@ -1265,6 +1297,9 @@ export default function App() {
     }
 
     setScheduleView(nextScheduleView);
+    if (nextScheduleView === "map") {
+      setSelectedAirportInfo(null);
+    }
 
     if (nextScheduleView !== "flights") {
       setPlannerControlsCollapsed(true);
@@ -1598,6 +1633,7 @@ export default function App() {
       setFlightBoards([defaultBoard]);
       setActiveFlightBoardId(defaultBoard.id);
       setSelectedFlightId(null);
+      setSelectedAirportInfo(null);
       setExpandedBoardFlightId(null);
       setPlannerMode("basic");
       setFilters(DEFAULT_FILTERS);
@@ -1834,6 +1870,8 @@ export default function App() {
       accomplishmentOptions={accomplishmentOptions}
       selectedAccomplishmentName={selectedAccomplishmentName}
       onSelectAccomplishmentName={setSelectedAccomplishmentName}
+      selectedAirportInfo={selectedAirportInfo}
+      onCloseAirportInfo={handleCloseAirportInfo}
       isAccomplishmentSelectorCollapsed={isAccomplishmentSelectorCollapsed}
       onToggleAccomplishmentSelectorCollapsed={handleToggleAccomplishmentSelectorCollapsed}
       selectedTourPath={selectedTourPath}
@@ -1926,6 +1964,7 @@ export default function App() {
     onShowAccomplishmentFlights: handleShowAccomplishmentFlights,
     onSortAccomplishmentFlights: handleSortAccomplishmentFlights,
     onSortFlights: handleSort,
+    onAirportSelect: handleSelectAirportInfo,
     onSelectRow: handleSelectFlight,
     onActivateRow: handleActivateRow,
     plannerMode,

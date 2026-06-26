@@ -15,6 +15,32 @@ function parseNumeric(value) {
   return normalized ? Number(normalized) : null;
 }
 
+function normalizeRunwayList(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (!normalized) {
+      return [];
+    }
+
+    if (/[;,|]/.test(normalized)) {
+      return normalized
+        .split(/[;,|]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [normalized];
+  }
+
+  return [];
+}
+
 function ensureAirportCatalogLoaded() {
   if (airportCatalog && airportByIcao && airportByIata) {
     return;
@@ -40,12 +66,16 @@ function ensureAirportCatalogLoaded() {
       icao: String(row.icao || "").trim().toUpperCase(),
       iata: String(row.iata || "").trim().toUpperCase(),
       name: String(row.name || "").trim(),
+      actualName: String(row.actualName || "").trim(),
       country: String(row.countryName || "").trim(),
       state: String(row.stateTerritory || "").trim(),
+      altitude: parseNumeric(row.alt ?? row.altitude ?? row.elevation),
       timezone: String(row.timezone || "").trim(),
       timezoneLabel: String(row.timezoneLabel || "").trim(),
       latitude: parseCoordinate(row.lat),
       longitude: parseCoordinate(row.lng),
+      takeoffRunways: normalizeRunwayList(row.takeoffRunways ?? row.takeoff_runways),
+      landingRunways: normalizeRunwayList(row.landingRunways ?? row.landing_runways),
       runwayLength: parseNumeric(row.runwayLength),
       regionCode: regionByCountry.get(String(row.countryName || "").trim())?.code || "",
       regionName: regionByCountry.get(String(row.countryName || "").trim())?.name || ""
@@ -97,12 +127,16 @@ export function buildAirportCatalogOptions() {
       icao: airport.icao,
       iata: airport.iata,
       name: airport.name,
+      actualName: airport.actualName,
       country: airport.country,
       state: airport.state,
+      altitude: airport.altitude,
       timezone: airport.timezone,
       timezoneLabel: airport.timezoneLabel,
       latitude: airport.latitude,
       longitude: airport.longitude,
+      takeoffRunways: airport.takeoffRunways,
+      landingRunways: airport.landingRunways,
       runwayLength: airport.runwayLength,
       regionCode: airport.regionCode,
       regionName: airport.regionName,
@@ -137,13 +171,17 @@ export function buildAirportOptions(flights) {
       const existing = optionByIcao.get(normalizedIcao) || {
         icao: normalizedIcao,
         name: airport?.name || normalizedIcao,
+        actualName: airport?.actualName || "",
         iata: airport?.iata || "",
         country: airport?.country || "",
         state: airport?.state || "",
+        altitude: airport?.altitude ?? null,
         timezone: airport?.timezone || "",
         timezoneLabel: airport?.timezoneLabel || "",
         latitude: airport?.latitude ?? null,
         longitude: airport?.longitude ?? null,
+        takeoffRunways: airport?.takeoffRunways || [],
+        landingRunways: airport?.landingRunways || [],
         runwayLength: airport?.runwayLength ?? null,
         regionCode: airport?.regionCode || "",
         regionName: airport?.regionName || "",

@@ -85,6 +85,7 @@ export default function AccomplishmentsPanel({
   addonAirports,
   vatsimCoverageIndex,
   selectedFlightRowId,
+  onAirportSelect,
   onSortAccomplishmentFlights,
   onSelectRow,
   onActivateRow,
@@ -178,6 +179,8 @@ export default function AccomplishmentsPanel({
                   viewportWidth={viewportWidth}
                   addonAirports={addonAirports}
                   vatsimCoverageIndex={vatsimCoverageIndex}
+                  sourceView="accomplishments"
+                  onAirportSelect={onAirportSelect}
                   onSort={onSortAccomplishmentFlights}
                   onSelectRow={onSelectRow}
                   onActivateRow={onActivateRow}
