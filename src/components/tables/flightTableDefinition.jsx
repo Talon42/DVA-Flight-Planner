@@ -217,7 +217,6 @@ export function getFlightTableColumns({
         onAirportSelect?.({ airportIcao: row.from, side: "departure", row, sourceView }),
       stopRowSelectOnClick: true,
       cellAriaLabel: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
-      cellTitle: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.from}
@@ -247,7 +246,6 @@ export function getFlightTableColumns({
         onAirportSelect?.({ airportIcao: row.to, side: "arrival", row, sourceView }),
       stopRowSelectOnClick: true,
       cellAriaLabel: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
-      cellTitle: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.to}

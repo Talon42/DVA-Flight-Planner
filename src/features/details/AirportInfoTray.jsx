@@ -15,7 +15,7 @@ function formatFeet(value) {
 }
 
 function formatAltitudeMeta(value) {
-  return Number.isFinite(value) ? `ALT: ${formatNumber(value)} ft` : "ALT: Unavailable";
+  return Number.isFinite(value) ? `ELV: ${formatNumber(value)} ft` : "ELV: Unavailable";
 }
 
 function normalizeSearchText(value) {
@@ -89,7 +89,7 @@ function formatRunwayLengthValue(value) {
     return "Unavailable";
   }
 
-  return `${formatNumber(length)} feet`;
+  return `${formatNumber(length)} ft`;
 }
 
 function formatRunwayCode(value) {
