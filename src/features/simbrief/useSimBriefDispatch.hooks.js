@@ -569,6 +569,37 @@ export function useSimBriefDispatch({
         return;
       }
 
+      const matchedBoardEntry =
+        flightBoard.find((entry) => entry.boardEntryId === boardEntryId) || null;
+      const beforeStaticId = String(
+        matchedBoardEntry?.simbriefPlan?.staticId || matchedBoardEntry?.simbriefPlan?.static_id || ""
+      ).trim();
+      const afterStaticId = String(
+        normalizedBoardEntry?.simbriefPlan?.staticId ||
+          normalizedBoardEntry?.simbriefPlan?.static_id ||
+          ""
+      ).trim();
+      await logSystemDebug("SimBrief", "dispatch-board-cache-update", {
+        dispatchRunId,
+        requestedBoardEntryId: boardEntryId,
+        returnedStaticId,
+        matchedBoardEntry: Boolean(matchedBoardEntry),
+        beforeStaticId,
+        afterStaticId
+      });
+      if (!matchedBoardEntry) {
+        await logSystemError(
+          "SimBrief",
+          "dispatch-board-cache-missed",
+          new Error("SimBrief board entry was not found for cache persistence."),
+          {
+            dispatchRunId,
+            requestedBoardEntryId: boardEntryId,
+            returnedStaticId
+          }
+        );
+      }
+
       setSimBriefDispatchState({
         flightId,
         isDispatching: false,

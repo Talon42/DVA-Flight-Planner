@@ -165,6 +165,7 @@ export default function App() {
     logbookSort: null,
     tourProgress: {}
   });
+  const flightBoardCacheSignatureRef = useRef("");
   // Builds the current UI-state payload so the debounced save and immediate map writes stay in sync.
   const buildCurrentUiStatePayload = useCallback(
     (overrides = {}) => {
@@ -182,6 +183,23 @@ export default function App() {
     },
     []
   );
+  // Builds a compact signature for the board cache fields we want to write through immediately.
+  const buildFlightBoardCacheSignature = useCallback((boards = []) => {
+    return JSON.stringify(
+      (Array.isArray(boards) ? boards : []).map((board) => ({
+        id: String(board?.id || "").trim(),
+        entries: (Array.isArray(board?.entries) ? board.entries : []).map((entry) => ({
+          boardEntryId: String(entry?.boardEntryId || "").trim(),
+          flightCode: String(entry?.flightCode || "").trim(),
+          staticId: String(entry?.simbriefPlan?.staticId || entry?.simbriefPlan?.static_id || "").trim(),
+          ofpXmlId: String(entry?.simbriefPlan?.ofpXmlId || entry?.simbriefPlan?.ofp_xml_id || "").trim(),
+          draftReportId: String(entry?.draftReportId || "").trim(),
+          dvaDraftReportId: String(entry?.dvaDraftReportId || "").trim(),
+          draftDeleteRequiresRegenerate: Boolean(entry?.draftDeleteRequiresRegenerate)
+        }))
+      }))
+    );
+  }, []);
   // Writes the current UI state immediately so preference toggles cannot be lost on exit.
   const handleSetMapOptions = useCallback(
     (updater) => {
@@ -1034,6 +1052,59 @@ export default function App() {
     ...logbookWorkspace.persistedUiState,
     tourProgress
   };
+  const currentFlightBoardCacheSignature = buildFlightBoardCacheSignature(flightBoards);
+  useEffect(() => {
+    if (isHydrating) {
+      flightBoardCacheSignatureRef.current = currentFlightBoardCacheSignature;
+      return;
+    }
+
+    if (flightBoardCacheSignatureRef.current === currentFlightBoardCacheSignature) {
+      return;
+    }
+
+    flightBoardCacheSignatureRef.current = currentFlightBoardCacheSignature;
+
+    const boardCount = Array.isArray(flightBoards) ? flightBoards.length : 0;
+    const entries = (Array.isArray(flightBoards) ? flightBoards : []).flatMap((board) =>
+      Array.isArray(board?.entries) ? board.entries : []
+    );
+    const cachedEntries = entries.filter(
+      (entry) =>
+        Boolean(entry?.simbriefPlan) ||
+        Boolean(entry?.draftReportId) ||
+        Boolean(entry?.dvaDraftReportId)
+    );
+    const sampleCachedFlightCodes = cachedEntries
+      .map((entry) => String(entry?.flightCode || "").trim())
+      .filter(Boolean)
+      .slice(0, 5);
+
+    void logAppEvent("persist-flight-board-cache-started", {
+      reason: "flight-board-cache",
+      boardCount,
+      entryCount: entries.length,
+      cachedEntryCount: cachedEntries.length
+    });
+
+    void writeSavedUiState(buildCurrentUiStatePayload({ flightBoards }))
+      .then(() => {
+        void logAppEvent("persist-flight-board-cache-succeeded", {
+          reason: "flight-board-cache",
+          boardCount,
+          entryCount: entries.length,
+          simbriefPlanCount: entries.filter((entry) => Boolean(entry?.simbriefPlan)).length,
+          draftReportCount: entries.filter(
+            (entry) => Boolean(entry?.draftReportId) || Boolean(entry?.dvaDraftReportId)
+          ).length,
+          sampleCachedFlightCodes
+        });
+      })
+      .catch((error) => {
+        setStatusMessage(error.message || "Unable to persist the current planner state.");
+        logAppError("persist-flight-board-cache-failed", error).catch(() => {});
+      });
+  }, [buildCurrentUiStatePayload, buildFlightBoardCacheSignature, currentFlightBoardCacheSignature, flightBoards, isHydrating]);
   useDebouncedEffect(
     () => {
       if (isHydrating) {
