@@ -596,25 +596,6 @@ export default function App() {
     handleRenameFlightBoard,
     handleDeleteFlightBoard
   } = boardState;
-  uiStateSnapshotRef.current = {
-    plannerMode,
-    filters,
-    dutyFilters,
-    flightBoards,
-    activeFlightBoardId,
-    flightBoard,
-    plannerControlsCollapsed,
-    basicAdvancedFiltersOpen,
-    basicAddonFiltersOpen,
-    sort,
-    selectedFlightId,
-    scheduleView,
-    selectedTourPath,
-    selectedAccomplishmentName,
-    mapOptions,
-    ...logbookWorkspace.persistedUiState,
-    tourProgress
-  };
   const handleToggleAccomplishmentSelectorCollapsed = useCallback((nextCollapsed) => {
     setIsAccomplishmentSelectorCollapsed(nextCollapsed);
   }, []);
@@ -889,40 +870,6 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
-  useDebouncedEffect(
-    () => {
-      if (isHydrating) {
-        return;
-      }
-
-      writeSavedUiState(buildCurrentUiStatePayload()).catch((error) => {
-        setStatusMessage(error.message || "Unable to persist the current planner state.");
-        logAppError("persist-ui-state-failed", error).catch(() => {});
-      });
-    },
-    [
-      plannerMode,
-      filters,
-      dutyFilters,
-      flightBoards,
-      activeFlightBoardId,
-      flightBoard,
-      plannerControlsCollapsed,
-      basicAdvancedFiltersOpen,
-      basicAddonFiltersOpen,
-      sort,
-      selectedFlightId,
-      scheduleView,
-      selectedTourPath,
-      selectedAccomplishmentName,
-      mapOptions,
-      logbookWorkspace.persistedUiState,
-      tourProgress,
-      buildCurrentUiStatePayload,
-      isHydrating
-    ],
-    350
-  );
   const airlines = useMemo(
     () => selectScheduleAirlines({ flights: scheduleFlights }),
     [scheduleFlights]
@@ -1068,6 +1015,59 @@ export default function App() {
     onRefreshLogbook: handleRefreshDeltaVirtualLogbook
   });
   logbookSyncCompleteRef.current = logbookWorkspace.handleSyncComplete;
+  uiStateSnapshotRef.current = {
+    plannerMode,
+    filters,
+    dutyFilters,
+    flightBoards,
+    activeFlightBoardId,
+    flightBoard,
+    plannerControlsCollapsed,
+    basicAdvancedFiltersOpen,
+    basicAddonFiltersOpen,
+    sort,
+    selectedFlightId,
+    scheduleView,
+    selectedTourPath,
+    selectedAccomplishmentName,
+    mapOptions,
+    ...logbookWorkspace.persistedUiState,
+    tourProgress
+  };
+  useDebouncedEffect(
+    () => {
+      if (isHydrating) {
+        return;
+      }
+
+      writeSavedUiState(buildCurrentUiStatePayload()).catch((error) => {
+        setStatusMessage(error.message || "Unable to persist the current planner state.");
+        logAppError("persist-ui-state-failed", error).catch(() => {});
+      });
+    },
+    [
+      plannerMode,
+      filters,
+      dutyFilters,
+      flightBoards,
+      activeFlightBoardId,
+      flightBoard,
+      plannerControlsCollapsed,
+      basicAdvancedFiltersOpen,
+      basicAddonFiltersOpen,
+      sort,
+      selectedFlightId,
+      scheduleView,
+      selectedTourPath,
+      selectedAccomplishmentName,
+      mapOptions,
+      logbookWorkspace.persistedUiState,
+      tourProgress,
+      buildCurrentUiStatePayload,
+      isHydrating
+    ],
+    350
+  );
   const appDeltaVirtualDraftReport = useDeltaVirtualDraftReport({
     flightBoard,
     isDevToolsEnabled,
