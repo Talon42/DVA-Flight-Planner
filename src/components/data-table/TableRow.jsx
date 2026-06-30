@@ -77,11 +77,18 @@ export default function TableRow({
         const overflowClassName = column.allowOverflow ? "overflow-visible" : "overflow-hidden";
 
         return (
-          <div key={column.key} className="min-w-0 self-stretch">
+          <div
+            key={column.key}
+            className={cn(
+              "flex min-w-0 self-stretch items-center px-3 bp-1024:px-2",
+              overflowClassName,
+              alignClassName
+            )}
+          >
             <button
               type="button"
               className={cn(
-                "block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[color:var(--table-row-text,var(--text-primary))] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)] dark:text-[rgb(255,255,255)]",
+                "inline-flex max-w-full appearance-none border-0 bg-transparent p-0 text-left text-[color:var(--table-row-text,var(--text-primary))] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)] dark:text-[rgb(255,255,255)]",
                 column.onCellClick ? "cursor-pointer" : "cursor-default",
                 bodyMdTextClassName
               )}
@@ -94,23 +101,15 @@ export default function TableRow({
                     : undefined
               }
               aria-label={column.cellAriaLabel?.(row, column)}
+              title={column.cellTitle?.(row, column)}
             >
               <span
                 className={cn(
-                  "flex h-full min-h-0 w-full items-center px-3 leading-none bp-1024:px-2",
-                  overflowClassName,
-                  alignClassName
+                  "inline-flex min-w-0 max-w-full items-center leading-none",
+                  column.onCellClick && selectableCellClassName
                 )}
               >
-                <span
-                  className={cn(
-                    "inline-flex min-w-0 max-w-full items-center leading-none",
-                    column.onCellClick && selectableCellClassName
-                  )}
-                  title={column.cellTitle?.(row, column)}
-                >
-                  {normalizeCellContent(content, column.truncate)}
-                </span>
+                {normalizeCellContent(content, column.truncate)}
               </span>
             </button>
           </div>
