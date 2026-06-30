@@ -1,6 +1,7 @@
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName, bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
+import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import planeLight from "../../data/images/plane_light.png";
 import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
 
@@ -23,6 +24,12 @@ function HeroValue({ value, className = "", title = "" }) {
       {value || "N/A"}
     </div>
   );
+}
+
+// Resolves the airport hover label from the shared airport catalog so the hero keeps showing codes.
+function getAirportActualName(airportCode) {
+  const airport = getAirportByIcao(airportCode);
+  return String(airport?.actualName || airport?.name || airportCode || "").trim();
 }
 
 function HeroAirlineMark({ flight }) {
@@ -172,7 +179,7 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
           <div className="flex min-w-0 items-center justify-between gap-2 bp-1920:gap-3">
             <HeroValue
               value={flight.departure}
-              title={flight.departure}
+              title={getAirportActualName(flight.departure)}
               className="truncate text-[clamp(0.94rem,1.76vw,1.39rem)] bp-1400:text-[clamp(1.25rem,2.35vw,1.85rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
             />
             <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 bp-1920:gap-3">
@@ -187,7 +194,7 @@ export default function LogbookHeroCard({ selectedLogbookFlight = null }) {
             </div>
             <HeroValue
               value={flight.arrival}
-              title={flight.arrival}
+              title={getAirportActualName(flight.arrival)}
               className="truncate text-right text-[clamp(0.94rem,1.76vw,1.39rem)] bp-1400:text-[clamp(1.25rem,2.35vw,1.85rem)] bp-1920:text-[clamp(1.65rem,3vw,2.15rem)]"
             />
           </div>

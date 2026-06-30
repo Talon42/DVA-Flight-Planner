@@ -8,6 +8,7 @@ import {
   formatLogbookSignedAviationNumber,
   formatLogbookTimestamp
 } from "../../domain/logbook/logbook.model.js";
+import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import LogbookHeroCard from "./LogbookHeroCard.jsx";
 
 function formatDetailValue(value) {
@@ -84,6 +85,23 @@ function LandingGradeText({ grade }) {
 
 function getNestedValue(primaryValue, fallbackValue) {
   return primaryValue ?? fallbackValue;
+}
+
+// Resolves the airport's official display name from the shared airport catalog.
+function getAirportActualName(airportRef) {
+  const airportCode =
+    typeof airportRef === "string"
+      ? airportRef
+      : String(airportRef?.icao || airportRef?.iata || "").trim().toUpperCase();
+  const airport = getAirportByIcao(airportCode);
+
+  return String(
+    airport?.actualName ||
+      airport?.name ||
+      airportRef?.actualName ||
+      airportRef?.name ||
+      airportCode
+  ).trim();
 }
 
 // Keeps passenger counts numeric so the summary card does not show malformed values.
@@ -190,7 +208,11 @@ export default function LogbookDetailsCard({
   ];
 
   const departureItems = [
-    { label: "Departure Airport", value: entry.airportD?.name, title: entry.airportD?.name },
+    {
+      label: "Departure Airport",
+      value: getAirportActualName(entry.airportD),
+      title: getAirportActualName(entry.airportD)
+    },
     {
       label: "Runway",
       value: buildRunwayDisplay(departureRunway, departureRunwayLength) || departureRunway,
@@ -214,7 +236,11 @@ export default function LogbookDetailsCard({
   ];
 
   const arrivalItems = [
-    { label: "Arrival Airport", value: entry.airportA?.name, title: entry.airportA?.name },
+    {
+      label: "Arrival Airport",
+      value: getAirportActualName(entry.airportA),
+      title: getAirportActualName(entry.airportA)
+    },
     {
       label: "Runway",
       value: buildRunwayDisplay(arrivalRunway, arrivalRunwayLength) || arrivalRunway,
