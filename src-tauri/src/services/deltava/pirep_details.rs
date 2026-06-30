@@ -262,6 +262,7 @@ fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
             .map(|cell| normalize_cell_text(&cell.text().collect::<String>()))
             .unwrap_or_default();
         let normalized_label = normalize_label_text(&label);
+        // Only match the current DVA labels here; the legacy bare "Payload" row should stay ignored.
         let passengers_carried_source = extract_row_value(&label, &value, &row_text, "passengers carried");
         let payload_weight_source = extract_row_value(&label, &value, &row_text, "payload weight");
 
@@ -525,6 +526,19 @@ mod tests {
         assert_eq!(parsed.payload_passengers, "121");
         assert_eq!(parsed.payload_cargo, "17,645 lbs");
         assert_eq!(parsed.departure_route, "ABC");
+    }
+
+    #[test]
+    fn bare_payload_label_is_ignored() {
+        let parsed = parse_pirep_detail_html(
+            "<html><body><table><tr><td>Passengers Carried</td><td>121 passengers (78.57% full)</td></tr><tr><td>Payload</td><td>163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
+        );
+
+        assert_eq!(parsed.passengers_carried_raw, "121 passengers (78.57% full)");
+        assert_eq!(parsed.payload_raw, "");
+        assert_eq!(parsed.payload_passengers, "121");
+        assert_eq!(parsed.payload_cargo, "");
+        assert_eq!(parsed.found_payload_weight, false);
     }
 
     #[test]
