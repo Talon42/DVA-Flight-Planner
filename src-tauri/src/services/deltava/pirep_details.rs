@@ -13,6 +13,22 @@ pub struct DeltaVirtualPirepDetailsRequest {
     pub pirep_id: serde_json::Value,
 }
 
+pub(crate) struct DeltaVirtualPirepDetailsClient {
+    client: reqwest::Client,
+}
+
+impl DeltaVirtualPirepDetailsClient {
+    pub(crate) fn try_new() -> Result<Self, String> {
+        Ok(Self {
+            client: build_client()?,
+        })
+    }
+
+    pub(crate) fn client(&self) -> &reqwest::Client {
+        &self.client
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeltaVirtualPirepDetailsResult {
@@ -392,13 +408,12 @@ fn log_parse_summary(parsed: &ParsedPirepDetails) {
 }
 
 pub async fn fetch_delta_virtual_pirep_details(
-    _app: tauri::AppHandle,
+    client: &reqwest::Client,
     request: DeltaVirtualPirepDetailsRequest,
 ) -> Result<DeltaVirtualPirepDetailsResult, String> {
     let (source_url, numeric_id) = resolve_pirep_url(&request)?;
     crate::append_sync_log(&format!("pirep-details:fetch-start id={}", source_url.rsplit('=').next().unwrap_or("")));
 
-    let client = build_client()?;
     let response = client
         .get(&source_url)
         .send()

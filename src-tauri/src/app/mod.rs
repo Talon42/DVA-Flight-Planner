@@ -11,7 +11,11 @@ pub(crate) use state::DeltaSyncManager;
 pub(crate) use window_state::{persist_main_window_state, restore_main_window_state};
 
 use crate::{
-    services::deltava::draft::DraftSubmitManager, services::deltava::tours::DeltaToursSyncManager,
+    services::deltava::{
+        draft::DraftSubmitManager,
+        pirep_details::DeltaVirtualPirepDetailsClient,
+        tours::DeltaToursSyncManager,
+    },
     services::simbrief::dispatch::SimBriefDispatchManager,
 };
 use tauri::{Manager, WindowEvent};
@@ -24,6 +28,9 @@ pub fn run() {
         .manage(DraftSubmitManager::default())
         .manage(SimBriefDispatchManager::default())
         .setup(|app| {
+            let pirep_details_client = DeltaVirtualPirepDetailsClient::try_new()
+                .map_err(std::io::Error::other)?;
+            app.manage(pirep_details_client);
             let app_handle = app.handle().clone();
             let _ = initialize_sync_log_path(&app_handle);
             tauri::async_runtime::spawn(async move {

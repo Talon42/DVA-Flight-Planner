@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
 import { fetchDeltaVirtualPirepDetails } from "../../services/tauri/deltaVirtual.client.js";
 
-const PIREP_DETAILS_DEBOUNCE_MS = 250;
 const EMPTY_PIREP_DETAILS = {
   id: "",
   numericId: null,
@@ -22,6 +21,7 @@ const EMPTY_PIREP_DETAILS = {
 };
 
 const pirepDetailsCache = new Map();
+const inFlightPirepDetailsRequests = new Map();
 
 function normalizeSelectedPirepId(selectedLogbookFlight) {
   const rawId =
@@ -74,34 +74,48 @@ export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true }
     setIsLoading(true);
     setError("");
 
-    const timeoutId = window.setTimeout(async () => {
-      try {
-        const fetchedDetails = await fetchDeltaVirtualPirepDetails(pirepId);
+    const inFlightRequest = inFlightPirepDetailsRequests.get(pirepId);
+    const requestPromise =
+      inFlightRequest ||
+      (async () => {
+        try {
+          const fetchedDetails = await fetchDeltaVirtualPirepDetails(pirepId);
+          const normalizedDetails = buildCachedDetails(fetchedDetails);
+          pirepDetailsCache.set(pirepId, normalizedDetails);
+          return normalizedDetails;
+        } finally {
+          inFlightPirepDetailsRequests.delete(pirepId);
+        }
+      })();
+
+    if (!inFlightRequest) {
+      inFlightPirepDetailsRequests.set(pirepId, requestPromise);
+    }
+
+    void requestPromise
+      .then((fetchedDetails) => {
         if (requestIdRef.current !== requestId) {
           return;
         }
 
-        const normalizedDetails = buildCachedDetails(fetchedDetails);
-        pirepDetailsCache.set(pirepId, normalizedDetails);
-        setDetails(normalizedDetails);
+        setDetails(fetchedDetails);
         setError("");
-      } catch {
+      })
+      .catch(() => {
         if (requestIdRef.current !== requestId) {
           return;
         }
 
         setDetails(EMPTY_PIREP_DETAILS);
         setError("PIREP details unavailable.");
-      } finally {
+      })
+      .finally(() => {
         if (requestIdRef.current === requestId) {
           setIsLoading(false);
         }
-      }
-    }, PIREP_DETAILS_DEBOUNCE_MS);
+      });
 
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    return undefined;
   }, [enabled, selectedLogbookFlight]);
 
   return {
