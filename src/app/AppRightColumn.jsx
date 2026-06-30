@@ -17,22 +17,14 @@ export default function AppRightColumn({
   filterUiVersion,
   filters,
   filterBounds,
-  logbookFilterBounds,
-  logbookFilterOptions,
-  logbookFilters,
-  selectedLogbookFlight,
-  logbookPirepDetails,
-  logbookPirepDetailsLoading,
-  logbookPirepDetailsError,
+  logbookWorkspace,
   airlines,
   airportOptions,
   geoOptions,
   equipmentOptions,
   viewportSize,
   onFilterChange,
-  onLogbookFilterChange,
   onTogglePlannerControls,
-  onResetLogbookFilters,
   onResetFilters,
   onScheduleViewChange,
   shortlist,
@@ -80,6 +72,7 @@ export default function AppRightColumn({
   onCompleteTourFlight
 }) {
   const [logbookFiltersCollapsed, setLogbookFiltersCollapsed] = useState(false);
+  const selectedLogbookFlight = logbookWorkspace?.selectedLogbookFlight || null;
 
   useEffect(() => {
     if (scheduleView === "logbook" && selectedLogbookFlight) {
@@ -146,20 +139,20 @@ export default function AppRightColumn({
         )}
       >
         <LogbookFiltersPanel
-          filters={logbookFilters}
-          filterBounds={logbookFilterBounds}
-          filterOptions={logbookFilterOptions}
+          filters={logbookWorkspace?.filters}
+          filterBounds={logbookWorkspace?.filterBounds}
+          filterOptions={logbookWorkspace?.filterOptions}
           collapsed={logbookFiltersCollapsed}
           onToggleCollapsed={() => setLogbookFiltersCollapsed((current) => !current)}
-          onFilterChange={onLogbookFilterChange}
-          onReset={onResetLogbookFilters}
+          onFilterChange={logbookWorkspace?.onFilterChange}
+          onReset={logbookWorkspace?.onResetFilters}
         />
         {logbookFiltersCollapsed ? (
           <LogbookDetailsCard
             selectedLogbookFlight={selectedLogbookFlight}
-            pirepDetails={logbookPirepDetails}
-            pirepDetailsLoading={logbookPirepDetailsLoading}
-            pirepDetailsError={logbookPirepDetailsError}
+            pirepDetails={logbookWorkspace?.pirepDetails}
+            pirepDetailsLoading={logbookWorkspace?.pirepDetailsLoading}
+            pirepDetailsError={logbookWorkspace?.pirepDetailsError}
           />
         ) : null}
       </div>

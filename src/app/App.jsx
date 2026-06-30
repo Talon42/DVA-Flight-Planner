@@ -43,8 +43,7 @@ import {
 import { useTourSelection } from "../features/tours/useTourSelection.hooks.js";
 import { useDutyScheduleBuilder } from "../features/dutySchedule/useDutyScheduleBuilder.hooks.js";
 import { useVatsimCoverage } from "../features/vatsim/useVatsimCoverage.hooks.js";
-import { useLogbook } from "../features/logbook/useLogbook.hooks.js";
-import { useLogbookPirepDetails } from "../features/logbook/useLogbookPirepDetails.hooks.js";
+import { useLogbookWorkspace } from "../features/logbook/useLogbookWorkspace.hooks.js";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "../features/schedule/schedule.constants.js";
 import { DEFAULT_DUTY_FILTERS } from "../logic/dutySchedule/dutySchedule.constants.js";
 import { buildDefaultDutyFilters } from "../logic/dutySchedule/dutyFilters";
@@ -130,7 +129,6 @@ export default function App() {
   const [filterUiVersion, setFilterUiVersion] = useState(0);
   const [vatsimRefreshVersion, setVatsimRefreshVersion] = useState(0);
   const [sort, setSort] = useState(DEFAULT_SORT);
-  const [logbookReloadVersion, setLogbookReloadVersion] = useState(0);
   const [selectedTourPath, setSelectedTourPath] = useState("");
   const [selectedAccomplishmentName, setSelectedAccomplishmentName] = useState("");
   const [isAccomplishmentSelectorCollapsed, setIsAccomplishmentSelectorCollapsed] = useState(false);
@@ -242,6 +240,7 @@ export default function App() {
     message: ""
   });
   const clearSimBriefDispatchStateRef = useRef(null);
+  const logbookSyncCompleteRef = useRef(() => {});
   const isDesktopAddonScanAvailable = isTauriRuntime();
   const appDevTools = useAppDevTools({
     isDesktopAddonScanAvailable,
@@ -479,17 +478,6 @@ export default function App() {
     setTourProgress
   });
   const isDesktopSimBriefAvailable = isDesktopAddonScanAvailable;
-  const logbook = useLogbook({
-    persistedUiState: restoredUiState,
-    reloadVersion: logbookReloadVersion
-  });
-  const selectedLogbookFlight = useMemo(
-    () => logbook.allRows.find((row) => row.id === logbook.selectedRowId) || null,
-    [logbook.allRows, logbook.selectedRowId]
-  );
-  const logbookPirepDetails = useLogbookPirepDetails(selectedLogbookFlight, {
-    enabled: scheduleView === "logbook"
-  });
   // Keep the derived flight list stable so downstream hooks can read it safely.
   const scheduleFlights = useMemo(() => schedule?.flights || [], [schedule]);
   const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
@@ -624,9 +612,7 @@ export default function App() {
     selectedTourPath,
     selectedAccomplishmentName,
     mapOptions,
-    logbookSubTab: logbook.selectedTab,
-    logbookFilters: logbook.filters,
-    logbookSort: logbook.sort,
+    ...logbookWorkspace.persistedUiState,
     tourProgress
   };
   const handleToggleAccomplishmentSelectorCollapsed = useCallback((nextCollapsed) => {
@@ -930,9 +916,7 @@ export default function App() {
       selectedTourPath,
       selectedAccomplishmentName,
       mapOptions,
-      logbook.selectedTab,
-      logbook.filters,
-      logbook.sort,
+      logbookWorkspace.persistedUiState,
       tourProgress,
       buildCurrentUiStatePayload,
       isHydrating
@@ -1064,7 +1048,7 @@ export default function App() {
     dvaHasPassword,
     dvaLastName,
     isDevToolsEnabled,
-    onLogbookSyncComplete: () => setLogbookReloadVersion((current) => current + 1),
+    onLogbookSyncComplete: () => logbookSyncCompleteRef.current?.(),
     processImportedSchedule,
     onScheduleSyncComplete: handleVatsimScheduleSyncComplete,
     setDerivedTourProgress,
@@ -1075,6 +1059,15 @@ export default function App() {
     setLogbookAirportProgress,
     setStatusMessage
   });
+  const logbookWorkspace = useLogbookWorkspace({
+    persistedUiState: restoredUiState,
+    scheduleView,
+    viewportWidth: viewportSize.width,
+    isSyncing,
+    isRefreshingLogbook,
+    onRefreshLogbook: handleRefreshDeltaVirtualLogbook
+  });
+  logbookSyncCompleteRef.current = logbookWorkspace.handleSyncComplete;
   const appDeltaVirtualDraftReport = useDeltaVirtualDraftReport({
     flightBoard,
     isDevToolsEnabled,
@@ -1843,22 +1836,14 @@ export default function App() {
       filterUiVersion={filterUiVersion}
       filters={filters}
       filterBounds={filterBounds}
-      logbookFilters={logbook.filters}
-      logbookFilterBounds={logbook.filterBounds}
-      logbookFilterOptions={logbook.filterOptions}
-      selectedLogbookFlight={selectedLogbookFlight}
-      logbookPirepDetails={logbookPirepDetails.details}
-      logbookPirepDetailsLoading={logbookPirepDetails.isLoading}
-      logbookPirepDetailsError={logbookPirepDetails.error}
+      logbookWorkspace={logbookWorkspace.rightPanelProps}
       airlines={airlines}
       airportOptions={airportOptions}
       geoOptions={geoOptions}
       equipmentOptions={equipmentOptions}
       viewportSize={viewportSize}
       onFilterChange={handleFilterChange}
-      onLogbookFilterChange={logbook.handleFilterChange}
       onTogglePlannerControls={() => setPlannerControlsCollapsed((current) => !current)}
-      onResetLogbookFilters={logbook.handleResetFilters}
       onResetFilters={handleResetFilters}
       onScheduleViewChange={setScheduleView}
       shortlist={shortlist}
@@ -1914,24 +1899,7 @@ export default function App() {
   const appShellProps = {
     schedule,
     scheduleView,
-    logbookProps: {
-      allRows: logbook.allRows,
-      filteredRows: logbook.filteredRows,
-      sortedFilteredRows: logbook.sortedFilteredRows,
-      viewportWidth: viewportSize.width,
-      selectedTab: logbook.selectedTab,
-      sort: logbook.sort,
-      selectedRowId: logbook.selectedRowId,
-      pilotStats: logbook.pilotStats,
-      summaryStats: logbook.allRowsPilotStats,
-      isSyncing,
-      isRefreshingLogbook,
-      onRefreshLogbook: handleRefreshDeltaVirtualLogbook,
-      onSelectTab: logbook.setSelectedTab,
-      onSort: logbook.handleSort,
-      onSelectRow: logbook.handleSelectRow,
-      onActivateRow: logbook.handleSelectRow
-    },
+    logbookProps: logbookWorkspace.mainProps,
     theme,
     flightBoard,
     activeFlightBoard,
