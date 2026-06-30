@@ -39,10 +39,14 @@ function repairBoardEntryAgainstSchedule(entry, flights = []) {
   return buildBoardEntryFromFlight(repairedFlight, {
     boardEntryId: normalizedEntry.boardEntryId,
     selectedAircraft: normalizedEntry.selectedAircraft,
-    simbriefPlan: null,
+    simbriefPlan: normalizedEntry.simbriefPlan,
     draftNetwork: normalizedEntry.draftNetwork,
     draftReportId: normalizedEntry.draftReportId,
+    dvaDraftReportId: normalizedEntry.dvaDraftReportId,
     draftDeleteRequiresRegenerate: normalizedEntry.draftDeleteRequiresRegenerate,
+    isCompleted: normalizedEntry.isCompleted,
+    completedAt: normalizedEntry.completedAt,
+    completionOrder: normalizedEntry.completionOrder,
     isStale: false
   });
 }
@@ -100,8 +104,11 @@ export function useFlightBoards({
           simbriefPlan: entry.simbriefPlan,
           draftNetwork: entry.draftNetwork,
           draftReportId: entry.draftReportId,
-          isCompleted: sourceFlight.isCompleted,
-          completionOrder: sourceFlight.completionOrder
+          dvaDraftReportId: entry.dvaDraftReportId,
+          draftDeleteRequiresRegenerate: entry.draftDeleteRequiresRegenerate,
+          isCompleted: entry.isCompleted,
+          completedAt: entry.completedAt,
+          completionOrder: entry.completionOrder
         });
       }),
     [flightBoard, tourFlightsByKey]

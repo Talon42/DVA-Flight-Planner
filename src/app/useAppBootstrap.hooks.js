@@ -79,6 +79,8 @@ function reconcileBoardWithSchedule(currentBoard, nextFlights) {
         simbriefPlan: normalizedEntry.simbriefPlan,
         draftNetwork: normalizedEntry.draftNetwork,
         draftReportId: normalizedEntry.draftReportId,
+        dvaDraftReportId: normalizedEntry.dvaDraftReportId,
+        draftDeleteRequiresRegenerate: normalizedEntry.draftDeleteRequiresRegenerate,
         isStale: false,
         isCompleted: normalizedEntry.isCompleted,
         completedAt: normalizedEntry.completedAt,
