@@ -15,15 +15,11 @@ function getCellAlignmentClass(column) {
   return "justify-start text-left";
 }
 
-function normalizeCellContent(content, truncate, isClickable = false) {
+function normalizeCellContent(content, truncate) {
   if (typeof content === "string" || typeof content === "number") {
     return (
       <span
-        className={cn(
-          "block min-w-0 leading-none",
-          truncate ? "truncate" : "whitespace-nowrap",
-          isClickable && selectableCellClassName
-        )}
+        className={cn("block min-w-0 leading-none", truncate ? "truncate" : "whitespace-nowrap")}
       >
         {content}
       </span>
@@ -87,7 +83,6 @@ export default function TableRow({
               className={cn(
                 "block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[color:var(--table-row-text,var(--text-primary))] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)] dark:text-[rgb(255,255,255)]",
                 column.onCellClick ? "cursor-pointer" : "cursor-default",
-                column.onCellClick && selectableCellClassName,
                 bodyMdTextClassName
               )}
               onClick={(event) => handleCellClick(column, event)}
@@ -99,17 +94,23 @@ export default function TableRow({
                     : undefined
               }
               aria-label={column.cellAriaLabel?.(row, column)}
-              title={column.cellTitle?.(row, column)}
             >
               <span
                 className={cn(
                   "flex h-full min-h-0 w-full items-center px-3 leading-none bp-1024:px-2",
                   overflowClassName,
-                  alignClassName,
-                  column.onCellClick && selectableCellClassName
+                  alignClassName
                 )}
               >
-                {normalizeCellContent(content, column.truncate, Boolean(column.onCellClick))}
+                <span
+                  className={cn(
+                    "inline-flex min-w-0 max-w-full items-center leading-none",
+                    column.onCellClick && selectableCellClassName
+                  )}
+                  title={column.cellTitle?.(row, column)}
+                >
+                  {normalizeCellContent(content, column.truncate)}
+                </span>
               </span>
             </button>
           </div>
