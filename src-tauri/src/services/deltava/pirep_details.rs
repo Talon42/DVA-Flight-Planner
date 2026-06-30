@@ -67,7 +67,21 @@ struct ParsedPirepDetails {
 }
 
 fn normalize_text(value: &str) -> String {
-    value.split_whitespace().collect::<Vec<_>>().join(" ").trim().to_string()
+    value
+        .replace('\u{00a0}', " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .to_string()
+}
+
+fn normalize_label_text(value: &str) -> String {
+    normalize_text(value)
+        .trim()
+        .trim_end_matches(':')
+        .trim()
+        .to_lowercase()
 }
 
 fn normalize_hex_id(value: &serde_json::Value) -> Option<String> {
@@ -179,7 +193,7 @@ fn parse_payload_details(raw: &str) -> (String, String) {
         .map(|match_value| match_value.as_str().to_string())
         .unwrap_or_default();
 
-    let cargo = regex::Regex::new(r"(?i)\b(\d[\d,]*)\s*(lb|lbs)\b[^0-9\r\n]*\bbaggage\b")
+    let cargo = regex::Regex::new(r"(?i)\b(\d[\d,]*)\s*(lb|lbs)\b.*?\bbaggage\b")
         .ok()
         .and_then(|regex| regex.captures(&normalized))
         .and_then(|captures| {
@@ -196,6 +210,33 @@ fn parse_payload_details(raw: &str) -> (String, String) {
     (passengers, cargo)
 }
 
+fn extract_payload_source(label: &str, value: &str, row_text: &str) -> Option<String> {
+    let normalized_label = normalize_label_text(label);
+    let normalized_value = normalize_text(value);
+    if normalized_label == "payload" && !normalized_value.is_empty() {
+        return Some(normalized_value);
+    }
+
+    let normalized_row_text = normalize_text(row_text);
+    let lower_row_text = normalized_row_text.to_lowercase();
+    if !lower_row_text.starts_with("payload") {
+        return None;
+    }
+
+    let payload_text = normalized_row_text
+        .get("payload".len()..)
+        .unwrap_or("")
+        .trim_start_matches(|ch: char| ch == ':' || ch.is_whitespace())
+        .trim()
+        .to_string();
+
+    if payload_text.is_empty() {
+        None
+    } else {
+        Some(payload_text)
+    }
+}
+
 fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
     let document = Html::parse_document(html_text);
     let row_selector = Selector::parse("tr").expect("valid row selector");
@@ -205,43 +246,51 @@ fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
 
     for row in document.select(&row_selector) {
         let cells = row.select(&cell_selector).collect::<Vec<_>>();
-        if cells.len() < 2 {
-            continue;
-        }
+        let row_text = normalize_cell_text(&row.text().collect::<String>());
+        let label = cells
+            .first()
+            .map(|cell| normalize_cell_text(&cell.text().collect::<String>()))
+            .unwrap_or_default();
+        let value = cells
+            .get(1)
+            .map(|cell| normalize_cell_text(&cell.text().collect::<String>()))
+            .unwrap_or_default();
+        let normalized_label = normalize_label_text(&label);
+        let payload_source = extract_payload_source(&label, &value, &row_text);
 
-        let label = normalize_cell_text(&cells[0].text().collect::<String>());
-        let value = normalize_cell_text(&cells[1].text().collect::<String>());
-
-        match label.as_str() {
-            "Payload" => {
-                parsed.payload_raw = value;
-                let (payload_passengers, payload_cargo) = parse_payload_details(&parsed.payload_raw);
-                parsed.payload_passengers = payload_passengers;
-                parsed.payload_cargo = payload_cargo;
-            }
-            "Departure Route" => {
+        match normalized_label.as_str() {
+            "departure route" => {
                 parsed.departure_route = value;
                 parsed.found_departure_route = true;
             }
-            "Flight Route" => {
+            "flight route" => {
                 parsed.flight_route = value;
                 parsed.found_flight_route = true;
             }
-            "Arrival Route" => {
+            "arrival route" => {
                 parsed.arrival_route = value;
                 parsed.found_arrival_route = true;
             }
-            "Takeoff Runway" => {
+            "takeoff runway" => {
                 parsed.departure_runway_raw = value;
                 parsed.departure_runway_details = parse_runway_details(&parsed.departure_runway_raw);
                 parsed.found_takeoff_runway = true;
             }
-            "Landing Runway" => {
+            "landing runway" => {
                 parsed.arrival_runway_raw = value;
                 parsed.arrival_runway_details = parse_runway_details(&parsed.arrival_runway_raw);
                 parsed.found_landing_runway = true;
             }
             _ => {}
+        }
+
+        if parsed.payload_raw.is_empty() {
+            if let Some(payload_source) = payload_source {
+                parsed.payload_raw = payload_source;
+                let (payload_passengers, payload_cargo) = parse_payload_details(&parsed.payload_raw);
+                parsed.payload_passengers = payload_passengers;
+                parsed.payload_cargo = payload_cargo;
+            }
         }
     }
 
@@ -308,12 +357,15 @@ fn build_client() -> Result<reqwest::Client, String> {
 
 fn log_parse_summary(parsed: &ParsedPirepDetails) {
     crate::append_sync_log(&format!(
-        "pirep-details:parse-summary departureRoute={} flightRoute={} arrivalRoute={} takeoffRunway={} landingRunway={}",
+        "pirep-details:parse-summary departureRoute={} flightRoute={} arrivalRoute={} takeoffRunway={} landingRunway={} payloadFound={} payloadPassengersParsed={} payloadCargoParsed={}",
         parsed.found_departure_route,
         parsed.found_flight_route,
         parsed.found_arrival_route,
         parsed.found_takeoff_runway,
-        parsed.found_landing_runway
+        parsed.found_landing_runway,
+        !parsed.payload_raw.is_empty(),
+        !parsed.payload_passengers.is_empty(),
+        !parsed.payload_cargo.is_empty()
     ));
 }
 
@@ -421,6 +473,30 @@ mod tests {
         assert_eq!(parsed.found_arrival_route, false);
         assert_eq!(parsed.found_takeoff_runway, false);
         assert_eq!(parsed.found_landing_runway, false);
+    }
+
+    #[test]
+    fn parses_payload_label_with_colon_and_mixed_case() {
+        let parsed = parse_pirep_detail_html(
+            "<html><body><table><tr><td>pAyLoAd:</td><td>121 Passengers, 8,000 lb baggage</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
+        );
+
+        assert_eq!(parsed.payload_raw, "121 Passengers, 8,000 lb baggage");
+        assert_eq!(parsed.payload_passengers, "121");
+        assert_eq!(parsed.payload_cargo, "8,000 lbs");
+        assert_eq!(parsed.departure_route, "ABC");
+    }
+
+    #[test]
+    fn parses_payload_from_row_text_fallback() {
+        let parsed = parse_pirep_detail_html(
+            "<html><body><table><tr><td colspan=\"2\">Payload 121 Passengers, 8,000 lb baggage</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
+        );
+
+        assert_eq!(parsed.payload_raw, "121 Passengers, 8,000 lb baggage");
+        assert_eq!(parsed.payload_passengers, "121");
+        assert_eq!(parsed.payload_cargo, "8,000 lbs");
+        assert_eq!(parsed.departure_route, "ABC");
     }
 
     #[test]
