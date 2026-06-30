@@ -1,27 +1,57 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
-import { Field } from "../../components/ui/filterFields";
 import { cn } from "../../components/ui/cn";
-import { bodySmTextClassName, labelTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
+import { bodySmTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
-import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
+import LogbookPilotStatsDetailView from "./LogbookPilotStatsDetailView.jsx";
+import LogbookPilotStatsHero from "./LogbookPilotStatsHero.jsx";
+import LogbookPilotStatsSummaryPanel from "./LogbookPilotStatsSummaryPanel.jsx";
 
 const PANEL_CAPS = {
-  wideTall: 6,
-  wideShort: 5,
-  narrowTall: 5,
-  narrowShort: 4
+  wideTall: {
+    airlines: 5,
+    equipment: 5,
+    recentLandings: 5,
+    topAirports: 6,
+    routes: 5,
+    records: 5
+  },
+  wideShort: {
+    airlines: 4,
+    equipment: 4,
+    recentLandings: 4,
+    topAirports: 4,
+    routes: 4,
+    records: 0
+  },
+  narrowTall: {
+    airlines: 4,
+    equipment: 4,
+    recentLandings: 4,
+    topAirports: 4,
+    routes: 0,
+    records: 0
+  },
+  narrowShort: {
+    airlines: 3,
+    equipment: 3,
+    recentLandings: 3,
+    topAirports: 0,
+    routes: 0,
+    records: 0
+  }
 };
 
 const EMPTY_DETAIL_ROWS = Object.freeze({
   airlines: [],
   equipment: [],
   recentLandings: [],
+  topAirports: [],
   departureAirports: [],
   arrivalAirports: [],
   routes: [],
-  status: []
+  status: [],
+  records: []
 });
 
 // Measures the dashboard content area so layout mode follows the space actually available.
@@ -59,9 +89,7 @@ function useElementSize(ref) {
       const nextHeight = Math.max(0, Math.floor(node.clientHeight));
 
       setSize((current) =>
-        current.width === nextWidth && current.height === nextHeight
-          ? current
-          : { width: nextWidth, height: nextHeight }
+        current.width === nextWidth && current.height === nextHeight ? current : { width: nextWidth, height: nextHeight }
       );
     };
 
@@ -75,547 +103,140 @@ function useElementSize(ref) {
   return size;
 }
 
-// Keeps the airline identity compact while the KPI row flexes per layout mode.
-function SummaryAirlineMark({ airline, className = "" }) {
-  const logoSrc = String(airline?.airlineLogoSrc || "").trim();
-  const logoClassName = String(airline?.airlineLogoClassName || "").trim();
-  const airlineName = String(airline?.displayName || airline?.label || "").trim();
-  const airlineCode = String(airline?.airlineCode || "").trim();
-
-  if (logoSrc) {
-    return (
-      <img
-        src={logoSrc}
-        alt=""
-        aria-hidden="true"
-        className={cn("h-14 w-14 shrink-0 object-contain", logoClassName, className)}
-      />
-    );
-  }
-
-  return (
-    <div className={cn("flex h-14 w-14 shrink-0 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-heading)]", className)}>
-      <span className={cn("truncate px-1 text-center text-[0.72rem] font-semibold", labelTextClassName)}>
-        {airlineCode || (airlineName ? airlineName.slice(0, 3).toUpperCase() : "?")}
-      </span>
-    </div>
-  );
-}
-
-function formatDeltaValue(delta, unit = "", format = "number") {
-  if (!Number.isFinite(delta)) {
-    return LOGBOOK_EMPTY_VALUE;
-  }
-
-  if (format === "minutes") {
-    const hours = Math.floor(Math.abs(delta) / 60);
-    const minutes = Math.round(Math.abs(delta) % 60);
-    const sign = delta > 0 ? "+" : delta < 0 ? "-" : "";
-    return `${sign}${hours}h ${String(minutes).padStart(2, "0")}m`;
-  }
-
-  const formatter = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-    signDisplay: "always"
-  });
-
-  return `${formatter.format(delta)}${unit ? ` ${unit}` : ""}`.trim();
-}
-
-function getKpiColumns(layoutMode) {
-  if (layoutMode === "narrowTall") {
-    return "grid-cols-3";
-  }
-
-  return "grid-cols-5";
-}
-
-function buildRecentLandingPanelItems(rows) {
-  return (Array.isArray(rows) ? rows : []).map((row) => ({
-    label: `${row.flight} - ${row.date}`,
-    value: row.landingRate,
-    meta: `${row.route} - ${row.badge}`
-  }));
-}
-
-function buildCombinedAirportRows(departures, arrivals) {
-  const airportMap = new Map();
-
-  function upsertAirport(item, type) {
-    const label = String(item?.label || "").trim();
-    if (!label) {
-      return;
-    }
-
-    const current = airportMap.get(label) || {
-      label,
-      dep: 0,
-      arr: 0
-    };
-
-    current[type] += Number(item?.count || 0);
-    airportMap.set(label, current);
-  }
-
-  (Array.isArray(departures) ? departures : []).forEach((item) => upsertAirport(item, "dep"));
-  (Array.isArray(arrivals) ? arrivals : []).forEach((item) => upsertAirport(item, "arr"));
-
-  const totalUses = [...airportMap.values()].reduce((sum, item) => sum + item.dep + item.arr, 0);
-
-  return [...airportMap.values()]
-    .map((item) => ({
-      label: item.label,
-      value: String(item.dep + item.arr),
-      meta: `${item.dep} dep / ${item.arr} arr`,
-      dep: String(item.dep),
-      arr: String(item.arr),
-      percentValue:
-        totalUses > 0 ? `${Math.round(((item.dep + item.arr) / totalUses) * 1000) / 10}%` : LOGBOOK_EMPTY_VALUE
-    }))
-    .sort((left, right) => Number(right.value) - Number(left.value) || left.label.localeCompare(right.label))
-    .map((item, index) => ({
-      ...item,
-      rank: index + 1
-    }));
-}
-
-function buildPanelRowsForMode(stats, mode, records) {
-  const cap = PANEL_CAPS[mode] || PANEL_CAPS.narrowShort;
-  const airlines = (stats.rankings?.airlines || []).slice(0, cap);
-  const equipment = (stats.rankings?.equipment || []).slice(0, cap);
-  const recentLandings = buildRecentLandingPanelItems((stats.recentLandings || []).slice(0, cap));
-  const combinedAirports = buildCombinedAirportRows(
-    (stats.rankings?.departureAirports || []).slice(0, 4),
-    (stats.rankings?.arrivalAirports || []).slice(0, 4)
-  ).slice(0, mode === "wideTall" ? 6 : 4);
-  const routes = (stats.rankings?.routes || []).slice(0, mode === "wideTall" || mode === "wideShort" ? 4 : 4);
-
-  return {
-    airlines,
-    equipment,
-    recentLandings,
-    combinedAirports,
-    routes,
-    records: records || {}
-  };
-}
-
-function SummaryPanel({ title, items, onViewAll, footer = null, className = "" }) {
-  return (
-    <Panel className={cn("flex min-h-0 flex-col gap-2 overflow-hidden border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName, className)}>
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <p className={cn("m-0 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
-        {onViewAll ? (
-          <Button variant="ghost" size="sm" onClick={onViewAll}>
-            View all
-          </Button>
-        ) : null}
-      </div>
-
-      <div className="min-h-0 overflow-hidden">
-        {items?.length ? (
-          <div className="grid gap-1.5">
-            {items.map((item) => (
-              <div key={`${title}-${item.label}`} className="flex min-w-0 items-baseline justify-between gap-3 border-b border-[color:var(--line)] pb-1.5 last:border-b-0 last:pb-0">
-                <div className="min-w-0 flex-1">
-                  <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item.label}</p>
-                  {item.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodySmTextClassName)}>{item.meta}</p> : null}
-                </div>
-                <p className={cn("m-0 shrink-0 text-[var(--text-heading)]", bodySmTextClassName)}>{item.value}</p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>No data available.</p>
-        )}
-      </div>
-
-      {footer}
-    </Panel>
-  );
-}
-
-function PilotStatsHero({ summary, comparison, comparisonPeriod, layoutMode }) {
-  const airline = summary?.topAirline || null;
-  const compact = layoutMode === "wideShort" || layoutMode === "narrowShort";
-  const useComparison = comparisonPeriod !== "off" && Boolean(comparison?.deltas);
-  const deltas = comparison?.deltas || {};
-  const airlineLabel = airline?.displayName || airline?.label || "Unknown Airline";
-  const airlineCountLabel = airline?.count ?? 0;
-  const kpiCards = [
-    {
-      label: "Total Flights",
-      value: summary?.totalFlights || LOGBOOK_EMPTY_VALUE,
-      delta: useComparison ? formatDeltaValue(deltas.totalFlights?.rawValue) : "",
-      deltaStatus: deltas.totalFlights?.status
-    },
-    {
-      label: "Total Distance",
-      value: summary?.totalDistance || LOGBOOK_EMPTY_VALUE,
-      delta: useComparison ? formatDeltaValue(deltas.totalDistanceNm?.rawValue, "nm") : "",
-      deltaStatus: deltas.totalDistanceNm?.status
-    },
-    {
-      label: "Total Duration",
-      value: summary?.totalDuration || LOGBOOK_EMPTY_VALUE,
-      delta: useComparison ? formatDeltaValue(deltas.totalDurationMinutes?.rawValue, "", "minutes") : "",
-      deltaStatus: deltas.totalDurationMinutes?.status
-    },
-    {
-      label: "Total Airborne Time",
-      value: summary?.totalAirborneTime || LOGBOOK_EMPTY_VALUE,
-      delta: useComparison ? formatDeltaValue(deltas.totalAirborneMinutes?.rawValue, "", "minutes") : "",
-      deltaStatus: deltas.totalAirborneMinutes?.status
-    },
-    {
-      label: "Average Landing Rate",
-      value: summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE,
-      delta: useComparison ? formatDeltaValue(deltas.averageLandingRate?.rawValue, "fpm") : "",
-      deltaStatus: deltas.averageLandingRate?.status
-    }
-  ];
-
-  return (
-    <Panel className={cn("border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName)}>
-      <div className="grid gap-2">
-        <div className="grid gap-3 bp-1400:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
-          <div className="flex min-w-0 items-center gap-3 border-b border-[color:var(--line)] pb-3 bp-1400:border-b-0 bp-1400:border-r bp-1400:pr-3 bp-1400:pb-0">
-            <SummaryAirlineMark airline={airline} />
-            <div className="min-w-0">
-              <p className="m-0 truncate text-[1.05rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)] bp-1400:text-[1.15rem]">
-                {airlineLabel}
-              </p>
-              <p className="m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                Most flown airline
-              </p>
-              <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>{`${airlineCountLabel} flights`}</p>
-            </div>
-          </div>
-
-          <div className={cn("grid min-w-0 gap-2", getKpiColumns(layoutMode))}>
-            {kpiCards.map((card) => (
-              <div
-                key={card.label}
-                className={cn(
-                  "grid min-w-0 gap-0.5 border border-[color:var(--line)] bg-[var(--surface-raised)]",
-                  compact ? "p-1.5" : "p-2"
-                )}
-              >
-                <p className="m-0 truncate text-[0.53rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                  {card.label}
-                </p>
-                <p className={cn("m-0 truncate text-[var(--text-heading)]", compact ? "text-[0.9rem] font-semibold leading-[1.05]" : sectionTitleTextClassName)}>
-                  {card.value}
-                </p>
-                {card.delta ? (
-                  <p
-                    className={cn(
-                      "m-0 truncate text-[0.68rem] font-medium",
-                      card.deltaStatus === "positive"
-                        ? "text-[#126835] dark:text-[#7FD18B]"
-                        : card.deltaStatus === "negative"
-                          ? "text-[var(--delta-red)]"
-                          : "text-[var(--text-muted)]"
-                    )}
-                  >
-                    {card.delta}
-                  </p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {layoutMode === "wideTall" && useComparison ? (
-          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
-            Comparing against {comparison?.periodLabel || "the selected period"}.
-          </p>
-        ) : null}
-      </div>
-    </Panel>
-  );
-}
-
-function PilotStatsDetailView({
-  detailView,
-  detailRows,
-  comparisonPeriodLabel,
-  comparisonEnabled,
-  onClose
-}) {
-  const [searchValue, setSearchValue] = useState("");
-  const [sortKey, setSortKey] = useState("rank");
-  const [sortDirection, setSortDirection] = useState("asc");
-
-  useEffect(() => {
-    setSearchValue("");
-    setSortKey(detailView === "recent-landings" ? "date" : "rank");
-    setSortDirection(detailView === "recent-landings" ? "desc" : "asc");
-  }, [detailView]);
-
-  const config = useMemo(() => {
-    switch (detailView) {
-      case "equipment":
-        return {
-          title: "All Equipment",
-          rows: detailRows.equipment || [],
-          columns: [
-            { key: "rank", label: "Rank" },
-            { key: "label", label: "Equipment" },
-            { key: "value", label: "Flights" },
-            { key: "percentValue", label: "% of Total" }
-          ]
-        };
-      case "recent-landings":
-        return {
-          title: "Recent Landings",
-          rows: detailRows.recentLandings || [],
-          columns: [
-            { key: "date", label: "Date" },
-            { key: "flight", label: "Flight" },
-            { key: "airline", label: "Airline" },
-            { key: "route", label: "Route" },
-            { key: "equipment", label: "Equipment" },
-            { key: "landingRate", label: "Landing Rate" },
-            { key: "badge", label: "Badge" }
-          ]
-        };
-      case "top-airports":
-        return {
-          title: "Top Airports",
-          rows: detailRows.topAirports || [],
-          columns: [
-            { key: "rank", label: "Rank" },
-            { key: "label", label: "Airport" },
-            { key: "value", label: "Total" },
-            { key: "dep", label: "DEP" },
-            { key: "arr", label: "ARR" },
-            { key: "percentValue", label: "% of Total" }
-          ]
-        };
-      case "routes":
-        return {
-          title: "All Routes",
-          rows: detailRows.routes || [],
-          columns: [
-            { key: "rank", label: "Rank" },
-            { key: "label", label: "Route" },
-            { key: "value", label: "Flights" },
-            { key: "percentValue", label: "% of Total" }
-          ]
-        };
-      case "records":
-        return {
-          title: "Records Snapshot",
-          rows: detailRows.records || [],
-          columns: [
-            { key: "label", label: "Record" },
-            { key: "value", label: "Value" },
-            { key: "meta", label: "Detail" }
-          ]
-        };
-      case "departure-airports":
-        return {
-          title: "All Departure Airports",
-          rows: detailRows.departureAirports || [],
-          columns: [
-            { key: "rank", label: "Rank" },
-            { key: "label", label: "Airport" },
-            { key: "value", label: "Departures" },
-            { key: "percentValue", label: "% of Total" }
-          ]
-        };
-      case "arrival-airports":
-        return {
-          title: "All Arrival Airports",
-          rows: detailRows.arrivalAirports || [],
-          columns: [
-            { key: "rank", label: "Rank" },
-            { key: "label", label: "Airport" },
-            { key: "value", label: "Arrivals" },
-            { key: "percentValue", label: "% of Total" }
-          ]
-        };
-      case "airlines":
-      default:
-        return {
-          title: "All Airlines",
-          rows: detailRows.airlines || [],
-          columns: [
-            { key: "rank", label: "Rank" },
-            { key: "label", label: "Airline" },
-            { key: "value", label: "Flights" },
-            { key: "percentValue", label: "% of Total" }
-          ]
-        };
-    }
-  }, [detailRows, detailView]);
-
-  const filteredRows = useMemo(() => {
-    const rows = Array.isArray(config.rows) ? config.rows : [];
-    const query = searchValue.trim().toLowerCase();
-    const searchedRows = query
-      ? rows.filter((row) =>
-          Object.values(row)
-            .filter(Boolean)
-            .some((value) => String(value).toLowerCase().includes(query))
-        )
-      : rows;
-
-    return [...searchedRows].sort((left, right) => {
-      const leftValue = String(left?.[sortKey] ?? "");
-      const rightValue = String(right?.[sortKey] ?? "");
-      const leftNumber = Number(leftValue.replace(/,/g, ""));
-      const rightNumber = Number(rightValue.replace(/,/g, ""));
-      const isNumericLeft = Number.isFinite(leftNumber) && leftValue !== "";
-      const isNumericRight = Number.isFinite(rightNumber) && rightValue !== "";
-      const direction = sortDirection === "asc" ? 1 : -1;
-
-      if (isNumericLeft && isNumericRight) {
-        return (leftNumber - rightNumber) * direction;
-      }
-
-      return leftValue.localeCompare(rightValue) * direction;
-    });
-  }, [config.rows, searchValue, sortDirection, sortKey]);
-
-  function handleSort(columnKey) {
-    setSortKey((current) => {
-      if (current === columnKey) {
-        setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
-        return current;
-      }
-
-      setSortDirection("asc");
-      return columnKey;
-    });
-  }
-
-  return (
-    <Panel className={cn("flex min-h-0 flex-1 flex-col gap-3 overflow-hidden border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName)}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          &lt; Pilot Stats
-        </Button>
-
-        <div className="min-w-0">
-          <p className={cn("m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>{config.title}</p>
-          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
-            {comparisonEnabled ? `Comparison: ${comparisonPeriodLabel}` : "Comparison off"}
-          </p>
-        </div>
-
-        <Field label="Search" className="min-w-[16rem] max-w-full">
-          <input
-            className="min-h-[var(--planner-control-box-min-height)] rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-[var(--text-primary)] outline-none"
-            value={searchValue}
-            onChange={(event) => setSearchValue(event.target.value)}
-            placeholder="Filter rows"
-          />
-        </Field>
-      </div>
-
-      <div className="app-scrollbar min-h-0 flex-1 overflow-auto">
-        <table className="min-w-full border-collapse">
-          <thead>
-            <tr className="border-b border-[color:var(--line)]">
-              {config.columns.map((column) => (
-                <th key={column.key} className="px-3 py-2 text-left">
-                  <button
-                    type="button"
-                    className={cn(
-                      "m-0 inline-flex items-center gap-1 rounded-none bg-transparent text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] hover:text-[var(--text-heading)]",
-                      column.key === sortKey && "text-[var(--text-heading)]"
-                    )}
-                    onClick={() => handleSort(column.key)}
-                  >
-                    {column.label}
-                    {column.key === sortKey ? (sortDirection === "asc" ? " ^" : " v") : null}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.length ? (
-              filteredRows.map((row) => (
-                <tr key={row.id || `${row.label}-${row.rank}`} className="border-b border-[color:var(--line)] last:border-b-0">
-                  {config.columns.map((column) => (
-                    <td key={column.key} className="px-3 py-2 align-top text-[var(--text-primary)] dark:text-white">
-                      {row[column.key] ?? LOGBOOK_EMPTY_VALUE}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={config.columns.length} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                  No matching rows.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Panel>
-  );
-}
-
 function buildPanelGrid(stats, mode, onViewAll) {
-  const rows = buildPanelRowsForMode(stats, mode, stats.records);
+  const caps = PANEL_CAPS[mode] || PANEL_CAPS.narrowShort;
+  const rankings = stats?.rankings || {};
+  const detailRows = stats?.detailRows || EMPTY_DETAIL_ROWS;
+  const summaryRows = stats?.records?.summaryRows || [];
 
-  if (mode === "wideTall") {
-    return (
-      <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden bp-1400:grid-cols-3">
-        <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
-        <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
-        <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
-        <SummaryPanel title="Top Airports" items={rows.combinedAirports} onViewAll={() => onViewAll("top-airports")} />
-        <SummaryPanel title="Favorite Routes" items={rows.routes} onViewAll={() => onViewAll("routes")} />
-        <SummaryPanel
-          title="Records Snapshot"
-          items={[
-            rows.records.bestLanding ? { label: "Best Landing", value: rows.records.bestLanding.value, meta: rows.records.bestLanding.label } : null,
-            rows.records.worstLanding ? { label: "Worst Landing", value: rows.records.worstLanding.value, meta: rows.records.worstLanding.label } : null,
-            rows.records.longestFlight ? { label: "Longest Flight", value: rows.records.longestFlight.value, meta: rows.records.longestFlight.label } : null,
-            rows.records.shortestFlight ? { label: "Shortest Flight", value: rows.records.shortestFlight.value, meta: rows.records.shortestFlight.label } : null,
-            rows.records.busiestMonth ? { label: "Busiest Month", value: rows.records.busiestMonth.value, meta: rows.records.busiestMonth.label } : null
-          ].filter(Boolean)}
-          onViewAll={() => onViewAll("records")}
-        />
-      </div>
-    );
-  }
+  const airlineItems = (rankings.airlines || detailRows.airlines || []).slice(0, caps.airlines);
+  const equipmentItems = (rankings.equipment || detailRows.equipment || []).slice(0, caps.equipment);
+  const recentLandingItems = (stats?.recentLandings || detailRows.recentLandings || []).slice(0, caps.recentLandings);
+  const topAirportItems = (rankings.topAirports || detailRows.topAirports || []).slice(0, caps.topAirports);
+  const routeItems = (rankings.routes || detailRows.routes || []).slice(0, caps.routes);
+  const recordItems = summaryRows.slice(0, caps.records);
 
-  if (mode === "wideShort") {
-    return (
-      <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden bp-1400:grid-cols-3">
-        <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
-        <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
-        <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
-        <SummaryPanel title="Top Airports" items={rows.combinedAirports} onViewAll={() => onViewAll("top-airports")} />
-        <SummaryPanel title="Favorite Routes" items={rows.routes} onViewAll={() => onViewAll("routes")} />
-      </div>
-    );
-  }
-
-  if (mode === "narrowTall") {
-    return (
-      <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden bp-1024:grid-cols-2">
-        <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
-        <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
-        <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
-        <SummaryPanel title="Top Airports" items={rows.combinedAirports} onViewAll={() => onViewAll("top-airports")} />
-      </div>
-    );
-  }
+  const showRecords = mode === "wideTall" && recordItems.length > 0;
 
   return (
-    <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden bp-1024:grid-cols-3">
-      <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
-      <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
-      <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden">
+      {mode === "wideTall" || mode === "wideShort" ? (
+        <>
+          <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden grid-cols-3">
+            <LogbookPilotStatsSummaryPanel
+              title="Flights by Airline"
+              items={airlineItems}
+              onViewAll={airlineItems.length ? () => onViewAll("airlines") : null}
+              variant="ranking"
+              maxRows={caps.airlines}
+            />
+            <LogbookPilotStatsSummaryPanel
+              title="Flights by Equipment"
+              items={equipmentItems}
+              onViewAll={equipmentItems.length ? () => onViewAll("equipment") : null}
+              variant="ranking"
+              maxRows={caps.equipment}
+            />
+            <LogbookPilotStatsSummaryPanel
+              title="Recent Landings"
+              items={recentLandingItems}
+              onViewAll={recentLandingItems.length ? () => onViewAll("recent-landings") : null}
+              variant="landing"
+              maxRows={caps.recentLandings}
+            />
+          </div>
+
+          <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden grid-cols-2">
+            <LogbookPilotStatsSummaryPanel
+              title="Top Airports"
+              items={topAirportItems}
+              onViewAll={topAirportItems.length ? () => onViewAll("top-airports") : null}
+              variant="airport"
+              maxRows={caps.topAirports}
+            />
+            <LogbookPilotStatsSummaryPanel
+              title="Favorite Routes"
+              items={routeItems}
+              onViewAll={routeItems.length ? () => onViewAll("routes") : null}
+              variant="ranking"
+              maxRows={caps.routes}
+            />
+          </div>
+        </>
+      ) : mode === "narrowTall" ? (
+        <>
+          <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden grid-cols-2">
+            <LogbookPilotStatsSummaryPanel
+              title="Flights by Airline"
+              items={airlineItems}
+              onViewAll={airlineItems.length ? () => onViewAll("airlines") : null}
+              variant="ranking"
+              maxRows={caps.airlines}
+            />
+            <LogbookPilotStatsSummaryPanel
+              title="Flights by Equipment"
+              items={equipmentItems}
+              onViewAll={equipmentItems.length ? () => onViewAll("equipment") : null}
+              variant="ranking"
+              maxRows={caps.equipment}
+            />
+          </div>
+
+          <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden grid-cols-2">
+            <LogbookPilotStatsSummaryPanel
+              title="Recent Landings"
+              items={recentLandingItems}
+              onViewAll={recentLandingItems.length ? () => onViewAll("recent-landings") : null}
+              variant="landing"
+              maxRows={caps.recentLandings}
+            />
+            <LogbookPilotStatsSummaryPanel
+              title="Top Airports"
+              items={topAirportItems}
+              onViewAll={topAirportItems.length ? () => onViewAll("top-airports") : null}
+              variant="airport"
+              maxRows={caps.topAirports}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden grid-cols-3">
+          <LogbookPilotStatsSummaryPanel
+            title="Flights by Airline"
+            items={airlineItems}
+            onViewAll={airlineItems.length ? () => onViewAll("airlines") : null}
+            variant="ranking"
+            maxRows={caps.airlines}
+          />
+          <LogbookPilotStatsSummaryPanel
+            title="Flights by Equipment"
+            items={equipmentItems}
+            onViewAll={equipmentItems.length ? () => onViewAll("equipment") : null}
+            variant="ranking"
+            maxRows={caps.equipment}
+          />
+          <LogbookPilotStatsSummaryPanel
+            title="Recent Landings"
+            items={recentLandingItems}
+            onViewAll={recentLandingItems.length ? () => onViewAll("recent-landings") : null}
+            variant="landing"
+            maxRows={caps.recentLandings}
+          />
+        </div>
+      )}
+
+      {showRecords ? (
+        <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden">
+          <LogbookPilotStatsSummaryPanel
+            title="Records Snapshot"
+            items={recordItems}
+            onViewAll={recordItems.length ? () => onViewAll("records") : null}
+            variant="records"
+            maxRows={caps.records}
+            className="min-h-0"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -629,70 +250,19 @@ export default function LogbookPilotStats({
   onPilotStatsDetailViewChange
 }) {
   const rootRef = useRef(null);
-  const summary = summaryStats?.summary || null;
-  const comparisons = summaryStats?.comparisons || null;
-  const detailRows = useMemo(
-    () => summaryStats?.detailRows ?? EMPTY_DETAIL_ROWS,
-    [summaryStats?.detailRows]
-  );
-  const records = useMemo(
-    () => summaryStats?.records ?? stats.records ?? {},
-    [stats.records, summaryStats?.records]
-  );
+  const displayStats = summaryStats || stats || {};
+  const summary = displayStats.summary || null;
+  const comparisons = displayStats.comparisons || null;
+  const detailRows = useMemo(() => displayStats.detailRows || EMPTY_DETAIL_ROWS, [displayStats.detailRows]);
   const measuredSize = useElementSize(rootRef);
   const layoutMode = usePilotStatsLayoutMode(measuredSize);
   const comparisonEnabled = pilotStatsComparisonPeriod !== "off";
-
-  const detailRowsWithCombinedAirports = useMemo(() => {
-    const departures = Array.isArray(detailRows.departureAirports) ? detailRows.departureAirports : [];
-    const arrivals = Array.isArray(detailRows.arrivalAirports) ? detailRows.arrivalAirports : [];
-    const airportMap = new Map();
-
-    for (const item of departures) {
-      airportMap.set(String(item.label || "").trim(), {
-        label: String(item.label || "").trim(),
-        dep: Number(item.count || 0),
-        arr: 0,
-        value: Number(item.count || 0)
-      });
-    }
-
-    for (const item of arrivals) {
-      const label = String(item.label || "").trim();
-      const current = airportMap.get(label) || { label, dep: 0, arr: 0, value: 0 };
-      current.arr += Number(item.count || 0);
-      current.value = current.dep + current.arr;
-      airportMap.set(label, current);
-    }
-
-    const totalUses = [...airportMap.values()].reduce((sum, item) => sum + item.value, 0);
-
-    return {
-      ...detailRows,
-      topAirports: [...airportMap.values()]
-        .map((item) => ({
-          label: item.label,
-          value: String(item.value),
-          dep: String(item.dep),
-          arr: String(item.arr),
-          percentValue: totalUses > 0 ? `${Math.round((item.value / totalUses) * 1000) / 10}%` : LOGBOOK_EMPTY_VALUE
-        }))
-        .sort((left, right) => Number(right.value) - Number(left.value) || left.label.localeCompare(right.label)),
-      records: [
-        records.bestLanding ? { label: "Best Landing", value: records.bestLanding.value, meta: records.bestLanding.label } : null,
-        records.worstLanding ? { label: "Worst Landing", value: records.worstLanding.value, meta: records.worstLanding.label } : null,
-        records.longestFlight ? { label: "Longest Flight", value: records.longestFlight.value, meta: records.longestFlight.label } : null,
-        records.shortestFlight ? { label: "Shortest Flight", value: records.shortestFlight.value, meta: records.shortestFlight.label } : null,
-        records.busiestMonth ? { label: "Busiest Month", value: records.busiestMonth.value, meta: records.busiestMonth.label } : null
-      ].filter(Boolean)
-    };
-  }, [detailRows, records]);
 
   return (
     <div ref={rootRef} className="logbook-pilot-stats flex h-full min-h-0 flex-col gap-3 overflow-hidden px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
       {summary ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-          <PilotStatsHero
+          <LogbookPilotStatsHero
             summary={summary}
             comparison={comparisons}
             comparisonPeriod={pilotStatsComparisonPeriod}
@@ -701,9 +271,9 @@ export default function LogbookPilotStats({
 
           {pilotStatsDetailView ? (
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              <PilotStatsDetailView
+              <LogbookPilotStatsDetailView
                 detailView={pilotStatsDetailView}
-                detailRows={detailRowsWithCombinedAirports}
+                detailRows={detailRows}
                 comparisonPeriodLabel={comparisons?.periodLabel || "Last 90 Days"}
                 comparisonEnabled={comparisonEnabled}
                 onClose={() => onPilotStatsDetailViewChange?.(null)}
@@ -711,11 +281,7 @@ export default function LogbookPilotStats({
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              {buildPanelGrid(
-                { ...stats, records },
-                layoutMode,
-                (viewName) => onPilotStatsDetailViewChange?.(viewName)
-              )}
+              {buildPanelGrid(displayStats, layoutMode, (viewName) => onPilotStatsDetailViewChange?.(viewName))}
             </div>
           )}
         </div>

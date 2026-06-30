@@ -197,6 +197,55 @@ function buildRankingItems(counterMap, { totalCount = 0, rowMap = null, labelBui
   }));
 }
 
+function buildCombinedAirportRows(departureCounts, arrivalCounts) {
+  const airportMap = new Map();
+
+  function upsertAirport(label, type, count) {
+    const normalizedLabel = String(label || "").trim();
+    if (!normalizedLabel) {
+      return;
+    }
+
+    const current = airportMap.get(normalizedLabel) || {
+      label: normalizedLabel,
+      dep: 0,
+      arr: 0
+    };
+
+    current[type] += Number(count || 0);
+    airportMap.set(normalizedLabel, current);
+  }
+
+  for (const [label, count] of departureCounts.entries()) {
+    upsertAirport(label, "dep", count);
+  }
+
+  for (const [label, count] of arrivalCounts.entries()) {
+    upsertAirport(label, "arr", count);
+  }
+
+  const totalUsesAllAirports = [...airportMap.values()].reduce((sum, item) => sum + item.dep + item.arr, 0);
+
+  return [...airportMap.values()]
+    .map((item) => {
+      const totalUses = item.dep + item.arr;
+      return {
+        label: item.label,
+        value: formatNumber(totalUses),
+        meta: `${formatNumber(item.dep)} dep / ${formatNumber(item.arr)} arr`,
+        dep: formatNumber(item.dep),
+        arr: formatNumber(item.arr),
+        percentValue: formatPercent(totalUses, totalUsesAllAirports),
+        totalUses
+      };
+    })
+    .sort((left, right) => right.totalUses - left.totalUses || left.label.localeCompare(right.label))
+    .map((item, index) => ({
+      rank: index + 1,
+      ...item
+    }));
+}
+
 function createPeriodConfig(periodKey, anchorDate) {
   if (!anchorDate) {
     return null;
@@ -403,15 +452,11 @@ function buildRecordSummary(rows) {
   const activeRows = Array.isArray(rows) ? rows : [];
   const landingRows = activeRows.filter((row) => Number.isFinite(row.landingRate));
   const bestLandingRate =
-    landingRows.length > 0
-      ? [...landingRows].sort(
-          (left, right) =>
-            Math.abs(left.landingRate + 250) - Math.abs(right.landingRate + 250) ||
-            right.dateSortKey - left.dateSortKey
-        )[0]
+      landingRows.length > 0
+      ? [...landingRows].sort((left, right) => right.landingRate - left.landingRate || right.dateSortKey - left.dateSortKey)[0]
       : null;
   const worstLandingRate =
-    landingRows.length > 0
+      landingRows.length > 0
       ? [...landingRows].sort(
           (left, right) => left.landingRate - right.landingRate || right.dateSortKey - left.dateSortKey
         )[0]
@@ -474,7 +519,49 @@ function buildRecordSummary(rows) {
           value: formatNumber(busiestMonthCount),
           meta: "Flights"
         }
-      : null
+      : null,
+    summaryRows: [
+      bestLandingRate
+        ? {
+            recordType: "best-landing",
+            label: "Best Landing",
+            value: bestLandingRate.landingRateDisplay,
+            meta: `${bestLandingRate.compactFlightLabel} - ${bestLandingRate.dateDisplay}`
+          }
+        : null,
+      worstLandingRate
+        ? {
+            recordType: "worst-landing",
+            label: "Worst Landing",
+            value: worstLandingRate.landingRateDisplay,
+            meta: `${worstLandingRate.compactFlightLabel} - ${worstLandingRate.dateDisplay}`
+          }
+        : null,
+      longestFlight
+        ? {
+            recordType: "longest-flight",
+            label: "Longest Flight",
+            value: longestFlight.distanceDisplay,
+            meta: `${longestFlight.compactFlightLabel} - ${longestFlight.dateDisplay}`
+          }
+        : null,
+      shortestFlight
+        ? {
+            recordType: "shortest-flight",
+            label: "Shortest Flight",
+            value: shortestFlight.distanceDisplay,
+            meta: `${shortestFlight.compactFlightLabel} - ${shortestFlight.dateDisplay}`
+          }
+        : null,
+      busiestMonthKey
+        ? {
+            recordType: "busiest-month",
+            label: "Busiest Month",
+            value: formatNumber(busiestMonthCount),
+            meta: buildMonthLabel(busiestMonthKey)
+          }
+        : null
+    ].filter(Boolean)
   };
 }
 
@@ -534,11 +621,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
       : null;
   const bestLandingRate =
     landingRows.length > 0
-      ? [...landingRows].sort(
-          (left, right) =>
-            Math.abs(left.landingRate + 250) - Math.abs(right.landingRate + 250) ||
-            right.dateSortKey - left.dateSortKey
-        )[0]
+      ? [...landingRows].sort((left, right) => right.landingRate - left.landingRate || right.dateSortKey - left.dateSortKey)[0]
       : null;
   const worstLandingRate =
     landingRows.length > 0
@@ -547,6 +630,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
         )[0]
       : null;
   const topAirline = selectTopCountEntry(airlineCounts, airlineFirstSeenOrder, airlineRowsByKey);
+  const records = buildRecordSummary(activeRows);
   const comparisonPeriod = String(options?.comparisonPeriod || "last-90-days").trim() || "last-90-days";
   const comparison = buildComparisonBundle(activeRows, comparisonPeriod);
 
@@ -606,11 +690,12 @@ export function buildLogbookPilotStats(rows, options = {}) {
         meta: landingRows.length ? `${formatNumber(landingRows.length)} recorded landings` : ""
       }
     ],
-    records: buildRecordSummary(activeRows),
+    records,
     recentLandings: buildRecentLandingRows(activeRows, 10),
     rankings: {
       airlines: buildRankingItems(airlineCounts, { totalCount: activeRows.length, rowMap: airlineRowsByKey }),
       equipment: buildRankingItems(equipmentCounts, { totalCount: activeRows.length }),
+      topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
       departureAirports: buildRankingItems(departureCounts, { totalCount: activeRows.length }),
       arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: activeRows.length }),
       routes: buildRankingItems(routeCounts, {
@@ -625,6 +710,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
       airlines: buildRankingItems(airlineCounts, { totalCount: activeRows.length, rowMap: airlineRowsByKey }),
       equipment: buildRankingItems(equipmentCounts, { totalCount: activeRows.length }),
       recentLandings: buildRecentLandingRows(activeRows, activeRows.length),
+      topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
       departureAirports: buildRankingItems(departureCounts, { totalCount: activeRows.length }),
       arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: activeRows.length }),
       routes: buildRankingItems(routeCounts, {
@@ -632,7 +718,8 @@ export function buildLogbookPilotStats(rows, options = {}) {
         rowMap: routeRowsByKey,
         labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
       }),
-      status: buildRankingItems(statusCounts, { totalCount: activeRows.length })
+      status: buildRankingItems(statusCounts, { totalCount: activeRows.length }),
+      records: records.summaryRows
     },
     layoutSafeLists: {
       airlines: buildRankingItems(airlineCounts, { totalCount: activeRows.length, rowMap: airlineRowsByKey }),

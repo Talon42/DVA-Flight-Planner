@@ -5,6 +5,7 @@ import { cardFrameClassName } from "../../components/ui/patterns";
 import { bodySmTextClassName } from "../../components/ui/typography";
 import LogbookFlightsTable from "./LogbookFlightsTable.jsx";
 import LogbookPilotStats from "./LogbookPilotStats.jsx";
+import { PILOT_STATS_COMPARISON_OPTIONS } from "./logbookPilotStats.constants.js";
 
 // Reuses the same header row for the empty and populated logbook states.
 function LogbookPanelHeader({
@@ -55,12 +56,11 @@ function LogbookPanelHeader({
                 value={pilotStatsComparisonPeriod}
                 onChange={(event) => onPilotStatsComparisonPeriodChange?.(event.target.value)}
               >
-                <option value="off">Off</option>
-                <option value="last-30-days">Last 30 Days</option>
-                <option value="last-90-days">Last 90 Days</option>
-                <option value="year-to-date">Year to Date</option>
-                <option value="previous-calendar-year">Previous Calendar Year</option>
-                <option value="all-time-average">All Time Average</option>
+                {PILOT_STATS_COMPARISON_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -113,8 +113,11 @@ export default function LogbookPanel({
             selectedTab={selectedTab}
             isRefreshDisabled={isRefreshDisabled}
             isRefreshingLogbook={isRefreshingLogbook}
+            pilotStatsComparisonPeriod={pilotStatsComparisonPeriod}
+            showPilotStatsComparison={false}
             onRefreshLogbook={onRefreshLogbook}
             onSelectTab={onSelectTab}
+            onPilotStatsComparisonPeriodChange={onPilotStatsComparisonPeriodChange}
           />
         </div>
 
