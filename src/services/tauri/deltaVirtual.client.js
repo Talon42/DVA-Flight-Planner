@@ -30,7 +30,7 @@ export async function fetchDeltaVirtualTourBriefing(briefingUrl) {
   );
 }
 
-// Loads the selected Delta Virtual PIREP detail page and returns the scraped route/runway fields.
+// Loads the selected Delta Virtual PIREP detail page and returns the scraped payload, route, and runway fields.
 export async function fetchDeltaVirtualPirepDetails(pirepId) {
   if (!isTauriRuntime()) {
     throw new Error("Delta Virtual PIREP detail requests are only available in the desktop app.");
@@ -62,6 +62,11 @@ export async function fetchDeltaVirtualPirepDetails(pirepId) {
       id: String(result?.id || normalizedPirepId).trim(),
       numericId: Number(result?.numericId ?? result?.numeric_id ?? 0) || null,
       sourceUrl: String(result?.sourceUrl ?? result?.source_url ?? "").trim(),
+      payloadPassengers: String(
+        result?.payloadPassengers ?? result?.payload_passengers ?? ""
+      ).trim(),
+      payloadCargo: String(result?.payloadCargo ?? result?.payload_cargo ?? "").trim(),
+      payloadRaw: String(result?.payloadRaw ?? result?.payload_raw ?? "").trim(),
       departureRoute: String(result?.departureRoute ?? result?.departure_route ?? "").trim(),
       flightRoute: String(result?.flightRoute ?? result?.flight_route ?? "").trim(),
       arrivalRoute: String(result?.arrivalRoute ?? result?.arrival_route ?? "").trim(),

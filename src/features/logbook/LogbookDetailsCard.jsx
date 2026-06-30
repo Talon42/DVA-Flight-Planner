@@ -114,6 +114,17 @@ function formatPassengerCount(value) {
   return Number.isInteger(numericValue) && numericValue >= 0 ? numericValue : null;
 }
 
+// Prefers the scraped payload passenger count, then falls back to the logbook entry count.
+function buildPassengerDisplay(scrapedPassengers, fallbackPassengers) {
+  const normalizedScrapedPassengers = String(scrapedPassengers || "").trim();
+  if (normalizedScrapedPassengers) {
+    return normalizedScrapedPassengers;
+  }
+
+  const fallbackPassengerCount = formatPassengerCount(fallbackPassengers);
+  return fallbackPassengerCount === null ? LOGBOOK_EMPTY_VALUE : String(fallbackPassengerCount);
+}
+
 function LogbookDetailRow({ label, value, title }) {
   const displayValue = formatDetailValue(value);
 
@@ -193,6 +204,8 @@ export default function LogbookDetailsCard({
   const departureRunwayLength = String(pirepDetails?.departureRunwayLength || "").trim();
   const arrivalRunway = String(pirepDetails?.arrivalRunway || "").trim();
   const arrivalRunwayLength = String(pirepDetails?.arrivalRunwayLength || "").trim();
+  const payloadPassengersDisplay = buildPassengerDisplay(pirepDetails?.payloadPassengers, entry.pax);
+  const payloadCargoValue = String(pirepDetails?.payloadCargo || "").trim();
   const arrivalThresholdDistanceValue = String(pirepDetails?.arrivalRunwayThresholdDistance || "").trim();
   const arrivalThresholdDistanceDisplay = buildScrapedDetailValue(arrivalThresholdDistanceValue, {
     isLoading: pirepDetailsLoading,
@@ -203,7 +216,19 @@ export default function LogbookDetailsCard({
     { label: "Flight Time", value: formatLogbookDuration(entry.airborneTime) },
     { label: "Total Time", value: formatLogbookDuration(entry.blockTime) },
     { label: "Distance", value: selectedLogbookFlight.distanceDisplay, title: selectedLogbookFlight.distanceDisplay },
-    { label: "Passengers", value: formatPassengerCount(entry.pax) },
+    {
+      label: "Passengers",
+      value: payloadPassengersDisplay,
+      title: pirepDetails?.payloadRaw || payloadPassengersDisplay
+    },
+    {
+      label: "Cargo",
+      value: buildScrapedDetailValue(payloadCargoValue, {
+        isLoading: pirepDetailsLoading,
+        hasError: hasPirepDetailsError
+      }),
+      title: payloadCargoValue || undefined
+    },
     { label: "Route", value: routeSummary, title: pirepDetails?.routeSummary || routeSummary }
   ];
 
