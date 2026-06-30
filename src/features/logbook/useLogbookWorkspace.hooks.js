@@ -43,13 +43,13 @@ export function useLogbookWorkspace({
   const mainProps = useMemo(
     () => ({
       allRows: logbook.allRows,
-      filteredRows: logbook.filteredRows,
       sortedFilteredRows: logbook.sortedFilteredRows,
       viewportWidth,
       selectedTab: logbook.selectedTab,
       sort: logbook.sort,
       selectedRowId: logbook.selectedRowId,
-      pilotStats: logbook.pilotStats,
+      // Pilot Stats intentionally use the full cached logbook so filters stay scoped to Flights.
+      pilotStats: logbook.allRowsPilotStats,
       summaryStats: logbook.allRowsPilotStats,
       isSyncing,
       isRefreshingLogbook,
@@ -64,10 +64,8 @@ export function useLogbookWorkspace({
       isSyncing,
       logbook.allRows,
       logbook.allRowsPilotStats,
-      logbook.filteredRows,
       logbook.handleSelectRow,
       logbook.handleSort,
-      logbook.pilotStats,
       logbook.selectedRowId,
       logbook.selectedTab,
       logbook.setSelectedTab,

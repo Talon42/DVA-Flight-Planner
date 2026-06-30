@@ -256,8 +256,8 @@ function PilotStatsCompactLayout({ summary, stats }) {
   );
 }
 
-// Renders the Pilot Stats summary card plus the filtered breakdown sections.
-export default function LogbookPilotStats({ rows, stats, summaryStats }) {
+// Renders the Pilot Stats summary card plus the full-logbook breakdown sections.
+export default function LogbookPilotStats({ stats, summaryStats }) {
   const summary = summaryStats?.summary || null;
 
   return (
@@ -265,14 +265,6 @@ export default function LogbookPilotStats({ rows, stats, summaryStats }) {
       <div className="flex min-h-0 flex-1 flex-col gap-3 py-0.5">
         {summary ? <PilotStatsStandardLayout summary={summary} stats={stats} /> : null}
         {summary ? <PilotStatsCompactLayout summary={summary} stats={stats} /> : null}
-
-        {rows.length ? null : (
-          <Panel className={cn("grid gap-2 p-3", cardFrameClassName)}>
-            <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
-              No logbook flights match the current filters.
-            </p>
-          </Panel>
-        )}
       </div>
     </div>
   );

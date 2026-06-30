@@ -57,7 +57,6 @@ function LogbookPanelHeader({
 // Renders the logbook workspace shell inside the main schedule panel body.
 export default function LogbookPanel({
   allRows,
-  filteredRows,
   sortedFilteredRows,
   viewportWidth = 0,
   selectedTab,
@@ -113,7 +112,7 @@ export default function LogbookPanel({
       <div className="min-h-0 w-full min-w-0 flex-1">
         {selectedTab === "pilot-stats" ? (
           <div className="app-scrollbar h-full min-h-0 overflow-y-auto overflow-x-hidden">
-            <LogbookPilotStats rows={filteredRows} stats={pilotStats} summaryStats={summaryStats} />
+            <LogbookPilotStats stats={pilotStats} summaryStats={summaryStats} />
           </div>
         ) : (
           <LogbookFlightsTable
