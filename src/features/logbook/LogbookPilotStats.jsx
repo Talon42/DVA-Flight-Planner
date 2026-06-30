@@ -6,41 +6,7 @@ import { cardFrameClassName } from "../../components/ui/patterns";
 import LogbookPilotStatsDetailView from "./LogbookPilotStatsDetailView.jsx";
 import LogbookPilotStatsHero from "./LogbookPilotStatsHero.jsx";
 import LogbookPilotStatsSummaryPanel from "./LogbookPilotStatsSummaryPanel.jsx";
-
-const PANEL_CAPS = {
-  wideTall: {
-    airlines: 5,
-    equipment: 5,
-    recentLandings: 5,
-    topAirports: 6,
-    routes: 5,
-    records: 5
-  },
-  wideShort: {
-    airlines: 4,
-    equipment: 4,
-    recentLandings: 4,
-    topAirports: 4,
-    routes: 4,
-    records: 0
-  },
-  narrowTall: {
-    airlines: 4,
-    equipment: 4,
-    recentLandings: 4,
-    topAirports: 4,
-    routes: 0,
-    records: 0
-  },
-  narrowShort: {
-    airlines: 3,
-    equipment: 3,
-    recentLandings: 3,
-    topAirports: 0,
-    routes: 0,
-    records: 0
-  }
-};
+import { PILOT_STATS_PANEL_CAPS } from "./logbookPilotStats.constants.js";
 
 const EMPTY_DETAIL_ROWS = Object.freeze({
   airlines: [],
@@ -104,7 +70,7 @@ function useElementSize(ref) {
 }
 
 function buildPanelGrid(stats, mode, onViewAll) {
-  const caps = PANEL_CAPS[mode] || PANEL_CAPS.narrowShort;
+  const caps = PILOT_STATS_PANEL_CAPS[mode] || PILOT_STATS_PANEL_CAPS.narrowShort;
   const rankings = stats?.rankings || {};
   const detailRows = stats?.detailRows || EMPTY_DETAIL_ROWS;
   const summaryRows = stats?.records?.summaryRows || [];
@@ -115,8 +81,6 @@ function buildPanelGrid(stats, mode, onViewAll) {
   const topAirportItems = (rankings.topAirports || detailRows.topAirports || []).slice(0, caps.topAirports);
   const routeItems = (rankings.routes || detailRows.routes || []).slice(0, caps.routes);
   const recordItems = summaryRows.slice(0, caps.records);
-
-  const showRecords = mode === "wideTall" && recordItems.length > 0;
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden">
@@ -146,22 +110,49 @@ function buildPanelGrid(stats, mode, onViewAll) {
             />
           </div>
 
-          <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden grid-cols-2">
-            <LogbookPilotStatsSummaryPanel
-              title="Top Airports"
-              items={topAirportItems}
-              onViewAll={topAirportItems.length ? () => onViewAll("top-airports") : null}
-              variant="airport"
-              maxRows={caps.topAirports}
-            />
-            <LogbookPilotStatsSummaryPanel
-              title="Favorite Routes"
-              items={routeItems}
-              onViewAll={routeItems.length ? () => onViewAll("routes") : null}
-              variant="ranking"
-              maxRows={caps.routes}
-            />
-          </div>
+          {mode === "wideTall" ? (
+            <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden grid-cols-3">
+              <LogbookPilotStatsSummaryPanel
+                title="Top Airports"
+                items={topAirportItems}
+                onViewAll={topAirportItems.length ? () => onViewAll("top-airports") : null}
+                variant="airport"
+                maxRows={caps.topAirports}
+              />
+              <LogbookPilotStatsSummaryPanel
+                title="Favorite Routes"
+                items={routeItems}
+                onViewAll={routeItems.length ? () => onViewAll("routes") : null}
+                variant="route"
+                maxRows={caps.routes}
+              />
+              <LogbookPilotStatsSummaryPanel
+                title="Records Snapshot"
+                items={recordItems}
+                onViewAll={recordItems.length ? () => onViewAll("records") : null}
+                variant="records"
+                maxRows={caps.records}
+                className="min-h-0"
+              />
+            </div>
+          ) : (
+            <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden grid-cols-2">
+              <LogbookPilotStatsSummaryPanel
+                title="Top Airports"
+                items={topAirportItems}
+                onViewAll={topAirportItems.length ? () => onViewAll("top-airports") : null}
+                variant="airport"
+                maxRows={caps.topAirports}
+              />
+              <LogbookPilotStatsSummaryPanel
+                title="Favorite Routes"
+                items={routeItems}
+                onViewAll={routeItems.length ? () => onViewAll("routes") : null}
+                variant="route"
+                maxRows={caps.routes}
+              />
+            </div>
+          )}
         </>
       ) : mode === "narrowTall" ? (
         <>
@@ -225,18 +216,6 @@ function buildPanelGrid(stats, mode, onViewAll) {
         </div>
       )}
 
-      {showRecords ? (
-        <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden">
-          <LogbookPilotStatsSummaryPanel
-            title="Records Snapshot"
-            items={recordItems}
-            onViewAll={recordItems.length ? () => onViewAll("records") : null}
-            variant="records"
-            maxRows={caps.records}
-            className="min-h-0"
-          />
-        </div>
-      ) : null}
     </div>
   );
 }

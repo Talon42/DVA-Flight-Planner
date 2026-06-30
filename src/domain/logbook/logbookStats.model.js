@@ -75,6 +75,14 @@ function shiftDays(date, amount) {
   return nextDate;
 }
 
+function shiftYears(date, amount) {
+  const year = date.getUTCFullYear() + amount;
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  const daysInTargetMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(day, daysInTargetMonth)));
+}
+
 function startOfYear(date) {
   return new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
 }
@@ -230,6 +238,7 @@ function buildCombinedAirportRows(departureCounts, arrivalCounts) {
     .map((item) => {
       const totalUses = item.dep + item.arr;
       return {
+        id: item.label,
         label: item.label,
         value: formatNumber(totalUses),
         meta: `${formatNumber(item.dep)} dep / ${formatNumber(item.arr)} arr`,
@@ -277,7 +286,7 @@ function createPeriodConfig(periodKey, anchorDate) {
         currentStart: startOfYear(anchorDate),
         currentEndExclusive: dayAfterAnchor,
         priorStart: startOfYear(startOfPreviousYear(anchorDate)),
-        priorEndExclusive: shiftDays(anchorDate, -365)
+        priorEndExclusive: shiftYears(dayAfterAnchor, -1)
       };
     case "previous-calendar-year":
       return {
@@ -286,14 +295,6 @@ function createPeriodConfig(periodKey, anchorDate) {
         currentEndExclusive: startOfYear(anchorDate),
         priorStart: startOfPreviousYear(startOfPreviousYear(anchorDate)),
         priorEndExclusive: startOfPreviousYear(anchorDate)
-      };
-    case "all-time-average":
-      return {
-        label: "All Time Average",
-        currentStart: null,
-        currentEndExclusive: null,
-        priorStart: null,
-        priorEndExclusive: null
       };
     default:
       return null;
@@ -487,6 +488,7 @@ function buildRecordSummary(rows) {
   return {
     bestLanding: bestLandingRate
       ? {
+          id: "best-landing",
           label: bestLandingRate.compactFlightLabel,
           value: bestLandingRate.landingRateDisplay,
           meta: bestLandingRate.dateDisplay
@@ -494,6 +496,7 @@ function buildRecordSummary(rows) {
       : null,
     worstLanding: worstLandingRate
       ? {
+          id: "worst-landing",
           label: worstLandingRate.compactFlightLabel,
           value: worstLandingRate.landingRateDisplay,
           meta: worstLandingRate.dateDisplay
@@ -501,6 +504,7 @@ function buildRecordSummary(rows) {
       : null,
     longestFlight: longestFlight
       ? {
+          id: "longest-flight",
           label: longestFlight.compactFlightLabel,
           value: longestFlight.distanceDisplay,
           meta: longestFlight.dateDisplay
@@ -508,6 +512,7 @@ function buildRecordSummary(rows) {
       : null,
     shortestFlight: shortestFlight
       ? {
+          id: "shortest-flight",
           label: shortestFlight.compactFlightLabel,
           value: shortestFlight.distanceDisplay,
           meta: shortestFlight.dateDisplay
@@ -515,6 +520,7 @@ function buildRecordSummary(rows) {
       : null,
     busiestMonth: busiestMonthKey
       ? {
+          id: "busiest-month",
           label: buildMonthLabel(busiestMonthKey),
           value: formatNumber(busiestMonthCount),
           meta: "Flights"
@@ -523,42 +529,52 @@ function buildRecordSummary(rows) {
     summaryRows: [
       bestLandingRate
         ? {
+            id: "best-landing",
             recordType: "best-landing",
             label: "Best Landing",
             value: bestLandingRate.landingRateDisplay,
-            meta: `${bestLandingRate.compactFlightLabel} - ${bestLandingRate.dateDisplay}`
+            meta: `${bestLandingRate.compactFlightLabel} - ${bestLandingRate.dateDisplay}`,
+            tone: "positive"
           }
         : null,
       worstLandingRate
         ? {
+            id: "worst-landing",
             recordType: "worst-landing",
             label: "Worst Landing",
             value: worstLandingRate.landingRateDisplay,
-            meta: `${worstLandingRate.compactFlightLabel} - ${worstLandingRate.dateDisplay}`
+            meta: `${worstLandingRate.compactFlightLabel} - ${worstLandingRate.dateDisplay}`,
+            tone: "negative"
           }
         : null,
       longestFlight
         ? {
+            id: "longest-flight",
             recordType: "longest-flight",
             label: "Longest Flight",
             value: longestFlight.distanceDisplay,
-            meta: `${longestFlight.compactFlightLabel} - ${longestFlight.dateDisplay}`
+            meta: `${longestFlight.compactFlightLabel} - ${longestFlight.dateDisplay}`,
+            tone: "neutral"
           }
         : null,
       shortestFlight
         ? {
+            id: "shortest-flight",
             recordType: "shortest-flight",
             label: "Shortest Flight",
             value: shortestFlight.distanceDisplay,
-            meta: `${shortestFlight.compactFlightLabel} - ${shortestFlight.dateDisplay}`
+            meta: `${shortestFlight.compactFlightLabel} - ${shortestFlight.dateDisplay}`,
+            tone: "neutral"
           }
         : null,
       busiestMonthKey
         ? {
+            id: "busiest-month",
             recordType: "busiest-month",
             label: "Busiest Month",
             value: formatNumber(busiestMonthCount),
-            meta: buildMonthLabel(busiestMonthKey)
+            meta: buildMonthLabel(busiestMonthKey),
+            tone: "neutral"
           }
         : null
     ].filter(Boolean)

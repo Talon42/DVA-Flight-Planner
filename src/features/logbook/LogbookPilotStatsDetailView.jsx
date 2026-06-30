@@ -154,6 +154,7 @@ export default function LogbookPilotStatsDetailView({
       return String(leftValue).localeCompare(String(rightValue)) * direction;
     });
   }, [config.rows, searchValue, sortDirection, sortKey]);
+  const rowCountLabel = `${filteredRows.length} rows`;
 
   function handleSort(columnKey) {
     setSortKey((current) => {
@@ -171,13 +172,13 @@ export default function LogbookPilotStatsDetailView({
     <Panel className={cn("flex min-h-0 flex-1 flex-col gap-3 overflow-hidden border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={onClose}>
-          &lt; Pilot Stats
+          ← Pilot Stats
         </Button>
 
         <div className="min-w-0">
           <p className={cn("m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>{config.title}</p>
           <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
-            {comparisonEnabled ? `Comparison: ${comparisonPeriodLabel}` : "Comparison off"}
+            {comparisonEnabled ? `${rowCountLabel} · Comparison: ${comparisonPeriodLabel}` : `${rowCountLabel} · Comparison off`}
           </p>
         </div>
 

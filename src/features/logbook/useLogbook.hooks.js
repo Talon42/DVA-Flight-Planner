@@ -15,6 +15,10 @@ import {
   selectLogbookPilotStats,
   selectSortedLogbookRows
 } from "./logbook.selectors.js";
+import {
+  DEFAULT_PILOT_STATS_COMPARISON_PERIOD,
+  normalizePilotStatsComparisonPeriod
+} from "./logbookPilotStats.constants.js";
 
 function normalizePersistedSort(sort) {
   const rawKey = String(sort?.key || DEFAULT_LOGBOOK_SORT.key).trim();
@@ -38,7 +42,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const [filters, setFilters] = useState(DEFAULT_LOGBOOK_FILTERS);
   const [sort, setSort] = useState(DEFAULT_LOGBOOK_SORT);
   const [selectedRowId, setSelectedRowId] = useState(null);
-  const [pilotStatsComparisonPeriod, setPilotStatsComparisonPeriod] = useState("last-90-days");
+  const [pilotStatsComparisonPeriod, setPilotStatsComparisonPeriod] = useState(DEFAULT_PILOT_STATS_COMPARISON_PERIOD);
   const [pilotStatsDetailView, setPilotStatsDetailView] = useState(null);
   const hasHydratedPersistedStateRef = useRef(false);
 
@@ -62,9 +66,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     );
     setFilters(normalizeLogbookFilters(persistedUiState.logbookFilters, filterBounds));
     setSort(normalizePersistedSort(persistedUiState.logbookSort));
-    setPilotStatsComparisonPeriod(
-      String(persistedUiState.pilotStatsComparisonPeriod || "last-90-days").trim() || "last-90-days"
-    );
+    setPilotStatsComparisonPeriod(normalizePilotStatsComparisonPeriod(persistedUiState.pilotStatsComparisonPeriod));
     setPilotStatsDetailView(
       String(persistedUiState.pilotStatsDetailView || "").trim() || null
     );

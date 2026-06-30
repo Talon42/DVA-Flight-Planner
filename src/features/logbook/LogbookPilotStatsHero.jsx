@@ -111,60 +111,77 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
               <p className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em]", labelToneClassName)}>
                 Most flown airline
               </p>
-              <p className={cn("m-0", bodySmTextClassName, isWide ? "text-white/75" : "text-[var(--text-muted)]")}>
+              <p className={cn("m-0", bodySmTextClassName, isWide ? "text-white/75 dark:text-white/75" : "text-[var(--text-muted)]")}>
                 {`${airline?.count ?? 0} flights`}
               </p>
             </div>
           </div>
 
-          <div className={cn("grid min-w-0 gap-2", getKpiGridClassName(layoutMode), isWide ? "divide-x divide-white/10" : "")}>
-            {kpiCards.map((card) => (
-              <div
-                key={card.label}
-                className={cn(
-                  "grid min-w-0 gap-0.5 border px-2 py-1.5",
-                  isWide
-                    ? "border-[color:var(--line)] bg-[var(--surface)] dark:border-white/10 dark:bg-white/5"
-                    : "border-[color:var(--line)] bg-[var(--surface)]",
-                  compact ? "py-1.5" : "py-2"
-                )}
-              >
-                <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
-                  {card.label}
-                </p>
-                <p className={cn("m-0 truncate text-[0.94rem] font-semibold leading-[1.05] bp-1024:text-[1rem]", valueToneClassName, compact ? "bp-1024:text-[0.92rem]" : sectionTitleTextClassName)}>
-                  {card.value}
-                </p>
-                {card.delta ? (
-                  <p
-                  className={cn(
-                    "m-0 truncate text-[0.68rem] font-medium",
-                    isWide
-                      ? card.deltaStatus === "positive"
-                        ? "text-[#126835] dark:text-[#8ee3a2]"
-                        : card.deltaStatus === "negative"
-                          ? "text-[var(--delta-red)] dark:text-[#ff9d9d]"
-                          : "text-[var(--text-muted)] dark:text-white/60"
-                      : card.deltaStatus === "positive"
-                        ? "text-[#126835] dark:text-[#7FD18B]"
-                        : card.deltaStatus === "negative"
-                          ? "text-[var(--delta-red)]"
-                          : "text-[var(--text-muted)]"
-                    )}
-                  >
-                    {card.delta}
+          {isWide ? (
+            <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 bp-1024:grid-cols-5 bp-1024:gap-x-0 bp-1024:gap-y-0">
+              {kpiCards.map((card) => (
+                <div key={card.label} className="min-w-0 px-2 first:pl-0 bp-1024:border-l bp-1024:border-[color:var(--line)] bp-1024:px-3 dark:bp-1024:border-white/10">
+                  <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
+                    {card.label}
                   </p>
-                ) : null}
-              </div>
-            ))}
-          </div>
+                  <p className={cn("m-0 truncate font-semibold leading-[1.05] text-[1rem]", valueToneClassName, sectionTitleTextClassName)}>
+                    {card.value}
+                  </p>
+                  {card.delta ? (
+                    <p
+                      className={cn(
+                        "m-0 truncate text-[0.68rem] font-medium",
+                        card.deltaStatus === "positive"
+                          ? "text-[#126835] dark:text-[#8ee3a2]"
+                          : card.deltaStatus === "negative"
+                            ? "text-[var(--delta-red)] dark:text-[#ff9d9d]"
+                            : "text-[var(--text-muted)] dark:text-white/60"
+                      )}
+                    >
+                      {card.delta}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={cn("grid min-w-0 gap-2", getKpiGridClassName(layoutMode))}>
+              {kpiCards.map((card) => (
+                <div
+                  key={card.label}
+                  className={cn(
+                    "grid min-w-0 gap-0.5 border px-2 py-1.5",
+                    "border-[color:var(--line)] bg-[var(--surface)]",
+                    compact ? "py-1.5" : "py-2"
+                  )}
+                >
+                  <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
+                    {card.label}
+                  </p>
+                  <p className={cn("m-0 truncate text-[0.94rem] font-semibold leading-[1.05] bp-1024:text-[1rem]", valueToneClassName, compact ? "bp-1024:text-[0.92rem]" : sectionTitleTextClassName)}>
+                    {card.value}
+                  </p>
+                  {card.delta ? (
+                    <p
+                      className={cn(
+                        "m-0 truncate text-[0.68rem] font-medium",
+                        card.deltaStatus === "positive"
+                          ? "text-[#126835] dark:text-[#7FD18B]"
+                          : card.deltaStatus === "negative"
+                            ? "text-[var(--delta-red)]"
+                            : "text-[var(--text-muted)]"
+                      )}
+                    >
+                      {card.delta}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {useComparison ? (
-          <p className={cn("m-0 text-[0.82rem]", isWide ? "text-[var(--text-muted)] dark:text-white/70" : "text-[var(--text-muted)]", bodySmTextClassName)}>
-            Comparing against {comparison?.periodLabel || "the selected period"}.
-          </p>
-        ) : null}
+        {useComparison ? <p className={cn("m-0 text-[0.82rem]", "text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>Comparing against {comparison?.periodLabel || "the selected period"}.</p> : null}
       </div>
     </Panel>
   );

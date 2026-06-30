@@ -5,7 +5,11 @@ import { cardFrameClassName } from "../../components/ui/patterns";
 import { bodySmTextClassName } from "../../components/ui/typography";
 import LogbookFlightsTable from "./LogbookFlightsTable.jsx";
 import LogbookPilotStats from "./LogbookPilotStats.jsx";
-import { PILOT_STATS_COMPARISON_OPTIONS } from "./logbookPilotStats.constants.js";
+import {
+  DEFAULT_PILOT_STATS_COMPARISON_PERIOD,
+  PILOT_STATS_COMPARISON_OPTIONS,
+  normalizePilotStatsComparisonPeriod
+} from "./logbookPilotStats.constants.js";
 
 // Reuses the same header row for the empty and populated logbook states.
 function LogbookPanelHeader({
@@ -104,6 +108,9 @@ export default function LogbookPanel({
   onPilotStatsDetailViewChange
 }) {
   const isRefreshDisabled = Boolean(isSyncing || isRefreshingLogbook);
+  const activePilotStatsComparisonPeriod = normalizePilotStatsComparisonPeriod(
+    pilotStatsComparisonPeriod || DEFAULT_PILOT_STATS_COMPARISON_PERIOD
+  );
 
   if (!allRows.length) {
     return (
@@ -113,7 +120,7 @@ export default function LogbookPanel({
             selectedTab={selectedTab}
             isRefreshDisabled={isRefreshDisabled}
             isRefreshingLogbook={isRefreshingLogbook}
-            pilotStatsComparisonPeriod={pilotStatsComparisonPeriod}
+            pilotStatsComparisonPeriod={activePilotStatsComparisonPeriod}
             showPilotStatsComparison={false}
             onRefreshLogbook={onRefreshLogbook}
             onSelectTab={onSelectTab}
@@ -138,7 +145,7 @@ export default function LogbookPanel({
           selectedTab={selectedTab}
           isRefreshDisabled={isRefreshDisabled}
           isRefreshingLogbook={isRefreshingLogbook}
-          pilotStatsComparisonPeriod={pilotStatsComparisonPeriod}
+          pilotStatsComparisonPeriod={activePilotStatsComparisonPeriod}
           showPilotStatsComparison={selectedTab === "pilot-stats" && allRows.length > 0}
           onRefreshLogbook={onRefreshLogbook}
           onSelectTab={onSelectTab}
@@ -152,7 +159,7 @@ export default function LogbookPanel({
             <LogbookPilotStats
               stats={pilotStats}
               summaryStats={summaryStats}
-              pilotStatsComparisonPeriod={pilotStatsComparisonPeriod}
+              pilotStatsComparisonPeriod={activePilotStatsComparisonPeriod}
               pilotStatsDetailView={pilotStatsDetailView}
               onPilotStatsComparisonPeriodChange={onPilotStatsComparisonPeriodChange}
               onPilotStatsDetailViewChange={onPilotStatsDetailViewChange}
