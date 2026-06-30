@@ -3,6 +3,7 @@ import { getAirlineLogo, getAirlineLogoClassName } from "../../domain/airlines/a
 import { isAirportCoveredByVatsim } from "../../domain/vatsim/vatsimCoverage.js";
 import { cn } from "../ui/cn";
 import { bodyMdTextClassName } from "../ui/typography";
+import { selectableCellClassName } from "../data-table/tableCellStyles";
 
 const BODY_CELL_CONTENT_CLASS =
   "flex h-full min-h-0 w-full items-center leading-none";
@@ -60,7 +61,7 @@ function getAirportStatusTitle({ addon, vatsim, missing = false }) {
   return "VATSIM ATC";
 }
 
-function AirportStatusChip({ airportCode, addon, vatsim, missing = false }) {
+function AirportStatusChip({ airportCode, addon, vatsim, missing = false, interactive = false }) {
   const statusTitle = getAirportStatusTitle({ addon, vatsim, missing });
   const ariaLabel = `${airportCode}: ${statusTitle}`;
 
@@ -82,7 +83,8 @@ function AirportStatusChip({ airportCode, addon, vatsim, missing = false }) {
       <span
         className={cn(
           "relative z-10",
-          getAirportStatusTextClassName({ addon, vatsim, missing })
+          getAirportStatusTextClassName({ addon, vatsim, missing }),
+          interactive && selectableCellClassName
         )}
       >
         {airportCode}
@@ -91,11 +93,13 @@ function AirportStatusChip({ airportCode, addon, vatsim, missing = false }) {
   );
 }
 
+// Renders the airport code with addon/VATSIM status while preserving the shared clickable text affordance.
 export function AirportIndicatorContent({
   airportCode,
   addonAirports,
   vatsimCoverageIndex,
   missingInDatabase = false,
+  interactive = false,
 }) {
   const normalizedAirportCode = String(airportCode || "").trim().toUpperCase();
 
@@ -124,6 +128,7 @@ export function AirportIndicatorContent({
         addon={showAddonIndicator}
         vatsim={showVatsimIndicator}
         missing={missingInDatabase}
+        interactive={interactive}
       />
     </span>
   );
@@ -228,6 +233,7 @@ export function getFlightTableColumns({
             Array.isArray(row?.missingAirportIcaos) &&
             row.missingAirportIcaos.includes(row.from)
           }
+          interactive
         />
       )
     },
@@ -258,6 +264,7 @@ export function getFlightTableColumns({
             Array.isArray(row?.missingAirportIcaos) &&
             row.missingAirportIcaos.includes(row.to)
           }
+          interactive
         />
       )
     },

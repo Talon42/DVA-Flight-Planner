@@ -1,5 +1,6 @@
 import { cn } from "../ui/cn";
 import { bodyMdTextClassName } from "../ui/typography";
+import { selectableCellClassName } from "./tableCellStyles";
 
 // Keeps body cells aligned to the same content edge declared in the column metadata.
 function getCellAlignmentClass(column) {
@@ -14,13 +15,14 @@ function getCellAlignmentClass(column) {
   return "justify-start text-left";
 }
 
-function normalizeCellContent(content, truncate) {
+function normalizeCellContent(content, truncate, isClickable = false) {
   if (typeof content === "string" || typeof content === "number") {
     return (
       <span
         className={cn(
           "block min-w-0 leading-none",
-          truncate ? "truncate" : "whitespace-nowrap"
+          truncate ? "truncate" : "whitespace-nowrap",
+          isClickable && selectableCellClassName
         )}
       >
         {content}
@@ -85,6 +87,7 @@ export default function TableRow({
               className={cn(
                 "block h-full w-full appearance-none border-0 bg-transparent p-0 text-left text-[color:var(--table-row-text,var(--text-primary))] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)] dark:text-[rgb(255,255,255)]",
                 column.onCellClick ? "cursor-pointer" : "cursor-default",
+                column.onCellClick && selectableCellClassName,
                 bodyMdTextClassName
               )}
               onClick={(event) => handleCellClick(column, event)}
@@ -103,10 +106,10 @@ export default function TableRow({
                   "flex h-full min-h-0 w-full items-center px-3 leading-none bp-1024:px-2",
                   overflowClassName,
                   alignClassName,
-                  column.onCellClick && "cursor-pointer"
+                  column.onCellClick && selectableCellClassName
                 )}
               >
-                {normalizeCellContent(content, column.truncate)}
+                {normalizeCellContent(content, column.truncate, Boolean(column.onCellClick))}
               </span>
             </button>
           </div>

@@ -98,6 +98,7 @@ export function getTourTableColumns({
             Array.isArray(row?.missingAirportIcaos) &&
             row.missingAirportIcaos.includes(row.from)
           }
+          interactive
         />
       )
     },
@@ -125,6 +126,7 @@ export function getTourTableColumns({
             Array.isArray(row?.missingAirportIcaos) &&
             row.missingAirportIcaos.includes(row.to)
           }
+          interactive
         />
       )
     },

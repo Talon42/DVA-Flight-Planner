@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import DataTable from "../../components/data-table/DataTable.jsx";
+import { selectableCellClassName } from "../../components/data-table/tableCellStyles";
 import { cn } from "../../components/ui/cn";
 import { getLogbookRowClassName } from "./logbookRowStyles.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
@@ -26,7 +27,10 @@ function LogbookFlightCell({ row, column }) {
       role="link"
       tabIndex={0}
       title={`Open DVA PIREP ${row.dvaPirepId}`}
-      className="block min-w-0 truncate font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit cursor-pointer underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+      className={cn(
+        "block min-w-0 truncate font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit focus-visible:outline-none",
+        selectableCellClassName
+      )}
       onClick={handleOpenPirep}
       onDoubleClick={(event) => {
         event.stopPropagation();
