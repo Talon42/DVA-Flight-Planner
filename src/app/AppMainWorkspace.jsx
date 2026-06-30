@@ -72,7 +72,8 @@ export default function AppMainWorkspace({
 }) {
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="grid min-h-0 flex-1 gap-4 [grid-template-columns:minmax(0,3fr)_minmax(260px,2fr)] bp-1024:gap-3">
+      {/* Keeps the standard 60/40 split until 1920px, then pins the right rail to 768px. */}
+      <div className="grid min-h-0 flex-1 gap-4 [grid-template-columns:minmax(0,3fr)_minmax(260px,2fr)] min-[1920px]:[grid-template-columns:minmax(0,1fr)_768px] bp-1024:gap-3">
         <ScheduleWorkspacePanel
           scheduleExists={Boolean(schedule)}
           scheduleView={scheduleView}
