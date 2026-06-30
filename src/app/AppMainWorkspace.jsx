@@ -1,5 +1,6 @@
 import ScheduleWorkspacePanel from "../components/ScheduleWorkspacePanel";
 import AppFooter from "../components/layout/AppFooter";
+import { cn } from "../components/ui/cn";
 
 // Renders the main two-column workspace and the footer beneath it.
 export default function AppMainWorkspace({
@@ -70,10 +71,19 @@ export default function AppMainWorkspace({
   onSelectDevWindowWidth,
   onOpenReleasePage
 }) {
+  const isPilotStatsWorkspace = scheduleView === "logbook" && logbookProps?.selectedTab === "pilot-stats";
+
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Keeps the standard 60/40 split until 1920px, then pins the right rail to 768px. */}
-      <div className="grid min-h-0 flex-1 gap-4 [grid-template-columns:minmax(0,3fr)_minmax(260px,2fr)] min-[1920px]:[grid-template-columns:minmax(0,1fr)_768px] bp-1024:gap-3">
+      {/* Uses a single column for Logbook Pilot Stats; all other views keep the standard two-column split. */}
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-4 bp-1024:gap-3",
+          isPilotStatsWorkspace
+            ? "[grid-template-columns:minmax(0,1fr)]"
+            : "[grid-template-columns:minmax(0,3fr)_minmax(260px,2fr)] min-[1920px]:[grid-template-columns:minmax(0,1fr)_768px]"
+        )}
+      >
         <ScheduleWorkspacePanel
           scheduleExists={Boolean(schedule)}
           scheduleView={scheduleView}
@@ -137,7 +147,7 @@ export default function AppMainWorkspace({
           onClearDutyBuildWarning={onClearDutyBuildWarning}
         />
 
-        {rightColumnContent}
+        {isPilotStatsWorkspace ? null : rightColumnContent}
       </div>
 
       <AppFooter
