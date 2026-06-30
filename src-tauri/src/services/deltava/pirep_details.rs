@@ -49,9 +49,12 @@ struct RunwayDetails {
 
 #[derive(Clone, Debug, Default)]
 struct ParsedPirepDetails {
+    passengers_carried_raw: String,
     payload_raw: String,
     payload_passengers: String,
     payload_cargo: String,
+    found_passengers_carried: bool,
+    found_payload_weight: bool,
     departure_route: String,
     flight_route: String,
     arrival_route: String,
@@ -179,61 +182,64 @@ fn build_route_summary(departure_route: &str, flight_route: &str, arrival_route:
         .join(" ")
 }
 
-// Extracts payload details without failing the full PIREP parse when the row is malformed.
-fn parse_payload_details(raw: &str) -> (String, String) {
+// Extracts passenger and cargo values without failing the full PIREP parse when the row is malformed.
+fn parse_passengers_carried_details(raw: &str) -> String {
     let normalized = normalize_text(raw);
     if normalized.is_empty() {
-        return (String::new(), String::new());
+        return String::new();
     }
 
-    let passengers = regex::Regex::new(r"(?i)\b(\d[\d,]*)\s+passengers?\b")
+    regex::Regex::new(r"(?i)\b(\d[\d,]*)\s+passengers?\b")
         .ok()
         .and_then(|regex| regex.captures(&normalized))
         .and_then(|captures| captures.get(1))
         .map(|match_value| match_value.as_str().to_string())
-        .unwrap_or_default();
-
-    let cargo = regex::Regex::new(r"(?i)\b(\d[\d,]*)\s*(lb|lbs)\b.*?\bbaggage\b")
-        .ok()
-        .and_then(|regex| regex.captures(&normalized))
-        .and_then(|captures| {
-            let amount = captures.get(1)?.as_str().to_string();
-            let unit = captures.get(2)?.as_str().to_lowercase();
-            Some(if unit == "lb" {
-                format!("{amount} lbs")
-            } else {
-                format!("{amount} {unit}")
-            })
-        })
-        .unwrap_or_default();
-
-    (passengers, cargo)
+        .unwrap_or_default()
 }
 
-fn extract_payload_source(label: &str, value: &str, row_text: &str) -> Option<String> {
+fn parse_payload_weight_details(raw: &str) -> String {
+    let normalized = normalize_text(raw);
+    if normalized.is_empty() {
+        return String::new();
+    }
+
+    regex::Regex::new(r"(?i)\b(\d[\d,]*)\s+lb\s+baggage(?:/cargo)?\b")
+        .ok()
+        .and_then(|regex| regex.captures(&normalized))
+        .and_then(|captures| Some(format!("{} lbs", captures.get(1)?.as_str())))
+        .unwrap_or_default()
+}
+
+// Pulls a normalized field value from either the first two cells or the full row text.
+fn extract_row_value(label: &str, value: &str, row_text: &str, expected_label: &str) -> Option<String> {
     let normalized_label = normalize_label_text(label);
     let normalized_value = normalize_text(value);
-    if normalized_label == "payload" && !normalized_value.is_empty() {
+    if normalized_label == expected_label && !normalized_value.is_empty() {
         return Some(normalized_value);
     }
 
     let normalized_row_text = normalize_text(row_text);
-    let lower_row_text = normalized_row_text.to_lowercase();
-    if !lower_row_text.starts_with("payload") {
+    if normalized_row_text.is_empty() {
         return None;
     }
 
-    let payload_text = normalized_row_text
-        .get("payload".len()..)
+    let expected_lower = expected_label.to_lowercase();
+    let lower_row_text = normalized_row_text.to_lowercase();
+    let Some(label_index) = lower_row_text.find(&expected_lower) else {
+        return None;
+    };
+
+    let extracted = normalized_row_text
+        .get(label_index + expected_label.len()..)
         .unwrap_or("")
         .trim_start_matches(|ch: char| ch == ':' || ch.is_whitespace())
         .trim()
         .to_string();
 
-    if payload_text.is_empty() {
+    if extracted.is_empty() {
         None
     } else {
-        Some(payload_text)
+        Some(extracted)
     }
 }
 
@@ -256,9 +262,16 @@ fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
             .map(|cell| normalize_cell_text(&cell.text().collect::<String>()))
             .unwrap_or_default();
         let normalized_label = normalize_label_text(&label);
-        let payload_source = extract_payload_source(&label, &value, &row_text);
+        let passengers_carried_source = extract_row_value(&label, &value, &row_text, "passengers carried");
+        let payload_weight_source = extract_row_value(&label, &value, &row_text, "payload weight");
 
         match normalized_label.as_str() {
+            "passengers carried" => {
+                parsed.found_passengers_carried = true;
+            }
+            "payload weight" => {
+                parsed.found_payload_weight = true;
+            }
             "departure route" => {
                 parsed.departure_route = value;
                 parsed.found_departure_route = true;
@@ -284,12 +297,19 @@ fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
             _ => {}
         }
 
+        if parsed.passengers_carried_raw.is_empty() {
+            if let Some(passengers_carried_source) = passengers_carried_source {
+                parsed.found_passengers_carried = true;
+                parsed.passengers_carried_raw = passengers_carried_source;
+                parsed.payload_passengers = parse_passengers_carried_details(&parsed.passengers_carried_raw);
+            }
+        }
+
         if parsed.payload_raw.is_empty() {
-            if let Some(payload_source) = payload_source {
-                parsed.payload_raw = payload_source;
-                let (payload_passengers, payload_cargo) = parse_payload_details(&parsed.payload_raw);
-                parsed.payload_passengers = payload_passengers;
-                parsed.payload_cargo = payload_cargo;
+            if let Some(payload_weight_source) = payload_weight_source {
+                parsed.found_payload_weight = true;
+                parsed.payload_raw = payload_weight_source;
+                parsed.payload_cargo = parse_payload_weight_details(&parsed.payload_raw);
             }
         }
     }
@@ -357,14 +377,15 @@ fn build_client() -> Result<reqwest::Client, String> {
 
 fn log_parse_summary(parsed: &ParsedPirepDetails) {
     crate::append_sync_log(&format!(
-        "pirep-details:parse-summary departureRoute={} flightRoute={} arrivalRoute={} takeoffRunway={} landingRunway={} payloadFound={} payloadPassengersParsed={} payloadCargoParsed={}",
+        "pirep-details:parse-summary departureRoute={} flightRoute={} arrivalRoute={} takeoffRunway={} landingRunway={} passengersCarriedFound={} passengersParsed={} payloadWeightFound={} cargoParsed={}",
         parsed.found_departure_route,
         parsed.found_flight_route,
         parsed.found_arrival_route,
         parsed.found_takeoff_runway,
         parsed.found_landing_runway,
-        !parsed.payload_raw.is_empty(),
+        parsed.found_passengers_carried,
         !parsed.payload_passengers.is_empty(),
+        parsed.found_payload_weight,
         !parsed.payload_cargo.is_empty()
     ));
 }
@@ -416,7 +437,8 @@ mod tests {
 <html>
   <body>
     <table>
-      <tr><td>Payload</td><td>121 Passengers, 8,000 lb baggage</td></tr>
+      <tr><td>Passengers Carried</td><td>121 passengers (78.57% full)</td></tr>
+      <tr><td>Payload Weight</td><td>163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)</td></tr>
       <tr><td>Departure Route</td><td>GLADZ4.LULLS</td></tr>
       <tr><td>Flight Route</td><td>LULLS Y196 CANOA UB879 NOSAT</td></tr>
       <tr><td>Arrival Route</td><td>NOSA1B.NOSAT</td></tr>
@@ -431,9 +453,10 @@ mod tests {
     fn parses_route_and_runway_fields_from_sample_table() {
         let parsed = parse_pirep_detail_html(SAMPLE_HTML);
 
-        assert_eq!(parsed.payload_raw, "121 Passengers, 8,000 lb baggage");
+        assert_eq!(parsed.passengers_carried_raw, "121 passengers (78.57% full)");
+        assert_eq!(parsed.payload_raw, "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)");
         assert_eq!(parsed.payload_passengers, "121");
-        assert_eq!(parsed.payload_cargo, "8,000 lbs");
+        assert_eq!(parsed.payload_cargo, "17,645 lbs");
         assert_eq!(parsed.departure_route, "GLADZ4.LULLS");
         assert_eq!(parsed.flight_route, "LULLS Y196 CANOA UB879 NOSAT");
         assert_eq!(parsed.arrival_route, "NOSA1B.NOSAT");
@@ -467,6 +490,9 @@ mod tests {
         assert_eq!(parsed.payload_raw, "");
         assert_eq!(parsed.payload_passengers, "");
         assert_eq!(parsed.payload_cargo, "");
+        assert_eq!(parsed.passengers_carried_raw, "");
+        assert_eq!(parsed.found_passengers_carried, false);
+        assert_eq!(parsed.found_payload_weight, false);
         assert_eq!(parsed.departure_route, "");
         assert_eq!(parsed.found_departure_route, false);
         assert_eq!(parsed.found_flight_route, false);
@@ -476,26 +502,28 @@ mod tests {
     }
 
     #[test]
-    fn parses_payload_label_with_colon_and_mixed_case() {
+    fn parses_passengers_carried_and_payload_weight_labels_with_colon_and_mixed_case() {
         let parsed = parse_pirep_detail_html(
-            "<html><body><table><tr><td>pAyLoAd:</td><td>121 Passengers, 8,000 lb baggage</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
+            "<html><body><table><tr><td>  pAsSeNgErS\u{00a0}cArRiEd : </td><td>121 passengers (78.57% full)</td></tr><tr><td>  pAyLoAd\u{00a0}WeIgHt : </td><td>163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
         );
 
-        assert_eq!(parsed.payload_raw, "121 Passengers, 8,000 lb baggage");
+        assert_eq!(parsed.passengers_carried_raw, "121 passengers (78.57% full)");
+        assert_eq!(parsed.payload_raw, "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)");
         assert_eq!(parsed.payload_passengers, "121");
-        assert_eq!(parsed.payload_cargo, "8,000 lbs");
+        assert_eq!(parsed.payload_cargo, "17,645 lbs");
         assert_eq!(parsed.departure_route, "ABC");
     }
 
     #[test]
-    fn parses_payload_from_row_text_fallback() {
+    fn parses_payload_weight_from_row_text_fallback() {
         let parsed = parse_pirep_detail_html(
-            "<html><body><table><tr><td colspan=\"2\">Payload 121 Passengers, 8,000 lb baggage</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
+            "<html><body><table><tr><td colspan=\"2\">Passengers Carried 121 passengers (78.57% full)</td></tr><tr><td colspan=\"2\">Payload Weight 163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
         );
 
-        assert_eq!(parsed.payload_raw, "121 Passengers, 8,000 lb baggage");
+        assert_eq!(parsed.passengers_carried_raw, "121 passengers (78.57% full)");
+        assert_eq!(parsed.payload_raw, "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)");
         assert_eq!(parsed.payload_passengers, "121");
-        assert_eq!(parsed.payload_cargo, "8,000 lbs");
+        assert_eq!(parsed.payload_cargo, "17,645 lbs");
         assert_eq!(parsed.departure_route, "ABC");
     }
 
@@ -532,18 +560,19 @@ mod tests {
         assert_eq!(result.id, "0x1d2a91");
         assert_eq!(result.numeric_id, 1911377);
         assert_eq!(result.payload_passengers, "121");
-        assert_eq!(result.payload_cargo, "8,000 lbs");
-        assert_eq!(result.payload_raw, "121 Passengers, 8,000 lb baggage");
+        assert_eq!(result.payload_cargo, "17,645 lbs");
+        assert_eq!(result.payload_raw, "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)");
         assert_eq!(result.route_summary, "GLADZ4.LULLS LULLS Y196 CANOA UB879 NOSAT NOSA1B.NOSAT");
     }
 
     #[test]
     fn malformed_payload_does_not_fail_parsing() {
         let parsed = parse_pirep_detail_html(
-            "<html><body><table><tr><td>Payload</td><td>Passengers unknown</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
+            "<html><body><table><tr><td>Passengers Carried</td><td>Passengers unknown</td></tr><tr><td>Payload Weight</td><td>Unknown</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
         );
 
-        assert_eq!(parsed.payload_raw, "Passengers unknown");
+        assert_eq!(parsed.passengers_carried_raw, "Passengers unknown");
+        assert_eq!(parsed.payload_raw, "Unknown");
         assert_eq!(parsed.payload_passengers, "");
         assert_eq!(parsed.payload_cargo, "");
         assert_eq!(parsed.departure_route, "ABC");

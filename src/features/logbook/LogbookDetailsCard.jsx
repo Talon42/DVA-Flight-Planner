@@ -31,6 +31,11 @@ function buildScrapedDetailValue(value, { isLoading = false, hasError = false } 
   return hasError ? "Unavailable" : LOGBOOK_EMPTY_VALUE;
 }
 
+// Uses a stable dash for web-scraped fields when no value is present.
+function formatWebOnlyDetailValue(value) {
+  return String(value || "").trim() || LOGBOOK_EMPTY_VALUE;
+}
+
 function formatRunwayLength(value) {
   const normalized = String(value || "").trim();
   if (!normalized) {
@@ -102,27 +107,6 @@ function getAirportActualName(airportRef) {
       airportRef?.name ||
       airportCode
   ).trim();
-}
-
-// Keeps passenger counts numeric so the summary card does not show malformed values.
-function formatPassengerCount(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  const numericValue = Number(String(value).replace(/,/g, "").trim());
-  return Number.isInteger(numericValue) && numericValue >= 0 ? numericValue : null;
-}
-
-// Prefers the scraped payload passenger count, then falls back to the logbook entry count.
-function buildPassengerDisplay(scrapedPassengers, fallbackPassengers) {
-  const normalizedScrapedPassengers = String(scrapedPassengers || "").trim();
-  if (normalizedScrapedPassengers) {
-    return normalizedScrapedPassengers;
-  }
-
-  const fallbackPassengerCount = formatPassengerCount(fallbackPassengers);
-  return fallbackPassengerCount === null ? LOGBOOK_EMPTY_VALUE : String(fallbackPassengerCount);
 }
 
 function LogbookDetailRow({ label, value, title }) {
@@ -204,7 +188,7 @@ export default function LogbookDetailsCard({
   const departureRunwayLength = String(pirepDetails?.departureRunwayLength || "").trim();
   const arrivalRunway = String(pirepDetails?.arrivalRunway || "").trim();
   const arrivalRunwayLength = String(pirepDetails?.arrivalRunwayLength || "").trim();
-  const payloadPassengersDisplay = buildPassengerDisplay(pirepDetails?.payloadPassengers, entry.pax);
+  const payloadPassengersValue = String(pirepDetails?.payloadPassengers || "").trim();
   const payloadCargoValue = String(pirepDetails?.payloadCargo || "").trim();
   const arrivalThresholdDistanceValue = String(pirepDetails?.arrivalRunwayThresholdDistance || "").trim();
   const arrivalThresholdDistanceDisplay = buildScrapedDetailValue(arrivalThresholdDistanceValue, {
@@ -216,19 +200,8 @@ export default function LogbookDetailsCard({
     { label: "Flight Time", value: formatLogbookDuration(entry.airborneTime) },
     { label: "Total Time", value: formatLogbookDuration(entry.blockTime) },
     { label: "Distance", value: selectedLogbookFlight.distanceDisplay, title: selectedLogbookFlight.distanceDisplay },
-    {
-      label: "Passengers",
-      value: payloadPassengersDisplay,
-      title: pirepDetails?.payloadRaw || payloadPassengersDisplay
-    },
-    {
-      label: "Cargo",
-      value: buildScrapedDetailValue(payloadCargoValue, {
-        isLoading: pirepDetailsLoading,
-        hasError: hasPirepDetailsError
-      }),
-      title: payloadCargoValue || undefined
-    },
+    { label: "Passengers", value: formatWebOnlyDetailValue(payloadPassengersValue) },
+    { label: "Cargo", value: formatWebOnlyDetailValue(payloadCargoValue) },
     { label: "Route", value: routeSummary, title: pirepDetails?.routeSummary || routeSummary }
   ];
 
