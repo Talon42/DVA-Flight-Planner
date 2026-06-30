@@ -45,7 +45,25 @@ export default function TableRow({
 }) {
   const isSelectableSelected = Boolean(enableRowSelection && isSelected && selectedRowClassName);
 
+  function handleRowClick() {
+    if (enableRowSelection) {
+      onSelectRow?.(rowId, row);
+    }
+  }
+
+  function handleRowDoubleClick() {
+    if (onActivateRow) {
+      onActivateRow(rowId, row);
+      return;
+    }
+
+    if (enableRowSelection) {
+      onSelectRow?.(rowId, row);
+    }
+  }
+
   function handleCellClick(column, event) {
+    event.stopPropagation();
     column.onCellClick?.(row, column, event);
 
     if (column.stopRowSelectOnClick) {
@@ -64,6 +82,8 @@ export default function TableRow({
         getRowClassName?.(row),
         isSelectableSelected && selectedRowClassName
       )}
+      onClick={handleRowClick}
+      onDoubleClick={handleRowDoubleClick}
       style={{
         ...style,
         width: "100%",
@@ -93,13 +113,10 @@ export default function TableRow({
                 bodyMdTextClassName
               )}
               onClick={(event) => handleCellClick(column, event)}
-              onDoubleClick={() =>
-                onActivateRow
-                  ? onActivateRow(rowId, row)
-                  : enableRowSelection
-                    ? onSelectRow?.(rowId, row)
-                    : undefined
-              }
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+                handleRowDoubleClick();
+              }}
               aria-label={column.cellAriaLabel?.(row, column)}
               title={column.cellTitle?.(row, column)}
             >
