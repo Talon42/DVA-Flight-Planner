@@ -1,21 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
-import SectionHeader from "../../components/ui/SectionHeader";
 import { Field } from "../../components/ui/filterFields";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, labelTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
-
-const PILOT_STATS_COMPARISON_OPTIONS = [
-  { value: "off", label: "Off" },
-  { value: "last-30-days", label: "Last 30 Days" },
-  { value: "last-90-days", label: "Last 90 Days" },
-  { value: "year-to-date", label: "Year to Date" },
-  { value: "previous-calendar-year", label: "Previous Calendar Year" },
-  { value: "all-time-average", label: "All Time Average" }
-];
 
 const PANEL_CAPS = {
   wideTall: 6,
@@ -34,30 +24,9 @@ const EMPTY_DETAIL_ROWS = Object.freeze({
   status: []
 });
 
-// Keeps the dashboard responsive without adding more global app layout state.
-function usePilotStatsLayoutMode(viewportWidth = 0, viewportHeight = 0) {
-  const [windowSize, setWindowSize] = useState(() => ({
-    width: typeof window !== "undefined" ? window.innerWidth : 0,
-    height: typeof window !== "undefined" ? window.innerHeight : 0
-  }));
-
-  useEffect(() => {
-    function handleResize() {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
-    }
-
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const width = viewportWidth || windowSize.width;
-  const height = viewportHeight || windowSize.height;
-
-  if (width >= 1600 && height >= 950) {
+// Measures the dashboard content area so layout mode follows the space actually available.
+function usePilotStatsLayoutMode({ width = 0, height = 0 } = {}) {
+  if (width >= 1600 && height >= 760) {
     return "wideTall";
   }
 
@@ -65,11 +34,45 @@ function usePilotStatsLayoutMode(viewportWidth = 0, viewportHeight = 0) {
     return "wideShort";
   }
 
-  if (height >= 900) {
+  if (width < 1600 && height >= 680) {
     return "narrowTall";
   }
 
   return "narrowShort";
+}
+
+// Tracks the rendered size of the dashboard container so the mode follows the real content box.
+function useElementSize(ref) {
+  const [size, setSize] = useState(() => ({
+    width: typeof window !== "undefined" ? window.innerWidth : 0,
+    height: typeof window !== "undefined" ? window.innerHeight : 0
+  }));
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const updateSize = () => {
+      const nextWidth = Math.max(0, Math.floor(node.clientWidth));
+      const nextHeight = Math.max(0, Math.floor(node.clientHeight));
+
+      setSize((current) =>
+        current.width === nextWidth && current.height === nextHeight
+          ? current
+          : { width: nextWidth, height: nextHeight }
+      );
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [ref]);
+
+  return size;
 }
 
 // Keeps the airline identity compact while the KPI row flexes per layout mode.
@@ -177,7 +180,7 @@ function buildCombinedAirportRows(departures, arrivals) {
     }));
 }
 
-function buildPanelRowsForMode(stats, mode) {
+function buildPanelRowsForMode(stats, mode, records) {
   const cap = PANEL_CAPS[mode] || PANEL_CAPS.narrowShort;
   const airlines = (stats.rankings?.airlines || []).slice(0, cap);
   const equipment = (stats.rankings?.equipment || []).slice(0, cap);
@@ -194,7 +197,7 @@ function buildPanelRowsForMode(stats, mode) {
     recentLandings,
     combinedAirports,
     routes,
-    records: stats.records || {}
+    records: records || {}
   };
 }
 
@@ -560,11 +563,11 @@ function PilotStatsDetailView({
 }
 
 function buildPanelGrid(stats, mode, onViewAll) {
-  const rows = buildPanelRowsForMode(stats, mode);
+  const rows = buildPanelRowsForMode(stats, mode, stats.records);
 
   if (mode === "wideTall") {
     return (
-      <div className="grid min-h-0 gap-3 overflow-hidden bp-1400:grid-cols-3">
+      <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden bp-1400:grid-cols-3">
         <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
         <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
         <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
@@ -587,7 +590,7 @@ function buildPanelGrid(stats, mode, onViewAll) {
 
   if (mode === "wideShort") {
     return (
-      <div className="grid min-h-0 gap-3 overflow-hidden bp-1400:grid-cols-3">
+      <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden bp-1400:grid-cols-3">
         <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
         <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
         <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
@@ -599,7 +602,7 @@ function buildPanelGrid(stats, mode, onViewAll) {
 
   if (mode === "narrowTall") {
     return (
-      <div className="grid min-h-0 gap-3 overflow-hidden bp-1024:grid-cols-2">
+      <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden bp-1024:grid-cols-2">
         <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
         <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
         <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
@@ -609,7 +612,7 @@ function buildPanelGrid(stats, mode, onViewAll) {
   }
 
   return (
-    <div className="grid min-h-0 gap-3 overflow-hidden bp-1024:grid-cols-3">
+    <div className="grid min-h-0 w-full flex-1 gap-3 overflow-hidden bp-1024:grid-cols-3">
       <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
       <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
       <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
@@ -621,16 +624,23 @@ function buildPanelGrid(stats, mode, onViewAll) {
 export default function LogbookPilotStats({
   stats,
   summaryStats,
-  viewportWidth = 0,
   pilotStatsComparisonPeriod = "last-90-days",
   pilotStatsDetailView = null,
-  onPilotStatsComparisonPeriodChange,
   onPilotStatsDetailViewChange
 }) {
+  const rootRef = useRef(null);
   const summary = summaryStats?.summary || null;
   const comparisons = summaryStats?.comparisons || null;
-  const detailRows = summaryStats?.detailRows ?? EMPTY_DETAIL_ROWS;
-  const layoutMode = usePilotStatsLayoutMode(viewportWidth);
+  const detailRows = useMemo(
+    () => summaryStats?.detailRows ?? EMPTY_DETAIL_ROWS,
+    [summaryStats?.detailRows]
+  );
+  const records = useMemo(
+    () => summaryStats?.records ?? stats.records ?? {},
+    [stats.records, summaryStats?.records]
+  );
+  const measuredSize = useElementSize(rootRef);
+  const layoutMode = usePilotStatsLayoutMode(measuredSize);
   const comparisonEnabled = pilotStatsComparisonPeriod !== "off";
 
   const detailRowsWithCombinedAirports = useMemo(() => {
@@ -669,36 +679,17 @@ export default function LogbookPilotStats({
         }))
         .sort((left, right) => Number(right.value) - Number(left.value) || left.label.localeCompare(right.label)),
       records: [
-        summaryStats?.records?.bestLanding ? { label: "Best Landing", value: summaryStats.records.bestLanding.value, meta: summaryStats.records.bestLanding.label } : null,
-        summaryStats?.records?.worstLanding ? { label: "Worst Landing", value: summaryStats.records.worstLanding.value, meta: summaryStats.records.worstLanding.label } : null,
-        summaryStats?.records?.longestFlight ? { label: "Longest Flight", value: summaryStats.records.longestFlight.value, meta: summaryStats.records.longestFlight.label } : null,
-        summaryStats?.records?.shortestFlight ? { label: "Shortest Flight", value: summaryStats.records.shortestFlight.value, meta: summaryStats.records.shortestFlight.label } : null,
-        summaryStats?.records?.busiestMonth ? { label: "Busiest Month", value: summaryStats.records.busiestMonth.value, meta: summaryStats.records.busiestMonth.label } : null
+        records.bestLanding ? { label: "Best Landing", value: records.bestLanding.value, meta: records.bestLanding.label } : null,
+        records.worstLanding ? { label: "Worst Landing", value: records.worstLanding.value, meta: records.worstLanding.label } : null,
+        records.longestFlight ? { label: "Longest Flight", value: records.longestFlight.value, meta: records.longestFlight.label } : null,
+        records.shortestFlight ? { label: "Shortest Flight", value: records.shortestFlight.value, meta: records.shortestFlight.label } : null,
+        records.busiestMonth ? { label: "Busiest Month", value: records.busiestMonth.value, meta: records.busiestMonth.label } : null
       ].filter(Boolean)
     };
-  }, [detailRows, summaryStats?.records]);
+  }, [detailRows, records]);
 
   return (
-    <div className="logbook-pilot-stats flex h-full min-h-0 flex-col gap-3 overflow-hidden px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
-      <SectionHeader
-        title="Pilot Stats"
-        actions={
-          <Field label="Compare" className="min-w-[14rem]">
-            <select
-              className="min-h-[var(--planner-control-box-min-height)] rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-[var(--text-primary)] outline-none"
-              value={pilotStatsComparisonPeriod}
-              onChange={(event) => onPilotStatsComparisonPeriodChange?.(event.target.value)}
-            >
-              {PILOT_STATS_COMPARISON_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        }
-      />
-
+    <div ref={rootRef} className="logbook-pilot-stats flex h-full min-h-0 flex-col gap-3 overflow-hidden px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
       {summary ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           <PilotStatsHero
@@ -720,7 +711,11 @@ export default function LogbookPilotStats({
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              {buildPanelGrid(stats, layoutMode, (viewName) => onPilotStatsDetailViewChange?.(viewName))}
+              {buildPanelGrid(
+                { ...stats, records },
+                layoutMode,
+                (viewName) => onPilotStatsDetailViewChange?.(viewName)
+              )}
             </div>
           )}
         </div>
