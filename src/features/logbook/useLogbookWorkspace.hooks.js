@@ -35,9 +35,11 @@ export function useLogbookWorkspace({
     () => ({
       logbookSubTab: logbook.selectedTab,
       logbookFilters: logbook.filters,
-      logbookSort: logbook.sort
+      logbookSort: logbook.sort,
+      pilotStatsComparisonPeriod: logbook.pilotStatsComparisonPeriod,
+      pilotStatsDetailView: logbook.pilotStatsDetailView
     }),
-    [logbook.filters, logbook.selectedTab, logbook.sort]
+    [logbook.filters, logbook.pilotStatsComparisonPeriod, logbook.pilotStatsDetailView, logbook.selectedTab, logbook.sort]
   );
 
   const mainProps = useMemo(
@@ -51,13 +53,17 @@ export function useLogbookWorkspace({
       // Pilot Stats intentionally use the full cached logbook so filters stay scoped to Flights.
       pilotStats: logbook.allRowsPilotStats,
       summaryStats: logbook.allRowsPilotStats,
+      pilotStatsComparisonPeriod: logbook.pilotStatsComparisonPeriod,
+      pilotStatsDetailView: logbook.pilotStatsDetailView,
       isSyncing,
       isRefreshingLogbook,
       onRefreshLogbook,
       onSelectTab: logbook.setSelectedTab,
       onSort: logbook.handleSort,
       onSelectRow: logbook.handleSelectRow,
-      onActivateRow: logbook.handleSelectRow
+      onActivateRow: logbook.handleSelectRow,
+      onPilotStatsComparisonPeriodChange: logbook.setPilotStatsComparisonPeriod,
+      onPilotStatsDetailViewChange: logbook.setPilotStatsDetailView
     }),
     [
       isRefreshingLogbook,
@@ -68,7 +74,11 @@ export function useLogbookWorkspace({
       logbook.handleSort,
       logbook.selectedRowId,
       logbook.selectedTab,
+      logbook.pilotStatsComparisonPeriod,
+      logbook.pilotStatsDetailView,
       logbook.setSelectedTab,
+      logbook.setPilotStatsComparisonPeriod,
+      logbook.setPilotStatsDetailView,
       logbook.sort,
       logbook.sortedFilteredRows,
       onRefreshLogbook,

@@ -38,6 +38,8 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const [filters, setFilters] = useState(DEFAULT_LOGBOOK_FILTERS);
   const [sort, setSort] = useState(DEFAULT_LOGBOOK_SORT);
   const [selectedRowId, setSelectedRowId] = useState(null);
+  const [pilotStatsComparisonPeriod, setPilotStatsComparisonPeriod] = useState("last-90-days");
+  const [pilotStatsDetailView, setPilotStatsDetailView] = useState(null);
   const hasHydratedPersistedStateRef = useRef(false);
 
   const allRows = useMemo(() => normalizeLogbookRows(cacheResult.entries), [cacheResult.entries]);
@@ -60,6 +62,12 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     );
     setFilters(normalizeLogbookFilters(persistedUiState.logbookFilters, filterBounds));
     setSort(normalizePersistedSort(persistedUiState.logbookSort));
+    setPilotStatsComparisonPeriod(
+      String(persistedUiState.pilotStatsComparisonPeriod || "last-90-days").trim() || "last-90-days"
+    );
+    setPilotStatsDetailView(
+      String(persistedUiState.pilotStatsDetailView || "").trim() || null
+    );
   }, [filterBounds, persistedUiState]);
 
   const loadLogbook = useCallback(async () => {
@@ -92,8 +100,14 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     () => selectFilteredLogbookRows({ rows: allRows, filters }),
     [allRows, filters]
   );
-  const pilotStats = useMemo(() => selectLogbookPilotStats(filteredRows), [filteredRows]);
-  const allRowsPilotStats = useMemo(() => selectLogbookPilotStats(allRows), [allRows]);
+  const pilotStats = useMemo(
+    () => selectLogbookPilotStats(filteredRows, { comparisonPeriod: pilotStatsComparisonPeriod }),
+    [filteredRows, pilotStatsComparisonPeriod]
+  );
+  const allRowsPilotStats = useMemo(
+    () => selectLogbookPilotStats(allRows, { comparisonPeriod: pilotStatsComparisonPeriod }),
+    [allRows, pilotStatsComparisonPeriod]
+  );
   const sortedFilteredRows = useMemo(
     () => selectSortedLogbookRows({ rows: filteredRows, sort }),
     [filteredRows, sort]
@@ -151,9 +165,13 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     filterOptions,
     pilotStats,
     allRowsPilotStats,
+    pilotStatsComparisonPeriod,
+    pilotStatsDetailView,
     handleFilterChange,
     handleResetFilters,
     handleSort,
-    handleSelectRow
+    handleSelectRow,
+    setPilotStatsComparisonPeriod,
+    setPilotStatsDetailView
   };
 }

@@ -163,6 +163,8 @@ export default function App() {
     logbookSubTab: "flights",
     logbookFilters: {},
     logbookSort: null,
+    pilotStatsComparisonPeriod: "last-90-days",
+    pilotStatsDetailView: null,
     tourProgress: {}
   });
   const flightBoardCacheSignatureRef = useRef("");
@@ -1049,6 +1051,8 @@ export default function App() {
     selectedTourPath,
     selectedAccomplishmentName,
     mapOptions,
+    pilotStatsComparisonPeriod: logbookWorkspace.persistedUiState.pilotStatsComparisonPeriod,
+    pilotStatsDetailView: logbookWorkspace.persistedUiState.pilotStatsDetailView,
     ...logbookWorkspace.persistedUiState,
     tourProgress
   };

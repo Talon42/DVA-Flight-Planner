@@ -64,13 +64,17 @@ export default function LogbookPanel({
   selectedRowId,
   pilotStats,
   summaryStats,
+  pilotStatsComparisonPeriod,
+  pilotStatsDetailView,
   isSyncing = false,
   isRefreshingLogbook = false,
   onRefreshLogbook,
   onSelectTab,
   onSort,
   onSelectRow,
-  onActivateRow
+  onActivateRow,
+  onPilotStatsComparisonPeriodChange,
+  onPilotStatsDetailViewChange
 }) {
   const isRefreshDisabled = Boolean(isSyncing || isRefreshingLogbook);
 
@@ -112,7 +116,14 @@ export default function LogbookPanel({
       <div className="min-h-0 w-full min-w-0 flex-1">
         {selectedTab === "pilot-stats" ? (
           <div className="app-scrollbar h-full min-h-0 overflow-y-auto overflow-x-hidden">
-            <LogbookPilotStats stats={pilotStats} summaryStats={summaryStats} />
+            <LogbookPilotStats
+              stats={pilotStats}
+              summaryStats={summaryStats}
+              pilotStatsComparisonPeriod={pilotStatsComparisonPeriod}
+              pilotStatsDetailView={pilotStatsDetailView}
+              onPilotStatsComparisonPeriodChange={onPilotStatsComparisonPeriodChange}
+              onPilotStatsDetailViewChange={onPilotStatsDetailViewChange}
+            />
           </div>
         ) : (
           <LogbookFlightsTable
