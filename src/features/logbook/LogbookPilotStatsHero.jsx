@@ -36,7 +36,7 @@ function SummaryAirlineMark({ airline, className = "" }) {
   }
 
   return (
-    <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)]", className)}>
+    <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center border border-[color:var(--line)] bg-[var(--surface)] text-[var(--text-heading)] dark:bg-[var(--surface-raised)] dark:text-white", className)}>
       <span className={cn("truncate px-1 text-center text-[0.72rem] font-semibold", labelTextClassName)}>
         {airlineCode || (airlineName ? airlineName.slice(0, 3).toUpperCase() : "?")}
       </span>
@@ -60,11 +60,11 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
   const compact = layoutMode === "wideShort" || layoutMode === "narrowShort";
   const isWide = layoutMode === "wideTall" || layoutMode === "wideShort";
   const toneClassName = isWide
-    ? "border-[#1f3555] bg-[#0d1b2e] text-white shadow-[0_10px_30px_rgba(8,18,32,0.18)]"
-    : "border-[color:var(--line)] bg-[var(--surface-raised)]";
-  const labelToneClassName = isWide ? "text-white/60" : "text-[var(--text-muted)]";
-  const headingToneClassName = isWide ? "text-white" : "text-[var(--text-heading)]";
-  const valueToneClassName = isWide ? "text-white" : "text-[var(--text-heading)]";
+    ? "border-[color:var(--line-strong)] bg-[var(--surface-panel)] text-[var(--text-primary)] shadow-[0_10px_30px_rgba(8,18,32,0.08)] dark:border-[#1f3555] dark:bg-[#0d1b2e] dark:text-white dark:shadow-[0_10px_30px_rgba(8,18,32,0.18)]"
+    : "border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-primary)]";
+  const labelToneClassName = isWide ? "text-[var(--text-muted)] dark:text-white/60" : "text-[var(--text-muted)]";
+  const headingToneClassName = isWide ? "text-[var(--text-heading)] dark:text-white" : "text-[var(--text-heading)]";
+  const valueToneClassName = isWide ? "text-[var(--text-heading)] dark:text-white" : "text-[var(--text-heading)]";
   const kpiCards = [
     {
       label: "Total Flights",
@@ -102,7 +102,7 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
     <Panel className={cn("border p-3 bp-1024:p-4", cardFrameClassName, toneClassName)}>
       <div className="grid min-w-0 gap-3">
         <div className={cn("grid min-w-0 gap-3", isWide ? "bp-1024:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]" : "bp-1024:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)]")}>
-          <div className={cn("flex min-w-0 items-center gap-3", isWide ? "border-b border-white/10 pb-3 bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0" : "border-b border-[color:var(--line)] pb-3 bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0")}>
+          <div className={cn("flex min-w-0 items-center gap-3", isWide ? "border-b border-[color:var(--line)] pb-3 bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0 dark:border-white/10" : "border-b border-[color:var(--line)] pb-3 bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0")}>
             <SummaryAirlineMark airline={airline} />
             <div className="min-w-0">
               <p className={cn("m-0 truncate text-[1rem] font-semibold leading-[1.1] tracking-[-0.02em] bp-1024:text-[1.1rem]", headingToneClassName)}>
@@ -123,7 +123,9 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
                 key={card.label}
                 className={cn(
                   "grid min-w-0 gap-0.5 border px-2 py-1.5",
-                  isWide ? "border-white/10 bg-white/5" : "border-[color:var(--line)] bg-[var(--surface-raised)]",
+                  isWide
+                    ? "border-[color:var(--line)] bg-[var(--surface)] dark:border-white/10 dark:bg-white/5"
+                    : "border-[color:var(--line)] bg-[var(--surface)]",
                   compact ? "py-1.5" : "py-2"
                 )}
               >
@@ -135,19 +137,19 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
                 </p>
                 {card.delta ? (
                   <p
-                    className={cn(
-                      "m-0 truncate text-[0.68rem] font-medium",
-                      isWide
-                        ? card.deltaStatus === "positive"
-                          ? "text-[#8ee3a2]"
-                          : card.deltaStatus === "negative"
-                            ? "text-[#ff9d9d]"
-                            : "text-white/60"
-                        : card.deltaStatus === "positive"
-                          ? "text-[#126835] dark:text-[#7FD18B]"
-                          : card.deltaStatus === "negative"
-                            ? "text-[var(--delta-red)]"
-                            : "text-[var(--text-muted)]"
+                  className={cn(
+                    "m-0 truncate text-[0.68rem] font-medium",
+                    isWide
+                      ? card.deltaStatus === "positive"
+                        ? "text-[#126835] dark:text-[#8ee3a2]"
+                        : card.deltaStatus === "negative"
+                          ? "text-[var(--delta-red)] dark:text-[#ff9d9d]"
+                          : "text-[var(--text-muted)] dark:text-white/60"
+                      : card.deltaStatus === "positive"
+                        ? "text-[#126835] dark:text-[#7FD18B]"
+                        : card.deltaStatus === "negative"
+                          ? "text-[var(--delta-red)]"
+                          : "text-[var(--text-muted)]"
                     )}
                   >
                     {card.delta}
@@ -159,7 +161,7 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
         </div>
 
         {useComparison ? (
-          <p className={cn("m-0 text-[0.82rem]", isWide ? "text-white/70" : "text-[var(--text-muted)]", bodySmTextClassName)}>
+          <p className={cn("m-0 text-[0.82rem]", isWide ? "text-[var(--text-muted)] dark:text-white/70" : "text-[var(--text-muted)]", bodySmTextClassName)}>
             Comparing against {comparison?.periodLabel || "the selected period"}.
           </p>
         ) : null}
