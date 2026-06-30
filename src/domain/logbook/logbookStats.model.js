@@ -319,12 +319,13 @@ function sumRows(rows) {
         accumulator.totalDistance += row.distanceNm;
       }
 
-      if (Number.isFinite(row.durationMinutes)) {
-        accumulator.totalDuration += row.durationMinutes;
+      // Use the imported block time and airborne time fields for pilot stats totals.
+      if (Number.isFinite(row.blockTimeMinutes)) {
+        accumulator.totalBlockTime += row.blockTimeMinutes;
       }
 
       if (Number.isFinite(row.airborneMinutes)) {
-        accumulator.totalAirborne += row.airborneMinutes;
+        accumulator.totalFlightTime += row.airborneMinutes;
       }
 
       if (Number.isFinite(row.totalFuelPounds)) {
@@ -341,8 +342,8 @@ function sumRows(rows) {
     {
       totalFlights: 0,
       totalDistance: 0,
-      totalDuration: 0,
-      totalAirborne: 0,
+      totalBlockTime: 0,
+      totalFlightTime: 0,
       totalFuel: 0,
       landingRows: []
     }
@@ -386,8 +387,8 @@ function buildPeriodMetrics(rows) {
   return {
     totalFlights: totals.totalFlights,
     totalDistanceNm: totals.totalDistance,
-    totalDurationMinutes: totals.totalDuration,
-    totalAirborneMinutes: totals.totalAirborne,
+    totalDurationMinutes: totals.totalBlockTime,
+    totalAirborneMinutes: totals.totalFlightTime,
     totalFuelPounds: totals.totalFuel,
     averageLandingRate,
     averageLandingRateGrade: averageLandingRate === null ? LOGBOOK_EMPTY_VALUE : formatLandingGrade(averageLandingRate)
@@ -597,8 +598,8 @@ export function buildLogbookPilotStats(rows, options = {}) {
   const routeFirstSeenOrder = new Map();
   const landingRows = [];
   let totalDistance = 0;
-  let totalDuration = 0;
-  let totalAirborne = 0;
+  let totalBlockTime = 0;
+  let totalFlightTime = 0;
   let totalFuel = 0;
 
   for (const row of activeRows) {
@@ -606,12 +607,14 @@ export function buildLogbookPilotStats(rows, options = {}) {
       totalDistance += row.distanceNm;
     }
 
-    if (Number.isFinite(row.durationMinutes)) {
-      totalDuration += row.durationMinutes;
+    // Keep the dashboard summary aligned to the imported block time field.
+    if (Number.isFinite(row.blockTimeMinutes)) {
+      totalBlockTime += row.blockTimeMinutes;
     }
 
+    // Keep the dashboard summary aligned to the imported airborne time field.
     if (Number.isFinite(row.airborneMinutes)) {
-      totalAirborne += row.airborneMinutes;
+      totalFlightTime += row.airborneMinutes;
     }
 
     if (Number.isFinite(row.totalFuelPounds)) {
@@ -657,8 +660,8 @@ export function buildLogbookPilotStats(rows, options = {}) {
       topEquipment: buildRankingItems(equipmentCounts, { totalCount: activeRows.length })[0] || null,
       totalFlights: formatNumber(activeRows.length),
       totalDistance: formatUnit(totalDistance, "nm"),
-      totalDuration: formatMinutes(totalDuration),
-      totalAirborneTime: formatMinutes(totalAirborne),
+      totalDuration: formatMinutes(totalBlockTime),
+      totalAirborneTime: formatMinutes(totalFlightTime),
       totalFuel: formatUnit(totalFuel, "lb"),
       averageLandingRate:
         averageLandingRate === null
@@ -679,8 +682,8 @@ export function buildLogbookPilotStats(rows, options = {}) {
     cards: [
       { label: "Total Flights", value: formatNumber(activeRows.length) },
       { label: "Total Distance", value: formatUnit(totalDistance, "nm") },
-      { label: "Total Duration", value: formatMinutes(totalDuration) },
-      { label: "Total Airborne Time", value: formatMinutes(totalAirborne) },
+      { label: "Total Block Time", value: formatMinutes(totalBlockTime) },
+      { label: "Total Flight Time", value: formatMinutes(totalFlightTime) },
       { label: "Total Fuel", value: formatUnit(totalFuel, "lb") },
       { label: "Average Landing Rate", value: formatUnit(averageLandingRate, "fpm", { maximumFractionDigits: 0 }) },
       {

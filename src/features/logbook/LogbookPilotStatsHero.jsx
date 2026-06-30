@@ -45,8 +45,9 @@ function SummaryAirlineMark({ airline, className = "" }) {
 }
 
 function getKpiGridClassName(layoutMode) {
+  // Keep the KPI strip in one row so height changes do not reflow the cards.
   if (layoutMode === "narrowShort") {
-    return "grid-cols-2";
+    return "grid-cols-5";
   }
 
   return "grid-cols-2 bp-1024:grid-cols-5";
@@ -79,13 +80,13 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
       deltaStatus: deltas.totalDistanceNm?.status
     },
     {
-      label: "Total Duration",
+      label: "Total Block Time",
       value: summary?.totalDuration || LOGBOOK_EMPTY_VALUE,
       delta: useComparison ? formatDeltaValue(deltas.totalDurationMinutes?.rawValue, "", "minutes") : "",
       deltaStatus: deltas.totalDurationMinutes?.status
     },
     {
-      label: "Total Airborne Time",
+      label: "Total Flight Time",
       value: summary?.totalAirborneTime || LOGBOOK_EMPTY_VALUE,
       delta: useComparison ? formatDeltaValue(deltas.totalAirborneMinutes?.rawValue, "", "minutes") : "",
       deltaStatus: deltas.totalAirborneMinutes?.status

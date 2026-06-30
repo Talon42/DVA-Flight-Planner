@@ -465,6 +465,7 @@ export function normalizeLogbookRows(entries) {
       airlineIcao: airlineCode
     });
     const durationMinutes = parseDurationMinutes(entry.duration) ?? parseDurationMinutes(entry.blockTime);
+    const blockTimeMinutes = parseDurationMinutes(entry.blockTime);
     const airborneMinutes = parseDurationMinutes(entry.airborneTime);
     const distanceNm = toNumber(entry.distance);
     const landingRate = toNumber(entry?.landing?.vSpeed);
@@ -490,6 +491,8 @@ export function normalizeLogbookRows(entries) {
         normalizeText(entry.eqType || entry?.aircraft?.icao || entry?.aircraft?.name) || LOGBOOK_EMPTY_VALUE,
       durationMinutes,
       durationDisplay: formatMinutes(durationMinutes),
+      blockTimeMinutes,
+      blockTimeDisplay: formatMinutes(blockTimeMinutes),
       airborneMinutes,
       airborneDisplay: formatMinutes(airborneMinutes),
       distanceNm,
