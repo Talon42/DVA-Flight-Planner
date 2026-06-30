@@ -115,10 +115,11 @@ export default function LogbookPanel({
 
       <div className="min-h-0 w-full min-w-0 flex-1">
         {selectedTab === "pilot-stats" ? (
-          <div className="app-scrollbar h-full min-h-0 overflow-y-auto overflow-x-hidden">
+          <div className="h-full min-h-0 overflow-hidden">
             <LogbookPilotStats
               stats={pilotStats}
               summaryStats={summaryStats}
+              viewportWidth={viewportWidth}
               pilotStatsComparisonPeriod={pilotStatsComparisonPeriod}
               pilotStatsDetailView={pilotStatsDetailView}
               onPilotStatsComparisonPeriodChange={onPilotStatsComparisonPeriodChange}

@@ -18,13 +18,23 @@ const PILOT_STATS_COMPARISON_OPTIONS = [
 ];
 
 const PANEL_CAPS = {
-  wideTall: 10,
-  wideShort: 8,
-  narrowTall: 8,
-  narrowShort: 5
+  wideTall: 6,
+  wideShort: 5,
+  narrowTall: 5,
+  narrowShort: 4
 };
 
-// Keeps the dashboard responsive without hard-coding more layout state into the app shell.
+const EMPTY_DETAIL_ROWS = Object.freeze({
+  airlines: [],
+  equipment: [],
+  recentLandings: [],
+  departureAirports: [],
+  arrivalAirports: [],
+  routes: [],
+  status: []
+});
+
+// Keeps the dashboard responsive without adding more global app layout state.
 function usePilotStatsLayoutMode(viewportWidth = 0, viewportHeight = 0) {
   const [windowSize, setWindowSize] = useState(() => ({
     width: typeof window !== "undefined" ? window.innerWidth : 0,
@@ -110,8 +120,12 @@ function formatDeltaValue(delta, unit = "", format = "number") {
   return `${formatter.format(delta)}${unit ? ` ${unit}` : ""}`.trim();
 }
 
-function formatRowValue(value) {
-  return value === null || value === undefined || value === "" ? LOGBOOK_EMPTY_VALUE : value;
+function getKpiColumns(layoutMode) {
+  if (layoutMode === "narrowTall") {
+    return "grid-cols-3";
+  }
+
+  return "grid-cols-5";
 }
 
 function buildRecentLandingPanelItems(rows) {
@@ -122,23 +136,71 @@ function buildRecentLandingPanelItems(rows) {
   }));
 }
 
-function getPanelRowsForMode(stats, mode) {
+function buildCombinedAirportRows(departures, arrivals) {
+  const airportMap = new Map();
+
+  function upsertAirport(item, type) {
+    const label = String(item?.label || "").trim();
+    if (!label) {
+      return;
+    }
+
+    const current = airportMap.get(label) || {
+      label,
+      dep: 0,
+      arr: 0
+    };
+
+    current[type] += Number(item?.count || 0);
+    airportMap.set(label, current);
+  }
+
+  (Array.isArray(departures) ? departures : []).forEach((item) => upsertAirport(item, "dep"));
+  (Array.isArray(arrivals) ? arrivals : []).forEach((item) => upsertAirport(item, "arr"));
+
+  const totalUses = [...airportMap.values()].reduce((sum, item) => sum + item.dep + item.arr, 0);
+
+  return [...airportMap.values()]
+    .map((item) => ({
+      label: item.label,
+      value: String(item.dep + item.arr),
+      meta: `${item.dep} dep / ${item.arr} arr`,
+      dep: String(item.dep),
+      arr: String(item.arr),
+      percentValue:
+        totalUses > 0 ? `${Math.round(((item.dep + item.arr) / totalUses) * 1000) / 10}%` : LOGBOOK_EMPTY_VALUE
+    }))
+    .sort((left, right) => Number(right.value) - Number(left.value) || left.label.localeCompare(right.label))
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1
+    }));
+}
+
+function buildPanelRowsForMode(stats, mode) {
   const cap = PANEL_CAPS[mode] || PANEL_CAPS.narrowShort;
+  const airlines = (stats.rankings?.airlines || []).slice(0, cap);
+  const equipment = (stats.rankings?.equipment || []).slice(0, cap);
+  const recentLandings = buildRecentLandingPanelItems((stats.recentLandings || []).slice(0, cap));
+  const combinedAirports = buildCombinedAirportRows(
+    (stats.rankings?.departureAirports || []).slice(0, 4),
+    (stats.rankings?.arrivalAirports || []).slice(0, 4)
+  ).slice(0, mode === "wideTall" ? 6 : 4);
+  const routes = (stats.rankings?.routes || []).slice(0, mode === "wideTall" || mode === "wideShort" ? 4 : 4);
 
   return {
-    airlines: (stats.rankings?.airlines || []).slice(0, cap),
-    equipment: (stats.rankings?.equipment || []).slice(0, cap),
-    recentLandings: buildRecentLandingPanelItems((stats.recentLandings || []).slice(0, cap)),
-    departures: (stats.rankings?.departureAirports || []).slice(0, mode === "wideTall" ? 8 : 5),
-    arrivals: (stats.rankings?.arrivalAirports || []).slice(0, mode === "wideTall" ? 8 : 5),
-    routes: (stats.rankings?.routes || []).slice(0, mode === "wideTall" ? 8 : 5),
-    status: (stats.rankings?.status || []).slice(0, cap)
+    airlines,
+    equipment,
+    recentLandings,
+    combinedAirports,
+    routes,
+    records: stats.records || {}
   };
 }
 
-function SummaryPanel({ title, items, onViewAll }) {
+function SummaryPanel({ title, items, onViewAll, footer = null, className = "" }) {
   return (
-    <Panel className={cn("flex h-full min-h-0 flex-col gap-3 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName)}>
+    <Panel className={cn("flex min-h-0 flex-col gap-2 overflow-hidden border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName, className)}>
       <div className="flex min-w-0 items-center justify-between gap-2">
         <p className={cn("m-0 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
         {onViewAll ? (
@@ -148,30 +210,25 @@ function SummaryPanel({ title, items, onViewAll }) {
         ) : null}
       </div>
 
-      {items?.length ? (
-        <div className="app-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-2">
-          {items.map((item) => (
-            <div
-              key={`${title}-${item.label}`}
-              className="flex min-w-0 items-baseline justify-between gap-3 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0"
-            >
-              <div className="min-w-0 flex-1">
-                <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>
-                  {item.label}
-                </p>
-                {item.meta ? (
-                  <p className={cn("m-0 truncate text-[var(--text-muted)]", bodySmTextClassName)}>{item.meta}</p>
-                ) : null}
+      <div className="min-h-0 overflow-hidden">
+        {items?.length ? (
+          <div className="grid gap-1.5">
+            {items.map((item) => (
+              <div key={`${title}-${item.label}`} className="flex min-w-0 items-baseline justify-between gap-3 border-b border-[color:var(--line)] pb-1.5 last:border-b-0 last:pb-0">
+                <div className="min-w-0 flex-1">
+                  <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item.label}</p>
+                  {item.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodySmTextClassName)}>{item.meta}</p> : null}
+                </div>
+                <p className={cn("m-0 shrink-0 text-[var(--text-heading)]", bodySmTextClassName)}>{item.value}</p>
               </div>
-              <p className={cn("m-0 shrink-0 text-[var(--text-heading)]", bodySmTextClassName)}>
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>No data available.</p>
-      )}
+            ))}
+          </div>
+        ) : (
+          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>No data available.</p>
+        )}
+      </div>
+
+      {footer}
     </Panel>
   );
 }
@@ -218,37 +275,40 @@ function PilotStatsHero({ summary, comparison, comparisonPeriod, layoutMode }) {
 
   return (
     <Panel className={cn("border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName)}>
-      <div className="grid gap-3">
+      <div className="grid gap-2">
         <div className="grid gap-3 bp-1400:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
           <div className="flex min-w-0 items-center gap-3 border-b border-[color:var(--line)] pb-3 bp-1400:border-b-0 bp-1400:border-r bp-1400:pr-3 bp-1400:pb-0">
             <SummaryAirlineMark airline={airline} />
             <div className="min-w-0">
-              <p className="m-0 truncate text-[1.15rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)]">
+              <p className="m-0 truncate text-[1.05rem] font-semibold leading-[1.1] tracking-[-0.02em] text-[var(--text-heading)] bp-1400:text-[1.15rem]">
                 {airlineLabel}
               </p>
-              <p className="m-0 truncate text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              <p className="m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                 Most flown airline
               </p>
               <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>{`${airlineCountLabel} flights`}</p>
             </div>
           </div>
 
-          <div className={cn("grid min-w-0 gap-2", compact ? "grid-cols-2" : "grid-cols-1 bp-1024:grid-cols-2 bp-1400:grid-cols-5")}>
+          <div className={cn("grid min-w-0 gap-2", getKpiColumns(layoutMode))}>
             {kpiCards.map((card) => (
               <div
                 key={card.label}
-                className="grid min-w-0 gap-1 border border-[color:var(--line)] bg-[var(--surface-raised)] p-2"
+                className={cn(
+                  "grid min-w-0 gap-0.5 border border-[color:var(--line)] bg-[var(--surface-raised)]",
+                  compact ? "p-1.5" : "p-2"
+                )}
               >
-                <p className="m-0 truncate text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                <p className="m-0 truncate text-[0.53rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                   {card.label}
                 </p>
-                <p className={cn("m-0 truncate text-[var(--text-heading)]", compact ? "text-[0.96rem] font-semibold leading-[1.05]" : sectionTitleTextClassName)}>
+                <p className={cn("m-0 truncate text-[var(--text-heading)]", compact ? "text-[0.9rem] font-semibold leading-[1.05]" : sectionTitleTextClassName)}>
                   {card.value}
                 </p>
                 {card.delta ? (
                   <p
                     className={cn(
-                      "m-0 truncate text-[0.72rem] font-medium",
+                      "m-0 truncate text-[0.68rem] font-medium",
                       card.deltaStatus === "positive"
                         ? "text-[#126835] dark:text-[#7FD18B]"
                         : card.deltaStatus === "negative"
@@ -264,7 +324,7 @@ function PilotStatsHero({ summary, comparison, comparisonPeriod, layoutMode }) {
           </div>
         </div>
 
-        {useComparison ? (
+        {layoutMode === "wideTall" && useComparison ? (
           <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
             Comparing against {comparison?.periodLabel || "the selected period"}.
           </p>
@@ -287,14 +347,8 @@ function PilotStatsDetailView({
 
   useEffect(() => {
     setSearchValue("");
-    if (detailView === "recent-landings") {
-      setSortKey("date");
-      setSortDirection("desc");
-      return;
-    }
-
-    setSortKey("rank");
-    setSortDirection("asc");
+    setSortKey(detailView === "recent-landings" ? "date" : "rank");
+    setSortDirection(detailView === "recent-landings" ? "desc" : "asc");
   }, [detailView]);
 
   const config = useMemo(() => {
@@ -303,8 +357,6 @@ function PilotStatsDetailView({
         return {
           title: "All Equipment",
           rows: detailRows.equipment || [],
-          defaultSortKey: "rank",
-          defaultSortDirection: "asc",
           columns: [
             { key: "rank", label: "Rank" },
             { key: "label", label: "Equipment" },
@@ -316,8 +368,6 @@ function PilotStatsDetailView({
         return {
           title: "Recent Landings",
           rows: detailRows.recentLandings || [],
-          defaultSortKey: "date",
-          defaultSortDirection: "desc",
           columns: [
             { key: "date", label: "Date" },
             { key: "flight", label: "Flight" },
@@ -328,12 +378,44 @@ function PilotStatsDetailView({
             { key: "badge", label: "Badge" }
           ]
         };
+      case "top-airports":
+        return {
+          title: "Top Airports",
+          rows: detailRows.topAirports || [],
+          columns: [
+            { key: "rank", label: "Rank" },
+            { key: "label", label: "Airport" },
+            { key: "value", label: "Total" },
+            { key: "dep", label: "DEP" },
+            { key: "arr", label: "ARR" },
+            { key: "percentValue", label: "% of Total" }
+          ]
+        };
+      case "routes":
+        return {
+          title: "All Routes",
+          rows: detailRows.routes || [],
+          columns: [
+            { key: "rank", label: "Rank" },
+            { key: "label", label: "Route" },
+            { key: "value", label: "Flights" },
+            { key: "percentValue", label: "% of Total" }
+          ]
+        };
+      case "records":
+        return {
+          title: "Records Snapshot",
+          rows: detailRows.records || [],
+          columns: [
+            { key: "label", label: "Record" },
+            { key: "value", label: "Value" },
+            { key: "meta", label: "Detail" }
+          ]
+        };
       case "departure-airports":
         return {
           title: "All Departure Airports",
           rows: detailRows.departureAirports || [],
-          defaultSortKey: "rank",
-          defaultSortDirection: "asc",
           columns: [
             { key: "rank", label: "Rank" },
             { key: "label", label: "Airport" },
@@ -345,38 +427,10 @@ function PilotStatsDetailView({
         return {
           title: "All Arrival Airports",
           rows: detailRows.arrivalAirports || [],
-          defaultSortKey: "rank",
-          defaultSortDirection: "asc",
           columns: [
             { key: "rank", label: "Rank" },
             { key: "label", label: "Airport" },
             { key: "value", label: "Arrivals" },
-            { key: "percentValue", label: "% of Total" }
-          ]
-        };
-      case "routes":
-        return {
-          title: "All Routes",
-          rows: detailRows.routes || [],
-          defaultSortKey: "rank",
-          defaultSortDirection: "asc",
-          columns: [
-            { key: "rank", label: "Rank" },
-            { key: "label", label: "Route" },
-            { key: "value", label: "Flights" },
-            { key: "percentValue", label: "% of Total" }
-          ]
-        };
-      case "status":
-        return {
-          title: "Status Breakdown",
-          rows: detailRows.status || [],
-          defaultSortKey: "rank",
-          defaultSortDirection: "asc",
-          columns: [
-            { key: "rank", label: "Rank" },
-            { key: "label", label: "Status" },
-            { key: "value", label: "Flights" },
             { key: "percentValue", label: "% of Total" }
           ]
         };
@@ -385,8 +439,6 @@ function PilotStatsDetailView({
         return {
           title: "All Airlines",
           rows: detailRows.airlines || [],
-          defaultSortKey: "rank",
-          defaultSortDirection: "asc",
           columns: [
             { key: "rank", label: "Rank" },
             { key: "label", label: "Airline" },
@@ -398,8 +450,8 @@ function PilotStatsDetailView({
   }, [detailRows, detailView]);
 
   const filteredRows = useMemo(() => {
-    const query = searchValue.trim().toLowerCase();
     const rows = Array.isArray(config.rows) ? config.rows : [];
+    const query = searchValue.trim().toLowerCase();
     const searchedRows = query
       ? rows.filter((row) =>
           Object.values(row)
@@ -438,7 +490,7 @@ function PilotStatsDetailView({
   }
 
   return (
-    <Panel className={cn("flex min-h-0 flex-1 flex-col gap-3 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName)}>
+    <Panel className={cn("flex min-h-0 flex-1 flex-col gap-3 overflow-hidden border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={onClose}>
           &lt; Pilot Stats
@@ -488,7 +540,7 @@ function PilotStatsDetailView({
                 <tr key={row.id || `${row.label}-${row.rank}`} className="border-b border-[color:var(--line)] last:border-b-0">
                   {config.columns.map((column) => (
                     <td key={column.key} className="px-3 py-2 align-top text-[var(--text-primary)] dark:text-white">
-                      {formatRowValue(row[column.key])}
+                      {row[column.key] ?? LOGBOOK_EMPTY_VALUE}
                     </td>
                   ))}
                 </tr>
@@ -508,28 +560,26 @@ function PilotStatsDetailView({
 }
 
 function buildPanelGrid(stats, mode, onViewAll) {
-  const rows = getPanelRowsForMode(stats, mode);
-  const records = stats.records || {};
+  const rows = buildPanelRowsForMode(stats, mode);
 
   if (mode === "wideTall") {
     return (
-      <div className="grid gap-3 bp-1400:grid-cols-4">
+      <div className="grid min-h-0 gap-3 overflow-hidden bp-1400:grid-cols-3">
         <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
         <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
         <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
-        <SummaryPanel title="Status Breakdown" items={rows.status} onViewAll={() => onViewAll("status")} />
-        <SummaryPanel title="Top Departure Airports" items={rows.departures} onViewAll={() => onViewAll("departure-airports")} />
-        <SummaryPanel title="Top Arrival Airports" items={rows.arrivals} onViewAll={() => onViewAll("arrival-airports")} />
+        <SummaryPanel title="Top Airports" items={rows.combinedAirports} onViewAll={() => onViewAll("top-airports")} />
         <SummaryPanel title="Favorite Routes" items={rows.routes} onViewAll={() => onViewAll("routes")} />
         <SummaryPanel
-          title="Personal Records"
+          title="Records Snapshot"
           items={[
-            records.bestLanding ? { label: "Best Landing", value: records.bestLanding.value, meta: records.bestLanding.label } : null,
-            records.worstLanding ? { label: "Worst Landing", value: records.worstLanding.value, meta: records.worstLanding.label } : null,
-            records.longestFlight ? { label: "Longest Flight", value: records.longestFlight.value, meta: records.longestFlight.label } : null,
-            records.shortestFlight ? { label: "Shortest Flight", value: records.shortestFlight.value, meta: records.shortestFlight.label } : null,
-            records.busiestMonth ? { label: "Busiest Month", value: records.busiestMonth.value, meta: records.busiestMonth.label } : null
+            rows.records.bestLanding ? { label: "Best Landing", value: rows.records.bestLanding.value, meta: rows.records.bestLanding.label } : null,
+            rows.records.worstLanding ? { label: "Worst Landing", value: rows.records.worstLanding.value, meta: rows.records.worstLanding.label } : null,
+            rows.records.longestFlight ? { label: "Longest Flight", value: rows.records.longestFlight.value, meta: rows.records.longestFlight.label } : null,
+            rows.records.shortestFlight ? { label: "Shortest Flight", value: rows.records.shortestFlight.value, meta: rows.records.shortestFlight.label } : null,
+            rows.records.busiestMonth ? { label: "Busiest Month", value: rows.records.busiestMonth.value, meta: rows.records.busiestMonth.label } : null
           ].filter(Boolean)}
+          onViewAll={() => onViewAll("records")}
         />
       </div>
     );
@@ -537,58 +587,41 @@ function buildPanelGrid(stats, mode, onViewAll) {
 
   if (mode === "wideShort") {
     return (
-      <div className="grid gap-3">
-        <div className="grid gap-3 bp-1400:grid-cols-4">
-          <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
-          <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
-          <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
-          <SummaryPanel title="Status Breakdown" items={rows.status} onViewAll={() => onViewAll("status")} />
-        </div>
-        <div className="grid gap-3 bp-1400:grid-cols-2">
-          <SummaryPanel title="Top Departure Airports" items={rows.departures} onViewAll={() => onViewAll("departure-airports")} />
-          <SummaryPanel title="Favorite Routes" items={rows.routes} onViewAll={() => onViewAll("routes")} />
-        </div>
+      <div className="grid min-h-0 gap-3 overflow-hidden bp-1400:grid-cols-3">
+        <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
+        <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
+        <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
+        <SummaryPanel title="Top Airports" items={rows.combinedAirports} onViewAll={() => onViewAll("top-airports")} />
+        <SummaryPanel title="Favorite Routes" items={rows.routes} onViewAll={() => onViewAll("routes")} />
       </div>
     );
   }
 
   if (mode === "narrowTall") {
     return (
-      <div className="grid gap-3">
-        <div className="grid gap-3 bp-1024:grid-cols-2">
-          <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
-          <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
-        </div>
-        <div className="grid gap-3 bp-1024:grid-cols-2">
-          <SummaryPanel title="Landing Trend" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
-          <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
-        </div>
-        <div className="grid gap-3 bp-1024:grid-cols-2">
-          <SummaryPanel title="Top Departure Airports" items={rows.departures} onViewAll={() => onViewAll("departure-airports")} />
-          <SummaryPanel title="Favorite Routes" items={rows.routes} onViewAll={() => onViewAll("routes")} />
-        </div>
+      <div className="grid min-h-0 gap-3 overflow-hidden bp-1024:grid-cols-2">
+        <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
+        <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
+        <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
+        <SummaryPanel title="Top Airports" items={rows.combinedAirports} onViewAll={() => onViewAll("top-airports")} />
       </div>
     );
   }
 
   return (
-    <div className="grid gap-3">
-      <div className="grid gap-3 bp-1024:grid-cols-2">
-        <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
-        <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
-      </div>
-      <div className="grid gap-3 bp-1024:grid-cols-2">
-        <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
-        <SummaryPanel title="Status Breakdown" items={rows.status} onViewAll={() => onViewAll("status")} />
-      </div>
+    <div className="grid min-h-0 gap-3 overflow-hidden bp-1024:grid-cols-3">
+      <SummaryPanel title="Flights by Airline" items={rows.airlines} onViewAll={() => onViewAll("airlines")} />
+      <SummaryPanel title="Flights by Equipment" items={rows.equipment} onViewAll={() => onViewAll("equipment")} />
+      <SummaryPanel title="Recent Landings" items={rows.recentLandings} onViewAll={() => onViewAll("recent-landings")} />
     </div>
   );
 }
 
-// Renders the adaptive Pilot Stats dashboard and the full-width detail drill-in.
+// Renders the Pilot Stats overview and drill-in detail view.
 export default function LogbookPilotStats({
   stats,
   summaryStats,
+  viewportWidth = 0,
   pilotStatsComparisonPeriod = "last-90-days",
   pilotStatsDetailView = null,
   onPilotStatsComparisonPeriodChange,
@@ -596,12 +629,57 @@ export default function LogbookPilotStats({
 }) {
   const summary = summaryStats?.summary || null;
   const comparisons = summaryStats?.comparisons || null;
-  const detailRows = summaryStats?.detailRows || {};
-  const layoutMode = usePilotStatsLayoutMode();
+  const detailRows = summaryStats?.detailRows ?? EMPTY_DETAIL_ROWS;
+  const layoutMode = usePilotStatsLayoutMode(viewportWidth);
   const comparisonEnabled = pilotStatsComparisonPeriod !== "off";
 
+  const detailRowsWithCombinedAirports = useMemo(() => {
+    const departures = Array.isArray(detailRows.departureAirports) ? detailRows.departureAirports : [];
+    const arrivals = Array.isArray(detailRows.arrivalAirports) ? detailRows.arrivalAirports : [];
+    const airportMap = new Map();
+
+    for (const item of departures) {
+      airportMap.set(String(item.label || "").trim(), {
+        label: String(item.label || "").trim(),
+        dep: Number(item.count || 0),
+        arr: 0,
+        value: Number(item.count || 0)
+      });
+    }
+
+    for (const item of arrivals) {
+      const label = String(item.label || "").trim();
+      const current = airportMap.get(label) || { label, dep: 0, arr: 0, value: 0 };
+      current.arr += Number(item.count || 0);
+      current.value = current.dep + current.arr;
+      airportMap.set(label, current);
+    }
+
+    const totalUses = [...airportMap.values()].reduce((sum, item) => sum + item.value, 0);
+
+    return {
+      ...detailRows,
+      topAirports: [...airportMap.values()]
+        .map((item) => ({
+          label: item.label,
+          value: String(item.value),
+          dep: String(item.dep),
+          arr: String(item.arr),
+          percentValue: totalUses > 0 ? `${Math.round((item.value / totalUses) * 1000) / 10}%` : LOGBOOK_EMPTY_VALUE
+        }))
+        .sort((left, right) => Number(right.value) - Number(left.value) || left.label.localeCompare(right.label)),
+      records: [
+        summaryStats?.records?.bestLanding ? { label: "Best Landing", value: summaryStats.records.bestLanding.value, meta: summaryStats.records.bestLanding.label } : null,
+        summaryStats?.records?.worstLanding ? { label: "Worst Landing", value: summaryStats.records.worstLanding.value, meta: summaryStats.records.worstLanding.label } : null,
+        summaryStats?.records?.longestFlight ? { label: "Longest Flight", value: summaryStats.records.longestFlight.value, meta: summaryStats.records.longestFlight.label } : null,
+        summaryStats?.records?.shortestFlight ? { label: "Shortest Flight", value: summaryStats.records.shortestFlight.value, meta: summaryStats.records.shortestFlight.label } : null,
+        summaryStats?.records?.busiestMonth ? { label: "Busiest Month", value: summaryStats.records.busiestMonth.value, meta: summaryStats.records.busiestMonth.label } : null
+      ].filter(Boolean)
+    };
+  }, [detailRows, summaryStats?.records]);
+
   return (
-    <div className="logbook-pilot-stats flex min-h-0 flex-col gap-3 px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
+    <div className="logbook-pilot-stats flex h-full min-h-0 flex-col gap-3 overflow-hidden px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
       <SectionHeader
         title="Pilot Stats"
         actions={
@@ -622,7 +700,7 @@ export default function LogbookPilotStats({
       />
 
       {summary ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           <PilotStatsHero
             summary={summary}
             comparison={comparisons}
@@ -631,15 +709,19 @@ export default function LogbookPilotStats({
           />
 
           {pilotStatsDetailView ? (
-            <PilotStatsDetailView
-              detailView={pilotStatsDetailView}
-              detailRows={detailRows}
-              comparisonPeriodLabel={comparisons?.periodLabel || "Last 90 Days"}
-              comparisonEnabled={comparisonEnabled}
-              onClose={() => onPilotStatsDetailViewChange?.(null)}
-            />
+            <div className="flex min-h-0 flex-1 overflow-hidden">
+              <PilotStatsDetailView
+                detailView={pilotStatsDetailView}
+                detailRows={detailRowsWithCombinedAirports}
+                comparisonPeriodLabel={comparisons?.periodLabel || "Last 90 Days"}
+                comparisonEnabled={comparisonEnabled}
+                onClose={() => onPilotStatsDetailViewChange?.(null)}
+              />
+            </div>
           ) : (
-            buildPanelGrid(stats, layoutMode, (viewName) => onPilotStatsDetailViewChange?.(viewName))
+            <div className="flex min-h-0 flex-1 overflow-hidden">
+              {buildPanelGrid(stats, layoutMode, (viewName) => onPilotStatsDetailViewChange?.(viewName))}
+            </div>
           )}
         </div>
       ) : (
