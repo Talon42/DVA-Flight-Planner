@@ -72,7 +72,7 @@ export default function AppMainWorkspace({
 }) {
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="grid min-h-0 flex-1 gap-4 [grid-template-columns:minmax(0,1.42fr)_minmax(224px,0.9fr)] bp-1024:gap-3 bp-1024:[grid-template-columns:minmax(0,1.48fr)_minmax(248px,0.9fr)] bp-1400:[grid-template-columns:minmax(0,1.55fr)_minmax(260px,0.92fr)]">
+      <div className="grid min-h-0 flex-1 gap-4 [grid-template-columns:minmax(0,3fr)_minmax(260px,2fr)] bp-1024:gap-3">
         <ScheduleWorkspacePanel
           scheduleExists={Boolean(schedule)}
           scheduleView={scheduleView}
