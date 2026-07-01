@@ -178,7 +178,7 @@ export default function LogbookPilotStatsDetailView({
         <div className="min-w-0">
           <p className={cn("m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>{config.title}</p>
           <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
-            {comparisonEnabled ? `${rowCountLabel} · Comparison: ${comparisonPeriodLabel}` : `${rowCountLabel} · Comparison off`}
+            {comparisonEnabled ? `${rowCountLabel} · Comparison: ${comparisonPeriodLabel}` : `${rowCountLabel} · Comparison: All`}
           </p>
         </div>
 

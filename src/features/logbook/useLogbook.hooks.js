@@ -17,6 +17,7 @@ import {
 } from "./logbook.selectors.js";
 import {
   DEFAULT_PILOT_STATS_COMPARISON_PERIOD,
+  buildPilotStatsComparisonOptions,
   normalizePilotStatsComparisonPeriod
 } from "./logbookPilotStats.constants.js";
 
@@ -47,6 +48,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const hasHydratedPersistedStateRef = useRef(false);
 
   const allRows = useMemo(() => normalizeLogbookRows(cacheResult.entries), [cacheResult.entries]);
+  const pilotStatsComparisonOptions = useMemo(() => buildPilotStatsComparisonOptions(allRows), [allRows]);
   const filterBounds = useMemo(() => selectLogbookFilterBounds(allRows), [allRows]);
 
   useEffect(() => {
@@ -66,7 +68,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     );
     setFilters(normalizeLogbookFilters(persistedUiState.logbookFilters, filterBounds));
     setSort(normalizePersistedSort(persistedUiState.logbookSort));
-    setPilotStatsComparisonPeriod(normalizePilotStatsComparisonPeriod(persistedUiState.pilotStatsComparisonPeriod));
+    setPilotStatsComparisonPeriod(String(persistedUiState.pilotStatsComparisonPeriod || "").trim() || DEFAULT_PILOT_STATS_COMPARISON_PERIOD);
     setPilotStatsDetailView(
       String(persistedUiState.pilotStatsDetailView || "").trim() || null
     );
@@ -102,13 +104,17 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     () => selectFilteredLogbookRows({ rows: allRows, filters }),
     [allRows, filters]
   );
+  const activePilotStatsComparisonPeriod = useMemo(
+    () => normalizePilotStatsComparisonPeriod(pilotStatsComparisonPeriod, pilotStatsComparisonOptions),
+    [pilotStatsComparisonOptions, pilotStatsComparisonPeriod]
+  );
   const pilotStats = useMemo(
-    () => selectLogbookPilotStats(filteredRows, { comparisonPeriod: pilotStatsComparisonPeriod }),
-    [filteredRows, pilotStatsComparisonPeriod]
+    () => selectLogbookPilotStats(filteredRows, { comparisonPeriod: activePilotStatsComparisonPeriod }),
+    [activePilotStatsComparisonPeriod, filteredRows]
   );
   const allRowsPilotStats = useMemo(
-    () => selectLogbookPilotStats(allRows, { comparisonPeriod: pilotStatsComparisonPeriod }),
-    [allRows, pilotStatsComparisonPeriod]
+    () => selectLogbookPilotStats(allRows, { comparisonPeriod: activePilotStatsComparisonPeriod }),
+    [activePilotStatsComparisonPeriod, allRows]
   );
   const sortedFilteredRows = useMemo(
     () => selectSortedLogbookRows({ rows: filteredRows, sort }),
@@ -168,6 +174,8 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     pilotStats,
     allRowsPilotStats,
     pilotStatsComparisonPeriod,
+    activePilotStatsComparisonPeriod,
+    pilotStatsComparisonOptions,
     pilotStatsDetailView,
     handleFilterChange,
     handleResetFilters,

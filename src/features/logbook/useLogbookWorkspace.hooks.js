@@ -50,10 +50,11 @@ export function useLogbookWorkspace({
       selectedTab: logbook.selectedTab,
       sort: logbook.sort,
       selectedRowId: logbook.selectedRowId,
-      // Pilot Stats intentionally use the full cached logbook so filters stay scoped to Flights.
+      // Pilot stats apply the selected comparison period inside the stats selector.
       pilotStats: logbook.allRowsPilotStats,
       summaryStats: logbook.allRowsPilotStats,
-      pilotStatsComparisonPeriod: logbook.pilotStatsComparisonPeriod,
+      pilotStatsComparisonPeriod: logbook.activePilotStatsComparisonPeriod,
+      pilotStatsComparisonOptions: logbook.pilotStatsComparisonOptions,
       pilotStatsDetailView: logbook.pilotStatsDetailView,
       isSyncing,
       isRefreshingLogbook,
@@ -74,7 +75,8 @@ export function useLogbookWorkspace({
       logbook.handleSort,
       logbook.selectedRowId,
       logbook.selectedTab,
-      logbook.pilotStatsComparisonPeriod,
+      logbook.activePilotStatsComparisonPeriod,
+      logbook.pilotStatsComparisonOptions,
       logbook.pilotStatsDetailView,
       logbook.setSelectedTab,
       logbook.setPilotStatsComparisonPeriod,

@@ -91,7 +91,7 @@ function buildPanelGrid(stats, mode, onViewAll) {
               title="Flights by Airline"
               items={airlineItems}
               onViewAll={airlineItems.length ? () => onViewAll("airlines") : null}
-              variant="ranking"
+              variant="airline"
               maxRows={caps.airlines}
             />
             <LogbookPilotStatsSummaryPanel
@@ -161,7 +161,7 @@ function buildPanelGrid(stats, mode, onViewAll) {
               title="Flights by Airline"
               items={airlineItems}
               onViewAll={airlineItems.length ? () => onViewAll("airlines") : null}
-              variant="ranking"
+              variant="airline"
               maxRows={caps.airlines}
             />
             <LogbookPilotStatsSummaryPanel
@@ -196,7 +196,7 @@ function buildPanelGrid(stats, mode, onViewAll) {
             title="Flights by Airline"
             items={airlineItems}
             onViewAll={airlineItems.length ? () => onViewAll("airlines") : null}
-            variant="ranking"
+            variant="airline"
             maxRows={caps.airlines}
           />
           <LogbookPilotStatsSummaryPanel
@@ -253,7 +253,7 @@ export default function LogbookPilotStats({
               <LogbookPilotStatsDetailView
                 detailView={pilotStatsDetailView}
                 detailRows={detailRows}
-                comparisonPeriodLabel={comparisons?.periodLabel || "Last 90 Days"}
+                comparisonPeriodLabel={comparisons?.periodLabel || "All"}
                 comparisonEnabled={comparisonEnabled}
                 onClose={() => onPilotStatsDetailViewChange?.(null)}
               />

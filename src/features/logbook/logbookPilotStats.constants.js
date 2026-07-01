@@ -1,5 +1,12 @@
 export const DEFAULT_PILOT_STATS_COMPARISON_PERIOD = "last-90-days";
 
+const STATIC_PILOT_STATS_COMPARISON_OPTIONS = Object.freeze([
+  { value: "off", label: "All" },
+  { value: "last-30-days", label: "Last 30 Days" },
+  { value: "last-90-days", label: "Last 90 Days" },
+  { value: "year-to-date", label: "Year to Date" }
+]);
+
 export const PILOT_STATS_PANEL_CAPS = Object.freeze({
   wideTall: {
     airlines: 5,
@@ -35,13 +42,30 @@ export const PILOT_STATS_PANEL_CAPS = Object.freeze({
   }
 });
 
-export const PILOT_STATS_COMPARISON_OPTIONS = Object.freeze([
-  { value: "off", label: "Off" },
-  { value: "last-30-days", label: "Last 30 Days" },
-  { value: "last-90-days", label: "Last 90 Days" },
-  { value: "year-to-date", label: "Year to Date" },
-  { value: "previous-calendar-year", label: "Previous Calendar Year" }
-]);
+// Builds the dropdown options from the available logbook years so the filter tracks the data set.
+export function buildPilotStatsComparisonOptions(rows = []) {
+  const yearValues = new Set();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const dateSortKey = Number(row?.dateSortKey);
+    if (!Number.isFinite(dateSortKey) || dateSortKey <= 0) {
+      continue;
+    }
+
+    yearValues.add(Math.floor(dateSortKey / 10000));
+  }
+
+  const yearOptions = [...yearValues]
+    .sort((left, right) => right - left)
+    .map((year) => ({
+      value: `year-${year}`,
+      label: String(year)
+    }));
+
+  return [...STATIC_PILOT_STATS_COMPARISON_OPTIONS, ...yearOptions];
+}
+
+export const PILOT_STATS_COMPARISON_OPTIONS = STATIC_PILOT_STATS_COMPARISON_OPTIONS;
 
 export const PILOT_STATS_LAYOUT_MODES = Object.freeze({
   wideTall: "wideTall",
@@ -50,9 +74,9 @@ export const PILOT_STATS_LAYOUT_MODES = Object.freeze({
   narrowShort: "narrowShort"
 });
 
-export function normalizePilotStatsComparisonPeriod(value) {
+export function normalizePilotStatsComparisonPeriod(value, availableOptions = PILOT_STATS_COMPARISON_OPTIONS) {
   const normalized = String(value || "").trim();
-  const allowedValues = new Set(PILOT_STATS_COMPARISON_OPTIONS.map((option) => option.value));
+  const allowedValues = new Set((Array.isArray(availableOptions) ? availableOptions : []).map((option) => option.value));
 
   if (!normalized || !allowedValues.has(normalized)) {
     return DEFAULT_PILOT_STATS_COMPARISON_PERIOD;

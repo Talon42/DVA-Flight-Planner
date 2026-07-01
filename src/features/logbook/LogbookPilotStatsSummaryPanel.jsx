@@ -47,6 +47,37 @@ function RankingRow({ item }) {
   );
 }
 
+// Renders the airline ranking row with a dedicated logo column and no progress bar.
+function AirlineRow({ item }) {
+  const airlineCode = String(item?.meta || item?.row?.airlineCode || "").trim();
+  const logoSrc = String(item?.row?.airlineLogoSrc || "").trim();
+  const logoClassName = String(item?.row?.airlineLogoClassName || "").trim();
+
+  return (
+    <div className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+        {logoSrc ? (
+          <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-6 w-6 object-contain", logoClassName)} loading="lazy" />
+        ) : (
+          <span className={cn("truncate px-1 text-center text-[0.62rem] font-semibold uppercase", labelTextClassName)}>
+            {airlineCode ? airlineCode.slice(0, 3) : "?"}
+          </span>
+        )}
+      </div>
+
+      <div className="min-w-0">
+        <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
+        {airlineCode ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodySmTextClassName)}>{airlineCode}</p> : null}
+      </div>
+
+      <div className="shrink-0 text-right">
+        <p className={cn("m-0 text-[var(--text-heading)]", bodySmTextClassName)}>{item?.value}</p>
+        {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>{item.percentValue}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 function RouteRow({ item }) {
   const barWidth = Math.max(0, Math.min(100, parsePercentValue(item?.percentValue)));
 
@@ -138,7 +169,7 @@ export default function LogbookPilotStatsSummaryPanel({
       <div className="flex min-w-0 items-center justify-between gap-2">
         <p className={cn("m-0 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
         {onViewAll ? (
-          <Button variant="ghost" size="sm" onClick={onViewAll}>
+          <Button variant="ghost" size="sm" className="!bg-transparent hover:!bg-transparent dark:!bg-transparent dark:hover:!bg-transparent" onClick={onViewAll}>
             View all
           </Button>
         ) : null}
@@ -155,7 +186,9 @@ export default function LogbookPilotStatsSummaryPanel({
           ) : (
             <div className="grid gap-1.5">
               {rows.map((item) =>
-                variant === "landing" ? (
+                variant === "airline" ? (
+                  <AirlineRow key={`${item?.label}-${item?.value}`} item={item} />
+                ) : variant === "landing" ? (
                   <LandingRow key={`${item?.label}-${item?.value}`} item={item} />
                 ) : variant === "airport" ? (
                   <AirportRow key={`${item?.label}-${item?.value}`} item={item} />

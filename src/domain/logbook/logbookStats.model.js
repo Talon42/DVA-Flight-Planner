@@ -256,11 +256,22 @@ function buildCombinedAirportRows(departureCounts, arrivalCounts) {
 }
 
 function createPeriodConfig(periodKey, anchorDate) {
+  const normalizedKey = String(periodKey || "").trim();
+
+  if (normalizedKey === "off") {
+    return {
+      label: "All",
+      currentStart: null,
+      currentEndExclusive: null,
+      priorStart: null,
+      priorEndExclusive: null
+    };
+  }
+
   if (!anchorDate) {
     return null;
   }
 
-  const normalizedKey = String(periodKey || "").trim();
   const dayAfterAnchor = shiftDays(anchorDate, 1);
 
   switch (normalizedKey) {
@@ -288,16 +299,25 @@ function createPeriodConfig(periodKey, anchorDate) {
         priorStart: startOfYear(startOfPreviousYear(anchorDate)),
         priorEndExclusive: shiftYears(dayAfterAnchor, -1)
       };
-    case "previous-calendar-year":
+    default: {
+      const yearMatch = /^year-(\d{4})$/.exec(normalizedKey);
+      if (!yearMatch) {
+        return null;
+      }
+
+      const year = Number(yearMatch[1]);
+      if (!Number.isFinite(year)) {
+        return null;
+      }
+
       return {
-        label: "Previous Calendar Year",
-        currentStart: startOfPreviousYear(anchorDate),
-        currentEndExclusive: startOfYear(anchorDate),
-        priorStart: startOfPreviousYear(startOfPreviousYear(anchorDate)),
-        priorEndExclusive: startOfPreviousYear(anchorDate)
+        label: String(year),
+        currentStart: new Date(Date.UTC(year, 0, 1)),
+        currentEndExclusive: new Date(Date.UTC(year + 1, 0, 1)),
+        priorStart: new Date(Date.UTC(year - 1, 0, 1)),
+        priorEndExclusive: new Date(Date.UTC(year, 0, 1))
       };
-    default:
-      return null;
+    }
   }
 }
 
@@ -414,8 +434,9 @@ function buildComparisonBundle(rows, periodKey) {
 
   return {
     periodKey: String(periodKey || "last-90-days"),
-    periodLabel: periodConfig?.label || "Last 90 Days",
+    periodLabel: periodConfig?.label || "All",
     anchorDateIso: anchorDate ? anchorDate.toISOString() : null,
+    currentRows: currentPeriodRows,
     current,
     prior,
     deltas: {
@@ -585,6 +606,9 @@ function buildRecordSummary(rows) {
 // Builds the Pilot Stats dashboard model from the normalized logbook rows.
 export function buildLogbookPilotStats(rows, options = {}) {
   const activeRows = Array.isArray(rows) ? rows : [];
+  const comparisonPeriod = String(options?.comparisonPeriod || "last-90-days").trim() || "last-90-days";
+  const comparison = buildComparisonBundle(activeRows, comparisonPeriod);
+  const statsRows = Array.isArray(comparison.currentRows) ? comparison.currentRows : activeRows;
   const equipmentCounts = new Map();
   const simulatorCounts = new Map();
   const statusCounts = new Map();
@@ -602,7 +626,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
   let totalFlightTime = 0;
   let totalFuel = 0;
 
-  for (const row of activeRows) {
+  for (const row of statsRows) {
     if (Number.isFinite(row.distanceNm)) {
       totalDistance += row.distanceNm;
     }
@@ -649,16 +673,14 @@ export function buildLogbookPilotStats(rows, options = {}) {
         )[0]
       : null;
   const topAirline = selectTopCountEntry(airlineCounts, airlineFirstSeenOrder, airlineRowsByKey);
-  const records = buildRecordSummary(activeRows);
-  const comparisonPeriod = String(options?.comparisonPeriod || "last-90-days").trim() || "last-90-days";
-  const comparison = buildComparisonBundle(activeRows, comparisonPeriod);
+  const records = buildRecordSummary(statsRows);
 
   return {
-    totalFlights: activeRows.length,
+    totalFlights: statsRows.length,
     summary: {
       topAirline,
-      topEquipment: buildRankingItems(equipmentCounts, { totalCount: activeRows.length })[0] || null,
-      totalFlights: formatNumber(activeRows.length),
+      topEquipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length })[0] || null,
+      totalFlights: formatNumber(statsRows.length),
       totalDistance: formatUnit(totalDistance, "nm"),
       totalDuration: formatMinutes(totalBlockTime),
       totalAirborneTime: formatMinutes(totalFlightTime),
@@ -680,7 +702,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
       anchorDateIso: comparison.anchorDateIso
     },
     cards: [
-      { label: "Total Flights", value: formatNumber(activeRows.length) },
+      { label: "Total Flights", value: formatNumber(statsRows.length) },
       { label: "Total Distance", value: formatUnit(totalDistance, "nm") },
       { label: "Total Block Time", value: formatMinutes(totalBlockTime) },
       { label: "Total Flight Time", value: formatMinutes(totalFlightTime) },
@@ -710,51 +732,51 @@ export function buildLogbookPilotStats(rows, options = {}) {
       }
     ],
     records,
-    recentLandings: buildRecentLandingRows(activeRows, 10),
+    recentLandings: buildRecentLandingRows(statsRows, 10),
     rankings: {
-      airlines: buildRankingItems(airlineCounts, { totalCount: activeRows.length, rowMap: airlineRowsByKey }),
-      equipment: buildRankingItems(equipmentCounts, { totalCount: activeRows.length }),
+      airlines: buildRankingItems(airlineCounts, { totalCount: statsRows.length, rowMap: airlineRowsByKey }),
+      equipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length }),
       topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
-      departureAirports: buildRankingItems(departureCounts, { totalCount: activeRows.length }),
-      arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: activeRows.length }),
+      departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
+      arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
       routes: buildRankingItems(routeCounts, {
-        totalCount: activeRows.length,
+        totalCount: statsRows.length,
         rowMap: routeRowsByKey,
         labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
       }),
-      status: buildRankingItems(statusCounts, { totalCount: activeRows.length }),
-      simulatorUsage: buildRankingItems(simulatorCounts, { totalCount: activeRows.length })
+      status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),
+      simulatorUsage: buildRankingItems(simulatorCounts, { totalCount: statsRows.length })
     },
     detailRows: {
-      airlines: buildRankingItems(airlineCounts, { totalCount: activeRows.length, rowMap: airlineRowsByKey }),
-      equipment: buildRankingItems(equipmentCounts, { totalCount: activeRows.length }),
-      recentLandings: buildRecentLandingRows(activeRows, activeRows.length),
+      airlines: buildRankingItems(airlineCounts, { totalCount: statsRows.length, rowMap: airlineRowsByKey }),
+      equipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length }),
+      recentLandings: buildRecentLandingRows(statsRows, statsRows.length),
       topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
-      departureAirports: buildRankingItems(departureCounts, { totalCount: activeRows.length }),
-      arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: activeRows.length }),
+      departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
+      arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
       routes: buildRankingItems(routeCounts, {
-        totalCount: activeRows.length,
+        totalCount: statsRows.length,
         rowMap: routeRowsByKey,
         labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
       }),
-      status: buildRankingItems(statusCounts, { totalCount: activeRows.length }),
+      status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),
       records: records.summaryRows
     },
     layoutSafeLists: {
-      airlines: buildRankingItems(airlineCounts, { totalCount: activeRows.length, rowMap: airlineRowsByKey }),
-      equipment: buildRankingItems(equipmentCounts, { totalCount: activeRows.length }),
-      departureAirports: buildRankingItems(departureCounts, { totalCount: activeRows.length }),
-      arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: activeRows.length }),
+      airlines: buildRankingItems(airlineCounts, { totalCount: statsRows.length, rowMap: airlineRowsByKey }),
+      equipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length }),
+      departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
+      arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
       routes: buildRankingItems(routeCounts, {
-        totalCount: activeRows.length,
+        totalCount: statsRows.length,
         rowMap: routeRowsByKey,
         labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
       }),
-      status: buildRankingItems(statusCounts, { totalCount: activeRows.length }),
-      recentLandings: buildRecentLandingRows(activeRows, 10)
+      status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),
+      recentLandings: buildRecentLandingRows(statsRows, 10)
     },
     raw: {
-      allRows: activeRows
+      allRows: statsRows
     }
   };
 }

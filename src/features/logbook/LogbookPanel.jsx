@@ -2,12 +2,11 @@ import { cn } from "../../components/ui/cn";
 import Button from "../../components/ui/Button";
 import { getPlannerTabStateClassName, plannerTabClassName, plannerTabsListClassName } from "../../components/ui/forms";
 import { cardFrameClassName } from "../../components/ui/patterns";
-import { bodySmTextClassName } from "../../components/ui/typography";
+import { bodySmTextClassName, buttonTextClassName } from "../../components/ui/typography";
 import LogbookFlightsTable from "./LogbookFlightsTable.jsx";
 import LogbookPilotStats from "./LogbookPilotStats.jsx";
 import {
   DEFAULT_PILOT_STATS_COMPARISON_PERIOD,
-  PILOT_STATS_COMPARISON_OPTIONS,
   normalizePilotStatsComparisonPeriod
 } from "./logbookPilotStats.constants.js";
 
@@ -17,13 +16,14 @@ function LogbookPanelHeader({
   isRefreshDisabled,
   isRefreshingLogbook,
   pilotStatsComparisonPeriod,
+  pilotStatsComparisonOptions,
   showPilotStatsComparison,
   onRefreshLogbook,
   onSelectTab,
   onPilotStatsComparisonPeriodChange
 }) {
   return (
-    <div className="logbook-panel__header flex w-full min-w-0 flex-wrap items-end justify-between gap-3">
+    <div className="logbook-panel__header flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
       <div className={cn(plannerTabsListClassName, "logbook-panel__tabs-row")} role="tablist" aria-label="Logbook views">
         <button
           type="button"
@@ -48,26 +48,28 @@ function LogbookPanelHeader({
         </button>
       </div>
 
-      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+      <div className="flex min-w-0 flex-nowrap items-center justify-end gap-2">
         {showPilotStatsComparison ? (
-          <div className="min-w-[14rem]">
-            <label className="flex min-w-0 flex-col gap-1 text-[var(--text-muted)]">
-              <span className="m-0 text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                Compare
-              </span>
-              <select
-                className="min-h-[var(--planner-control-box-min-height)] rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-[var(--text-primary)] outline-none"
-                value={pilotStatsComparisonPeriod}
-                onChange={(event) => onPilotStatsComparisonPeriodChange?.(event.target.value)}
-              >
-                {PILOT_STATS_COMPARISON_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="flex min-w-0 items-center gap-2 text-[var(--text-muted)]">
+            <span className="m-0 text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Filter
+            </span>
+            <select
+              className={cn(
+                "min-h-11 w-auto rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-4 py-2.5 text-[0.88rem] text-[var(--text-primary)] outline-none",
+                buttonTextClassName,
+                "bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
+              )}
+              value={pilotStatsComparisonPeriod}
+              onChange={(event) => onPilotStatsComparisonPeriodChange?.(event.target.value)}
+            >
+              {(pilotStatsComparisonOptions || []).map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
 
         <Button
@@ -96,6 +98,7 @@ export default function LogbookPanel({
   pilotStats,
   summaryStats,
   pilotStatsComparisonPeriod,
+  pilotStatsComparisonOptions,
   pilotStatsDetailView,
   isSyncing = false,
   isRefreshingLogbook = false,
@@ -109,7 +112,8 @@ export default function LogbookPanel({
 }) {
   const isRefreshDisabled = Boolean(isSyncing || isRefreshingLogbook);
   const activePilotStatsComparisonPeriod = normalizePilotStatsComparisonPeriod(
-    pilotStatsComparisonPeriod || DEFAULT_PILOT_STATS_COMPARISON_PERIOD
+    pilotStatsComparisonPeriod || DEFAULT_PILOT_STATS_COMPARISON_PERIOD,
+    pilotStatsComparisonOptions
   );
 
   if (!allRows.length) {
@@ -121,6 +125,7 @@ export default function LogbookPanel({
             isRefreshDisabled={isRefreshDisabled}
             isRefreshingLogbook={isRefreshingLogbook}
             pilotStatsComparisonPeriod={activePilotStatsComparisonPeriod}
+            pilotStatsComparisonOptions={pilotStatsComparisonOptions}
             showPilotStatsComparison={false}
             onRefreshLogbook={onRefreshLogbook}
             onSelectTab={onSelectTab}
@@ -146,6 +151,7 @@ export default function LogbookPanel({
           isRefreshDisabled={isRefreshDisabled}
           isRefreshingLogbook={isRefreshingLogbook}
           pilotStatsComparisonPeriod={activePilotStatsComparisonPeriod}
+          pilotStatsComparisonOptions={pilotStatsComparisonOptions}
           showPilotStatsComparison={selectedTab === "pilot-stats" && allRows.length > 0}
           onRefreshLogbook={onRefreshLogbook}
           onSelectTab={onSelectTab}
@@ -160,6 +166,7 @@ export default function LogbookPanel({
               stats={pilotStats}
               summaryStats={summaryStats}
               pilotStatsComparisonPeriod={activePilotStatsComparisonPeriod}
+              pilotStatsComparisonOptions={pilotStatsComparisonOptions}
               pilotStatsDetailView={pilotStatsDetailView}
               onPilotStatsComparisonPeriodChange={onPilotStatsComparisonPeriodChange}
               onPilotStatsDetailViewChange={onPilotStatsDetailViewChange}
