@@ -1,0 +1,62 @@
+import React from "react";
+import Button from "../components/ui/Button";
+import Panel from "../components/ui/Panel";
+import SectionHeader from "../components/ui/SectionHeader";
+import { logAppError } from "../services/logging/appLog.client.js";
+
+function buildRenderErrorMetadata(error, info) {
+  const componentStack = String(info?.componentStack || "").trim();
+
+  return {
+    errorName: error instanceof Error ? error.name : "Error",
+    errorMessage: error instanceof Error ? error.message : String(error || "Unknown render error"),
+    componentStack: componentStack ? componentStack.slice(0, 4000) : null
+  };
+}
+
+// Catches root render crashes so the app can show a recoverable fallback instead of a blank screen.
+export default class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    logAppError("app-render-failed", error, buildRenderErrorMetadata(error, info)).catch(() => {});
+  }
+
+  handleRetry = () => {
+    this.setState({ hasError: false });
+  };
+
+  handleReload = () => {
+    window.location.reload();
+  };
+
+  render() {
+    if (!this.state.hasError) {
+      return this.props.children;
+    }
+
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--app-background)] p-4">
+        <Panel className="w-full max-w-lg gap-4 p-6 shadow-lg">
+          <SectionHeader eyebrow="Application" title="Unable to render the app" />
+          <p className="text-sm leading-6 text-[color:var(--muted-text)]">
+            The app hit a render error. Try again first. If the problem comes back, reload the app.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={this.handleRetry}>Try Again</Button>
+            <Button variant="ghost" onClick={this.handleReload}>
+              Reload App
+            </Button>
+          </div>
+        </Panel>
+      </div>
+    );
+  }
+}

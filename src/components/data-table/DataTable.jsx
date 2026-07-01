@@ -11,6 +11,7 @@ import {
 } from "./tableUtils";
 import { TABLE_ROW_HEIGHT } from "./tableWidthPresets";
 import { cn } from "../ui/cn";
+import { tableCanvasClassName } from "../ui/patterns";
 
 const INITIAL_VISIBLE_ROWS = 50;
 const VISIBLE_ROW_PAGE = 50;
@@ -23,7 +24,7 @@ const TableListOuter = forwardRef(function TableListOuter(props, ref) {
     <div
       {...rest}
       ref={ref}
-      className={cn(className, "app-scrollbar relative z-0 bg-[var(--surface-panel)]")}
+      className={cn(className, "app-scrollbar relative z-0", tableCanvasClassName)}
       style={{
         ...style,
         overflowX: "hidden",
@@ -244,7 +245,10 @@ export default function DataTable({
   return (
     <div
       ref={tableRef}
-      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)] bg-[var(--surface-panel)]"
+      className={cn(
+        "flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)]",
+        tableCanvasClassName
+      )}
     >
       <div className="w-full min-w-0 flex-none overflow-hidden">
         <TableHeader
@@ -277,7 +281,10 @@ export default function DataTable({
       ) : (
         <div
           ref={scrollContainerRef}
-          className="app-scrollbar relative z-0 min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--surface-panel)]"
+          className={cn(
+            "app-scrollbar relative z-0 min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden",
+            tableCanvasClassName
+          )}
         >
           {rows.map((row) => {
             const rowId = getRowId(row);

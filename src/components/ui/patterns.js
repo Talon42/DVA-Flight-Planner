@@ -22,6 +22,10 @@ export const nestedListItemInteractiveClassName = cn(
   "transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] dark:hover:bg-[var(--surface-panel)]"
 );
 
+export const tableCanvasClassName = "bg-[var(--surface-panel)]";
+
+export const tableFrameClassName = cn("border-2 border-[color:var(--panel-border)]", tableCanvasClassName);
+
 export const insetPanelClassName =
   cn("mt-4 grid gap-4 rounded-none p-4 bp-1024:gap-3 bp-1024:p-3.5", cardFrameClassName);
 

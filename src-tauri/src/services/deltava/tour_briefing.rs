@@ -21,6 +21,10 @@ use webview2_com::{
 #[cfg(windows)]
 use windows::core::{Interface, PWSTR};
 
+use crate::services::deltava::sync_types::{
+    MAX_DELTAVA_TOUR_BRIEFING_PDF_BYTES, MAX_DELTAVA_TOUR_BRIEFING_WEB_MESSAGE_BYTES,
+};
+
 const DELTAVA_TOUR_BRIEFING_LABEL_PREFIX: &str = "dva-tour-briefing";
 const DELTAVA_TOUR_BRIEFING_TIMEOUT_SECONDS: u64 = 120;
 const DELTAVA_TOUR_BRIEFING_RESULT_MESSAGE_PREFIX: &str =
@@ -223,6 +227,55 @@ fn build_briefing_fetch_script(briefing_url: &str, nonce: &str) -> String {
     return btoa(binary);
   };
 
+  const readBoundedBytes = async (response, maxBytes, label) => {
+    const contentLength = Number(response.headers.get('content-length') || NaN);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+    }
+
+    if (!response.body?.getReader) {
+      const buffer = await response.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      if (bytes.length > maxBytes) {
+        throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+      }
+      return bytes;
+    }
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        if (value && value.length) {
+          totalBytes += value.length;
+          if (totalBytes > maxBytes) {
+            await reader.cancel();
+            throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+          }
+          chunks.push(value);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return bytes;
+  };
+
   const parseFilename = (contentDisposition) => {
     const raw = String(contentDisposition || '').trim();
     if (!raw) {
@@ -257,8 +310,7 @@ fn build_briefing_fetch_script(briefing_url: &str, nonce: &str) -> String {
       });
       const contentType = String(response.headers.get('content-type') || '').trim();
       const contentDisposition = String(response.headers.get('content-disposition') || '').trim();
-      const buffer = await response.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
+      const bytes = await readBoundedBytes(response, __BRIEFING_MAX_BYTES__, 'Delta Virtual briefing PDF');
       const isPdfMagic =
         bytes.length >= 4 &&
         bytes[0] === 0x25 &&
@@ -325,6 +377,10 @@ fn build_briefing_fetch_script(briefing_url: &str, nonce: &str) -> String {
         .replace("__NONCE__", &nonce)
         .replace("__RESULT_PREFIX__", &result_prefix)
         .replace("__DEBUG_PREFIX__", &debug_prefix)
+        .replace(
+            "__BRIEFING_MAX_BYTES__",
+            &MAX_DELTAVA_TOUR_BRIEFING_PDF_BYTES.to_string(),
+        )
 }
 
 fn close_briefing_window(app: &AppHandle, label: &str) {
@@ -445,6 +501,17 @@ fn attach_windows_briefing_message_handler(
                                 let sync_nonce = sync_nonce.clone();
                                 let sender_for_task = sender.clone();
                                 let briefing_window_label_for_task = briefing_window_label.clone();
+
+                                if payload_text.len() > MAX_DELTAVA_TOUR_BRIEFING_WEB_MESSAGE_BYTES {
+                                    if let Some(sender) = sender_for_task.lock().ok().and_then(|mut slot| slot.take()) {
+                                        let _ = sender.send(Err(
+                                            "download_failed: Delta Virtual response was too large."
+                                                .into(),
+                                        ));
+                                    }
+                                    close_briefing_window(&app_handle, &briefing_window_label_for_task);
+                                    return Ok(());
+                                }
 
                                 tauri::async_runtime::spawn(async move {
                                     match serde_json::from_str::<DeltaTourBriefingResultEnvelope>(&payload_text) {

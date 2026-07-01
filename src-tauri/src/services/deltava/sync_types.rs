@@ -1,5 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+pub(crate) const MAX_DELTAVA_SCHEDULE_XML_BYTES: usize = 10 * 1024 * 1024;
+pub(crate) const MAX_DELTAVA_LOGBOOK_JSON_BYTES: usize = 25 * 1024 * 1024;
+pub(crate) const MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES: usize = 5 * 1024 * 1024;
+pub(crate) const MAX_DELTAVA_TOUR_BRIEFING_PDF_BYTES: usize = 50 * 1024 * 1024;
+pub(crate) const MAX_DELTAVA_DEBUG_MESSAGE_BYTES: usize = 4 * 1024;
+pub(crate) const MAX_DELTAVA_SYNC_WEB_MESSAGE_BYTES: usize = 40 * 1024 * 1024;
+pub(crate) const MAX_DELTAVA_LOGBOOK_REFRESH_WEB_MESSAGE_BYTES: usize = 26 * 1024 * 1024;
+pub(crate) const MAX_DELTAVA_XML_CAPTURE_WEB_MESSAGE_BYTES: usize = 11 * 1024 * 1024;
+pub(crate) const MAX_DELTAVA_TOUR_BRIEFING_WEB_MESSAGE_BYTES: usize = 70 * 1024 * 1024;
+
 /// Shared DTOs for the Delta Virtual sync flow and its webview message bridge.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +24,7 @@ pub(crate) struct DeltaSyncPayload {
     pub warnings: Vec<String>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeltaLogbookArtifact {
     pub file_name: String,

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { DEFAULT_DERIVED_TOUR_PROGRESS } from "../tours/tours.constants.js";
 import {
   createLogRunId,
@@ -19,19 +19,6 @@ import {
   syncScheduleFromDeltaVirtual
 } from "../../services/tauri/deltaVirtual.client.js";
 
-const DELTA_VIRTUAL_SYNC_TIMEOUT_MS = 30_000;
-
-function withTimeout(promise, timeoutMs, createError) {
-  let timeoutId = null;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = window.setTimeout(() => reject(createError()), timeoutMs);
-  });
-
-  return Promise.race([promise, timeoutPromise]).finally(() => {
-    window.clearTimeout(timeoutId);
-  });
-}
-
 // Owns the Delta Virtual sync workflow so App.jsx can keep the shell and settings wiring thin.
 export function useDeltaVirtualSync({
   dvaFirstName = "",
@@ -51,6 +38,8 @@ export function useDeltaVirtualSync({
   } = {}) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isRefreshingLogbook, setIsRefreshingLogbook] = useState(false);
+  const isSyncingRef = useRef(false);
+  const isRefreshingLogbookRef = useRef(false);
 
   const handleCloseDvaSyncWarning = useCallback(() => {
     setDvaSyncWarning?.(null);
@@ -110,6 +99,10 @@ export function useDeltaVirtualSync({
   }, [setDeltaVirtualAccomplishmentEligibility]);
 
   const handleDeltaVirtualSync = useCallback(async () => {
+    if (isSyncingRef.current || isRefreshingLogbookRef.current) {
+      return;
+    }
+
     const syncRunId = createLogRunId("sync");
     const syncStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
     await logSystemEvent("DVA Sync", "started", {
@@ -141,22 +134,17 @@ export function useDeltaVirtualSync({
       return;
     }
 
+    isSyncingRef.current = true;
     setIsSyncing(true);
     setStatusMessage?.("Syncing data from Delta Virtual.");
     let shouldRemoveDownloadedSchedule = false;
-    let shouldResetSyncSession = false;
 
     try {
       setStatusMessage?.("Syncing data from Delta Virtual.");
-      const syncedFile = await withTimeout(
-        syncScheduleFromDeltaVirtual({ syncRunId, debugEnabled: isDevToolsEnabled }),
-        DELTA_VIRTUAL_SYNC_TIMEOUT_MS,
-        () => {
-          const error = new Error("Delta Virtual Sync timed out after 30 seconds.");
-          error.kind = "sync_timeout";
-          return error;
-        }
-      );
+      const syncedFile = await syncScheduleFromDeltaVirtual({
+        syncRunId,
+        debugEnabled: isDevToolsEnabled
+      });
       await logSystemEvent("DVA Sync", "succeeded", {
         syncRunId,
         file: syncedFile.fileName,
@@ -273,26 +261,6 @@ export function useDeltaVirtualSync({
             )
           )
         });
-      } else if (error?.kind === "sync_timeout") {
-        shouldResetSyncSession = true;
-        setIsSyncing(false);
-        const message =
-          "Delta Virtual Sync failed. Please check that your First Name, Last Name, and Password are correct, then try again.";
-        setStatusMessage?.(message);
-        setDvaSyncWarning?.({
-          kind: "sync_timeout",
-          title: "Delta Virtual Sync failed.",
-          message,
-          primaryAction: "open_delta_virtual_settings",
-          primaryLabel: "Open Delta Virtual Settings"
-        });
-        await closeDeltaVirtualSyncWindow();
-        await logSystemError("DVA Sync", "failed", error, {
-          syncRunId,
-          reason: "sync_timeout",
-          timeoutMs: DELTA_VIRTUAL_SYNC_TIMEOUT_MS,
-          stage: "sync"
-        });
       } else {
         const message = error?.message || "Delta Virtual sync failed.";
         setStatusMessage?.(message);
@@ -310,17 +278,9 @@ export function useDeltaVirtualSync({
       }
     } finally {
       await closeDeltaVirtualSyncWindow();
-      if (shouldResetSyncSession) {
-        try {
-          await resetDeltaVirtualSyncSession();
-        } catch (resetError) {
-          await logSystemError("DVA Sync Reset", "failed", resetError, {
-            syncRunId
-          });
-        }
-      }
       await pruneDeltaVirtualStorage(shouldRemoveDownloadedSchedule);
       setIsSyncing(false);
+      isSyncingRef.current = false;
     }
   }, [
     dvaFirstName,
@@ -341,6 +301,10 @@ export function useDeltaVirtualSync({
   ]);
 
   const handleRefreshDeltaVirtualLogbook = useCallback(async () => {
+    if (isSyncingRef.current || isRefreshingLogbookRef.current) {
+      return;
+    }
+
     const syncRunId = createLogRunId("logbook-refresh");
     const syncStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
     await logSystemEvent("DVA Logbook Refresh", "started", {
@@ -372,9 +336,9 @@ export function useDeltaVirtualSync({
       return;
     }
 
+    isRefreshingLogbookRef.current = true;
     setIsRefreshingLogbook(true);
     setStatusMessage?.("Refreshing Delta Virtual logbook.");
-    let shouldResetSyncSession = false;
 
     try {
       setStatusMessage?.("Refreshing Delta Virtual logbook.");
@@ -420,26 +384,6 @@ export function useDeltaVirtualSync({
           reason: "auth_failed",
           stage: "auth"
         });
-      } else if (error?.kind === "sync_timeout") {
-        shouldResetSyncSession = true;
-        setIsRefreshingLogbook(false);
-        const message =
-          "Delta Virtual logbook refresh failed. Please check that your First Name, Last Name, and Password are correct, then try again.";
-        setStatusMessage?.(message);
-        setDvaSyncWarning?.({
-          kind: "sync_timeout",
-          title: "Delta Virtual logbook refresh failed.",
-          message,
-          primaryAction: "open_delta_virtual_settings",
-          primaryLabel: "Open Delta Virtual Settings"
-        });
-        await closeDeltaVirtualSyncWindow();
-        await logSystemError("DVA Logbook Refresh", "failed", error, {
-          syncRunId,
-          reason: "sync_timeout",
-          timeoutMs: DELTA_VIRTUAL_SYNC_TIMEOUT_MS,
-          stage: "refresh"
-        });
       } else {
         const message = error?.message || "Delta Virtual logbook refresh failed.";
         setStatusMessage?.(message);
@@ -457,17 +401,9 @@ export function useDeltaVirtualSync({
       }
     } finally {
       await closeDeltaVirtualSyncWindow();
-      if (shouldResetSyncSession) {
-        try {
-          await resetDeltaVirtualSyncSession();
-        } catch (resetError) {
-          await logSystemError("DVA Logbook Refresh Reset", "failed", resetError, {
-            syncRunId
-          });
-        }
-      }
       await pruneDeltaVirtualStorage(false);
       setIsRefreshingLogbook(false);
+      isRefreshingLogbookRef.current = false;
     }
   }, [
     dvaFirstName,

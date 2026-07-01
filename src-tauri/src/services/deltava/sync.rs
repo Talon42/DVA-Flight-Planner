@@ -60,7 +60,6 @@ pub(crate) async fn start_deltava_sync(
         }
     };
     let started_at = Instant::now();
-    close_deltava_sync_window(app.clone());
 
     let download_path = crate::app::paths::build_download_path(&app)?;
     let webview_data_directory = build_webview_data_directory(&app)?;
@@ -100,7 +99,11 @@ pub(crate) async fn start_deltava_sync(
     let auto_sync_script = build_deltava_auto_sync_script(&sync_nonce);
 
     let (sender, receiver) = oneshot::channel();
-    if let Err(error) = sync_manager.begin(window_factory::DELTAVA_SYNC_LABEL.to_string(), sender) {
+    if let Err(error) = sync_manager.begin(
+        window_factory::DELTAVA_SYNC_LABEL.to_string(),
+        sync_nonce.clone(),
+        sender,
+    ) {
         append_sync_log(&format!(
             "start-rejected syncRunId={} error={error}",
             sync_run_id
@@ -108,11 +111,13 @@ pub(crate) async fn start_deltava_sync(
         return Err(error);
     }
 
+    close_deltava_sync_window(app.clone());
+
     let _window = match window_factory::build_deltava_sync_window(
         app.clone(),
         webview_data_directory,
         download_path,
-        sync_nonce,
+        sync_nonce.clone(),
         debug_enabled,
         login_automation_script,
         auto_sync_script,
@@ -123,7 +128,7 @@ pub(crate) async fn start_deltava_sync(
             // Once the manager is active, any startup failure must clear it before returning.
             let outcome = app
                 .state::<crate::DeltaSyncManager>()
-                .finish(window_factory::DELTAVA_SYNC_LABEL, Err(error.clone()));
+                .finish(window_factory::DELTAVA_SYNC_LABEL, &sync_nonce, Err(error.clone()));
             if outcome != DeltaSyncFinishOutcome::Completed {
                 log_ignored_finish("startup-error", outcome);
             }
@@ -161,6 +166,7 @@ pub(crate) async fn start_deltava_sync(
             ));
             let outcome = app.state::<crate::DeltaSyncManager>().finish(
                 window_factory::DELTAVA_SYNC_LABEL,
+                &sync_nonce,
                 Err(
                     "auth_failed: Timed out waiting for Delta Virtual login or schedule download."
                         .into(),
@@ -196,7 +202,6 @@ pub(crate) async fn refresh_deltava_logbook(
         }
     };
     let started_at = Instant::now();
-    close_deltava_sync_window(app.clone());
 
     let webview_data_directory = build_webview_data_directory(&app)?;
     let refresh_download_path = crate::app::paths::deltava_sync_dir(&app)?.join("logbook-refresh").join("refresh.tmp");
@@ -237,7 +242,11 @@ pub(crate) async fn refresh_deltava_logbook(
     let refresh_script = build_deltava_logbook_refresh_script(&sync_nonce);
 
     let (sender, receiver) = oneshot::channel();
-    if let Err(error) = sync_manager.begin(window_factory::DELTAVA_SYNC_LABEL.to_string(), sender) {
+    if let Err(error) = sync_manager.begin(
+        window_factory::DELTAVA_SYNC_LABEL.to_string(),
+        sync_nonce.clone(),
+        sender,
+    ) {
         append_sync_log(&format!(
             "logbook-refresh:start-rejected syncRunId={} error={error}",
             sync_run_id
@@ -245,11 +254,13 @@ pub(crate) async fn refresh_deltava_logbook(
         return Err(error);
     }
 
+    close_deltava_sync_window(app.clone());
+
     let _window = match window_factory::build_deltava_sync_window(
         app.clone(),
         webview_data_directory,
         refresh_download_path,
-        sync_nonce,
+        sync_nonce.clone(),
         debug_enabled,
         login_automation_script,
         refresh_script,
@@ -259,7 +270,7 @@ pub(crate) async fn refresh_deltava_logbook(
         Err(error) => {
             let outcome = app
                 .state::<crate::DeltaSyncManager>()
-                .finish(window_factory::DELTAVA_SYNC_LABEL, Err(error.clone()));
+                .finish(window_factory::DELTAVA_SYNC_LABEL, &sync_nonce, Err(error.clone()));
             if outcome != DeltaSyncFinishOutcome::Completed {
                 log_ignored_finish("logbook-refresh-startup-error", outcome);
             }
@@ -297,6 +308,7 @@ pub(crate) async fn refresh_deltava_logbook(
             ));
             let outcome = app.state::<crate::DeltaSyncManager>().finish(
                 window_factory::DELTAVA_SYNC_LABEL,
+                &sync_nonce,
                 Err("auth_failed: Timed out waiting for Delta Virtual login or logbook refresh.".into()),
             );
             if outcome != DeltaSyncFinishOutcome::Completed {
@@ -311,14 +323,14 @@ pub(crate) async fn refresh_deltava_logbook(
 /// Resets only the active Delta Virtual sync session and its local webview/session data.
 pub(crate) fn reset_deltava_sync_session(app: AppHandle) -> Result<(), String> {
     append_sync_log("reset-session:requested");
-    window_factory::close_deltava_sync_window(&app);
-    let outcome = app.state::<crate::DeltaSyncManager>().finish(
+    let outcome = app.state::<crate::DeltaSyncManager>().finish_any(
         window_factory::DELTAVA_SYNC_LABEL,
         Err("cancelled: Delta Virtual sync session was reset.".into()),
     );
     if outcome != DeltaSyncFinishOutcome::Completed {
         log_ignored_finish("reset", outcome);
     }
+    window_factory::close_deltava_sync_window(&app);
     file_store::reset_deltava_sync_session_storage(&app)?;
     append_sync_log("reset-session:succeeded");
     Ok(())

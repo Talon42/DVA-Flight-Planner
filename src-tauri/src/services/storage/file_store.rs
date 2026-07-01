@@ -9,6 +9,10 @@ use crate::services::deltava::{
     auth::clear_auth_settings_internal,
     logbook::{extract_latest_logbook_date_iso, normalize_logbook_entries, store_logbook_json},
     sync_types::{DeltaAccomplishmentEligibilityStore, DeltaWebSyncResult},
+    sync_types::{
+        MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES, MAX_DELTAVA_LOGBOOK_JSON_BYTES,
+        MAX_DELTAVA_SCHEDULE_XML_BYTES,
+    },
 };
 use crate::{append_sync_log, append_sync_log_debug, DELTAVA_SYNC_DOWNLOAD_FILE};
 use serde_json::Value;
@@ -256,6 +260,10 @@ fn summarize_warnings(warnings: &[String]) -> Option<String> {
     Some(format!("{preview}{suffix}"))
 }
 
+fn format_too_large_error(label: &str, limit_bytes: usize) -> String {
+    format!("download_failed: Delta Virtual {label} exceeded the {limit_bytes} byte limit.")
+}
+
 fn is_expected_cleanup_skip(error: &std::io::Error) -> bool {
     match error.raw_os_error() {
         // ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION.
@@ -446,12 +454,17 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
 
     let xml_text = if result.xml.ok {
         let xml_text = result.xml.xml_text.unwrap_or_default();
-        let trimmed = xml_text.trim_start();
-        if !trimmed.starts_with('<') || !xml_text.contains("<FLIGHT>") {
-            warnings.push("Delta Virtual returned an invalid schedule XML response.".into());
+        if xml_text.len() > MAX_DELTAVA_SCHEDULE_XML_BYTES {
+            warnings.push(format_too_large_error("schedule XML", MAX_DELTAVA_SCHEDULE_XML_BYTES));
             None
         } else {
-            Some(xml_text)
+            let trimmed = xml_text.trim_start();
+            if !trimmed.starts_with('<') || !xml_text.contains("<FLIGHT>") {
+                warnings.push("Delta Virtual returned an invalid schedule XML response.".into());
+                None
+            } else {
+                Some(xml_text)
+            }
         }
     } else {
         warnings.push(
@@ -466,17 +479,22 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
     let logbook_json = if result.logbook.ok {
         let json_text = result.logbook.json_text.unwrap_or_default();
         append_sync_log_debug(debug_enabled, "logbook-fetch");
-        match store_logbook_json(
-            app,
-            &json_text,
-            result.logbook.content_type,
-        )
-        .await
-        {
-            Ok(artifact) => Some(artifact),
-            Err(error) => {
-                warnings.push(error);
-                None
+        if json_text.len() > MAX_DELTAVA_LOGBOOK_JSON_BYTES {
+            warnings.push(format_too_large_error("logbook JSON", MAX_DELTAVA_LOGBOOK_JSON_BYTES));
+            None
+        } else {
+            match store_logbook_json(
+                app,
+                &json_text,
+                result.logbook.content_type,
+            )
+            .await
+            {
+                Ok(artifact) => Some(artifact),
+                Err(error) => {
+                    warnings.push(error);
+                    None
+                }
             }
         }
     } else {
@@ -492,17 +510,25 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
     let accomplishment_eligibility = if let Some(accomplishments) = result.accomplishments {
         if accomplishments.ok {
             let html_text = accomplishments.html_text.unwrap_or_default();
-            let parsed = parse_accomplishment_eligibility_html(&html_text);
-            append_sync_log_debug(debug_enabled, &format!(
-                "accomplishments:parsed rows={}",
-                parsed.rows.len()
-            ));
+            if html_text.len() > MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES {
+                warnings.push(format_too_large_error(
+                    "accomplishment eligibility HTML",
+                    MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES,
+                ));
+                None
+            } else {
+                let parsed = parse_accomplishment_eligibility_html(&html_text);
+                append_sync_log_debug(debug_enabled, &format!(
+                    "accomplishments:parsed rows={}",
+                    parsed.rows.len()
+                ));
 
-            match store_deltava_accomplishment_eligibility(app, &parsed) {
-                Ok(store) => Some(build_accomplishment_eligibility_summary(&store)),
-                Err(error) => {
-                    warnings.push(error);
-                    None
+                match store_deltava_accomplishment_eligibility(app, &parsed) {
+                    Ok(store) => Some(build_accomplishment_eligibility_summary(&store)),
+                    Err(error) => {
+                        warnings.push(error);
+                        None
+                    }
                 }
             }
         } else {
@@ -570,11 +596,16 @@ pub(crate) async fn build_delta_logbook_refresh_payload_from_web_result(
     let logbook_json = if result.logbook.ok {
         let json_text = result.logbook.json_text.unwrap_or_default();
         append_sync_log_debug(debug_enabled, "logbook-refresh-fetch");
-        match store_logbook_json(app, &json_text, result.logbook.content_type).await {
-            Ok(artifact) => Some(artifact),
-            Err(error) => {
-                warnings.push(error);
-                None
+        if json_text.len() > MAX_DELTAVA_LOGBOOK_JSON_BYTES {
+            warnings.push(format_too_large_error("logbook JSON", MAX_DELTAVA_LOGBOOK_JSON_BYTES));
+            None
+        } else {
+            match store_logbook_json(app, &json_text, result.logbook.content_type).await {
+                Ok(artifact) => Some(artifact),
+                Err(error) => {
+                    warnings.push(error);
+                    None
+                }
             }
         }
     } else {

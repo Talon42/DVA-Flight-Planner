@@ -26,13 +26,11 @@ const PERSISTED_SCHEDULE_VERSION = 4;
 const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
 const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
 const BROWSER_LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
-const DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
+const LEGACY_DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
 const DELTAVA_TOURS_CACHE_STORAGE_KEY = "flight-planner.deltava-tours-cache";
 const DELTAVA_TOUR_PROGRESS_STORAGE_KEY = "flight-planner.deltava-tour-progress";
 const GETTING_STARTED_STORAGE_KEY = "flight-planner.getting-started";
 const WHATS_NEW_LAST_SEEN_RELEASE_STORAGE_KEY = "flight-planner.whats-new.last-seen-release-id";
-const DELTAVA_LOGBOOK_STORAGE_DIR = "flight-planner/deltava-sync/logbook";
-const DELTAVA_LOGBOOK_FALLBACK_FILE = "deltava-logbook.json";
 const DELTAVA_TOURS_CACHE_FILE = "dva-tours-cache.json";
 const DELTAVA_TOUR_PROGRESS_FILE = "dva-tour-progress.json";
 const textEncoder = new TextEncoder();
@@ -1232,6 +1230,7 @@ export async function deleteStoredUserData() {
     await invoke("clear_user_data");
   }
 
+  // Legacy browser cleanup only; canonical DVA logbook storage is Rust-backed.
   for (const key of [
     "flight-planner.saved-schedule",
     "flight-planner.ui-state",
@@ -1239,7 +1238,7 @@ export async function deleteStoredUserData() {
     "flight-planner.deltava-auth",
     GETTING_STARTED_STORAGE_KEY,
     "flight-planner.import-log",
-    DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
+    LEGACY_DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
     DELTAVA_TOUR_PROGRESS_STORAGE_KEY,
     WHATS_NEW_LAST_SEEN_RELEASE_STORAGE_KEY,
     "flight-planner.theme",
@@ -1315,67 +1314,4 @@ export async function pickXmlScheduleFile() {
     fileName: selectedFile.fileName,
     xmlText: selectedFile.text
   };
-}
-
-export async function pickJsonLogbookFile() {
-  const selectedFile = await pickTextFile({
-    accept: ".json,application/json",
-    filterName: "Logbook JSON",
-    extensions: ["json"]
-  });
-
-  if (!selectedFile) {
-    return null;
-  }
-
-  return {
-    fileName: selectedFile.fileName,
-    jsonText: selectedFile.text
-  };
-}
-
-function sanitizeLogbookFilename(fileName) {
-  const rawName = String(fileName || "").split(/[\\/]/).pop()?.trim() || DELTAVA_LOGBOOK_FALLBACK_FILE;
-  const sanitized = rawName
-    .replace(/[^A-Za-z0-9._-]/g, "-")
-    .replace(/^[-._]+|[-._]+$/g, "");
-  const normalized = sanitized || DELTAVA_LOGBOOK_FALLBACK_FILE;
-
-  return normalized.toLowerCase().endsWith(".json") ? normalized : `${normalized}.json`;
-}
-
-export async function storeDeltaVirtualLogbookJson(fileName, jsonText) {
-  const trimmed = String(jsonText || "").trim();
-  if (!trimmed) {
-    throw new Error("Logbook JSON was empty.");
-  }
-
-  try {
-    JSON.parse(trimmed);
-  } catch (error) {
-    throw new Error(`Logbook JSON was invalid: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  const normalizedFileName = sanitizeLogbookFilename(fileName);
-
-  if (isTauriRuntime()) {
-    const { mkdir, writeTextFile, BaseDirectory } = await loadFsModule();
-    await mkdir(DELTAVA_LOGBOOK_STORAGE_DIR, {
-      baseDir: BaseDirectory.AppLocalData,
-      recursive: true
-    });
-
-    await writeTextFile(`${DELTAVA_LOGBOOK_STORAGE_DIR}/${normalizedFileName}`, trimmed, {
-      baseDir: BaseDirectory.AppLocalData
-    });
-    return;
-  }
-
-  window.localStorage.setItem(
-    DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
-    JSON.stringify({
-      fileName: normalizedFileName,
-      jsonText: trimmed
-    })
-  );
 }

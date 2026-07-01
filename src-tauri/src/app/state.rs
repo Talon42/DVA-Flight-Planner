@@ -7,7 +7,7 @@ use tokio::sync::oneshot;
 pub(crate) enum DeltaSyncFinishOutcome {
     Completed,
     NoActiveSession,
-    LabelMismatch,
+    SessionMismatch,
     LockFailed,
     ReceiverDropped,
 }
@@ -19,6 +19,7 @@ pub(crate) struct DeltaSyncManager {
 
 struct ActiveDeltaSync {
     label: String,
+    session_id: String,
     sender: oneshot::Sender<Result<DeltaSyncPayload, String>>,
 }
 
@@ -26,6 +27,7 @@ impl DeltaSyncManager {
     pub(crate) fn begin(
         &self,
         label: String,
+        session_id: String,
         sender: oneshot::Sender<Result<DeltaSyncPayload, String>>,
     ) -> Result<(), String> {
         let mut active = self
@@ -37,12 +39,43 @@ impl DeltaSyncManager {
             return Err("download_failed: A Delta Virtual sync is already in progress.".into());
         }
 
-        *active = Some(ActiveDeltaSync { label, sender });
+        *active = Some(ActiveDeltaSync {
+            label,
+            session_id,
+            sender,
+        });
         Ok(())
     }
 
-    // Resolves the active sync session and reports why late finish attempts were ignored.
+    // Resolves the active sync session only when the label and session id still match.
     pub(crate) fn finish(
+        &self,
+        label: &str,
+        session_id: &str,
+        result: Result<DeltaSyncPayload, String>,
+    ) -> DeltaSyncFinishOutcome {
+        let sender = match self.active.lock() {
+            Ok(mut active) => match active.take() {
+                Some(session) if session.label == label && session.session_id == session_id => {
+                    session.sender
+                }
+                Some(session) => {
+                    *active = Some(session);
+                    return DeltaSyncFinishOutcome::SessionMismatch;
+                }
+                None => return DeltaSyncFinishOutcome::NoActiveSession,
+            },
+            Err(_) => return DeltaSyncFinishOutcome::LockFailed,
+        };
+
+        match sender.send(result) {
+            Ok(()) => DeltaSyncFinishOutcome::Completed,
+            Err(_) => DeltaSyncFinishOutcome::ReceiverDropped,
+        }
+    }
+
+    // Explicit user resets can clear the active session without matching its session id.
+    pub(crate) fn finish_any(
         &self,
         label: &str,
         result: Result<DeltaSyncPayload, String>,
@@ -52,7 +85,7 @@ impl DeltaSyncManager {
                 Some(session) if session.label == label => session.sender,
                 Some(session) => {
                     *active = Some(session);
-                    return DeltaSyncFinishOutcome::LabelMismatch;
+                    return DeltaSyncFinishOutcome::SessionMismatch;
                 }
                 None => return DeltaSyncFinishOutcome::NoActiveSession,
             },

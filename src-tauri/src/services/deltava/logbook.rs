@@ -6,8 +6,10 @@ use std::{
     time::SystemTime,
 };
 use tauri::AppHandle;
+use tokio::io::AsyncWriteExt;
 
 use crate::{append_sync_log, DELTAVA_LOGBOOK_FILE};
+use crate::services::deltava::sync_types::MAX_DELTAVA_LOGBOOK_JSON_BYTES;
 
 fn get_json_field_i32(value: &Value, key: &str) -> Option<i32> {
     value
@@ -133,14 +135,22 @@ pub(crate) fn remove_stale_logbook_json_files(logbook_dir: &Path) {
     }
 }
 
-pub(crate) async fn store_logbook_json(
-    app: &AppHandle,
+async fn store_logbook_json_in_dir(
+    logbook_dir: &Path,
     json_text: &str,
     content_type: Option<String>,
+    simulate_final_rename_failure: bool,
 ) -> Result<crate::DeltaLogbookArtifact, String> {
     let trimmed = json_text.trim();
     if trimmed.is_empty() {
         return Err("download_failed: Delta Virtual logbook JSON export was empty.".into());
+    }
+
+    if trimmed.len() > MAX_DELTAVA_LOGBOOK_JSON_BYTES {
+        return Err(format!(
+            "download_failed: Delta Virtual logbook JSON export exceeded the {} byte limit.",
+            MAX_DELTAVA_LOGBOOK_JSON_BYTES
+        ));
     }
 
     serde_json::from_str::<Value>(trimmed).map_err(|error| {
@@ -148,24 +158,70 @@ pub(crate) async fn store_logbook_json(
     })?;
     append_sync_log("logbook:json-valid");
 
-    let logbook_dir = crate::app::paths::build_logbook_dir(app)?;
-    remove_stale_logbook_json_files(&logbook_dir);
-
     let file_name = DELTAVA_LOGBOOK_FILE.to_string();
     let final_path = logbook_dir.join(&file_name);
     let temp_path = logbook_dir.join(format!("{file_name}.tmp"));
+    let backup_path = logbook_dir.join(format!("{file_name}.bak"));
 
-    tokio::fs::write(&temp_path, trimmed.as_bytes())
+    tokio::fs::create_dir_all(logbook_dir)
+        .await
+        .map_err(|error| format!("download_failed: Unable to create logbook storage: {error}"))?;
+
+    let mut temp_file = tokio::fs::File::create(&temp_path)
         .await
         .map_err(|error| format!("download_failed: Unable to write logbook JSON: {error}"))?;
-    if final_path.exists() {
-        let _ = tokio::fs::remove_file(&final_path).await;
-    }
-    tokio::fs::rename(&temp_path, &final_path)
+    temp_file
+        .write_all(trimmed.as_bytes())
+        .await
+        .map_err(|error| format!("download_failed: Unable to write logbook JSON: {error}"))?;
+    temp_file
+        .flush()
+        .await
+        .map_err(|error| format!("download_failed: Unable to write logbook JSON: {error}"))?;
+    temp_file
+        .sync_all()
         .await
         .map_err(|error| format!("download_failed: Unable to store logbook JSON: {error}"))?;
+    drop(temp_file);
+
+    let final_exists = final_path.exists();
+    if final_exists {
+        let _ = tokio::fs::remove_file(&backup_path).await;
+        tokio::fs::rename(&final_path, &backup_path).await.map_err(|error| {
+            format!("download_failed: Unable to preserve the existing logbook JSON: {error}")
+        })?;
+    }
+
+    if simulate_final_rename_failure {
+        let _ = tokio::fs::remove_file(&temp_path).await;
+        if final_exists {
+            let _ = tokio::fs::rename(&backup_path, &final_path).await;
+        }
+        return Err("download_failed: Unable to store logbook JSON: simulated final replacement failure.".into());
+    }
+
+    if let Err(error) = tokio::fs::rename(&temp_path, &final_path).await {
+        if final_exists {
+            let _ = tokio::fs::rename(&backup_path, &final_path).await;
+        }
+        let _ = tokio::fs::remove_file(&temp_path).await;
+        return Err(format!("download_failed: Unable to store logbook JSON: {error}"));
+    }
+
+    if tokio::fs::metadata(&final_path).await.is_err() {
+        let _ = tokio::fs::remove_file(&final_path).await;
+        if final_exists {
+            let _ = tokio::fs::rename(&backup_path, &final_path).await;
+        }
+        return Err("download_failed: Unable to verify stored logbook JSON.".into());
+    }
+
+    if final_exists {
+        let _ = tokio::fs::remove_file(&backup_path).await;
+    }
 
     append_sync_log(&format!("logbook:write {}", final_path.display()));
+    remove_stale_logbook_json_files(logbook_dir);
 
     Ok(crate::DeltaLogbookArtifact {
         file_name,
@@ -173,6 +229,15 @@ pub(crate) async fn store_logbook_json(
         bytes: trimmed.as_bytes().len(),
         content_type,
     })
+}
+
+pub(crate) async fn store_logbook_json(
+    app: &AppHandle,
+    json_text: &str,
+    content_type: Option<String>,
+) -> Result<crate::DeltaLogbookArtifact, String> {
+    let logbook_dir = crate::app::paths::build_logbook_dir(app)?;
+    store_logbook_json_in_dir(&logbook_dir, json_text, content_type, false).await
 }
 
 pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCachePayload {
@@ -216,6 +281,21 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_test_dir() -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        std::env::temp_dir().join(format!("flight-planner-logbook-test-{stamp}"))
+    }
+
+    fn run_async<T>(future: impl std::future::Future<Output = T>) -> T {
+        tokio::runtime::Runtime::new()
+            .expect("runtime")
+            .block_on(future)
+    }
 
     #[test]
     fn normalize_logbook_entries_accepts_supported_shapes() {
@@ -264,5 +344,98 @@ mod tests {
             extract_latest_logbook_date_iso(&json),
             Some("2026-06-01".to_string())
         );
+    }
+
+    #[test]
+    fn store_logbook_json_writes_final_file() {
+        let logbook_dir = unique_test_dir();
+        let json_text = json!({
+            "entries": [
+                { "date": { "y": 2026, "m": 0, "d": 2 }, "status": "OK" }
+            ]
+        })
+        .to_string();
+
+        let artifact = run_async(store_logbook_json_in_dir(&logbook_dir, &json_text, None, false))
+            .expect("store logbook");
+
+        let stored_text = std::fs::read_to_string(logbook_dir.join(DELTAVA_LOGBOOK_FILE))
+            .expect("stored file");
+        assert_eq!(stored_text, json_text);
+        assert_eq!(artifact.file_name, DELTAVA_LOGBOOK_FILE);
+        assert_eq!(artifact.bytes, json_text.len());
+
+        let _ = std::fs::remove_dir_all(&logbook_dir);
+    }
+
+    #[test]
+    fn store_logbook_json_rejects_oversized_payloads() {
+        let logbook_dir = unique_test_dir();
+        let oversized = format!(
+            "{{\"value\":\"{}\"}}",
+            "a".repeat(MAX_DELTAVA_LOGBOOK_JSON_BYTES + 1)
+        );
+
+        let error = run_async(store_logbook_json_in_dir(&logbook_dir, &oversized, None, false))
+            .expect_err("oversized payload");
+
+        assert!(error.contains("exceeded"));
+        assert!(!logbook_dir.join(DELTAVA_LOGBOOK_FILE).exists());
+
+        let _ = std::fs::remove_dir_all(&logbook_dir);
+    }
+
+    #[test]
+    fn store_logbook_json_rejects_invalid_json() {
+        let logbook_dir = unique_test_dir();
+
+        let error = run_async(store_logbook_json_in_dir(
+            &logbook_dir,
+            "{not-json}",
+            None,
+            false,
+        ))
+        .expect_err("invalid payload");
+
+        assert!(error.contains("invalid_json"));
+        assert!(!logbook_dir.join(DELTAVA_LOGBOOK_FILE).exists());
+
+        let _ = std::fs::remove_dir_all(&logbook_dir);
+    }
+
+    #[test]
+    fn store_logbook_json_restores_existing_file_when_replace_fails() {
+        let logbook_dir = unique_test_dir();
+        std::fs::create_dir_all(&logbook_dir).expect("test dir");
+        let final_path = logbook_dir.join(DELTAVA_LOGBOOK_FILE);
+        let original_text = json!({
+            "entries": [
+                { "date": { "y": 2026, "m": 0, "d": 1 }, "status": "OK" }
+            ]
+        })
+        .to_string();
+        std::fs::write(&final_path, &original_text).expect("original file");
+
+        let replacement_text = json!({
+            "entries": [
+                { "date": { "y": 2026, "m": 0, "d": 2 }, "status": "OK" }
+            ]
+        })
+        .to_string();
+        let error = run_async(store_logbook_json_in_dir(
+            &logbook_dir,
+            &replacement_text,
+            None,
+            true,
+        ))
+        .expect_err("simulated replacement failure");
+
+        assert!(error.contains("simulated final replacement failure"));
+        assert_eq!(
+            std::fs::read_to_string(&final_path).expect("restored file"),
+            original_text
+        );
+
+        let _ = std::fs::remove_dir_all(&logbook_dir);
     }
 }

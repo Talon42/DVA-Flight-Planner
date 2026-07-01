@@ -62,13 +62,107 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
     const overlay = ensureSyncOverlay();
     overlay.style.display = 'flex';
   };
+  const readBoundedText = async (response, maxBytes, label) => {
+    const contentLength = Number(response.headers.get('content-length') || NaN);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+    }
+
+    if (!response.body?.getReader) {
+      const text = await response.text();
+      if (new TextEncoder().encode(text).length > maxBytes) {
+        throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+      }
+      return text;
+    }
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        if (value && value.length) {
+          totalBytes += value.length;
+          if (totalBytes > maxBytes) {
+            await reader.cancel();
+            throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+          }
+          chunks.push(value);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return new TextDecoder().decode(bytes);
+  };
+  const readBoundedText = async (response, maxBytes, label) => {
+    const contentLength = Number(response.headers.get('content-length') || NaN);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+    }
+
+    if (!response.body?.getReader) {
+      const text = await response.text();
+      if (new TextEncoder().encode(text).length > maxBytes) {
+        throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+      }
+      return text;
+    }
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        if (value && value.length) {
+          totalBytes += value.length;
+          if (totalBytes > maxBytes) {
+            await reader.cancel();
+            throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+          }
+          chunks.push(value);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return new TextDecoder().decode(bytes);
+  };
   const fetchScheduleXml = async () => {
     const response = await fetch(targetUrl, {
       method: 'GET',
       credentials: 'include',
       cache: 'no-store'
     });
-    const xml = await response.text();
+    const xml = await readBoundedText(response, __SCHEDULE_XML_MAX_BYTES__, 'Delta Virtual schedule XML');
     emitDebug(`xml:fetch-status:${response.status}:${xml.length}`);
     if (!response.ok) {
       throw new Error(`Schedule XML request failed with HTTP ${response.status}.`);
@@ -86,7 +180,7 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
       credentials: 'include',
       cache: 'no-store'
     });
-    const htmlText = await response.text();
+    const htmlText = await readBoundedText(response, __ACCOMPLISHMENT_HTML_MAX_BYTES__, 'Delta Virtual accomplishment eligibility HTML');
     emitDebug(`accomplishments:fetch-status:${response.status}:${htmlText.length}`);
     if (!response.ok) {
       throw new Error(`Accomplishment eligibility request failed with HTTP ${response.status}.`);
@@ -309,6 +403,53 @@ const DELTAVA_LOGBOOK_REFRESH_SCRIPT: &str = r#"
     const doc = new DOMParser().parseFromString(html || '', 'text/html');
     return doc.querySelector('input[name="id"]')?.value || '';
   };
+  const readBoundedText = async (response, maxBytes, label) => {
+    const contentLength = Number(response.headers.get('content-length') || NaN);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+    }
+
+    if (!response.body?.getReader) {
+      const text = await response.text();
+      if (new TextEncoder().encode(text).length > maxBytes) {
+        throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+      }
+      return text;
+    }
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        if (value && value.length) {
+          totalBytes += value.length;
+          if (totalBytes > maxBytes) {
+            await reader.cancel();
+            throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+          }
+          chunks.push(value);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return new TextDecoder().decode(bytes);
+  };
   const fetchLogbookJsonExport = async () => {
     emitDebug('logbook:page-fetch-start');
     const pageResponse = await fetch(logbookPageUrl, {
@@ -316,7 +457,7 @@ const DELTAVA_LOGBOOK_REFRESH_SCRIPT: &str = r#"
       credentials: 'include',
       cache: 'no-store'
     });
-    const pageHtml = await pageResponse.text();
+    const pageHtml = await readBoundedText(pageResponse, __LOGBOOK_PAGE_HTML_MAX_BYTES__, 'Delta Virtual logbook page HTML');
     emitDebug(`logbook:page-status:${pageResponse.status}:${pageResponse.url}`);
     if (!pageResponse.ok) {
       throw new Error(`Logbook page request failed with HTTP ${pageResponse.status}.`);
@@ -348,7 +489,7 @@ const DELTAVA_LOGBOOK_REFRESH_SCRIPT: &str = r#"
     });
     const filename = exportResponse.headers.get('X-Logbook-Filename') || '';
     const contentType = exportResponse.headers.get('Content-Type') || '';
-    const jsonText = await exportResponse.text();
+    const jsonText = await readBoundedText(exportResponse, __LOGBOOK_JSON_MAX_BYTES__, 'Delta Virtual logbook JSON export');
     emitDebug(`logbook:export-status:${exportResponse.status}:${jsonText.length}`);
     if (!exportResponse.ok) {
       throw new Error(`Logbook JSON export failed with HTTP ${exportResponse.status}.`);
@@ -486,7 +627,7 @@ const LOGBOOK_EXPORT_HELPERS: &str = r#"
       credentials: 'include',
       cache: 'no-store'
     });
-    const pageHtml = await pageResponse.text();
+    const pageHtml = await readBoundedText(pageResponse, __LOGBOOK_PAGE_HTML_MAX_BYTES__, 'Delta Virtual logbook page HTML');
     emitDebug(`logbook:page-status:${pageResponse.status}:${pageResponse.url}`);
     if (!pageResponse.ok) {
       throw new Error(`Logbook page request failed with HTTP ${pageResponse.status}.`);
@@ -518,7 +659,7 @@ const LOGBOOK_EXPORT_HELPERS: &str = r#"
     });
     const filename = exportResponse.headers.get('X-Logbook-Filename') || '';
     const contentType = exportResponse.headers.get('Content-Type') || '';
-    const jsonText = await exportResponse.text();
+    const jsonText = await readBoundedText(exportResponse, __LOGBOOK_JSON_MAX_BYTES__, 'Delta Virtual logbook JSON export');
     emitDebug(`logbook:export-status:${exportResponse.status}:${jsonText.length}`);
     if (!exportResponse.ok) {
       throw new Error(`Logbook JSON export failed with HTTP ${exportResponse.status}.`);
@@ -531,10 +672,17 @@ pub(crate) fn build_deltava_auto_sync_script(nonce: &str) -> String {
     let nonce = serde_json::to_string(nonce).unwrap_or_else(|_| "\"\"".to_string());
     DELTAVA_AUTO_SYNC_SCRIPT
         .replace("__LOGBOOK_EXPORT_HELPERS__", LOGBOOK_EXPORT_HELPERS)
+        .replace("__SCHEDULE_XML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_SCHEDULE_XML_BYTES.to_string())
+        .replace("__ACCOMPLISHMENT_HTML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES.to_string())
+        .replace("__LOGBOOK_PAGE_HTML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_SCHEDULE_XML_BYTES.to_string())
+        .replace("__LOGBOOK_JSON_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_LOGBOOK_JSON_BYTES.to_string())
         .replace("__NONCE__", &nonce)
 }
 
 pub(crate) fn build_deltava_logbook_refresh_script(nonce: &str) -> String {
     let nonce = serde_json::to_string(nonce).unwrap_or_else(|_| "\"\"".to_string());
-    DELTAVA_LOGBOOK_REFRESH_SCRIPT.replace("__NONCE__", &nonce)
+    DELTAVA_LOGBOOK_REFRESH_SCRIPT
+        .replace("__LOGBOOK_PAGE_HTML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_SCHEDULE_XML_BYTES.to_string())
+        .replace("__LOGBOOK_JSON_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_LOGBOOK_JSON_BYTES.to_string())
+        .replace("__NONCE__", &nonce)
 }
