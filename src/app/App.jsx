@@ -163,7 +163,7 @@ export default function App() {
     logbookSubTab: "flights",
     logbookFilters: {},
     logbookSort: null,
-    pilotStatsComparisonPeriod: "last-90-days",
+    pilotStatsComparisonPeriod: "off",
     pilotStatsDetailView: null,
     tourProgress: {}
   });

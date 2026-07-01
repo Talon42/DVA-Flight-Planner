@@ -1,4 +1,4 @@
-export const DEFAULT_PILOT_STATS_COMPARISON_PERIOD = "last-90-days";
+export const DEFAULT_PILOT_STATS_COMPARISON_PERIOD = "off";
 
 const STATIC_PILOT_STATS_COMPARISON_OPTIONS = Object.freeze([
   { value: "off", label: "All" },

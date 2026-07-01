@@ -66,6 +66,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const [pilotStatsDashboardSlots, setPilotStatsDashboardSlots] = useState({});
   const [pilotStatsDetailView, setPilotStatsDetailView] = useState(null);
   const hasHydratedPersistedStateRef = useRef(false);
+  const previousSelectedTabRef = useRef("flights");
 
   const allRows = useMemo(() => normalizeLogbookRows(cacheResult.entries), [cacheResult.entries]);
   const pilotStatsComparisonOptions = useMemo(() => buildPilotStatsComparisonOptions(allRows), [allRows]);
@@ -94,6 +95,14 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
       String(persistedUiState.pilotStatsDetailView || "").trim() || null
     );
   }, [filterBounds, persistedUiState]);
+
+  useEffect(() => {
+    if (previousSelectedTabRef.current === "pilot-stats" && selectedTab !== "pilot-stats") {
+      setPilotStatsComparisonPeriod(DEFAULT_PILOT_STATS_COMPARISON_PERIOD);
+    }
+
+    previousSelectedTabRef.current = selectedTab;
+  }, [selectedTab]);
 
   const loadLogbook = useCallback(async () => {
     setIsLoading(true);

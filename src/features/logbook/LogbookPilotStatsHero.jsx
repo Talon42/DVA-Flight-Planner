@@ -78,38 +78,92 @@ function formatPilotMetadataLine(profile) {
   return parts.join(" \u00b7 ");
 }
 
-function KpiMetric({ card, prominent = false, labelToneClassName, valueToneClassName }) {
+function KpiGlyph({ cardId }) {
+  const baseClassName = "h-7 w-7 shrink-0 stroke-current";
+
+  switch (cardId) {
+    case "total-flights":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
+          <path d="M3 15.5 21 9l-7.5 6.5L13 21l-2.5-4.5L5 19l1.5-3.5L3 15.5Z" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="m9.5 13.5 3 1.5" strokeWidth="1.75" strokeLinecap="round" />
+        </svg>
+      );
+    case "total-distance":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
+          <path d="M4 17c2.5-4 5.5-6 8-6s5.5 2 8 6" strokeWidth="1.75" strokeLinecap="round" />
+          <path d="M6 7h3m6 0h3" strokeWidth="1.75" strokeLinecap="round" />
+          <circle cx="12" cy="10" r="1.5" strokeWidth="1.75" />
+        </svg>
+      );
+    case "total-block-time":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
+          <circle cx="12" cy="12" r="7.5" strokeWidth="1.75" />
+          <path d="M12 8.5v4l2.75 1.75" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M9.5 4.5 8 3m8 1.5 1.5-1.5" strokeWidth="1.75" strokeLinecap="round" />
+        </svg>
+      );
+    case "total-flight-time":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
+          <path d="M3.5 14.5 20.5 9l-6.5 5 1 4.5-3-2-2.5 3.5.5-4.5-6.5-1Z" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M8 11.5 6.5 10" strokeWidth="1.75" strokeLinecap="round" />
+        </svg>
+      );
+    case "average-landing-rate":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
+          <path d="M4 18h16" strokeWidth="1.75" strokeLinecap="round" />
+          <path d="M6 13.5 12 8l6 5.5" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M12 5.5v10" strokeWidth="1.75" strokeLinecap="round" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+function KpiMetric({ card, labelToneClassName, valueToneClassName }) {
   return (
     <div className="min-w-0 border-l border-[color:rgba(15,35,58,0.14)] pl-3 first:border-l-0 first:pl-0 dark:border-white/10 bp-1024:first:border-l-0 bp-1024:first:pl-0">
-      <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
-        {card.label}
-      </p>
-      <div className="mt-1 flex min-w-0 items-center gap-2">
-        <p
-          className={cn(
-            "m-0 min-w-0 truncate font-semibold leading-[1.05] tracking-[0]",
-            valueToneClassName,
-            prominent ? "text-[1.42rem] bp-1024:text-[1.52rem]" : "text-[0.98rem] bp-1400:text-[1.06rem]"
-          )}
-        >
-          {card.value}
-        </p>
-        {card.badge ? <LandingGradeBadge grade={card.badge} className="h-5 w-auto min-w-[4.2rem] px-2 text-[0.54rem]" /> : null}
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-center text-[var(--text-heading)] dark:text-white">
+          <KpiGlyph cardId={card.id} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
+            {card.label}
+          </p>
+          <div className="mt-1 flex min-w-0 items-center gap-2">
+            <p
+              className={cn(
+                "m-0 min-w-0 truncate font-semibold leading-[1.05] tracking-[0]",
+                valueToneClassName,
+                "text-[0.98rem] bp-1400:text-[1.06rem]"
+              )}
+            >
+              {card.value}
+            </p>
+            {card.badge ? <LandingGradeBadge grade={card.badge} className="h-5 w-auto min-w-[4.2rem] px-2 text-[0.54rem]" /> : null}
+          </div>
+          {card.delta ? (
+            <p
+              className={cn(
+                "m-0 mt-1 truncate text-[0.68rem] font-medium",
+                card.deltaStatus === "positive"
+                  ? "text-[#126835] dark:text-[#8ee3a2]"
+                  : card.deltaStatus === "negative"
+                    ? "text-[var(--delta-red)] dark:text-[#ff9d9d]"
+                    : "text-[var(--text-muted)] dark:text-white/60"
+              )}
+            >
+              {card.delta}
+            </p>
+          ) : null}
+        </div>
       </div>
-      {card.delta ? (
-        <p
-          className={cn(
-            "m-0 mt-1 truncate text-[0.68rem] font-medium",
-            card.deltaStatus === "positive"
-              ? "text-[#126835] dark:text-[#8ee3a2]"
-              : card.deltaStatus === "negative"
-                ? "text-[var(--delta-red)] dark:text-[#ff9d9d]"
-                : "text-[var(--text-muted)] dark:text-white/60"
-          )}
-        >
-          {card.delta}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -229,11 +283,10 @@ export default function LogbookPilotStatsHero({
         </div>
 
         <div className="grid min-w-0 grid-cols-2 gap-y-3 bp-1024:grid-cols-5 bp-1024:gap-y-0">
-          {kpiCards.map((card, index) => (
+          {kpiCards.map((card) => (
             <KpiMetric
               key={card.id}
               card={card}
-              prominent={index === 0}
               labelToneClassName={labelToneClassName}
               valueToneClassName={valueToneClassName}
             />

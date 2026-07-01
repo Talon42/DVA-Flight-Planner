@@ -13,7 +13,7 @@ export default function LogbookPilotStats({
   stats,
   summaryStats,
   profileMetadata,
-  pilotStatsComparisonPeriod = "last-90-days",
+  pilotStatsComparisonPeriod = "off",
   pilotStatsDetailView = null,
   onPilotStatsDetailViewChange
 }) {
