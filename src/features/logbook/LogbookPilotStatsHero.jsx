@@ -1,8 +1,11 @@
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
-import { bodySmTextClassName, labelTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
+import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
+import { getAirlinePrimaryColor } from "../../domain/airlines/airlineBranding.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
+import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
+import LogbookHeroMapBackground from "./LogbookHeroMapBackground.jsx";
 
 function formatDeltaValue(delta, unit = "", format = "number") {
   if (!Number.isFinite(delta)) {
@@ -32,11 +35,11 @@ function SummaryAirlineMark({ airline, className = "" }) {
   const airlineCode = String(airline?.airlineCode || "").trim();
 
   if (logoSrc) {
-    return <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-12 w-12 shrink-0 object-contain", logoClassName, className)} />;
+    return <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-16 w-20 shrink-0 object-contain", logoClassName, className)} />;
   }
 
   return (
-    <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center border border-[color:var(--line)] bg-[var(--surface)] text-[var(--text-heading)] dark:bg-[var(--surface-raised)] dark:text-white", className)}>
+    <div className={cn("flex h-16 w-20 shrink-0 items-center justify-center border border-[color:var(--line)] bg-[var(--surface)] text-[var(--text-heading)] dark:bg-[var(--surface-raised)] dark:text-white", className)}>
       <span className={cn("truncate px-1 text-center text-[0.72rem] font-semibold", labelTextClassName)}>
         {airlineCode || (airlineName ? airlineName.slice(0, 3).toUpperCase() : "?")}
       </span>
@@ -44,28 +47,86 @@ function SummaryAirlineMark({ airline, className = "" }) {
   );
 }
 
-function getKpiGridClassName(layoutMode) {
-  // Keep the KPI strip in one row so height changes do not reflow the cards.
-  if (layoutMode === "narrowShort") {
-    return "grid-cols-5";
-  }
-
-  return "grid-cols-2 bp-1024:grid-cols-5";
+function parseFormattedNumber(value) {
+  const normalized = Number(String(value || "").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(normalized) ? normalized : 0;
 }
 
-// Renders the compact summary strip at the top of the Pilot Stats dashboard.
+function formatTopAirlineMeta(airline, totalFlights) {
+  const parsedCount = Number(airline?.count ?? 0);
+  const count = Number.isFinite(parsedCount) ? parsedCount : 0;
+  const countLabel = `${new Intl.NumberFormat("en-US").format(count)} ${count === 1 ? "flight" : "flights"}`;
+
+  if (count <= 0 || !Number.isFinite(totalFlights) || totalFlights <= 0) {
+    return countLabel;
+  }
+
+  const percentLabel = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  }).format((count / totalFlights) * 100);
+
+  return `${countLabel} - ${percentLabel}% of filtered logbook`;
+}
+
+function KpiMetric({ card, prominent = false, labelToneClassName, valueToneClassName }) {
+  return (
+    <div className="min-w-0 border-l border-[color:rgba(15,35,58,0.14)] pl-3 first:border-l-0 first:pl-0 dark:border-white/10 bp-1024:first:border-l-0 bp-1024:first:pl-0">
+      <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
+        {card.label}
+      </p>
+      <div className="mt-1 flex min-w-0 items-center gap-2">
+        <p
+          className={cn(
+            "m-0 min-w-0 truncate font-semibold leading-[1.05] tracking-[0]",
+            valueToneClassName,
+            prominent ? "text-[1.42rem] bp-1024:text-[1.52rem]" : "text-[0.98rem] bp-1400:text-[1.06rem]"
+          )}
+        >
+          {card.value}
+        </p>
+        {card.badge ? <LandingGradeBadge grade={card.badge} className="h-5 w-auto min-w-[4.2rem] px-2 text-[0.54rem]" /> : null}
+      </div>
+      {card.delta ? (
+        <p
+          className={cn(
+            "m-0 mt-1 truncate text-[0.68rem] font-medium",
+            card.deltaStatus === "positive"
+              ? "text-[#126835] dark:text-[#8ee3a2]"
+              : card.deltaStatus === "negative"
+                ? "text-[var(--delta-red)] dark:text-[#ff9d9d]"
+                : "text-[var(--text-muted)] dark:text-white/60"
+          )}
+        >
+          {card.delta}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+// Renders the integrated airline identity and KPI hero at the top of Pilot Stats.
 export default function LogbookPilotStatsHero({ summary, comparison, comparisonPeriod, layoutMode }) {
   const airline = summary?.topAirline || null;
   const useComparison = layoutMode === "wideTall" && comparisonPeriod !== "off" && Boolean(comparison?.deltas);
   const deltas = comparison?.deltas || {};
-  const compact = layoutMode === "wideShort" || layoutMode === "narrowShort";
-  const isWide = layoutMode === "wideTall" || layoutMode === "wideShort";
-  const toneClassName = isWide
-    ? "border-[color:var(--line-strong)] bg-[var(--surface-panel)] text-[var(--text-primary)] shadow-[0_10px_30px_rgba(8,18,32,0.08)] dark:border-[#1f3555] dark:bg-[#0d1b2e] dark:text-white dark:shadow-[0_10px_30px_rgba(8,18,32,0.18)]"
-    : "border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-primary)]";
-  const labelToneClassName = isWide ? "text-[var(--text-muted)] dark:text-white/60" : "text-[var(--text-muted)]";
-  const headingToneClassName = isWide ? "text-[var(--text-heading)] dark:text-white" : "text-[var(--text-heading)]";
-  const valueToneClassName = isWide ? "text-[var(--text-heading)] dark:text-white" : "text-[var(--text-heading)]";
+  const airlineName = airline?.displayName || airline?.label || "Unknown Airline";
+  const brandColor = getAirlinePrimaryColor({
+    airlineName,
+    airlineIata: airline?.airlineCode,
+    airlineIcao: airline?.airlineCode
+  });
+  const heroStyle = {
+    "--logbook-hero-brand-color": brandColor,
+    "--logbook-hero-accent-color": brandColor
+  };
+  const totalFlightsRaw = parseFormattedNumber(summary?.totalFlights);
+  const topAirlineMeta = formatTopAirlineMeta(airline, totalFlightsRaw);
+  const logoSrc = String(airline?.airlineLogoSrc || "").trim();
+  const logoClassName = String(airline?.airlineLogoClassName || "").trim();
+  const labelToneClassName = "text-[var(--text-muted)] dark:text-white/60";
+  const headingToneClassName = "text-[var(--text-heading)] dark:text-white";
+  const valueToneClassName = "text-[var(--text-heading)] dark:text-white";
   const kpiCards = [
     {
       id: "total-flights",
@@ -104,95 +165,69 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
         </>
       ),
       value: summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE,
+      badge: summary?.averageLandingRateGrade || "",
       delta: useComparison ? formatDeltaValue(deltas.averageLandingRate?.rawValue, "fpm") : "",
       deltaStatus: deltas.averageLandingRate?.status
     }
   ];
 
   return (
-    <Panel className={cn("border p-3 bp-1024:p-4", cardFrameClassName, toneClassName)}>
-      <div className="grid min-w-0 gap-3">
-        <div className={cn("grid min-w-0 gap-3", isWide ? "bp-1024:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]" : "bp-1024:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)]")}>
-          <div className={cn("flex min-w-0 items-center gap-3", isWide ? "border-b border-[color:var(--line)] pb-3 bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0 dark:border-white/10" : "border-b border-[color:var(--line)] pb-3 bp-1024:border-b-0 bp-1024:border-r bp-1024:pr-3 bp-1024:pb-0")}>
-            <SummaryAirlineMark airline={airline} />
-            <div className="min-w-0">
-              <p className={cn("m-0 truncate text-[1rem] font-semibold leading-[1.1] tracking-[-0.02em] bp-1024:text-[1.1rem]", headingToneClassName)}>
-                {airline?.displayName || airline?.label || "Unknown Airline"}
-              </p>
-              <p className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em]", labelToneClassName)}>
-                Most flown airline
-              </p>
-              <p className={cn("m-0", bodySmTextClassName, isWide ? "text-white/75 dark:text-white/75" : "text-[var(--text-muted)]")}>
-                {`${airline?.count ?? 0} flights`}
-              </p>
-            </div>
-          </div>
-
-          {isWide ? (
-            <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 bp-1024:grid-cols-5 bp-1024:gap-x-0 bp-1024:gap-y-0">
-              {kpiCards.map((card) => (
-                <div key={card.id} className="min-w-0 px-2 first:pl-0 bp-1024:border-l bp-1024:border-[color:var(--line)] bp-1024:px-3 dark:bp-1024:border-white/10">
-                  <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
-                    {card.label}
-                  </p>
-                  <p className={cn("m-0 truncate font-semibold leading-[1.05] text-[1rem]", valueToneClassName, sectionTitleTextClassName)}>
-                    {card.value}
-                  </p>
-                  {card.delta ? (
-                    <p
-                      className={cn(
-                        "m-0 truncate text-[0.68rem] font-medium",
-                        card.deltaStatus === "positive"
-                          ? "text-[#126835] dark:text-[#8ee3a2]"
-                          : card.deltaStatus === "negative"
-                            ? "text-[var(--delta-red)] dark:text-[#ff9d9d]"
-                            : "text-[var(--text-muted)] dark:text-white/60"
-                      )}
-                    >
-                      {card.delta}
-                    </p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className={cn("grid min-w-0 gap-2", getKpiGridClassName(layoutMode))}>
-              {kpiCards.map((card) => (
-                <div
-                  key={card.id}
-                  className={cn(
-                    "grid min-w-0 gap-0.5 border px-2 py-1.5",
-                    "border-[color:var(--line)] bg-[var(--surface)]",
-                    compact ? "py-1.5" : "py-2"
-                  )}
-                >
-                  <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
-                    {card.label}
-                  </p>
-                  <p className={cn("m-0 truncate text-[0.94rem] font-semibold leading-[1.05] bp-1024:text-[1rem]", valueToneClassName, compact ? "bp-1024:text-[0.92rem]" : sectionTitleTextClassName)}>
-                    {card.value}
-                  </p>
-                  {card.delta ? (
-                    <p
-                      className={cn(
-                        "m-0 truncate text-[0.68rem] font-medium",
-                        card.deltaStatus === "positive"
-                          ? "text-[#126835] dark:text-[#7FD18B]"
-                          : card.deltaStatus === "negative"
-                            ? "text-[var(--delta-red)]"
-                            : "text-[var(--text-muted)]"
-                      )}
-                    >
-                      {card.delta}
-                    </p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
+    <Panel
+      style={heroStyle}
+      className={cn(
+        "relative isolate border p-0 text-[var(--text-primary)]",
+        "!bg-[linear-gradient(105deg,rgba(245,248,252,0.98)_0%,rgba(233,239,247,0.96)_100%)]",
+        "dark:!bg-[linear-gradient(105deg,#09182a_0%,#0d2138_58%,#102b45_100%)] dark:text-white",
+        cardFrameClassName
+      )}
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[3px] bg-[var(--logbook-hero-accent-color)] opacity-90" />
+      <LogbookHeroMapBackground className="pointer-events-none absolute -right-16 top-1/2 z-0 h-[132%] w-[74%] -translate-y-1/2 text-[var(--logbook-hero-brand-color)] opacity-[0.12] dark:opacity-[0.16]" />
+      {logoSrc ? (
+        <img
+          src={logoSrc}
+          alt=""
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute -left-6 top-1/2 z-0 h-32 w-40 -translate-y-1/2 object-contain opacity-[0.05] dark:opacity-[0.07]",
+            logoClassName
           )}
+        />
+      ) : null}
+
+      <div className="relative z-20 grid min-w-0 gap-3 p-3 bp-1024:grid-cols-[minmax(15rem,34%)_minmax(0,1fr)] bp-1024:items-center bp-1024:gap-3.5 bp-1024:p-3.5 bp-1400:grid-cols-[minmax(18rem,32%)_minmax(0,1fr)]">
+        <div className="flex min-w-0 items-center gap-3 border-b border-[color:rgba(15,35,58,0.14)] pb-3 dark:border-white/10 bp-1024:border-b-0 bp-1024:pb-0">
+          <SummaryAirlineMark airline={airline} />
+          <div className="min-w-0">
+            <p className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em]", labelToneClassName)}>
+              Most flown airline
+            </p>
+            <p className={cn("m-0 truncate text-[1.08rem] font-semibold leading-[1.1] tracking-[0] bp-1024:text-[1.2rem]", headingToneClassName)}>
+              {airlineName}
+            </p>
+            <p className={cn("m-0 truncate text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>
+              {topAirlineMeta}
+            </p>
+          </div>
         </div>
 
-        {useComparison ? <p className={cn("m-0 text-[0.82rem]", "text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>Comparing against {comparison?.periodLabel || "the selected period"}.</p> : null}
+        <div className="grid min-w-0 grid-cols-2 gap-y-3 bp-1024:grid-cols-5 bp-1024:gap-y-0">
+          {kpiCards.map((card, index) => (
+            <KpiMetric
+              key={card.id}
+              card={card}
+              prominent={index === 0}
+              labelToneClassName={labelToneClassName}
+              valueToneClassName={valueToneClassName}
+            />
+          ))}
+        </div>
+
+        {useComparison ? (
+          <p className={cn("m-0 text-[0.82rem] text-[var(--text-muted)] dark:text-white/70 bp-1024:col-start-2", bodySmTextClassName)}>
+            Comparing against {comparison?.periodLabel || "the selected period"}.
+          </p>
+        ) : null}
       </div>
     </Panel>
   );

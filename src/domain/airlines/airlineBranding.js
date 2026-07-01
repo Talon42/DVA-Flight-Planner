@@ -11,7 +11,24 @@ const airlineIcaoByIata = new Map();
 const airlineLogoByIcao = new Map();
 const airlineNameByIata = new Map();
 const airlineNameByCode = new Map();
+const airlinePrimaryColorByIcao = new Map();
+const FALLBACK_AIRLINE_PRIMARY_COLOR = "#C8102E";
 const darkModeWhiteLogoIcaos = new Set(["AMX", "KAL", "SAS", "SBS"]);
+const airlinePrimaryColorOverridesByIcao = new Map([
+  ["AAL", "#0078D2"],
+  ["AFR", "#002157"],
+  ["AMX", "#002F6C"],
+  ["ASA", "#01426A"],
+  ["DAL", "#C8102E"],
+  ["DAL-H", "#C8102E"],
+  ["JBU", "#003876"],
+  ["KAL", "#003478"],
+  ["KLM", "#00A1DE"],
+  ["NWA", "#D50032"],
+  ["SWA", "#304CB2"],
+  ["UAL", "#005DAA"],
+  ["VIR", "#DA0530"]
+]);
 const airlineLogoOverridesByName = new Map([
   ["DELTA HISTORIC", "DAL-H"],
   ["NORTH CENTRAL AIRLINES", "NCA"],
@@ -20,6 +37,11 @@ const airlineLogoOverridesByName = new Map([
   ["PAN AM HISTORICAL", "PAN-H"],
   ["PAN AMERICAN AIRWAYS", "PAN-H"]
 ]);
+
+function resolveSafeHexColor(value, fallback = FALLBACK_AIRLINE_PRIMARY_COLOR) {
+  const normalized = String(value || "").trim();
+  return /^#[0-9A-Fa-f]{6}$/.test(normalized) ? normalized.toUpperCase() : fallback;
+}
 
 for (const [path, assetUrl] of Object.entries(airlineLogoModules)) {
   const fileName = path.split("/").pop() || "";
@@ -55,6 +77,19 @@ for (const row of airlineRows) {
   if (icao && normalizedName && !airlineNameByCode.has(icao)) {
     airlineNameByCode.set(icao, airlineName);
   }
+
+  // Supports future airline data color fields without requiring a parallel lookup shape.
+  const primaryColor = resolveSafeHexColor(
+    row.primaryColor || row.PrimaryColor || row.primary_color || row["Primary Color"],
+    ""
+  );
+  if (icao && primaryColor && !airlinePrimaryColorByIcao.has(icao)) {
+    airlinePrimaryColorByIcao.set(icao, primaryColor);
+  }
+}
+
+for (const [icao, primaryColor] of airlinePrimaryColorOverridesByIcao.entries()) {
+  airlinePrimaryColorByIcao.set(icao, resolveSafeHexColor(primaryColor));
 }
 
 function normalizeAirlineLookupName(airlineName) {
@@ -144,6 +179,12 @@ export function getAirlineLogo({ airlineName, airlineIata, airlineIcao }) {
 export function getAirlineLogoClassName({ airlineName, airlineIata, airlineIcao }) {
   const resolvedIcao = resolveAirlineLogoIcao({ airlineName, airlineIata, airlineIcao });
   return darkModeWhiteLogoIcaos.has(resolvedIcao) ? "dark:brightness-0 dark:invert" : "";
+}
+
+// Resolves a validated brand color for decorative airline identity treatments.
+export function getAirlinePrimaryColor({ airlineName, airlineIata, airlineIcao }) {
+  const resolvedIcao = resolveAirlineLogoIcao({ airlineName, airlineIata, airlineIcao });
+  return resolveSafeHexColor(airlinePrimaryColorByIcao.get(resolvedIcao), FALLBACK_AIRLINE_PRIMARY_COLOR);
 }
 
 export function getAirlineNameByIata(airlineIata) {
