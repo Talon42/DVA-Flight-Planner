@@ -5,9 +5,10 @@ import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
 import { dropdownOptionRowClassName } from "../../components/ui/forms";
+import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
-  "!bg-transparent !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
+  "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
 const CHANGE_MENU_PANEL_CLASS_NAME =
   "grid gap-1 overflow-hidden rounded-none border border-[color:var(--line)] bg-[var(--surface-raised)] p-2 shadow-none";
 
@@ -171,13 +172,18 @@ export default function LogbookPilotStatsSummaryPanel({
   changeMenuLabel = "Change",
   variant = "ranking",
   maxRows = 5,
+  autoFitRows = true,
   className = ""
 }) {
-  const rows = (Array.isArray(items) ? items : []).slice(0, maxRows);
   const rootRef = useRef(null);
+  const bodyRef = useRef(null);
   const [isChangeMenuOpen, setIsChangeMenuOpen] = useState(false);
+  const [bodyHeight, setBodyHeight] = useState(0);
   const hasChangeOptions = typeof onChange === "function" && Array.isArray(changeOptions) && changeOptions.length > 0;
   const changeMenuId = `pilot-stats-change-${String(selectedChangeKey || title || "card").replace(/\s+/g, "-").toLowerCase()}`;
+  const estimatedRowHeight = getEstimatedPilotStatsRowHeight(variant);
+  const visibleRowLimit = autoFitRows && bodyHeight > 0 ? Math.max(1, Math.floor(bodyHeight / estimatedRowHeight)) : maxRows;
+  const rows = (Array.isArray(items) ? items : []).slice(0, Math.min(maxRows, visibleRowLimit, Array.isArray(items) ? items.length : 0));
 
   useEffect(() => {
     if (!isChangeMenuOpen) {
@@ -211,6 +217,25 @@ export default function LogbookPilotStatsSummaryPanel({
     setIsChangeMenuOpen(false);
   }, [changeOptions, selectedChangeKey]);
 
+  useEffect(() => {
+    const node = bodyRef.current;
+
+    if (!node || typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+
+    const updateHeight = () => {
+      const nextHeight = Math.max(0, Math.floor(node.clientHeight));
+      setBodyHeight((current) => (current === nextHeight ? current : nextHeight));
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [variant]);
+
   function handleSelectChange(nextCardKey) {
     setIsChangeMenuOpen(false);
     onChange?.(nextCardKey);
@@ -225,8 +250,8 @@ export default function LogbookPilotStatsSummaryPanel({
         className
       )}
     >
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-2 gap-y-1">
-        <p className={cn("m-0 min-w-[9rem] flex-1 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <p className={cn("m-0 min-w-0 flex-1 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {hasChangeOptions ? (
             <div className="relative">
@@ -281,7 +306,7 @@ export default function LogbookPilotStatsSummaryPanel({
         </div>
       </div>
 
-      <div className="min-h-0 overflow-hidden">
+      <div ref={bodyRef} className="min-h-0 flex-1 overflow-hidden">
         {rows.length ? (
           variant === "records" ? (
             <div className="grid grid-cols-2 gap-2">

@@ -258,6 +258,25 @@ export function buildPilotStatsDashboardChangeOptions(visibleCardKeys, layoutMod
   return getPilotStatsChangeOptions({ layoutMode, visibleCardKeys });
 }
 
+// Returns a conservative estimated body row height for the active card variant.
+export function getEstimatedPilotStatsRowHeight(variant) {
+  switch (String(variant || "").trim()) {
+    case "airline":
+      return 48;
+    case "landing":
+      return 46;
+    case "airport":
+      return 54;
+    case "route":
+      return 58;
+    case "records":
+      return 56;
+    case "ranking":
+    default:
+      return 56;
+  }
+}
+
 // Resolves the data, title, and render variant for one dashboard card slot.
 export function resolvePilotStatsCard({ cardKey, stats, layoutMode }) {
   const card = getPilotStatsCardDefinition(cardKey);
