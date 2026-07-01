@@ -159,7 +159,12 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
     >
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onClose} className="justify-self-start">
-          {"‹ Pilot Stats"}
+          <span className="inline-flex items-center gap-1 leading-none">
+            <span aria-hidden="true" className="text-base leading-none">
+              ‹
+            </span>
+            <span className="leading-none">Pilot Stats</span>
+          </span>
         </Button>
 
         <p className={cn("m-0 min-w-0 justify-self-center text-center text-[var(--text-heading)]", sectionTitleTextClassName)}>
