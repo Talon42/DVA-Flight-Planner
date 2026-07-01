@@ -4,7 +4,9 @@ import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
+import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
+import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
@@ -106,18 +108,20 @@ function RouteRow({ item }) {
 }
 
 function LandingRow({ item }) {
+  const landingRateValue = item?.landingRate || item?.value || LOGBOOK_EMPTY_VALUE;
+
   return (
     <div className="grid gap-1.5 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
-      <div className="flex min-w-0 items-baseline justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
-          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodySmTextClassName)}>{item.meta}</p> : null}
-        </div>
-        <p className={cn("m-0 shrink-0 text-right font-semibold", getLandingToneClassName(item?.rawLandingRate), bodySmTextClassName)}>
-          {item?.value}
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_4.5rem_5.5rem_auto] items-center gap-2">
+        <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
+        <p className={cn("m-0 shrink-0 truncate text-[var(--text-muted)] tabular-nums", bodySmTextClassName)}>{item?.date || LOGBOOK_EMPTY_VALUE}</p>
+        <p className={cn("m-0 shrink-0 truncate text-right font-semibold tabular-nums", getLandingToneClassName(item?.rawLandingRate), bodySmTextClassName)}>
+          {landingRateValue}
         </p>
+        <div className="flex justify-end">
+          <LandingGradeBadge grade={item?.badge} />
+        </div>
       </div>
-      {item?.badge ? <p className={cn("m-0 text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-muted)]")}>{item.badge}</p> : null}
     </div>
   );
 }
