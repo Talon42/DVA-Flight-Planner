@@ -465,22 +465,35 @@ function buildRecentLandingRows(rows, limit = 10) {
     .filter((row) => Number.isFinite(row.landingRate))
     .sort((left, right) => right.dateSortKey - left.dateSortKey || right.sourceIndex - left.sourceIndex)
     .slice(0, limit)
-    .map((row) => ({
-      id: row.id,
-      label: row.compactFlightLabel,
-      date: row.dateDisplay,
-      dateSortKey: row.dateSortKey,
-      flight: row.compactFlightLabel,
-      airline: row.airlineDisplayName,
-      route: `${row.departure} -> ${row.arrival}`,
-      arrivalAirport: row.arrival,
-      equipment: row.equipment,
-      meta: row.arrival,
-      value: row.landingRateDisplay,
-      landingRate: row.landingRateDisplay,
-      badge: row.landingGradeDisplay,
-      rawLandingRate: row.landingRate
-    }));
+    .map((row) => {
+      const arrivalAirport = row.arrival || LOGBOOK_EMPTY_VALUE;
+      const runwayValue =
+        row.landingRunway && row.landingRunway !== LOGBOOK_EMPTY_VALUE
+          ? row.landingRunway
+          : row.arrivalRunway && row.arrivalRunway !== LOGBOOK_EMPTY_VALUE
+            ? row.arrivalRunway
+            : null;
+
+      return {
+        id: row.id,
+        rawLogbookId: row.rawLogbookId || null,
+        dvaPirepId: row.dvaPirepId || null,
+        label: row.compactFlightLabel,
+        date: row.dateDisplay,
+        dateSortKey: row.dateSortKey,
+        flight: row.compactFlightLabel,
+        airline: row.airlineDisplayName,
+        route: `${row.departure} -> ${row.arrival}`,
+        arrivalAirport,
+        arrivalRunway: runwayValue || LOGBOOK_EMPTY_VALUE,
+        equipment: row.equipment,
+        meta: [arrivalAirport, runwayValue].filter(Boolean).join(" • "),
+        value: row.landingRateDisplay,
+        landingRate: row.landingRateDisplay,
+        badge: row.landingGradeDisplay,
+        rawLandingRate: row.landingRate
+      };
+    });
 }
 
 function buildRecordSummary(rows) {

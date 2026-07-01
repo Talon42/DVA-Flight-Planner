@@ -1,113 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
-import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
-import { fetchDeltaVirtualPirepDetails } from "../../services/tauri/deltaVirtual.client.js";
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
 
-const recentLandingRunwayCache = new Map();
-const recentLandingRunwayRequests = new Map();
-
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
   return Number.isFinite(numeric) ? numeric : 0;
-}
-
-function isTauriRuntime() {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
-
-function normalizeRecentLandingPirepId(row) {
-  const rawId =
-    row?.dvaPirepId ??
-    row?.rawLogbookId ??
-    row?.rawEntry?.logbookId ??
-    row?.rawEntry?.id ??
-    "";
-  return buildDvaPirepId(rawId);
-}
-
-function useRecentLandingRunways(rows) {
-  const [runwaysByRowId, setRunwaysByRowId] = useState({});
-
-  useEffect(() => {
-    const visibleRows = Array.isArray(rows) ? rows : [];
-
-    if (!visibleRows.length || !isTauriRuntime()) {
-      setRunwaysByRowId({});
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    const visibleRunways = {};
-    const pendingRequests = [];
-
-    for (const row of visibleRows) {
-      const pirepId = normalizeRecentLandingPirepId(row);
-      if (!pirepId || !row?.id) {
-        continue;
-      }
-
-      const cachedRunway = recentLandingRunwayCache.get(pirepId);
-      if (cachedRunway) {
-        visibleRunways[row.id] = cachedRunway;
-        continue;
-      }
-
-      pendingRequests.push({ rowId: row.id, pirepId });
-    }
-
-    setRunwaysByRowId(visibleRunways);
-
-    for (const { rowId, pirepId } of pendingRequests) {
-      const inFlightRequest =
-        recentLandingRunwayRequests.get(pirepId) ||
-        (async () => {
-          const details = await fetchDeltaVirtualPirepDetails(pirepId);
-          const runway = String(details?.arrivalRunway || "").trim();
-          recentLandingRunwayCache.set(pirepId, runway);
-          return runway;
-        })();
-
-      if (!recentLandingRunwayRequests.has(pirepId)) {
-        recentLandingRunwayRequests.set(pirepId, inFlightRequest);
-      }
-
-      void inFlightRequest
-        .then((runway) => {
-          if (cancelled || !runway) {
-            return;
-          }
-
-          setRunwaysByRowId((current) => (current[rowId] === runway ? current : { ...current, [rowId]: runway }));
-        })
-        .catch(() => {
-          if (cancelled) {
-            return;
-          }
-
-          recentLandingRunwayCache.set(pirepId, "");
-        })
-        .finally(() => {
-          recentLandingRunwayRequests.delete(pirepId);
-        });
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [rows]);
-
-  return runwaysByRowId;
 }
 
 function RankingRow({ item, showProgressBar = true }) {
@@ -350,21 +256,12 @@ export default function LogbookPilotStatsSummaryPanel({
   const rowItems = Array.isArray(items) ? items : [];
   const effectiveMaxRows = autoFitRows ? Math.min(maxRows, fitItems) : maxRows;
   const rows = rowItems.slice(0, Math.min(effectiveMaxRows, rowItems.length));
-  const recentLandingRunwaysByRowId = useRecentLandingRunways(variant === "landing" ? rows : []);
 
   function renderRow(item, index) {
     return variant === "airline" ? (
       <AirlineRow key={`${item?.label || item?.value || "airline"}-${index}`} item={item} />
     ) : variant === "landing" ? (
-      <LandingRow
-        key={`${item?.label || item?.value || "landing"}-${index}`}
-        item={{
-          ...item,
-          meta: [item?.arrivalAirport || item?.arrival || LOGBOOK_EMPTY_VALUE, recentLandingRunwaysByRowId[item?.id]]
-            .filter(Boolean)
-            .join(" • ")
-        }}
-      />
+      <LandingRow key={`${item?.label || item?.value || "landing"}-${index}`} item={item} />
     ) : variant === "airport" ? (
       <AirportRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
     ) : variant === "route" ? (
