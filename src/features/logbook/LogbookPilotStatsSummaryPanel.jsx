@@ -259,6 +259,7 @@ export default function LogbookPilotStatsSummaryPanel({
 }) {
   const rootRef = useRef(null);
   const bodyRef = useRef(null);
+  const measureShellRef = useRef(null);
   const measureRef = useRef(null);
   const [isChangeMenuOpen, setIsChangeMenuOpen] = useState(false);
   const [fitItems, setFitItems] = useState(maxRows);
@@ -287,7 +288,7 @@ export default function LogbookPilotStatsSummaryPanel({
     );
   }
 
-  function renderRows(rowItemsToRender, { measure = false } = {}) {
+  function renderRows(rowItemsToRender, { containerRef = null } = {}) {
     const safeRowItems = Array.isArray(rowItemsToRender) ? rowItemsToRender : [];
 
     if (!safeRowItems.length) {
@@ -296,18 +297,13 @@ export default function LogbookPilotStatsSummaryPanel({
 
     if (variant === "records") {
       return (
-        <div className="grid grid-cols-2 gap-2">
+        <div ref={containerRef} className="grid grid-cols-2 gap-2">
           {safeRowItems.map((item, index) => {
-            const row = (
-              <RecordTile key={`${item?.recordType || item?.label || item?.value || "record"}-${index}`} item={item} />
-            );
-
-            return measure ? (
-              <div key={`${item?.recordType || item?.label || item?.value || "record"}-measure-${index}`} className="min-w-0">
-                {row}
-              </div>
-            ) : (
-              row
+            return (
+              <RecordTile
+                key={`${item?.recordType || item?.label || item?.value || "record"}-${index}`}
+                item={item}
+              />
             );
           })}
         </div>
@@ -315,18 +311,8 @@ export default function LogbookPilotStatsSummaryPanel({
     }
 
     return (
-      <div className={measure ? "grid gap-1.5" : "grid gap-1.5"}>
-        {safeRowItems.map((item, index) => {
-          const row = renderRow(item, index);
-
-          return measure ? (
-            <div key={`${item?.label || item?.value || "measure"}-${index}`} className="min-w-0">
-              {row}
-            </div>
-          ) : (
-            row
-          );
-        })}
+      <div ref={containerRef} className="grid gap-1.5">
+        {safeRowItems.map((item, index) => renderRow(item, index))}
       </div>
     );
   }
@@ -370,10 +356,11 @@ export default function LogbookPilotStatsSummaryPanel({
     }
 
     const bodyNode = bodyRef.current;
+    const measureShellNode = measureShellRef.current;
     const measureNode = measureRef.current;
     const candidateCount = Math.min(maxRows, rowItems.length);
 
-    if (!bodyNode || !measureNode || typeof ResizeObserver === "undefined") {
+    if (!bodyNode || !measureShellNode || !measureNode || typeof ResizeObserver === "undefined") {
       const fallbackFitItems = getFallbackPilotStatsFitCount({
         bodyHeight: bodyNode?.clientHeight || 0,
         variant,
@@ -430,6 +417,7 @@ export default function LogbookPilotStatsSummaryPanel({
     scheduleUpdate();
     const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(bodyNode);
+    observer.observe(measureShellNode);
     observer.observe(measureNode);
 
     return () => {
@@ -516,8 +504,12 @@ export default function LogbookPilotStatsSummaryPanel({
         {rows.length ? (
           <>
             {renderRows(rows)}
-            <div ref={measureRef} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden opacity-0">
-              {renderRows(rowItems.slice(0, maxRows), { measure: true })}
+            <div
+              ref={measureShellRef}
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 w-full overflow-hidden opacity-0"
+            >
+              {renderRows(rowItems.slice(0, maxRows), { containerRef: measureRef })}
             </div>
           </>
         ) : (
