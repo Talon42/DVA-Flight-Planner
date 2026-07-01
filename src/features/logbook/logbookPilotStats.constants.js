@@ -15,7 +15,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "airlines",
     variant: "airline",
     dataKey: "airlines",
-    maxRows: 8,
+    maxRows: 6,
     cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
@@ -26,7 +26,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "equipment",
     variant: "ranking",
     dataKey: "equipment",
-    maxRows: 8,
+    maxRows: 6,
     cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
@@ -37,7 +37,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "recent-landings",
     variant: "landing",
     dataKey: "recentLandings",
-    maxRows: 8,
+    maxRows: 6,
     cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
@@ -48,7 +48,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "top-airports",
     variant: "airport",
     dataKey: "topAirports",
-    maxRows: 8,
+    maxRows: 6,
     cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
@@ -59,7 +59,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "routes",
     variant: "route",
     dataKey: "routes",
-    maxRows: 8,
+    maxRows: 6,
     cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
@@ -70,7 +70,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "records",
     variant: "records",
     dataKey: "records",
-    maxRows: 6,
+    maxRows: 4,
     cardClassName: "min-h-[15rem]",
     spanClassName: "col-span-1"
   })

@@ -42,7 +42,7 @@ export default function LogbookPilotStats({
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+              <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-3 pr-1">
                 <div className="grid auto-rows-min grid-cols-2 gap-3 bp-1400:grid-cols-3 bp-1920:grid-cols-4">
                   {dashboardCards.map((card) => (
                     <LogbookPilotStatsSummaryPanel
