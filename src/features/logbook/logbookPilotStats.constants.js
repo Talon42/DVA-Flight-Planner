@@ -16,6 +16,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "airline",
     dataKey: "airlines",
     maxRows: 8,
+    cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
   equipment: Object.freeze({
@@ -26,6 +27,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "ranking",
     dataKey: "equipment",
     maxRows: 8,
+    cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
   "recent-landings": Object.freeze({
@@ -36,6 +38,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "landing",
     dataKey: "recentLandings",
     maxRows: 8,
+    cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
   "top-airports": Object.freeze({
@@ -46,6 +49,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "airport",
     dataKey: "topAirports",
     maxRows: 8,
+    cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
   routes: Object.freeze({
@@ -56,6 +60,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "route",
     dataKey: "routes",
     maxRows: 8,
+    cardClassName: "min-h-[17rem]",
     spanClassName: "col-span-1"
   }),
   records: Object.freeze({
@@ -66,6 +71,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "records",
     dataKey: "records",
     maxRows: 6,
+    cardClassName: "min-h-[15rem]",
     spanClassName: "col-span-1"
   })
 });
@@ -151,7 +157,7 @@ export function getEstimatedPilotStatsRowHeight(variant) {
   }
 }
 
-// Resolves the data, title, and render variant for one dashboard dashboard card.
+// Resolves the data, title, and render variant for one dashboard card.
 export function resolvePilotStatsCard({ cardKey, stats }) {
   const card = getPilotStatsCardDefinition(cardKey);
   if (!card) {

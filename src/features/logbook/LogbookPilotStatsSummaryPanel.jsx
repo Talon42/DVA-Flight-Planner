@@ -413,7 +413,7 @@ export default function LogbookPilotStatsSummaryPanel({
         </div>
       </div>
 
-      <div ref={bodyRef} className="relative min-h-0 flex-1 overflow-hidden">
+      <div ref={bodyRef} className="relative min-h-0 overflow-hidden">
         {rows.length ? (
           <>
             {renderRows(rows)}
