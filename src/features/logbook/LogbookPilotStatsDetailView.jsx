@@ -12,6 +12,31 @@ function resolveSortValue(value) {
   return Number.isFinite(numeric) && normalized !== "" ? numeric : normalized.toLowerCase();
 }
 
+// Matches the shared table sort chevron so the detail view uses the same visual cue.
+function SortChevron({ direction, active }) {
+  return (
+    <span
+      className={cn(
+        "pointer-events-none flex h-4 w-4 shrink-0 items-center justify-center text-[var(--text-muted)] transition-transform duration-150",
+        active ? "" : "opacity-35",
+        active && direction === "asc" && "rotate-180"
+      )}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
+        <path
+          d="M4 6.5 8 10.5 12 6.5"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.75"
+        />
+      </svg>
+    </span>
+  );
+}
+
 function buildColumns(detailView, detailRows) {
   switch (detailView) {
     case "equipment":
@@ -198,9 +223,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                     onClick={() => handleSort(column.key)}
                   >
                     {column.label}
-                    {column.key === sortKey ? (
-                      <span aria-hidden="true">{sortDirection === "asc" ? "â–´" : "â–¾"}</span>
-                    ) : null}
+                    <SortChevron direction={sortDirection} active={column.key === sortKey} />
                   </button>
                 </th>
               ))}
