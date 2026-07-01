@@ -31,7 +31,7 @@ export function LandingGradeBadge({ grade, className = "" }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-none border px-1.5 py-[0.625rem] text-[0.62rem] font-semibold uppercase leading-none tracking-[0.16em]",
+        "inline-flex h-[1.7rem] w-[5.75rem] shrink-0 items-center justify-center rounded-none border px-1.5 text-center text-[0.62rem] font-semibold uppercase leading-none tracking-[0.16em]",
         getLandingGradePaletteClassName(normalizedGrade),
         className
       )}

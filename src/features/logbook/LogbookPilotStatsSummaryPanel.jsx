@@ -1,35 +1,113 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
+import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
+import { fetchDeltaVirtualPirepDetails } from "../../services/tauri/deltaVirtual.client.js";
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
+
+const recentLandingRunwayCache = new Map();
+const recentLandingRunwayRequests = new Map();
 
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function getLandingToneClassName(rawLandingRate) {
-  if (!Number.isFinite(rawLandingRate)) {
-    return "text-[var(--text-muted)]";
-  }
+function isTauriRuntime() {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
 
-  if (rawLandingRate >= -150) {
-    return "text-[#126835] dark:text-[#7FD18B]";
-  }
+function normalizeRecentLandingPirepId(row) {
+  const rawId =
+    row?.dvaPirepId ??
+    row?.rawLogbookId ??
+    row?.rawEntry?.logbookId ??
+    row?.rawEntry?.id ??
+    "";
+  return buildDvaPirepId(rawId);
+}
 
-  if (rawLandingRate >= -350) {
-    return "text-[#946200] dark:text-[#f0c15d]";
-  }
+function useRecentLandingRunways(rows) {
+  const [runwaysByRowId, setRunwaysByRowId] = useState({});
 
-  return "text-[var(--delta-red)]";
+  useEffect(() => {
+    const visibleRows = Array.isArray(rows) ? rows : [];
+
+    if (!visibleRows.length || !isTauriRuntime()) {
+      setRunwaysByRowId({});
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const visibleRunways = {};
+    const pendingRequests = [];
+
+    for (const row of visibleRows) {
+      const pirepId = normalizeRecentLandingPirepId(row);
+      if (!pirepId || !row?.id) {
+        continue;
+      }
+
+      const cachedRunway = recentLandingRunwayCache.get(pirepId);
+      if (cachedRunway) {
+        visibleRunways[row.id] = cachedRunway;
+        continue;
+      }
+
+      pendingRequests.push({ rowId: row.id, pirepId });
+    }
+
+    setRunwaysByRowId(visibleRunways);
+
+    for (const { rowId, pirepId } of pendingRequests) {
+      const inFlightRequest =
+        recentLandingRunwayRequests.get(pirepId) ||
+        (async () => {
+          const details = await fetchDeltaVirtualPirepDetails(pirepId);
+          const runway = String(details?.arrivalRunway || "").trim();
+          recentLandingRunwayCache.set(pirepId, runway);
+          return runway;
+        })();
+
+      if (!recentLandingRunwayRequests.has(pirepId)) {
+        recentLandingRunwayRequests.set(pirepId, inFlightRequest);
+      }
+
+      void inFlightRequest
+        .then((runway) => {
+          if (cancelled || !runway) {
+            return;
+          }
+
+          setRunwaysByRowId((current) => (current[rowId] === runway ? current : { ...current, [rowId]: runway }));
+        })
+        .catch(() => {
+          if (cancelled) {
+            return;
+          }
+
+          recentLandingRunwayCache.set(pirepId, "");
+        })
+        .finally(() => {
+          recentLandingRunwayRequests.delete(pirepId);
+        });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rows]);
+
+  return runwaysByRowId;
 }
 
 function RankingRow({ item, showProgressBar = true }) {
@@ -112,13 +190,22 @@ function LandingRow({ item }) {
 
   return (
     <div className="grid gap-1.5 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_4.5rem_5.5rem_auto] items-center gap-2">
-        <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
-        <p className={cn("m-0 shrink-0 truncate text-[var(--text-muted)] tabular-nums", bodySmTextClassName)}>{item?.date || LOGBOOK_EMPTY_VALUE}</p>
-        <p className={cn("m-0 shrink-0 truncate text-right font-semibold tabular-nums", getLandingToneClassName(item?.rawLandingRate), bodySmTextClassName)}>
+      <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_auto] items-center gap-3">
+        <p className={cn("m-0 shrink-0 truncate text-[var(--text-primary)] tabular-nums", bodySmTextClassName)}>
+          {item?.date || LOGBOOK_EMPTY_VALUE}
+        </p>
+        <div className="min-w-0">
+          <p className={cn("m-0 truncate text-[var(--text-primary)]", bodySmTextClassName)}>
+            {item?.meta || item?.arrivalAirport || item?.arrival || LOGBOOK_EMPTY_VALUE}
+          </p>
+          <p className={cn("m-0 truncate text-[var(--text-primary)]", bodySmTextClassName)}>
+            {item?.equipment || LOGBOOK_EMPTY_VALUE}
+          </p>
+        </div>
+        <p className={cn("m-0 shrink-0 truncate text-center font-semibold tabular-nums text-[var(--text-primary)]", bodySmTextClassName)}>
           {landingRateValue}
         </p>
-        <div className="flex justify-end">
+        <div className="flex shrink-0 items-center justify-end">
           <LandingGradeBadge grade={item?.badge} />
         </div>
       </div>
@@ -263,12 +350,21 @@ export default function LogbookPilotStatsSummaryPanel({
   const rowItems = Array.isArray(items) ? items : [];
   const effectiveMaxRows = autoFitRows ? Math.min(maxRows, fitItems) : maxRows;
   const rows = rowItems.slice(0, Math.min(effectiveMaxRows, rowItems.length));
+  const recentLandingRunwaysByRowId = useRecentLandingRunways(variant === "landing" ? rows : []);
 
   function renderRow(item, index) {
     return variant === "airline" ? (
       <AirlineRow key={`${item?.label || item?.value || "airline"}-${index}`} item={item} />
     ) : variant === "landing" ? (
-      <LandingRow key={`${item?.label || item?.value || "landing"}-${index}`} item={item} />
+      <LandingRow
+        key={`${item?.label || item?.value || "landing"}-${index}`}
+        item={{
+          ...item,
+          meta: [item?.arrivalAirport || item?.arrival || LOGBOOK_EMPTY_VALUE, recentLandingRunwaysByRowId[item?.id]]
+            .filter(Boolean)
+            .join(" • ")
+        }}
+      />
     ) : variant === "airport" ? (
       <AirportRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
     ) : variant === "route" ? (

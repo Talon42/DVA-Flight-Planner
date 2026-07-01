@@ -460,18 +460,23 @@ function buildComparisonBundle(rows, periodKey) {
 }
 
 function buildRecentLandingRows(rows, limit = 10) {
+  // Keeps the landing summary card fed with the compact fields its row renderer expects.
   return [...rows]
     .filter((row) => Number.isFinite(row.landingRate))
     .sort((left, right) => right.dateSortKey - left.dateSortKey || right.sourceIndex - left.sourceIndex)
     .slice(0, limit)
     .map((row) => ({
       id: row.id,
+      label: row.compactFlightLabel,
       date: row.dateDisplay,
       dateSortKey: row.dateSortKey,
       flight: row.compactFlightLabel,
       airline: row.airlineDisplayName,
       route: `${row.departure} -> ${row.arrival}`,
+      arrivalAirport: row.arrival,
       equipment: row.equipment,
+      meta: row.arrival,
+      value: row.landingRateDisplay,
       landingRate: row.landingRateDisplay,
       badge: row.landingGradeDisplay,
       rawLandingRate: row.landingRate
