@@ -181,12 +181,13 @@ export default function LogbookPilotStatsSummaryPanel({
   const rootRef = useRef(null);
   const bodyRef = useRef(null);
   const [isChangeMenuOpen, setIsChangeMenuOpen] = useState(false);
-  const [bodyHeight, setBodyHeight] = useState(0);
+  const [fitRows, setFitRows] = useState(maxRows);
+  const rafIdRef = useRef(0);
   const hasChangeOptions = typeof onChange === "function" && Array.isArray(changeOptions) && changeOptions.length > 0;
   const changeMenuId = `pilot-stats-change-${String(selectedChangeKey || title || "card").replace(/\s+/g, "-").toLowerCase()}`;
   const estimatedRowHeight = getEstimatedPilotStatsRowHeight(variant);
-  const visibleRowLimit = autoFitRows && bodyHeight > 0 ? Math.max(1, Math.floor(bodyHeight / estimatedRowHeight)) : maxRows;
-  const rows = (Array.isArray(items) ? items : []).slice(0, Math.min(maxRows, visibleRowLimit, Array.isArray(items) ? items.length : 0));
+  const effectiveMaxRows = autoFitRows ? Math.min(maxRows, fitRows) : maxRows;
+  const rows = (Array.isArray(items) ? items : []).slice(0, Math.min(effectiveMaxRows, Array.isArray(items) ? items.length : 0));
 
   useEffect(() => {
     if (!isChangeMenuOpen) {
@@ -227,17 +228,37 @@ export default function LogbookPilotStatsSummaryPanel({
       return undefined;
     }
 
-    const updateHeight = () => {
+    const updateFitRows = () => {
       const nextHeight = Math.max(0, Math.floor(node.clientHeight));
-      setBodyHeight((current) => (current === nextHeight ? current : nextHeight));
+      const nextFitRows = Math.max(1, Math.floor(nextHeight / estimatedRowHeight));
+
+      setFitRows((current) => (current === nextFitRows ? current : nextFitRows));
     };
 
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
+    const scheduleUpdate = () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = 0;
+        updateFitRows();
+      });
+    };
+
+    scheduleUpdate();
+    const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(node);
 
-    return () => observer.disconnect();
-  }, [variant]);
+    return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = 0;
+      }
+
+      observer.disconnect();
+    };
+  }, [estimatedRowHeight, variant]);
 
   function handleSelectChange(nextCardKey) {
     setIsChangeMenuOpen(false);

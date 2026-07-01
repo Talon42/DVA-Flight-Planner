@@ -26,7 +26,89 @@ const EMPTY_DETAIL_ROWS = Object.freeze({
 });
 
 // Measures the dashboard content area so layout mode follows the space actually available.
-function usePilotStatsLayoutMode({ width = 0, height = 0 } = {}) {
+function getNextPilotStatsLayoutMode({ width = 0, height = 0 } = {}, currentMode = "narrowShort") {
+  const mode = String(currentMode || "narrowShort").trim();
+
+  if (mode === "wideTall") {
+    if (width >= 1600 && height >= 740) {
+      return "wideTall";
+    }
+
+    if (width >= 1600) {
+      return "wideShort";
+    }
+
+    if (width >= 1350) {
+      return "wideCompact";
+    }
+
+    if (height >= 660) {
+      return "narrowTall";
+    }
+
+    return "narrowShort";
+  }
+
+  if (mode === "wideShort") {
+    if (width >= 1600) {
+      return "wideShort";
+    }
+
+    if (width >= 1580) {
+      return "wideShort";
+    }
+
+    if (width >= 1350) {
+      return "wideCompact";
+    }
+
+    if (height >= 660) {
+      return "narrowTall";
+    }
+
+    return "narrowShort";
+  }
+
+  if (mode === "wideCompact") {
+    if (width >= 1600) {
+      return "wideShort";
+    }
+
+    if (width >= 1320) {
+      return "wideCompact";
+    }
+
+    if (height >= 660) {
+      return "narrowTall";
+    }
+
+    return "narrowShort";
+  }
+
+  if (mode === "narrowTall") {
+    if (width >= 1600 && height >= 760) {
+      return "wideTall";
+    }
+
+    if (width >= 1600) {
+      return "wideShort";
+    }
+
+    if (width >= 1350) {
+      return "wideCompact";
+    }
+
+    if (height >= 680) {
+      return "narrowTall";
+    }
+
+    if (height >= 660) {
+      return "narrowTall";
+    }
+
+    return "narrowShort";
+  }
+
   if (width >= 1600 && height >= 760) {
     return "wideTall";
   }
@@ -35,7 +117,7 @@ function usePilotStatsLayoutMode({ width = 0, height = 0 } = {}) {
     return "wideShort";
   }
 
-  if (width >= 1275) {
+  if (width >= 1350) {
     return "wideCompact";
   }
 
@@ -44,6 +126,21 @@ function usePilotStatsLayoutMode({ width = 0, height = 0 } = {}) {
   }
 
   return "narrowShort";
+}
+
+function usePilotStatsLayoutMode(size = {}) {
+  const [layoutMode, setLayoutMode] = useState(() => getNextPilotStatsLayoutMode(size, "narrowShort"));
+  const width = Number(size?.width || 0);
+  const height = Number(size?.height || 0);
+
+  useEffect(() => {
+    setLayoutMode((currentMode) => {
+      const nextMode = getNextPilotStatsLayoutMode({ width, height }, currentMode);
+      return nextMode === currentMode ? currentMode : nextMode;
+    });
+  }, [height, width]);
+
+  return layoutMode;
 }
 
 // Returns the grid column class for a given dashboard row size.
@@ -66,6 +163,7 @@ function useElementSize(ref) {
     width: typeof window !== "undefined" ? window.innerWidth : 0,
     height: typeof window !== "undefined" ? window.innerHeight : 0
   }));
+  const rafIdRef = useRef(0);
 
   useEffect(() => {
     const node = ref.current;
@@ -77,16 +175,38 @@ function useElementSize(ref) {
       const nextWidth = Math.max(0, Math.floor(node.clientWidth));
       const nextHeight = Math.max(0, Math.floor(node.clientHeight));
 
-      setSize((current) =>
-        current.width === nextWidth && current.height === nextHeight ? current : { width: nextWidth, height: nextHeight }
-      );
+      setSize((current) => {
+        if (Math.abs(current.width - nextWidth) <= 1 && Math.abs(current.height - nextHeight) <= 1) {
+          return current;
+        }
+
+        return current.width === nextWidth && current.height === nextHeight ? current : { width: nextWidth, height: nextHeight };
+      });
     };
 
-    updateSize();
-    const observer = new ResizeObserver(updateSize);
+    const scheduleUpdate = () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = 0;
+        updateSize();
+      });
+    };
+
+    scheduleUpdate();
+    const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(node);
 
-    return () => observer.disconnect();
+    return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = 0;
+      }
+
+      observer.disconnect();
+    };
   }, [ref]);
 
   return size;
