@@ -7,7 +7,7 @@ import { cardFrameClassName } from "../../components/ui/patterns";
 import { dropdownOptionRowClassName } from "../../components/ui/forms";
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
-  "!bg-transparent hover:!bg-transparent dark:!bg-transparent dark:hover:!bg-transparent";
+  "!bg-transparent !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
 const CHANGE_MENU_PANEL_CLASS_NAME =
   "grid gap-1 overflow-hidden rounded-none border border-[color:var(--line)] bg-[var(--surface-raised)] p-2 shadow-none";
 
@@ -227,7 +227,7 @@ export default function LogbookPilotStatsSummaryPanel({
     >
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-2 gap-y-1">
         <p className={cn("m-0 min-w-[9rem] flex-1 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {hasChangeOptions ? (
             <div className="relative">
               <Button
@@ -266,6 +266,8 @@ export default function LogbookPilotStatsSummaryPanel({
             </div>
           ) : null}
 
+          {hasChangeOptions && onViewAll ? <span aria-hidden="true" className="h-3 w-px bg-[color:var(--line)]" /> : null}
+
           {onViewAll ? (
             <Button
               variant="ghost"
@@ -283,23 +285,23 @@ export default function LogbookPilotStatsSummaryPanel({
         {rows.length ? (
           variant === "records" ? (
             <div className="grid grid-cols-2 gap-2">
-              {rows.map((item) => (
-                <RecordTile key={`${item?.recordType || item?.label}-${item?.value}`} item={item} />
+              {rows.map((item, index) => (
+                <RecordTile key={`${item?.recordType || item?.label || item?.value || "record"}-${index}`} item={item} />
               ))}
             </div>
           ) : (
             <div className="grid gap-1.5">
-              {rows.map((item) =>
+              {rows.map((item, index) =>
                 variant === "airline" ? (
-                  <AirlineRow key={`${item?.label}-${item?.value}`} item={item} />
+                  <AirlineRow key={`${item?.label || item?.value || "airline"}-${index}`} item={item} />
                 ) : variant === "landing" ? (
-                  <LandingRow key={`${item?.label}-${item?.value}`} item={item} />
+                  <LandingRow key={`${item?.label || item?.value || "landing"}-${index}`} item={item} />
                 ) : variant === "airport" ? (
-                  <AirportRow key={`${item?.label}-${item?.value}`} item={item} />
+                  <AirportRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
                 ) : variant === "route" ? (
-                  <RouteRow key={`${item?.label}-${item?.value}`} item={item} />
+                  <RouteRow key={`${item?.label || item?.value || "route"}-${index}`} item={item} />
                 ) : (
-                  <RankingRow key={`${item?.label}-${item?.value}`} item={item} />
+                  <RankingRow key={`${item?.label || item?.value || "ranking"}-${index}`} item={item} />
                 )
               )}
             </div>
