@@ -448,23 +448,42 @@ fn store_deltava_accomplishment_eligibility(
     Ok(store.clone())
 }
 
-fn read_logbook_profile_metadata_from_path(
-    path: &Path,
-) -> Option<crate::DeltaLogbookPilotProfileMetadata> {
-    let text = fs::read_to_string(path).ok()?;
-    let mut metadata = serde_json::from_str::<crate::DeltaLogbookPilotProfileMetadata>(&text).ok()?;
-
+fn normalize_deltava_logbook_profile_metadata(
+    mut metadata: crate::DeltaLogbookPilotProfileMetadata,
+) -> crate::DeltaLogbookPilotProfileMetadata {
     if metadata.display_name.is_none() {
         if let Some(raw_header) = metadata.raw_profile_header.as_deref() {
             metadata.display_name = derive_display_name_from_profile_header(raw_header);
         }
     }
 
-    if metadata.name.is_none() {
-        metadata.name = metadata.display_name.clone();
+    if metadata.display_name.is_none() {
+        if let (Some(rank), Some(name)) = (metadata.rank.as_deref(), metadata.name.as_deref()) {
+            let normalized_rank = rank.trim();
+            let normalized_name = name.trim();
+            if !normalized_rank.is_empty() && !normalized_name.is_empty() {
+                metadata.display_name = Some(format!("{normalized_rank} {normalized_name}"));
+            }
+        }
     }
 
-    Some(metadata)
+    metadata
+}
+
+fn read_logbook_profile_metadata_from_path(
+    path: &Path,
+) -> Option<crate::DeltaLogbookPilotProfileMetadata> {
+    let text = fs::read_to_string(path).ok()?;
+    serde_json::from_str::<crate::DeltaLogbookPilotProfileMetadata>(&text)
+        .ok()
+        .map(normalize_deltava_logbook_profile_metadata)
+}
+
+fn read_raw_logbook_profile_metadata_from_path(
+    path: &Path,
+) -> Option<crate::DeltaLogbookPilotProfileMetadata> {
+    let text = fs::read_to_string(path).ok()?;
+    serde_json::from_str::<crate::DeltaLogbookPilotProfileMetadata>(&text).ok()
 }
 
 pub(crate) fn read_deltava_logbook_profile_metadata(
@@ -478,12 +497,24 @@ pub(crate) fn read_deltava_logbook_profile_metadata(
     read_logbook_profile_metadata_from_path(&path)
 }
 
+fn read_raw_deltava_logbook_profile_metadata(
+    app: &AppHandle,
+) -> Option<crate::DeltaLogbookPilotProfileMetadata> {
+    let path = build_logbook_profile_path(app).ok()?;
+    if !path.is_file() {
+        return None;
+    }
+
+    read_raw_logbook_profile_metadata_from_path(&path)
+}
+
 fn store_deltava_logbook_profile_metadata(
     app: &AppHandle,
     metadata: &crate::DeltaLogbookPilotProfileMetadata,
 ) -> Result<crate::DeltaLogbookPilotProfileMetadata, String> {
     let path = build_logbook_profile_path(app)?;
-    let json = serde_json::to_string_pretty(metadata).map_err(|error| {
+    let normalized = normalize_deltava_logbook_profile_metadata(metadata.clone());
+    let json = serde_json::to_string_pretty(&normalized).map_err(|error| {
         format!("download_failed: Unable to serialize Delta Virtual pilot profile metadata: {error}")
     })?;
 
@@ -491,7 +522,21 @@ fn store_deltava_logbook_profile_metadata(
         format!("download_failed: Unable to write Delta Virtual pilot profile metadata: {error}")
     })?;
 
-    Ok(metadata.clone())
+    Ok(normalized)
+}
+
+fn is_complete_cached_pilot_profile_metadata(
+    metadata: &crate::DeltaLogbookPilotProfileMetadata,
+    export_id: &str,
+) -> bool {
+    metadata
+        .export_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        == Some(export_id)
+        && metadata.display_name.is_some()
+        && metadata.pilot_code.is_some()
 }
 
 async fn resolve_deltava_logbook_profile_metadata(
@@ -506,21 +551,25 @@ async fn resolve_deltava_logbook_profile_metadata(
     let cached_metadata = if force_refresh {
         None
     } else {
-        read_deltava_logbook_profile_metadata(app)
+        read_raw_deltava_logbook_profile_metadata(app)
     };
 
     if let (Some(export_id), Some(metadata)) = (normalized_export_id, cached_metadata.clone()) {
+        if is_complete_cached_pilot_profile_metadata(&metadata, export_id) {
+            return normalize_deltava_logbook_profile_metadata(metadata);
+        }
+
         if metadata
             .export_id
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
             == Some(export_id)
-            && metadata.rank.is_some()
-            && metadata.name.is_some()
-            && metadata.pilot_code.is_some()
+            && metadata.display_name.is_none()
         {
-            return metadata;
+            append_sync_log(&format!(
+                "pilot-profile:cache-ignored exportId={export_id} reason=missing-display-name"
+            ));
         }
     }
 
@@ -942,5 +991,42 @@ mod tests {
             arrival_airports.into_iter().collect::<Vec<_>>(),
             vec!["KJFK".to_string()]
         );
+    }
+
+    #[test]
+    fn normalize_backfills_display_name_from_rank_and_name() {
+        let metadata = crate::DeltaLogbookPilotProfileMetadata {
+            export_id: Some("11384".to_string()),
+            profile_url: Some("https://www.deltava.org/profile.do?id=11384".to_string()),
+            raw_profile_header: None,
+            display_name: None,
+            rank: Some("Captain".to_string()),
+            name: Some("Jacob Benjamin".to_string()),
+            pilot_code: Some("DVA11384".to_string()),
+            equipment_type: Some("A350-900".to_string()),
+            fetched_at_utc: Some("2026-07-01T00:00:00Z".to_string()),
+        };
+
+        let normalized = normalize_deltava_logbook_profile_metadata(metadata);
+
+        assert_eq!(normalized.display_name.as_deref(), Some("Captain Jacob Benjamin"));
+        assert_eq!(normalized.pilot_code.as_deref(), Some("DVA11384"));
+    }
+
+    #[test]
+    fn incomplete_cached_profile_metadata_without_display_name_is_not_complete() {
+        let metadata = crate::DeltaLogbookPilotProfileMetadata {
+            export_id: Some("11384".to_string()),
+            profile_url: Some("https://www.deltava.org/profile.do?id=11384".to_string()),
+            raw_profile_header: None,
+            display_name: None,
+            rank: Some("Captain".to_string()),
+            name: Some("Jacob Benjamin".to_string()),
+            pilot_code: Some("DVA11384".to_string()),
+            equipment_type: Some("A350-900".to_string()),
+            fetched_at_utc: Some("2026-07-01T00:00:00Z".to_string()),
+        };
+
+        assert!(!is_complete_cached_pilot_profile_metadata(&metadata, "11384"));
     }
 }

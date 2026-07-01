@@ -5,7 +5,6 @@ import { cardFrameClassName } from "../../components/ui/patterns";
 import { getAirlinePrimaryColor } from "../../domain/airlines/airlineBranding.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
-import LogbookHeroMapBackground from "./LogbookHeroMapBackground.jsx";
 
 function formatDeltaValue(delta, unit = "", format = "number") {
   if (!Number.isFinite(delta)) {
@@ -136,6 +135,7 @@ export default function LogbookPilotStatsHero({
     "--logbook-hero-brand-color": brandColor,
     "--logbook-hero-accent-color": brandColor
   };
+  const topAirlineLabel = airlineName || "Top Flight by Airline";
   const profileDisplayName = formatPilotName(profileMetadata);
   const profileMetaLine = formatPilotMetadataLine(profileMetadata);
   const logoSrc = String(airline?.airlineLogoSrc || "").trim();
@@ -198,7 +198,6 @@ export default function LogbookPilotStatsHero({
       )}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[3px] bg-[var(--logbook-hero-accent-color)] opacity-90" />
-      <LogbookHeroMapBackground className="pointer-events-none absolute -right-16 top-1/2 z-0 h-[132%] w-[74%] -translate-y-1/2 text-[var(--logbook-hero-brand-color)] opacity-[0.12] dark:opacity-[0.16]" />
       {logoSrc ? (
         <img
           src={logoSrc}
@@ -216,7 +215,7 @@ export default function LogbookPilotStatsHero({
           <SummaryAirlineMark airline={airline} />
           <div className="min-w-0">
             <p className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em]", labelToneClassName)}>
-              DVA PILOT PROFILE
+              {topAirlineLabel}
             </p>
             <p className={cn("m-0 truncate text-[1.08rem] font-semibold leading-[1.1] tracking-[0] bp-1024:text-[1.2rem]", headingToneClassName)}>
               {profileDisplayName}

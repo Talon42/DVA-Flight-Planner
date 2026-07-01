@@ -70,7 +70,7 @@ fn build_client() -> Result<reqwest::Client, String> {
 fn parse_profile_header_text(
     document: &Html,
 ) -> (Option<String>, Option<String>, Option<String>) {
-    let selectors = ["h1", "h2", "h3", "header", "strong", "title"];
+    let selectors = ["h1", "h2", "h3", "header", "strong", "td", "th", "title"];
     let mut candidates = Vec::new();
 
     for selector_text in selectors {
@@ -91,7 +91,7 @@ fn parse_profile_header_text(
         }
     }
 
-    let header_pattern = regex::Regex::new(r"^(?P<lead>.+?)\s*\((?P<pilot_code>[^()]+)\)\s*$")
+    let header_pattern = regex::Regex::new(r"^(?P<lead>.+?)\s*\((?P<pilot_code>DVA\d+)\)\s*$")
         .expect("valid profile header regex");
 
     for candidate in candidates {
@@ -196,14 +196,13 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
         return Err("parse_empty: Delta Virtual profile page did not contain a recognizable profile header.".into());
     }
 
-    let name = display_name.clone();
     let metadata = DeltaLogbookPilotProfileMetadata {
         export_id: Some(normalized_export_id.clone()),
         profile_url: Some(profile_url.clone()),
         raw_profile_header,
         display_name,
         rank: None,
-        name,
+        name: None,
         pilot_code,
         equipment_type,
         fetched_at_utc: Some(Utc::now().to_rfc3339()),
@@ -233,5 +232,52 @@ pub(crate) fn build_unavailable_pilot_profile_metadata(
         pilot_code: None,
         equipment_type: None,
         fetched_at_utc: Some(Utc::now().to_rfc3339()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_profile_header_text_prefers_table_cell_header_and_preserves_prefix() {
+        let document = Html::parse_document(
+            r#"
+            <html>
+              <head><title>Captain Jacob Benjamin (DVA11384)</title></head>
+              <body>
+                <table>
+                  <tr><td>CAPTAIN JACOB BENJAMIN (DVA11384)</td></tr>
+                </table>
+              </body>
+            </html>
+            "#,
+        );
+
+        let (raw_profile_header, display_name, pilot_code) = parse_profile_header_text(&document);
+
+        assert_eq!(raw_profile_header.as_deref(), Some("CAPTAIN JACOB BENJAMIN (DVA11384)"));
+        assert_eq!(display_name.as_deref(), Some("Captain Jacob Benjamin"));
+        assert_eq!(pilot_code.as_deref(), Some("DVA11384"));
+    }
+
+    #[test]
+    fn parse_profile_header_text_preserves_multi_word_prefix() {
+        let document = Html::parse_document(
+            r#"
+            <html>
+              <body>
+                <table>
+                  <tr><th>SENIOR CAPTAIN JANE DOE (DVA9999)</th></tr>
+                </table>
+              </body>
+            </html>
+            "#,
+        );
+
+        let (_, display_name, pilot_code) = parse_profile_header_text(&document);
+
+        assert_eq!(display_name.as_deref(), Some("Senior Captain Jane Doe"));
+        assert_eq!(pilot_code.as_deref(), Some("DVA9999"));
     }
 }
