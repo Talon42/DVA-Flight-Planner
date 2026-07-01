@@ -60,6 +60,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
 
 export const PILOT_STATS_LAYOUT_DEFAULT_SLOTS = Object.freeze({
   wideTall: Object.freeze(["airlines", "equipment", "recent-landings", "top-airports", "routes", "records"]),
+  wideCompact: Object.freeze(["airlines", "equipment", "recent-landings", "top-airports"]),
   wideShort: Object.freeze(["airlines", "equipment", "recent-landings", "top-airports", "routes"]),
   narrowTall: Object.freeze(["airlines", "equipment", "recent-landings", "top-airports"]),
   narrowShort: Object.freeze(["airlines", "equipment", "recent-landings"])
@@ -67,6 +68,7 @@ export const PILOT_STATS_LAYOUT_DEFAULT_SLOTS = Object.freeze({
 
 export const PILOT_STATS_LAYOUT_ROW_COUNTS = Object.freeze({
   wideTall: Object.freeze([3, 3]),
+  wideCompact: Object.freeze([4]),
   wideShort: Object.freeze([3, 2]),
   narrowTall: Object.freeze([2, 2]),
   narrowShort: Object.freeze([3])
@@ -74,6 +76,14 @@ export const PILOT_STATS_LAYOUT_ROW_COUNTS = Object.freeze({
 
 export const PILOT_STATS_PANEL_CAPS = Object.freeze({
   wideTall: {
+    airlines: 8,
+    equipment: 8,
+    recentLandings: 8,
+    topAirports: 8,
+    routes: 8,
+    records: 6
+  },
+  wideCompact: {
     airlines: 8,
     equipment: 8,
     recentLandings: 8,
@@ -312,6 +322,7 @@ export function resolvePilotStatsCard({ cardKey, stats, layoutMode }) {
 
 export const PILOT_STATS_LAYOUT_MODES = Object.freeze({
   wideTall: "wideTall",
+  wideCompact: "wideCompact",
   wideShort: "wideShort",
   narrowTall: "narrowTall",
   narrowShort: "narrowShort"

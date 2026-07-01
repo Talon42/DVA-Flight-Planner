@@ -35,11 +35,29 @@ function usePilotStatsLayoutMode({ width = 0, height = 0 } = {}) {
     return "wideShort";
   }
 
-  if (width < 1600 && height >= 680) {
+  if (width >= 1350) {
+    return "wideCompact";
+  }
+
+  if (height >= 680) {
     return "narrowTall";
   }
 
   return "narrowShort";
+}
+
+// Returns the grid column class for a given dashboard row size.
+function getPilotStatsGridColumnClassName(columnCount) {
+  switch (Number(columnCount || 0)) {
+    case 4:
+      return "grid-cols-4";
+    case 3:
+      return "grid-cols-3";
+    case 2:
+      return "grid-cols-2";
+    default:
+      return "grid-cols-1";
+  }
 }
 
 // Tracks the rendered size of the dashboard container so the mode follows the real content box.
@@ -183,10 +201,7 @@ export default function LogbookPilotStats({
                 {visibleCardRows.map((row, rowIndex) => (
                   <div
                     key={`${layoutMode}-row-${rowIndex}`}
-                    className={cn(
-                      "grid min-h-0 w-full flex-1 gap-3 overflow-hidden",
-                      row.length === 3 ? "grid-cols-3" : "grid-cols-2"
-                    )}
+                    className={cn("grid min-h-0 w-full flex-1 gap-3 overflow-hidden", getPilotStatsGridColumnClassName(row.length))}
                   >
                     {row.map((card) => {
                       const changeOptions = getPilotStatsChangeOptions({
@@ -201,6 +216,7 @@ export default function LogbookPilotStats({
                           items={card.items}
                           variant={card.variant}
                           maxRows={card.maxRows}
+                          showProgressBar={card.key !== "equipment"}
                           onViewAll={card.hasData ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
                           onChange={changeOptions.length ? (nextKey) => handleChangeCard(card.slotIndex, nextKey) : null}
                           changeOptions={changeOptions}

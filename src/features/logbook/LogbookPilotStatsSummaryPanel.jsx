@@ -33,7 +33,7 @@ function getLandingToneClassName(rawLandingRate) {
   return "text-[var(--delta-red)]";
 }
 
-function RankingRow({ item }) {
+function RankingRow({ item, showProgressBar = true }) {
   const barWidth = Math.max(0, Math.min(100, parsePercentValue(item?.percentValue)));
 
   return (
@@ -48,9 +48,11 @@ function RankingRow({ item }) {
           {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>{item.percentValue}</p> : null}
         </div>
       </div>
-      <div className="h-1 w-full overflow-hidden bg-[color:var(--line)]">
-        <div className="h-full bg-[var(--delta-blue)] dark:bg-[#4d91d8]" style={{ width: `${barWidth}%` }} />
-      </div>
+      {showProgressBar ? (
+        <div className="h-1 w-full overflow-hidden bg-[color:var(--line)]">
+          <div className="h-full bg-[var(--delta-blue)] dark:bg-[#4d91d8]" style={{ width: `${barWidth}%` }} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -173,6 +175,7 @@ export default function LogbookPilotStatsSummaryPanel({
   variant = "ranking",
   maxRows = 5,
   autoFitRows = true,
+  showProgressBar = true,
   className = ""
 }) {
   const rootRef = useRef(null);
@@ -326,7 +329,11 @@ export default function LogbookPilotStatsSummaryPanel({
                 ) : variant === "route" ? (
                   <RouteRow key={`${item?.label || item?.value || "route"}-${index}`} item={item} />
                 ) : (
-                  <RankingRow key={`${item?.label || item?.value || "ranking"}-${index}`} item={item} />
+                  <RankingRow
+                    key={`${item?.label || item?.value || "ranking"}-${index}`}
+                    item={item}
+                    showProgressBar={showProgressBar}
+                  />
                 )
               )}
             </div>
