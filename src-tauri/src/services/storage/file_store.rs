@@ -10,7 +10,8 @@ use crate::services::deltava::{
     auth::clear_auth_settings_internal,
     logbook::{extract_latest_logbook_date_iso, normalize_logbook_entries, store_logbook_json},
     pilot_profile::{
-        build_unavailable_pilot_profile_metadata, fetch_delta_virtual_pilot_profile_metadata,
+        build_unavailable_pilot_profile_metadata, derive_display_name_from_profile_header,
+        fetch_delta_virtual_pilot_profile_metadata,
     },
     sync_types::{DeltaAccomplishmentEligibilityStore, DeltaWebSyncResult},
     sync_types::{
@@ -451,7 +452,19 @@ fn read_logbook_profile_metadata_from_path(
     path: &Path,
 ) -> Option<crate::DeltaLogbookPilotProfileMetadata> {
     let text = fs::read_to_string(path).ok()?;
-    serde_json::from_str::<crate::DeltaLogbookPilotProfileMetadata>(&text).ok()
+    let mut metadata = serde_json::from_str::<crate::DeltaLogbookPilotProfileMetadata>(&text).ok()?;
+
+    if metadata.display_name.is_none() {
+        if let Some(raw_header) = metadata.raw_profile_header.as_deref() {
+            metadata.display_name = derive_display_name_from_profile_header(raw_header);
+        }
+    }
+
+    if metadata.name.is_none() {
+        metadata.name = metadata.display_name.clone();
+    }
+
+    Some(metadata)
 }
 
 pub(crate) fn read_deltava_logbook_profile_metadata(

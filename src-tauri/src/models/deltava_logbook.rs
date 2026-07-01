@@ -5,13 +5,23 @@ use serde_json::Value;
 #[derive(Clone, Default, Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeltaLogbookPilotProfileMetadata {
+    #[serde(alias = "export_id")]
     pub export_id: Option<String>,
+    #[serde(alias = "profile_url")]
     pub profile_url: Option<String>,
+    #[serde(alias = "raw_profile_header")]
+    pub raw_profile_header: Option<String>,
+    #[serde(alias = "display_name")]
     pub display_name: Option<String>,
+    #[serde(alias = "rank")]
     pub rank: Option<String>,
+    #[serde(alias = "name")]
     pub name: Option<String>,
+    #[serde(alias = "pilot_code")]
     pub pilot_code: Option<String>,
+    #[serde(alias = "equipment_type")]
     pub equipment_type: Option<String>,
+    #[serde(alias = "fetched_at_utc")]
     pub fetched_at_utc: Option<String>,
 }
 

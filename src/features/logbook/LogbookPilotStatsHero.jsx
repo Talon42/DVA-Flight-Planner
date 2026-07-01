@@ -47,21 +47,34 @@ function SummaryAirlineMark({ airline, className = "" }) {
   );
 }
 
+function readProfileField(profile, camelKey, snakeKey = "") {
+  const camelValue = String(profile?.[camelKey] || "").trim();
+  if (camelValue) {
+    return camelValue;
+  }
+
+  if (snakeKey) {
+    return String(profile?.[snakeKey] || "").trim();
+  }
+
+  return "";
+}
+
 function formatPilotName(profile) {
-  const profileDisplayName = String(profile?.displayName || "").trim();
+  const profileDisplayName = readProfileField(profile, "displayName", "display_name");
   if (profileDisplayName) {
     return profileDisplayName;
   }
 
-  const rank = String(profile?.rank || "").trim();
-  const name = String(profile?.name || "").trim();
+  const rank = readProfileField(profile, "rank", "rank");
+  const name = readProfileField(profile, "name", "name");
   const fallbackDisplayName = [rank, name].filter(Boolean).join(" ");
   return fallbackDisplayName || "Pilot profile unavailable";
 }
 
 function formatPilotMetadataLine(profile) {
-  const pilotCode = String(profile?.pilotCode || "").trim();
-  const equipmentType = String(profile?.equipmentType || "").trim();
+  const pilotCode = readProfileField(profile, "pilotCode", "pilot_code");
+  const equipmentType = readProfileField(profile, "equipmentType", "equipment_type");
   const parts = [pilotCode, equipmentType].filter(Boolean);
   return parts.join(" \u00b7 ");
 }

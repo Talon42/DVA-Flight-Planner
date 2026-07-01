@@ -36,6 +36,28 @@ fn to_title_case(value: &str) -> String {
         .join(" ")
 }
 
+pub(crate) fn derive_display_name_from_profile_header(header: &str) -> Option<String> {
+    let normalized_header = normalize_text(header);
+    if normalized_header.is_empty() {
+        return None;
+    }
+
+    let header_pattern = regex::Regex::new(r"^(?P<lead>.+?)\s*\([^()]+\)\s*$")
+        .expect("valid profile header regex");
+
+    let lead = header_pattern
+        .captures(&normalized_header)
+        .and_then(|captures| captures.name("lead").map(|value| value.as_str()))
+        .unwrap_or(normalized_header.as_str());
+
+    let display_name = to_title_case(lead);
+    if display_name.is_empty() {
+        None
+    } else {
+        Some(display_name)
+    }
+}
+
 fn build_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(PROFILE_FETCH_TIMEOUT_SECONDS))
@@ -47,7 +69,7 @@ fn build_client() -> Result<reqwest::Client, String> {
 
 fn parse_profile_header_text(
     document: &Html,
-) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+) -> (Option<String>, Option<String>, Option<String>) {
     let selectors = ["h1", "h2", "h3", "header", "strong", "title"];
     let mut candidates = Vec::new();
 
@@ -77,32 +99,17 @@ fn parse_profile_header_text(
             continue;
         };
 
-        let lead = normalize_text(captures.name("lead").map(|value| value.as_str()).unwrap_or(""));
         let pilot_code = normalize_text(captures.name("pilot_code").map(|value| value.as_str()).unwrap_or(""));
-        let mut lead_parts = lead.split_whitespace().collect::<Vec<_>>();
-
-        if pilot_code.is_empty() || lead_parts.is_empty() {
+        if pilot_code.is_empty() {
             continue;
         }
 
-        let display_name = to_title_case(&lead);
-        let (rank, name) = if lead_parts.len() > 1 {
-            let rank = to_title_case(lead_parts.remove(0));
-            let name = to_title_case(&lead_parts.join(" "));
-            (Some(rank), if name.is_empty() { None } else { Some(name) })
-        } else {
-            (None, Some(to_title_case(&lead)))
-        };
+        let display_name = derive_display_name_from_profile_header(&candidate);
 
-        return (
-            Some(display_name),
-            rank.filter(|value| !value.is_empty()),
-            name.filter(|value| !value.is_empty()),
-            Some(pilot_code.to_uppercase()),
-        );
+        return (Some(candidate), display_name, Some(pilot_code.to_uppercase()));
     }
 
-    (None, None, None, None)
+    (None, None, None)
 }
 
 fn extract_equipment_type(document: &Html) -> Option<String> {
@@ -175,26 +182,27 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     }
 
     let document = Html::parse_document(&html_text);
-    let (display_name, rank, name, pilot_code) = parse_profile_header_text(&document);
+    let (raw_profile_header, display_name, pilot_code) = parse_profile_header_text(&document);
     let equipment_type = extract_equipment_type(&document);
 
     if pilot_code.is_none()
+        && raw_profile_header.is_none()
         && display_name.is_none()
-        && rank.is_none()
-        && name.is_none()
         && equipment_type.is_none()
     {
         append_sync_log(&format!(
-            "pilot-profile:parse-summary exportId={normalized_export_id} ok=false hasDisplayName=false hasRank=false hasName=false hasPilotCode=false hasEquipmentType=false finalUrl={final_url}"
+            "pilot-profile:parse-summary exportId={normalized_export_id} ok=false displayNamePresent=false pilotCodePresent=false equipmentTypePresent=false finalUrl={final_url}"
         ));
         return Err("parse_empty: Delta Virtual profile page did not contain a recognizable profile header.".into());
     }
 
+    let name = display_name.clone();
     let metadata = DeltaLogbookPilotProfileMetadata {
         export_id: Some(normalized_export_id.clone()),
         profile_url: Some(profile_url.clone()),
+        raw_profile_header,
         display_name,
-        rank,
+        rank: None,
         name,
         pilot_code,
         equipment_type,
@@ -202,10 +210,8 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     };
 
     append_sync_log(&format!(
-        "pilot-profile:parse-summary exportId={normalized_export_id} ok=true hasDisplayName={} hasRank={} hasName={} hasPilotCode={} hasEquipmentType={} finalUrl={final_url}",
+        "pilot-profile:parse-summary exportId={normalized_export_id} ok=true displayNamePresent={} pilotCodePresent={} equipmentTypePresent={} finalUrl={final_url}",
         metadata.display_name.is_some(),
-        metadata.rank.is_some(),
-        metadata.name.is_some(),
         metadata.pilot_code.is_some(),
         metadata.equipment_type.is_some()
     ));
@@ -220,6 +226,7 @@ pub(crate) fn build_unavailable_pilot_profile_metadata(
     DeltaLogbookPilotProfileMetadata {
         export_id: export_id.map(|value| normalize_text(value)).filter(|value| !value.is_empty()),
         profile_url: profile_url.map(|value| normalize_text(value)).filter(|value| !value.is_empty()),
+        raw_profile_header: None,
         display_name: None,
         rank: None,
         name: None,
