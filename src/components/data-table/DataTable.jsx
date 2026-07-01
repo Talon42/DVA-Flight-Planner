@@ -23,7 +23,7 @@ const TableListOuter = forwardRef(function TableListOuter(props, ref) {
     <div
       {...rest}
       ref={ref}
-      className={cn(className, "app-scrollbar relative z-0 bg-[var(--surface-table-row)]")}
+      className={cn(className, "app-scrollbar relative z-0 bg-[var(--surface-panel)]")}
       style={{
         ...style,
         overflowX: "hidden",
@@ -244,7 +244,7 @@ export default function DataTable({
   return (
     <div
       ref={tableRef}
-      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)]"
+      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)] bg-[var(--surface-panel)]"
     >
       <div className="w-full min-w-0 flex-none overflow-hidden">
         <TableHeader
@@ -277,7 +277,7 @@ export default function DataTable({
       ) : (
         <div
           ref={scrollContainerRef}
-          className="app-scrollbar relative z-0 min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--surface-table-row)]"
+          className="app-scrollbar relative z-0 min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-[var(--surface-panel)]"
         >
           {rows.map((row) => {
             const rowId = getRowId(row);
