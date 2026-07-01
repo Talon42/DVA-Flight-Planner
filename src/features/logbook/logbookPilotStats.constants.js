@@ -74,36 +74,36 @@ export const PILOT_STATS_LAYOUT_ROW_COUNTS = Object.freeze({
 
 export const PILOT_STATS_PANEL_CAPS = Object.freeze({
   wideTall: {
-    airlines: 5,
-    equipment: 5,
-    recentLandings: 5,
-    topAirports: 4,
-    routes: 4,
-    records: 5
+    airlines: 8,
+    equipment: 8,
+    recentLandings: 8,
+    topAirports: 8,
+    routes: 8,
+    records: 6
   },
   wideShort: {
-    airlines: 4,
-    equipment: 4,
-    recentLandings: 4,
-    topAirports: 3,
-    routes: 3,
-    records: 2
+    airlines: 8,
+    equipment: 8,
+    recentLandings: 8,
+    topAirports: 8,
+    routes: 8,
+    records: 6
   },
   narrowTall: {
-    airlines: 4,
-    equipment: 4,
-    recentLandings: 3,
-    topAirports: 3,
-    routes: 3,
-    records: 2
+    airlines: 8,
+    equipment: 8,
+    recentLandings: 8,
+    topAirports: 8,
+    routes: 8,
+    records: 6
   },
   narrowShort: {
-    airlines: 3,
-    equipment: 3,
-    recentLandings: 3,
-    topAirports: 3,
-    routes: 3,
-    records: 2
+    airlines: 8,
+    equipment: 8,
+    recentLandings: 8,
+    topAirports: 8,
+    routes: 8,
+    records: 6
   }
 });
 
@@ -304,7 +304,7 @@ export function resolvePilotStatsCard({ cardKey, stats, layoutMode }) {
 
   return {
     ...card,
-    items: [...(Array.isArray(itemSources[card.dataKey]) ? itemSources[card.dataKey] : [])].slice(0, maxRows),
+    items: [...(Array.isArray(itemSources[card.dataKey]) ? itemSources[card.dataKey] : [])],
     maxRows,
     hasData: Array.isArray(itemSources[card.dataKey]) && itemSources[card.dataKey].length > 0
   };
