@@ -21,7 +21,9 @@ function AccomplishmentChecklistRow({ row, requirement, onShowFlights, isAltRow,
       className={cn(
         "relative grid min-h-[3.15rem] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] px-3.5 py-2.5",
         showColumnSeparator && "border-l border-[color:var(--line)]",
-        isAltRow ? "bg-[var(--surface-table-row-alt)]" : "bg-[var(--surface-table-row)]"
+        isAltRow
+          ? "bg-[var(--surface-table-row-alt)] dark:bg-[var(--surface-raised)]"
+          : "bg-[var(--surface-table-row)] dark:bg-[var(--surface)]"
       )}
     >
       <span
