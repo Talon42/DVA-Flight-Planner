@@ -35,7 +35,7 @@ function usePilotStatsLayoutMode({ width = 0, height = 0 } = {}) {
     return "wideShort";
   }
 
-  if (width >= 1350) {
+  if (width >= 1275) {
     return "wideCompact";
   }
 
