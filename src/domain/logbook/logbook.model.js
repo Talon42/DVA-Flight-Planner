@@ -330,17 +330,6 @@ function readFdrSource(entry) {
   return normalizeText(entry?.fdrSource || fdrValue) || LOGBOOK_EMPTY_VALUE;
 }
 
-function readRunwayValue(...values) {
-  for (const value of values) {
-    const normalized = normalizeText(value);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return LOGBOOK_EMPTY_VALUE;
-}
-
 function buildDetailItem(label, value, options = {}) {
   const normalizedValue = typeof value === "string" ? value.trim() : value;
   if (
@@ -480,20 +469,6 @@ export function normalizeLogbookRows(entries) {
     const airborneMinutes = parseDurationMinutes(entry.airborneTime);
     const distanceNm = toNumber(entry.distance);
     const landingRate = toNumber(entry?.landing?.vSpeed);
-    // Preserve any runway data already present on the cached logbook row so stats cards do not need to fetch details.
-    const landingRunway = readRunwayValue(
-      entry.landingRunway,
-      entry.landing_runway,
-      entry?.landing?.runway,
-      entry?.landing?.runwayCode
-    );
-    const arrivalRunway = readRunwayValue(
-      entry.arrivalRunway,
-      entry.arrival_runway,
-      entry?.arrival?.runway,
-      entry?.arrival?.runwayCode,
-      landingRunway !== LOGBOOK_EMPTY_VALUE ? landingRunway : null
-    );
     const row = {
       id: rawLogbookId || `logbook-row-${sourceIndex}`,
       rawLogbookId: rawLogbookId || null,
@@ -512,8 +487,6 @@ export function normalizeLogbookRows(entries) {
       airlineLogoClassName,
       departure: readAirportCode(entry.airportD) || LOGBOOK_EMPTY_VALUE,
       arrival: readAirportCode(entry.airportA) || LOGBOOK_EMPTY_VALUE,
-      landingRunway,
-      arrivalRunway,
       equipment:
         normalizeText(entry.eqType || entry?.aircraft?.icao || entry?.aircraft?.name) || LOGBOOK_EMPTY_VALUE,
       durationMinutes,

@@ -7,6 +7,7 @@ import { nestedPanelFrameClassName } from "../../components/ui/patterns";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
+import { buildLogbookPirepId, useVisibleLogbookPirepDetails } from "./useLogbookPirepDetails.hooks.js";
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
@@ -91,7 +92,19 @@ function RouteRow({ item }) {
   );
 }
 
-function LandingRow({ item }) {
+function buildLandingLocationLabel(item, pirepDetails) {
+  const arrivalAirport = String(item?.arrivalAirport || item?.arrival || "").trim();
+  const arrivalRunway = String(pirepDetails?.arrivalRunway || "").trim();
+  const formattedArrivalRunway = arrivalRunway ? `RW${arrivalRunway}` : "";
+
+  if (arrivalAirport && formattedArrivalRunway) {
+    return `${arrivalAirport} • ${formattedArrivalRunway}`;
+  }
+
+  return arrivalAirport || item?.meta || LOGBOOK_EMPTY_VALUE;
+}
+
+function LandingRow({ item, pirepDetails }) {
   const landingRateValue = item?.landingRate || item?.value || LOGBOOK_EMPTY_VALUE;
 
   return (
@@ -102,7 +115,7 @@ function LandingRow({ item }) {
         </p>
         <div className="min-w-0">
           <p className={cn("m-0 truncate text-[var(--text-primary)]", bodySmTextClassName)}>
-            {item?.meta || item?.arrivalAirport || item?.arrival || LOGBOOK_EMPTY_VALUE}
+            {buildLandingLocationLabel(item, pirepDetails)}
           </p>
           <p className={cn("m-0 truncate text-[var(--text-primary)]", bodySmTextClassName)}>
             {item?.equipment || LOGBOOK_EMPTY_VALUE}
@@ -256,12 +269,20 @@ export default function LogbookPilotStatsSummaryPanel({
   const rowItems = Array.isArray(items) ? items : [];
   const effectiveMaxRows = autoFitRows ? Math.min(maxRows, fitItems) : maxRows;
   const rows = rowItems.slice(0, Math.min(effectiveMaxRows, rowItems.length));
+  const landingPirepDetailsById = useVisibleLogbookPirepDetails(rows, {
+    enabled: variant === "landing",
+    limit: rows.length
+  });
 
   function renderRow(item, index) {
     return variant === "airline" ? (
       <AirlineRow key={`${item?.label || item?.value || "airline"}-${index}`} item={item} />
     ) : variant === "landing" ? (
-      <LandingRow key={`${item?.label || item?.value || "landing"}-${index}`} item={item} />
+      <LandingRow
+        key={`${item?.label || item?.value || "landing"}-${index}`}
+        item={item}
+        pirepDetails={landingPirepDetailsById[buildLogbookPirepId(item)] || null}
+      />
     ) : variant === "airport" ? (
       <AirportRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
     ) : variant === "route" ? (

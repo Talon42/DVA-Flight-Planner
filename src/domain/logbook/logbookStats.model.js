@@ -467,13 +467,6 @@ function buildRecentLandingRows(rows, limit = 10) {
     .slice(0, limit)
     .map((row) => {
       const arrivalAirport = row.arrival || LOGBOOK_EMPTY_VALUE;
-      const runwayValue =
-        row.landingRunway && row.landingRunway !== LOGBOOK_EMPTY_VALUE
-          ? row.landingRunway
-          : row.arrivalRunway && row.arrivalRunway !== LOGBOOK_EMPTY_VALUE
-            ? row.arrivalRunway
-            : null;
-
       return {
         id: row.id,
         rawLogbookId: row.rawLogbookId || null,
@@ -485,9 +478,8 @@ function buildRecentLandingRows(rows, limit = 10) {
         airline: row.airlineDisplayName,
         route: `${row.departure} -> ${row.arrival}`,
         arrivalAirport,
-        arrivalRunway: runwayValue || LOGBOOK_EMPTY_VALUE,
         equipment: row.equipment,
-        meta: [arrivalAirport, runwayValue].filter(Boolean).join(" • "),
+        meta: arrivalAirport,
         value: row.landingRateDisplay,
         landingRate: row.landingRateDisplay,
         badge: row.landingGradeDisplay,
