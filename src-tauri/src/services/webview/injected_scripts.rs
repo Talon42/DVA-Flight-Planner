@@ -109,53 +109,6 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
 
     return new TextDecoder().decode(bytes);
   };
-  const readBoundedText = async (response, maxBytes, label) => {
-    const contentLength = Number(response.headers.get('content-length') || NaN);
-    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-      throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
-    }
-
-    if (!response.body?.getReader) {
-      const text = await response.text();
-      if (new TextEncoder().encode(text).length > maxBytes) {
-        throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
-      }
-      return text;
-    }
-
-    const reader = response.body.getReader();
-    const chunks = [];
-    let totalBytes = 0;
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
-        }
-
-        if (value && value.length) {
-          totalBytes += value.length;
-          if (totalBytes > maxBytes) {
-            await reader.cancel();
-            throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
-          }
-          chunks.push(value);
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    const bytes = new Uint8Array(totalBytes);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.length;
-    }
-
-    return new TextDecoder().decode(bytes);
-  };
   const fetchScheduleXml = async () => {
     const response = await fetch(targetUrl, {
       method: 'GET',
@@ -403,53 +356,6 @@ const DELTAVA_LOGBOOK_REFRESH_SCRIPT: &str = r#"
     const doc = new DOMParser().parseFromString(html || '', 'text/html');
     return doc.querySelector('input[name="id"]')?.value || '';
   };
-  const readBoundedText = async (response, maxBytes, label) => {
-    const contentLength = Number(response.headers.get('content-length') || NaN);
-    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
-      throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
-    }
-
-    if (!response.body?.getReader) {
-      const text = await response.text();
-      if (new TextEncoder().encode(text).length > maxBytes) {
-        throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
-      }
-      return text;
-    }
-
-    const reader = response.body.getReader();
-    const chunks = [];
-    let totalBytes = 0;
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
-        }
-
-        if (value && value.length) {
-          totalBytes += value.length;
-          if (totalBytes > maxBytes) {
-            await reader.cancel();
-            throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
-          }
-          chunks.push(value);
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    const bytes = new Uint8Array(totalBytes);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.length;
-    }
-
-    return new TextDecoder().decode(bytes);
-  };
   const fetchLogbookJsonExport = async () => {
     emitDebug('logbook:page-fetch-start');
     const pageResponse = await fetch(logbookPageUrl, {
@@ -674,7 +580,7 @@ pub(crate) fn build_deltava_auto_sync_script(nonce: &str) -> String {
         .replace("__LOGBOOK_EXPORT_HELPERS__", LOGBOOK_EXPORT_HELPERS)
         .replace("__SCHEDULE_XML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_SCHEDULE_XML_BYTES.to_string())
         .replace("__ACCOMPLISHMENT_HTML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES.to_string())
-        .replace("__LOGBOOK_PAGE_HTML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_SCHEDULE_XML_BYTES.to_string())
+        .replace("__LOGBOOK_PAGE_HTML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_LOGBOOK_PAGE_HTML_BYTES.to_string())
         .replace("__LOGBOOK_JSON_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_LOGBOOK_JSON_BYTES.to_string())
         .replace("__NONCE__", &nonce)
 }
@@ -682,7 +588,33 @@ pub(crate) fn build_deltava_auto_sync_script(nonce: &str) -> String {
 pub(crate) fn build_deltava_logbook_refresh_script(nonce: &str) -> String {
     let nonce = serde_json::to_string(nonce).unwrap_or_else(|_| "\"\"".to_string());
     DELTAVA_LOGBOOK_REFRESH_SCRIPT
-        .replace("__LOGBOOK_PAGE_HTML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_SCHEDULE_XML_BYTES.to_string())
+        .replace("__LOGBOOK_PAGE_HTML_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_LOGBOOK_PAGE_HTML_BYTES.to_string())
         .replace("__LOGBOOK_JSON_MAX_BYTES__", &crate::services::deltava::sync_types::MAX_DELTAVA_LOGBOOK_JSON_BYTES.to_string())
         .replace("__NONCE__", &nonce)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_no_unresolved_placeholders(script: &str) {
+        assert!(!script.contains("__SCHEDULE_XML_MAX_BYTES__"));
+        assert!(!script.contains("__LOGBOOK_PAGE_HTML_MAX_BYTES__"));
+        assert!(!script.contains("__LOGBOOK_JSON_MAX_BYTES__"));
+        assert!(!script.contains("__ACCOMPLISHMENT_HTML_MAX_BYTES__"));
+        assert!(!script.contains("__NONCE__"));
+    }
+
+    #[test]
+    fn build_deltava_auto_sync_script_has_single_bounded_reader() {
+        let script = build_deltava_auto_sync_script("nonce-test");
+        assert_eq!(script.matches("const readBoundedText = async").count(), 1);
+        assert_no_unresolved_placeholders(&script);
+    }
+
+    #[test]
+    fn build_deltava_logbook_refresh_script_has_no_unresolved_placeholders() {
+        let script = build_deltava_logbook_refresh_script("nonce-test");
+        assert_no_unresolved_placeholders(&script);
+    }
 }
