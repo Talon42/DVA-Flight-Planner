@@ -8,8 +8,8 @@ import {
   supportCopyTextClassName
 } from "../../components/ui/typography";
 import {
-  nestedPanelFrameClassName,
-  nestedPanelInteractiveClassName,
+  nestedListItemFrameClassName,
+  nestedListItemInteractiveClassName,
   nestedPanelStrongFrameClassName
 } from "../../components/ui/patterns";
 
@@ -124,7 +124,7 @@ export default function AccomplishmentSelectorPanel({
                       type="button"
                       className={cn(
                         "relative grid min-h-[3.5rem] gap-1 px-4 py-3 text-left",
-                        isSelected ? nestedPanelFrameClassName : nestedPanelInteractiveClassName,
+                        isSelected ? nestedListItemFrameClassName : nestedListItemInteractiveClassName,
                         isSelected ? "text-[var(--text-heading)]" : "text-[var(--text-muted)]",
                         isSelected
                           ? "bg-[var(--surface-table-row-hover)] before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-[var(--delta-red)] before:content-[''] dark:bg-[rgba(31,70,110,0.22)]"

@@ -14,6 +14,14 @@ export const nestedPanelInteractiveClassName = cn(
   "transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)]"
 );
 
+export const nestedListItemFrameClassName =
+  "[--panel-border:var(--line)] border border-[color:var(--panel-border)] bg-[var(--surface)] dark:[--panel-border:var(--line-strong)] dark:bg-[var(--surface-raised)]";
+
+export const nestedListItemInteractiveClassName = cn(
+  nestedListItemFrameClassName,
+  "transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] dark:hover:bg-[var(--surface-panel)]"
+);
+
 export const insetPanelClassName =
   cn("mt-4 grid gap-4 rounded-none p-4 bp-1024:gap-3 bp-1024:p-3.5", cardFrameClassName);
 
