@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
-import { sectionTitleTextClassName } from "../../components/ui/typography";
+import { bodySmTextClassName, labelTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 
@@ -159,7 +159,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
     >
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onClose} className="justify-self-start">
-          {"<- Pilot Stats"}
+          {"‹ Pilot Stats"}
         </Button>
 
         <p className={cn("m-0 min-w-0 justify-self-center text-center text-[var(--text-heading)]", sectionTitleTextClassName)}>
@@ -178,7 +178,8 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                   <button
                     type="button"
                     className={cn(
-                      "m-0 inline-flex items-center gap-1 rounded-none bg-transparent text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] hover:text-[var(--text-heading)]",
+                      "m-0 inline-flex items-center gap-1 rounded-none bg-transparent uppercase tracking-[0.14em] text-[var(--text-muted)] hover:text-[var(--text-heading)]",
+                      labelTextClassName,
                       column.key === sortKey && "text-[var(--text-heading)]"
                     )}
                     onClick={() => handleSort(column.key)}
@@ -197,7 +198,14 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
               sortedRows.map((row) => (
                 <tr key={row.id || `${row.label}-${row.rank}`} className="border-b border-[color:var(--line)] last:border-b-0">
                   {config.columns.map((column) => (
-                    <td key={column.key} className="px-3 py-2 align-top text-[var(--text-primary)] dark:text-white">
+                    <td
+                      key={column.key}
+                      className={cn(
+                        "px-3 py-1.5 align-top text-[var(--text-primary)] dark:text-white",
+                        bodySmTextClassName,
+                        /^(rank|value|percentValue|dep|arr|landingRate)$/.test(column.key) && "tabular-nums"
+                      )}
+                    >
                       {row[column.key] ?? LOGBOOK_EMPTY_VALUE}
                     </td>
                   ))}
@@ -205,7 +213,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
               ))
             ) : (
               <tr>
-                <td colSpan={config.columns.length} className="px-3 py-6 text-center text-[var(--text-muted)]">
+                <td colSpan={config.columns.length} className={cn("px-3 py-6 text-center text-[var(--text-muted)]", bodySmTextClassName)}>
                   No data available.
                 </td>
               </tr>
