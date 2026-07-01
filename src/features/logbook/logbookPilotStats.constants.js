@@ -7,15 +7,6 @@ const STATIC_PILOT_STATS_COMPARISON_OPTIONS = Object.freeze([
   { value: "year-to-date", label: "Year to Date" }
 ]);
 
-export const PILOT_STATS_CARD_ORDER = Object.freeze([
-  "airlines",
-  "equipment",
-  "recent-landings",
-  "top-airports",
-  "routes",
-  "records"
-]);
-
 export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
   airlines: Object.freeze({
     key: "airlines",
@@ -146,6 +137,11 @@ export function getPilotStatsCardDefinition(cardKey) {
   return PILOT_STATS_CARD_REGISTRY[String(cardKey || "").trim()] || null;
 }
 
+// Returns the registry keys in display order so new cards only need one registry entry.
+export function getPilotStatsCardKeys() {
+  return Object.keys(PILOT_STATS_CARD_REGISTRY);
+}
+
 // Returns the default slot order for the active layout mode.
 export function getPilotStatsDefaultSlots(layoutMode) {
   const defaultSlots = PILOT_STATS_LAYOUT_DEFAULT_SLOTS[String(layoutMode || "").trim()] || PILOT_STATS_LAYOUT_DEFAULT_SLOTS.narrowShort;
@@ -185,7 +181,7 @@ export function buildPilotStatsDashboardChangeOptions(visibleCardKeys, layoutMod
   const caps = PILOT_STATS_PANEL_CAPS[String(layoutMode || "").trim()] || PILOT_STATS_PANEL_CAPS.narrowShort;
   const visibleSet = new Set((Array.isArray(visibleCardKeys) ? visibleCardKeys : []).filter(Boolean));
 
-  return PILOT_STATS_CARD_ORDER.filter((key) => {
+  return getPilotStatsCardKeys().filter((key) => {
     const card = getPilotStatsCardDefinition(key);
     return card && (caps[card.capKey] || 0) > 0 && !visibleSet.has(key);
   }).map((key) => {
@@ -198,12 +194,13 @@ export function buildPilotStatsDashboardChangeOptions(visibleCardKeys, layoutMod
 }
 
 // Resolves the data, title, and render variant for one dashboard card slot.
-export function resolvePilotStatsCardData(stats, cardKey, caps) {
+export function resolvePilotStatsCard({ cardKey, stats, layoutMode }) {
   const card = getPilotStatsCardDefinition(cardKey);
   if (!card) {
     return null;
   }
 
+  const caps = PILOT_STATS_PANEL_CAPS[String(layoutMode || "").trim()] || PILOT_STATS_PANEL_CAPS.narrowShort;
   const maxRows = Number(caps?.[card.capKey] || 0);
   if (maxRows <= 0) {
     return null;
@@ -224,7 +221,8 @@ export function resolvePilotStatsCardData(stats, cardKey, caps) {
   return {
     ...card,
     items: [...(Array.isArray(itemSources[card.dataKey]) ? itemSources[card.dataKey] : [])].slice(0, maxRows),
-    maxRows
+    maxRows,
+    hasData: Array.isArray(itemSources[card.dataKey]) && itemSources[card.dataKey].length > 0
   };
 }
 

@@ -8,10 +8,9 @@ import LogbookPilotStatsHero from "./LogbookPilotStatsHero.jsx";
 import LogbookPilotStatsSummaryPanel from "./LogbookPilotStatsSummaryPanel.jsx";
 import {
   PILOT_STATS_LAYOUT_ROW_COUNTS,
-  PILOT_STATS_PANEL_CAPS,
   buildPilotStatsDashboardChangeOptions,
   normalizePilotStatsDashboardSlots,
-  resolvePilotStatsCardData
+  resolvePilotStatsCard
 } from "./logbookPilotStats.constants.js";
 
 const EMPTY_DETAIL_ROWS = Object.freeze({
@@ -117,7 +116,6 @@ export default function LogbookPilotStats({
   const measuredSize = useElementSize(rootRef);
   const layoutMode = usePilotStatsLayoutMode(measuredSize);
   const comparisonEnabled = pilotStatsComparisonPeriod !== "off";
-  const caps = PILOT_STATS_PANEL_CAPS[layoutMode] || PILOT_STATS_PANEL_CAPS.narrowShort;
   const normalizedSlots = useMemo(
     () => normalizePilotStatsDashboardSlots(pilotStatsDashboardSlots, layoutMode),
     [layoutMode, pilotStatsDashboardSlots]
@@ -125,9 +123,9 @@ export default function LogbookPilotStats({
   const visibleCards = useMemo(
     () =>
       normalizedSlots
-        .map((cardKey) => resolvePilotStatsCardData(displayStats, cardKey, caps))
+        .map((cardKey) => resolvePilotStatsCard({ cardKey, stats: displayStats, layoutMode }))
         .filter(Boolean),
-    [caps, displayStats, normalizedSlots]
+    [displayStats, layoutMode, normalizedSlots]
   );
   const rowCounts = PILOT_STATS_LAYOUT_ROW_COUNTS[layoutMode] || PILOT_STATS_LAYOUT_ROW_COUNTS.narrowShort;
   const rowCards = useMemo(() => splitCardsIntoRows(visibleCards, rowCounts), [rowCounts, visibleCards]);
@@ -199,7 +197,7 @@ export default function LogbookPilotStats({
                           items={card.items}
                           variant={card.variant}
                           maxRows={card.maxRows}
-                          onViewAll={card.items.length ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
+                          onViewAll={card.hasData ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
                           onChange={changeOptions.length ? (nextKey) => handleChangeCard(card.slotIndex, nextKey) : null}
                           changeOptions={changeOptions}
                           selectedChangeKey={card.key}
