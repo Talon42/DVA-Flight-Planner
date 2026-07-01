@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
@@ -159,14 +159,22 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
     >
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onClose} className="justify-self-start">
-          <span className="inline-flex items-center gap-1 leading-none">
-            <span aria-hidden="true" className="text-base leading-none">
-              ‹
-            </span>
-            <span className="leading-none">Pilot Stats</span>
+          <span className="inline-flex items-center gap-1">
+            <svg
+              aria-hidden="true"
+              className="h-3.5 w-3.5 shrink-0"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 5L7 10l5 5" />
+            </svg>
+            <span>Pilot Stats</span>
           </span>
         </Button>
-
         <p className={cn("m-0 min-w-0 justify-self-center text-center text-[var(--text-heading)]", sectionTitleTextClassName)}>
           {config.title}
         </p>
@@ -191,7 +199,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                   >
                     {column.label}
                     {column.key === sortKey ? (
-                      <span aria-hidden="true">{sortDirection === "asc" ? "▴" : "▾"}</span>
+                      <span aria-hidden="true">{sortDirection === "asc" ? "â–´" : "â–¾"}</span>
                     ) : null}
                   </button>
                 </th>
