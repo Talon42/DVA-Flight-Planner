@@ -356,6 +356,53 @@ const DELTAVA_LOGBOOK_REFRESH_SCRIPT: &str = r#"
     const doc = new DOMParser().parseFromString(html || '', 'text/html');
     return doc.querySelector('input[name="id"]')?.value || '';
   };
+  const readBoundedText = async (response, maxBytes, label) => {
+    const contentLength = Number(response.headers.get('content-length') || NaN);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+    }
+
+    if (!response.body?.getReader) {
+      const text = await response.text();
+      if (new TextEncoder().encode(text).length > maxBytes) {
+        throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+      }
+      return text;
+    }
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        if (value && value.length) {
+          totalBytes += value.length;
+          if (totalBytes > maxBytes) {
+            await reader.cancel();
+            throw new Error(`${label} exceeded the ${maxBytes} byte limit.`);
+          }
+          chunks.push(value);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return new TextDecoder().decode(bytes);
+  };
   const fetchLogbookJsonExport = async () => {
     emitDebug('logbook:page-fetch-start');
     const pageResponse = await fetch(logbookPageUrl, {
@@ -613,8 +660,9 @@ mod tests {
     }
 
     #[test]
-    fn build_deltava_logbook_refresh_script_has_no_unresolved_placeholders() {
+    fn build_deltava_logbook_refresh_script_has_single_bounded_reader() {
         let script = build_deltava_logbook_refresh_script("nonce-test");
+        assert_eq!(script.matches("const readBoundedText = async").count(), 1);
         assert_no_unresolved_placeholders(&script);
     }
 }
