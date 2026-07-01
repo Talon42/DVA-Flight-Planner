@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
-import { Field } from "../../components/ui/filterFields";
 import { cn } from "../../components/ui/cn";
-import { bodySmTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
+import { sectionTitleTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 
@@ -111,38 +110,22 @@ function buildColumns(detailView, detailRows) {
   }
 }
 
-// Renders the detail table with sticky headers so drill-in stays usable without page scrolling.
-export default function LogbookPilotStatsDetailView({
-  detailView,
-  detailRows,
-  comparisonPeriodLabel,
-  comparisonEnabled,
-  onClose
-}) {
-  const [searchValue, setSearchValue] = useState("");
+// Renders the detail table without the search/count/comparison header chrome.
+export default function LogbookPilotStatsDetailView({ detailView, detailRows, onClose }) {
   const [sortKey, setSortKey] = useState("rank");
   const [sortDirection, setSortDirection] = useState("asc");
 
   useEffect(() => {
-    setSearchValue("");
     setSortKey(detailView === "recent-landings" ? "date" : "rank");
     setSortDirection(detailView === "recent-landings" ? "desc" : "asc");
   }, [detailView]);
 
   const config = useMemo(() => buildColumns(detailView, detailRows), [detailRows, detailView]);
 
-  const filteredRows = useMemo(() => {
+  const sortedRows = useMemo(() => {
     const rows = Array.isArray(config.rows) ? config.rows : [];
-    const query = searchValue.trim().toLowerCase();
-    const searchedRows = query
-      ? rows.filter((row) =>
-          Object.values(row)
-            .filter(Boolean)
-            .some((value) => String(value).toLowerCase().includes(query))
-        )
-      : rows;
 
-    return [...searchedRows].sort((left, right) => {
+    return [...rows].sort((left, right) => {
       const leftValue = resolveSortValue(left?.[sortKey]);
       const rightValue = resolveSortValue(right?.[sortKey]);
       const direction = sortDirection === "asc" ? 1 : -1;
@@ -153,8 +136,7 @@ export default function LogbookPilotStatsDetailView({
 
       return String(leftValue).localeCompare(String(rightValue)) * direction;
     });
-  }, [config.rows, searchValue, sortDirection, sortKey]);
-  const rowCountLabel = `${filteredRows.length} rows`;
+  }, [config.rows, sortDirection, sortKey]);
 
   function handleSort(columnKey) {
     setSortKey((current) => {
@@ -169,27 +151,22 @@ export default function LogbookPilotStatsDetailView({
   }
 
   return (
-    <Panel className={cn("flex min-h-0 flex-1 flex-col gap-3 overflow-hidden border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName)}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          ← Pilot Stats
+    <Panel
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-3 overflow-hidden border border-[color:var(--line)] bg-[var(--surface-raised)] p-3",
+        cardFrameClassName
+      )}
+    >
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={onClose} className="justify-self-start">
+          {"<- Pilot Stats"}
         </Button>
 
-        <div className="min-w-0">
-          <p className={cn("m-0 text-[var(--text-heading)]", sectionTitleTextClassName)}>{config.title}</p>
-          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
-            {comparisonEnabled ? `${rowCountLabel} · Comparison: ${comparisonPeriodLabel}` : `${rowCountLabel} · Comparison: All`}
-          </p>
-        </div>
+        <p className={cn("m-0 min-w-0 justify-self-center text-center text-[var(--text-heading)]", sectionTitleTextClassName)}>
+          {config.title}
+        </p>
 
-        <Field label="Search" className="min-w-[16rem] max-w-full">
-          <input
-            className="min-h-[var(--planner-control-box-min-height)] rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-[var(--text-primary)] outline-none"
-            value={searchValue}
-            onChange={(event) => setSearchValue(event.target.value)}
-            placeholder="Filter rows"
-          />
-        </Field>
+        <div aria-hidden="true" className="justify-self-end" />
       </div>
 
       <div className="app-scrollbar min-h-0 flex-1 overflow-auto">
@@ -207,15 +184,17 @@ export default function LogbookPilotStatsDetailView({
                     onClick={() => handleSort(column.key)}
                   >
                     {column.label}
-                    {column.key === sortKey ? <span aria-hidden="true">{sortDirection === "asc" ? "▴" : "▾"}</span> : null}
+                    {column.key === sortKey ? (
+                      <span aria-hidden="true">{sortDirection === "asc" ? "▴" : "▾"}</span>
+                    ) : null}
                   </button>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filteredRows.length ? (
-              filteredRows.map((row) => (
+            {sortedRows.length ? (
+              sortedRows.map((row) => (
                 <tr key={row.id || `${row.label}-${row.rank}`} className="border-b border-[color:var(--line)] last:border-b-0">
                   {config.columns.map((column) => (
                     <td key={column.key} className="px-3 py-2 align-top text-[var(--text-primary)] dark:text-white">
@@ -227,7 +206,7 @@ export default function LogbookPilotStatsDetailView({
             ) : (
               <tr>
                 <td colSpan={config.columns.length} className="px-3 py-6 text-center text-[var(--text-muted)]">
-                  No matching rows.
+                  No data available.
                 </td>
               </tr>
             )}

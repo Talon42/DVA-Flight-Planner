@@ -253,7 +253,6 @@ export default function LogbookPilotStats({
   const detailRows = useMemo(() => displayStats.detailRows || EMPTY_DETAIL_ROWS, [displayStats.detailRows]);
   const measuredSize = useElementSize(rootRef);
   const layoutMode = usePilotStatsLayoutMode(measuredSize);
-  const comparisonEnabled = pilotStatsComparisonPeriod !== "off";
   const normalizedSlots = useMemo(
     () => normalizePilotStatsDashboardSlots(pilotStatsDashboardSlots, layoutMode),
     [layoutMode, pilotStatsDashboardSlots]
@@ -310,8 +309,6 @@ export default function LogbookPilotStats({
               <LogbookPilotStatsDetailView
                 detailView={pilotStatsDetailView}
                 detailRows={detailRows}
-                comparisonPeriodLabel={comparisons?.periodLabel || "All"}
-                comparisonEnabled={comparisonEnabled}
                 onClose={() => onPilotStatsDetailViewChange?.(null)}
               />
             </div>
