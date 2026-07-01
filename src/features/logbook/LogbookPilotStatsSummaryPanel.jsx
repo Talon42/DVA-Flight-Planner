@@ -417,13 +417,15 @@ export default function LogbookPilotStatsSummaryPanel({
         {rows.length ? (
           <>
             {renderRows(rows)}
-            <div
-              ref={measureShellRef}
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 w-full overflow-hidden opacity-0"
-            >
-              {renderRows(rowItems.slice(0, maxRows), { containerRef: measureRef })}
-            </div>
+            {autoFitRows ? (
+              <div
+                ref={measureShellRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 w-full overflow-hidden opacity-0"
+              >
+                {renderRows(rowItems.slice(0, maxRows), { containerRef: measureRef })}
+              </div>
+            ) : null}
           </>
         ) : (
           <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>No data available.</p>
