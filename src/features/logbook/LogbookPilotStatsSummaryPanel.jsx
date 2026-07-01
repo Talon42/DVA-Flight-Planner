@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
@@ -163,6 +163,85 @@ function RecordTile({ item }) {
   );
 }
 
+function getMeasuredPilotStatsFitCount({
+  bodyHeight,
+  rowHeights,
+  rowGap,
+  variant,
+  maxRows,
+  itemCount
+}) {
+  const safeBodyHeight = Math.max(0, Math.floor(Number(bodyHeight) || 0));
+  const safeRowGap = Math.max(0, Math.floor(Number(rowGap) || 0));
+  const safeMaxRows = Math.max(1, Math.floor(Number(maxRows) || 1));
+  const safeItemCount = Math.max(0, Math.floor(Number(itemCount) || 0));
+  const measuredHeights = (Array.isArray(rowHeights) ? rowHeights : []).map((height) =>
+    Math.max(0, Math.floor(Number(height) || 0))
+  );
+
+  if (!safeItemCount) {
+    return 0;
+  }
+
+  if (!(safeBodyHeight > 0) || !measuredHeights.length) {
+    return Math.max(1, Math.min(safeMaxRows, safeItemCount));
+  }
+
+  if (variant === "records") {
+    let fittedVisualRows = 0;
+    let usedTiles = 0;
+    let consumedHeight = 0;
+
+    while (usedTiles < measuredHeights.length && fittedVisualRows < safeMaxRows) {
+      const firstTileHeight = measuredHeights[usedTiles] || 0;
+      const secondTileHeight = measuredHeights[usedTiles + 1];
+      const rowHeight = Math.max(firstTileHeight, Number.isFinite(secondTileHeight) ? secondTileHeight : firstTileHeight);
+      const nextHeight = consumedHeight + (fittedVisualRows > 0 ? safeRowGap : 0) + rowHeight;
+
+      if (nextHeight > safeBodyHeight) {
+        break;
+      }
+
+      consumedHeight = nextHeight;
+      fittedVisualRows += 1;
+      usedTiles += 2;
+    }
+
+    return Math.max(1, Math.min(safeItemCount, fittedVisualRows * 2));
+  }
+
+  let fittedRows = 0;
+  let consumedHeight = 0;
+
+  for (const rowHeight of measuredHeights.slice(0, safeMaxRows)) {
+    const nextHeight = consumedHeight + (fittedRows > 0 ? safeRowGap : 0) + rowHeight;
+
+    if (nextHeight > safeBodyHeight) {
+      break;
+    }
+
+    consumedHeight = nextHeight;
+    fittedRows += 1;
+  }
+
+  return Math.max(1, Math.min(safeItemCount, fittedRows));
+}
+
+function getFallbackPilotStatsFitCount({ bodyHeight, variant, maxRows, itemCount }) {
+  const safeBodyHeight = Math.max(0, Math.floor(Number(bodyHeight) || 0));
+  const safeMaxRows = Math.max(1, Math.floor(Number(maxRows) || 1));
+  const safeItemCount = Math.max(0, Math.floor(Number(itemCount) || 0));
+
+  if (!safeItemCount) {
+    return 0;
+  }
+
+  const estimatedRowHeight = getEstimatedPilotStatsRowHeight(variant);
+  const estimatedRows = Math.max(1, Math.floor(safeBodyHeight / estimatedRowHeight));
+
+  return Math.max(1, Math.min(safeItemCount, safeMaxRows, estimatedRows));
+}
+
 // Renders the summary cards for the overview dashboard without letting any card scroll.
 export default function LogbookPilotStatsSummaryPanel({
   title,
@@ -180,14 +259,77 @@ export default function LogbookPilotStatsSummaryPanel({
 }) {
   const rootRef = useRef(null);
   const bodyRef = useRef(null);
+  const measureRef = useRef(null);
   const [isChangeMenuOpen, setIsChangeMenuOpen] = useState(false);
-  const [fitRows, setFitRows] = useState(maxRows);
+  const [fitItems, setFitItems] = useState(maxRows);
   const rafIdRef = useRef(0);
   const hasChangeOptions = typeof onChange === "function" && Array.isArray(changeOptions) && changeOptions.length > 0;
   const changeMenuId = `pilot-stats-change-${String(selectedChangeKey || title || "card").replace(/\s+/g, "-").toLowerCase()}`;
-  const estimatedRowHeight = getEstimatedPilotStatsRowHeight(variant);
-  const effectiveMaxRows = autoFitRows ? Math.min(maxRows, fitRows) : maxRows;
-  const rows = (Array.isArray(items) ? items : []).slice(0, Math.min(effectiveMaxRows, Array.isArray(items) ? items.length : 0));
+  const rowItems = Array.isArray(items) ? items : [];
+  const effectiveMaxRows = autoFitRows ? Math.min(maxRows, fitItems) : maxRows;
+  const rows = rowItems.slice(0, Math.min(effectiveMaxRows, rowItems.length));
+
+  function renderRow(item, index) {
+    return variant === "airline" ? (
+      <AirlineRow key={`${item?.label || item?.value || "airline"}-${index}`} item={item} />
+    ) : variant === "landing" ? (
+      <LandingRow key={`${item?.label || item?.value || "landing"}-${index}`} item={item} />
+    ) : variant === "airport" ? (
+      <AirportRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
+    ) : variant === "route" ? (
+      <RouteRow key={`${item?.label || item?.value || "route"}-${index}`} item={item} />
+    ) : (
+      <RankingRow
+        key={`${item?.label || item?.value || "ranking"}-${index}`}
+        item={item}
+        showProgressBar={showProgressBar}
+      />
+    );
+  }
+
+  function renderRows(rowItemsToRender, { measure = false } = {}) {
+    const safeRowItems = Array.isArray(rowItemsToRender) ? rowItemsToRender : [];
+
+    if (!safeRowItems.length) {
+      return null;
+    }
+
+    if (variant === "records") {
+      return (
+        <div className="grid grid-cols-2 gap-2">
+          {safeRowItems.map((item, index) => {
+            const row = (
+              <RecordTile key={`${item?.recordType || item?.label || item?.value || "record"}-${index}`} item={item} />
+            );
+
+            return measure ? (
+              <div key={`${item?.recordType || item?.label || item?.value || "record"}-measure-${index}`} className="min-w-0">
+                {row}
+              </div>
+            ) : (
+              row
+            );
+          })}
+        </div>
+      );
+    }
+
+    return (
+      <div className={measure ? "grid gap-1.5" : "grid gap-1.5"}>
+        {safeRowItems.map((item, index) => {
+          const row = renderRow(item, index);
+
+          return measure ? (
+            <div key={`${item?.label || item?.value || "measure"}-${index}`} className="min-w-0">
+              {row}
+            </div>
+          ) : (
+            row
+          );
+        })}
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (!isChangeMenuOpen) {
@@ -221,18 +363,57 @@ export default function LogbookPilotStatsSummaryPanel({
     setIsChangeMenuOpen(false);
   }, [changeOptions, selectedChangeKey]);
 
-  useEffect(() => {
-    const node = bodyRef.current;
-
-    if (!node || typeof ResizeObserver === "undefined") {
+  useLayoutEffect(() => {
+    if (!autoFitRows) {
+      setFitItems((current) => (current === maxRows ? current : maxRows));
       return undefined;
     }
 
-    const updateFitRows = () => {
-      const nextHeight = Math.max(0, Math.floor(node.clientHeight));
-      const nextFitRows = Math.max(1, Math.floor(nextHeight / estimatedRowHeight));
+    const bodyNode = bodyRef.current;
+    const measureNode = measureRef.current;
+    const candidateCount = Math.min(maxRows, rowItems.length);
 
-      setFitRows((current) => (current === nextFitRows ? current : nextFitRows));
+    if (!bodyNode || !measureNode || typeof ResizeObserver === "undefined") {
+      const fallbackFitItems = getFallbackPilotStatsFitCount({
+        bodyHeight: bodyNode?.clientHeight || 0,
+        variant,
+        maxRows,
+        itemCount: candidateCount
+      });
+
+      setFitItems((current) => (current === fallbackFitItems ? current : fallbackFitItems));
+      return undefined;
+    }
+
+    const updateFitItems = () => {
+      const bodyHeight = Math.max(0, Math.floor(bodyNode.clientHeight || 0));
+      const rowGap = (() => {
+        const computedStyle = window.getComputedStyle(measureNode);
+        const gapValue = computedStyle.rowGap || computedStyle.gap || "0";
+        const numericGap = Number.parseFloat(gapValue);
+        return Number.isFinite(numericGap) ? numericGap : 0;
+      })();
+      const childHeights = Array.from(measureNode.children)
+        .map((child) => (child instanceof HTMLElement ? child.clientHeight : 0))
+        .filter((height) => Number.isFinite(height) && height > 0);
+
+      const measuredFitItems = getMeasuredPilotStatsFitCount({
+        bodyHeight,
+        rowHeights: childHeights,
+        rowGap,
+        variant,
+        maxRows,
+        itemCount: candidateCount
+      });
+      const fallbackFitItems = getFallbackPilotStatsFitCount({
+        bodyHeight,
+        variant,
+        maxRows,
+        itemCount: candidateCount
+      });
+      const nextFitItems = measuredFitItems > 0 ? measuredFitItems : fallbackFitItems;
+
+      setFitItems((current) => (current === nextFitItems ? current : nextFitItems));
     };
 
     const scheduleUpdate = () => {
@@ -242,13 +423,14 @@ export default function LogbookPilotStatsSummaryPanel({
 
       rafIdRef.current = requestAnimationFrame(() => {
         rafIdRef.current = 0;
-        updateFitRows();
+        updateFitItems();
       });
     };
 
     scheduleUpdate();
     const observer = new ResizeObserver(scheduleUpdate);
-    observer.observe(node);
+    observer.observe(bodyNode);
+    observer.observe(measureNode);
 
     return () => {
       if (rafIdRef.current) {
@@ -258,7 +440,7 @@ export default function LogbookPilotStatsSummaryPanel({
 
       observer.disconnect();
     };
-  }, [estimatedRowHeight, variant]);
+  }, [autoFitRows, maxRows, rowItems.length, variant]);
 
   function handleSelectChange(nextCardKey) {
     setIsChangeMenuOpen(false);
@@ -330,35 +512,14 @@ export default function LogbookPilotStatsSummaryPanel({
         </div>
       </div>
 
-      <div ref={bodyRef} className="min-h-0 flex-1 overflow-hidden">
+      <div ref={bodyRef} className="relative min-h-0 flex-1 overflow-hidden">
         {rows.length ? (
-          variant === "records" ? (
-            <div className="grid grid-cols-2 gap-2">
-              {rows.map((item, index) => (
-                <RecordTile key={`${item?.recordType || item?.label || item?.value || "record"}-${index}`} item={item} />
-              ))}
+          <>
+            {renderRows(rows)}
+            <div ref={measureRef} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden opacity-0">
+              {renderRows(rowItems.slice(0, maxRows), { measure: true })}
             </div>
-          ) : (
-            <div className="grid gap-1.5">
-              {rows.map((item, index) =>
-                variant === "airline" ? (
-                  <AirlineRow key={`${item?.label || item?.value || "airline"}-${index}`} item={item} />
-                ) : variant === "landing" ? (
-                  <LandingRow key={`${item?.label || item?.value || "landing"}-${index}`} item={item} />
-                ) : variant === "airport" ? (
-                  <AirportRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
-                ) : variant === "route" ? (
-                  <RouteRow key={`${item?.label || item?.value || "route"}-${index}`} item={item} />
-                ) : (
-                  <RankingRow
-                    key={`${item?.label || item?.value || "ranking"}-${index}`}
-                    item={item}
-                    showProgressBar={showProgressBar}
-                  />
-                )
-              )}
-            </div>
-          )
+          </>
         ) : (
           <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>No data available.</p>
         )}

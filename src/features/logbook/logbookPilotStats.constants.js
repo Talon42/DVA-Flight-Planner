@@ -268,7 +268,7 @@ export function buildPilotStatsDashboardChangeOptions(visibleCardKeys, layoutMod
   return getPilotStatsChangeOptions({ layoutMode, visibleCardKeys });
 }
 
-// Returns a conservative estimated body row height for the active card variant.
+// Returns a conservative fallback row height when DOM measurement is unavailable.
 export function getEstimatedPilotStatsRowHeight(variant) {
   switch (String(variant || "").trim()) {
     case "airline":
