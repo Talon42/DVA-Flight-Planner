@@ -19,11 +19,11 @@ function AccomplishmentChecklistRow({ row, requirement, onShowFlights, isAltRow,
   return (
     <div
       className={cn(
-        "relative grid min-h-[3.15rem] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] px-3.5 py-2.5",
-        showColumnSeparator && "border-l border-[color:var(--line)]",
+        "relative grid min-h-[3.15rem] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] px-3.5 py-2.5 dark:border-[color:var(--line-strong)]",
+        showColumnSeparator && "border-l border-[color:var(--line)] dark:border-[color:var(--line-strong)]",
         isAltRow
-          ? "bg-[var(--surface-table-row-alt)] dark:bg-[var(--surface-raised)]"
-          : "bg-[var(--surface-table-row)] dark:bg-[var(--surface)]"
+          ? "bg-[var(--surface-table-row-alt)]"
+          : "bg-[var(--surface-table-row)]"
       )}
     >
       <span
@@ -154,6 +154,15 @@ export default function AccomplishmentsPanel({
               nestedPanelStrongFrameClassName
             )}
           >
+            <div
+              className={cn(
+                "border-b border-[color:var(--line)] bg-[var(--surface-soft)] px-3.5 py-2 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]",
+                labelTextClassName,
+                "text-[var(--eyebrow)]"
+              )}
+            >
+              Remaining Requirements
+            </div>
             <div className="grid min-w-0 grid-cols-2 overflow-hidden bp-1400:grid-cols-3">
               {rows.map((row, index) => (
                 <AccomplishmentChecklistRow
