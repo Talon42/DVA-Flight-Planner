@@ -3,7 +3,7 @@ import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
-import { cardFrameClassName } from "../../components/ui/patterns";
+import { nestedPanelFrameClassName } from "../../components/ui/patterns";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
@@ -389,8 +389,8 @@ export default function LogbookPilotStatsSummaryPanel({
     <Panel
       ref={rootRef}
       className={cn(
-        "relative flex min-h-0 flex-col gap-2 border border-[color:var(--line)] bg-[var(--surface-raised)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-panel)] p-3",
-        cardFrameClassName,
+        "relative flex min-h-0 flex-col gap-2 p-3",
+        nestedPanelFrameClassName,
         className
       )}
     >

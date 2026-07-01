@@ -6,6 +6,7 @@ import {
   bodySmTextClassName,
   labelTextClassName
 } from "./ui/typography";
+import { nestedPanelStrongFrameClassName } from "./ui/patterns";
 import FlightsTable from "./tables/FlightsTable";
 import CompletedStatusCard from "./CompletedStatusCard";
 
@@ -63,7 +64,7 @@ function EmbeddedFlightSearchEmptyState({ isSearchActive, airport, viewportWidth
       : "Click an airplane icon to show matching flights here.";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)]">
+    <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", nestedPanelStrongFrameClassName)}>
       <div className="app-scrollbar flex h-full min-h-0 items-center justify-center px-6 py-8 text-center">
         <p className={cn("m-0 max-w-xl text-[var(--text-muted)]", bodyMdTextClassName)}>
           {message}
@@ -145,7 +146,12 @@ export default function AccomplishmentsPanel({
             </span>
           </div>
 
-          <div className="app-scrollbar min-h-0 overflow-x-hidden overflow-y-auto border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)]">
+          <div
+            className={cn(
+              "app-scrollbar min-h-0 overflow-x-hidden overflow-y-auto",
+              nestedPanelStrongFrameClassName
+            )}
+          >
             <div className="grid min-w-0 grid-cols-2 overflow-hidden bp-1400:grid-cols-3">
               {rows.map((row, index) => (
                 <AccomplishmentChecklistRow

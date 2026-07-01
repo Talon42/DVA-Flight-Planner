@@ -7,6 +7,11 @@ import {
   bodySmTextClassName,
   supportCopyTextClassName
 } from "../../components/ui/typography";
+import {
+  nestedPanelFrameClassName,
+  nestedPanelInteractiveClassName,
+  nestedPanelStrongFrameClassName
+} from "../../components/ui/patterns";
 
 function AccomplishmentStatusBadge({ label }) {
   return (
@@ -70,7 +75,8 @@ export default function AccomplishmentSelectorPanel({
       onClick={handlePanelClick}
       onKeyDown={handlePanelKeyDown}
       className={cn(
-        "flex min-h-0 flex-col rounded-none border-2 border-[rgba(160,180,202,0.52)] bg-[rgba(14,28,48,0.98)] p-4 dark:border-[color:var(--surface-border)]",
+        "flex min-h-0 flex-col rounded-none p-4",
+        nestedPanelStrongFrameClassName,
         isFullHeight ? "h-full overflow-hidden" : "max-h-[min(44vh,420px)] overflow-hidden"
       )}
     >
@@ -117,10 +123,12 @@ export default function AccomplishmentSelectorPanel({
                       key={accomplishment.name}
                       type="button"
                       className={cn(
-                        "relative grid min-h-[3.5rem] gap-1 border border-[color:var(--line)] px-4 py-3 text-left",
+                        "relative grid min-h-[3.5rem] gap-1 px-4 py-3 text-left",
+                        isSelected ? nestedPanelFrameClassName : nestedPanelInteractiveClassName,
+                        isSelected ? "text-[var(--text-heading)]" : "text-[var(--text-muted)]",
                         isSelected
-                          ? "bg-[var(--surface-table-row-hover)] text-[var(--text-heading)] before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-[var(--delta-red)] before:content-[''] dark:bg-[rgba(31,70,110,0.22)]"
-                          : "bg-[var(--surface-table-row)] text-[var(--text-muted)]"
+                          ? "bg-[var(--surface-table-row-hover)] before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-[var(--delta-red)] before:content-[''] dark:bg-[rgba(31,70,110,0.22)]"
+                          : null
                       )}
                       aria-current={isSelected ? "true" : undefined}
                       aria-label={`Select accomplishment ${accomplishment.name}`}

@@ -4,6 +4,16 @@ import { supportCopyTextClassName } from "./typography";
 export const cardFrameClassName =
   "[--panel-border:rgba(160,180,202,0.52)] border-2 border-[color:var(--panel-border)] bg-[rgba(240,245,250,0.98)] dark:[--panel-border:var(--surface-border)] dark:bg-[rgba(10,24,43,0.96)]";
 
+export const nestedPanelFrameClassName =
+  "[--panel-border:var(--line)] border border-[color:var(--panel-border)] bg-[var(--surface-raised)] dark:[--panel-border:var(--line-strong)] dark:bg-[var(--surface-panel)]";
+
+export const nestedPanelStrongFrameClassName = cn(nestedPanelFrameClassName, "border-2");
+
+export const nestedPanelInteractiveClassName = cn(
+  nestedPanelFrameClassName,
+  "transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)]"
+);
+
 export const insetPanelClassName =
   cn("mt-4 grid gap-4 rounded-none p-4 bp-1024:gap-3 bp-1024:p-3.5", cardFrameClassName);
 
