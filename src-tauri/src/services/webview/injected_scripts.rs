@@ -617,7 +617,7 @@ const LOGBOOK_EXPORT_HELPERS: &str = r#"
     if (!exportResponse.ok) {
       throw new Error(`Logbook JSON export failed with HTTP ${exportResponse.status}.`);
     }
-    return { jsonText, filename, contentType };
+    return { jsonText, filename, contentType, exportId };
   };
 "#;
 

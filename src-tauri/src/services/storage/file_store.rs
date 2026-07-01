@@ -512,11 +512,13 @@ async fn resolve_deltava_logbook_profile_metadata(
     }
 
     let Some(export_id) = normalized_export_id else {
-        append_sync_log("profile:fetch-skipped reason=missing-export-id");
+        append_sync_log("pilot-profile:skipped reason=missing-export-id");
         let metadata = build_unavailable_pilot_profile_metadata(None, profile_url.as_deref());
         let _ = store_deltava_logbook_profile_metadata(app, &metadata);
         return metadata;
     };
+
+    append_sync_log(&format!("pilot-profile:resolved-export-id exportId={export_id}"));
 
     match fetch_delta_virtual_pilot_profile_metadata(export_id).await {
         Ok(metadata) => {

@@ -45,7 +45,9 @@ fn build_client() -> Result<reqwest::Client, String> {
         .map_err(|error| format!("fetch_failed: Unable to initialize Delta Virtual profile client: {error}"))
 }
 
-fn parse_profile_header_text(document: &Html) -> (Option<String>, Option<String>, Option<String>) {
+fn parse_profile_header_text(
+    document: &Html,
+) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
     let selectors = ["h1", "h2", "h3", "header", "strong", "title"];
     let mut candidates = Vec::new();
 
@@ -67,7 +69,7 @@ fn parse_profile_header_text(document: &Html) -> (Option<String>, Option<String>
         }
     }
 
-    let header_pattern = regex::Regex::new(r"^(?P<lead>[^()]+?)\s*\((?P<pilot_code>[^()]+)\)\s*$")
+    let header_pattern = regex::Regex::new(r"^(?P<lead>.+?)\s*\((?P<pilot_code>[^()]+)\)\s*$")
         .expect("valid profile header regex");
 
     for candidate in candidates {
@@ -83,6 +85,7 @@ fn parse_profile_header_text(document: &Html) -> (Option<String>, Option<String>
             continue;
         }
 
+        let display_name = to_title_case(&lead);
         let (rank, name) = if lead_parts.len() > 1 {
             let rank = to_title_case(lead_parts.remove(0));
             let name = to_title_case(&lead_parts.join(" "));
@@ -92,13 +95,14 @@ fn parse_profile_header_text(document: &Html) -> (Option<String>, Option<String>
         };
 
         return (
+            Some(display_name),
             rank.filter(|value| !value.is_empty()),
             name.filter(|value| !value.is_empty()),
             Some(pilot_code.to_uppercase()),
         );
     }
 
-    (None, None, None)
+    (None, None, None, None)
 }
 
 fn extract_equipment_type(document: &Html) -> Option<String> {
@@ -137,17 +141,27 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     }
 
     let profile_url = format!("{DELTAVA_PROFILE_URL_PREFIX}{normalized_export_id}");
-    append_sync_log(&format!("profile:fetch-start exportId={normalized_export_id}"));
+    append_sync_log(&format!("pilot-profile:fetch-start exportId={normalized_export_id}"));
 
     let client = build_client()?;
-    let response = client
-        .get(&profile_url)
-        .send()
-        .await
-        .map_err(|error| format!("fetch_failed: Delta Virtual profile request failed: {error}"))?;
+    let response = match client.get(&profile_url).send().await {
+        Ok(response) => response,
+        Err(error) => {
+            append_sync_log(&format!(
+                "pilot-profile:fetch-status exportId={normalized_export_id} ok=false status=request_failed finalUrl={profile_url}"
+            ));
+            return Err(format!("fetch_failed: Delta Virtual profile request failed: {error}"));
+        }
+    };
 
     let status = response.status().as_u16();
     let final_url = response.url().to_string();
+    append_sync_log(&format!(
+        "pilot-profile:fetch-status exportId={normalized_export_id} ok={} status={status} finalUrl={final_url}",
+        reqwest::StatusCode::from_u16(status)
+            .map(|code| code.is_success())
+            .unwrap_or(false)
+    ));
     let html_text = response
         .text()
         .await
@@ -157,19 +171,21 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
         .map(|code| code.is_success())
         .unwrap_or(false)
     {
-        append_sync_log(&format!(
-            "profile:fetch-failed exportId={normalized_export_id} reason=http_status:{status}"
-        ));
         return Err(format!("http_status: Delta Virtual profile request returned HTTP {status}."));
     }
 
     let document = Html::parse_document(&html_text);
-    let (rank, name, pilot_code) = parse_profile_header_text(&document);
+    let (display_name, rank, name, pilot_code) = parse_profile_header_text(&document);
     let equipment_type = extract_equipment_type(&document);
 
-    if pilot_code.is_none() && rank.is_none() && name.is_none() && equipment_type.is_none() {
+    if pilot_code.is_none()
+        && display_name.is_none()
+        && rank.is_none()
+        && name.is_none()
+        && equipment_type.is_none()
+    {
         append_sync_log(&format!(
-            "profile:fetch-failed exportId={normalized_export_id} reason=parse_empty finalUrl={final_url}"
+            "pilot-profile:parse-summary exportId={normalized_export_id} ok=false hasDisplayName=false hasRank=false hasName=false hasPilotCode=false hasEquipmentType=false finalUrl={final_url}"
         ));
         return Err("parse_empty: Delta Virtual profile page did not contain a recognizable profile header.".into());
     }
@@ -177,6 +193,7 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     let metadata = DeltaLogbookPilotProfileMetadata {
         export_id: Some(normalized_export_id.clone()),
         profile_url: Some(profile_url.clone()),
+        display_name,
         rank,
         name,
         pilot_code,
@@ -185,7 +202,8 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     };
 
     append_sync_log(&format!(
-        "profile:fetch-success exportId={normalized_export_id} hasRank={} hasName={} hasPilotCode={} hasEquipmentType={} finalUrl={final_url}",
+        "pilot-profile:parse-summary exportId={normalized_export_id} ok=true hasDisplayName={} hasRank={} hasName={} hasPilotCode={} hasEquipmentType={} finalUrl={final_url}",
+        metadata.display_name.is_some(),
         metadata.rank.is_some(),
         metadata.name.is_some(),
         metadata.pilot_code.is_some(),
@@ -202,6 +220,7 @@ pub(crate) fn build_unavailable_pilot_profile_metadata(
     DeltaLogbookPilotProfileMetadata {
         export_id: export_id.map(|value| normalize_text(value)).filter(|value| !value.is_empty()),
         profile_url: profile_url.map(|value| normalize_text(value)).filter(|value| !value.is_empty()),
+        display_name: None,
         rank: None,
         name: None,
         pilot_code: None,

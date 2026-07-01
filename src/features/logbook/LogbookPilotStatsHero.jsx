@@ -48,10 +48,15 @@ function SummaryAirlineMark({ airline, className = "" }) {
 }
 
 function formatPilotName(profile) {
+  const profileDisplayName = String(profile?.displayName || "").trim();
+  if (profileDisplayName) {
+    return profileDisplayName;
+  }
+
   const rank = String(profile?.rank || "").trim();
   const name = String(profile?.name || "").trim();
-  const displayName = [rank, name].filter(Boolean).join(" ");
-  return displayName || "Pilot profile unavailable";
+  const fallbackDisplayName = [rank, name].filter(Boolean).join(" ");
+  return fallbackDisplayName || "Pilot profile unavailable";
 }
 
 function formatPilotMetadataLine(profile) {

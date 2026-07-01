@@ -7,6 +7,7 @@ use serde_json::Value;
 pub(crate) struct DeltaLogbookPilotProfileMetadata {
     pub export_id: Option<String>,
     pub profile_url: Option<String>,
+    pub display_name: Option<String>,
     pub rank: Option<String>,
     pub name: Option<String>,
     pub pilot_code: Option<String>,
