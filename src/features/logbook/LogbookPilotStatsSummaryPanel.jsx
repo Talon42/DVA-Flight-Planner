@@ -20,7 +20,7 @@ function RankingRow({ item, showProgressBar = true }) {
   const barWidth = Math.max(0, Math.min(100, parsePercentValue(item?.percentValue)));
 
   return (
-    <div className="grid gap-1.5 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
+    <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex min-w-0 items-baseline justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
@@ -47,7 +47,7 @@ function AirlineRow({ item }) {
   const logoClassName = String(item?.row?.airlineLogoClassName || "").trim();
 
   return (
-    <div className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
+    <div className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center">
         {logoSrc ? (
           <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-6 w-6 object-contain", logoClassName)} loading="lazy" />
@@ -75,7 +75,7 @@ function RouteRow({ item }) {
   const barWidth = Math.max(0, Math.min(100, parsePercentValue(item?.percentValue)));
 
   return (
-    <div className="grid gap-1.5 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
+    <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex min-w-0 items-baseline justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
@@ -95,7 +95,7 @@ function LandingRow({ item }) {
   const landingRateValue = item?.landingRate || item?.value || LOGBOOK_EMPTY_VALUE;
 
   return (
-    <div className="grid gap-1.5 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
+    <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_auto] items-center gap-3">
         <p className={cn("m-0 shrink-0 truncate text-[var(--text-primary)] tabular-nums", bodySmTextClassName)}>
           {item?.date || LOGBOOK_EMPTY_VALUE}
@@ -389,7 +389,7 @@ export default function LogbookPilotStatsSummaryPanel({
     <Panel
       ref={rootRef}
       className={cn(
-        "relative flex min-h-0 flex-col gap-2 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3",
+        "relative flex min-h-0 flex-col gap-2 border border-[color:var(--line)] bg-[var(--surface-raised)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-panel)] p-3",
         cardFrameClassName,
         className
       )}
