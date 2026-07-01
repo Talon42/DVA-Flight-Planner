@@ -127,13 +127,9 @@ function KpiGlyph({ cardId }) {
 
 function KpiMetric({ card, labelToneClassName, valueToneClassName }) {
   const hasBadge = Boolean(card.badge);
-  const cardClassName =
-    card.id === "average-landing-rate"
-      ? "bp-1024:col-span-2 bp-1400:col-span-1"
-      : "bp-1024:col-span-1 bp-1400:col-span-1";
 
   return (
-    <div className={cn("min-w-0", cardClassName, "bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10")}>
+    <div className="min-w-0 bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10">
       <div className="flex min-w-0 items-center gap-2">
         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center self-center text-[var(--text-heading)] dark:text-white">
           <KpiGlyph cardId={card.id} />
@@ -148,7 +144,7 @@ function KpiMetric({ card, labelToneClassName, valueToneClassName }) {
                 "m-0 min-w-0 flex-1 truncate font-semibold leading-[1.05] tracking-[0]",
                 valueToneClassName,
                 hasBadge
-                  ? "shrink-0 whitespace-nowrap text-[0.98rem] bp-1400:text-[1.06rem]"
+                  ? "flex-none shrink-0 whitespace-nowrap text-[0.98rem] bp-1400:text-[1.06rem]"
                   : "min-w-0 flex-1 truncate text-[0.98rem] bp-1400:text-[1.06rem]"
               )}
             >
@@ -290,7 +286,7 @@ export default function LogbookPilotStatsHero({
           </div>
         </div>
 
-        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-3 bp-1024:gap-x-4 bp-1024:gap-y-3 bp-1400:grid-cols-5 bp-1400:gap-x-0 bp-1400:gap-y-0">
+        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-6 bp-1024:gap-x-4 bp-1024:gap-y-3 bp-1024:[&>*]:col-span-2 bp-1024:[&>*:nth-child(4)]:col-start-2 bp-1024:[&>*:nth-child(5)]:col-start-4 bp-1400:grid-cols-5 bp-1400:gap-x-0 bp-1400:gap-y-0 bp-1400:[&>*]:col-span-1 bp-1400:[&>*]:col-start-auto">
           {kpiCards.map((card) => (
             <KpiMetric
               key={card.id}
