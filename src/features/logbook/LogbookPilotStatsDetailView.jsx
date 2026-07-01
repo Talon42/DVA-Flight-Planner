@@ -18,7 +18,8 @@ function resolveNumericSortValue(value) {
     return null;
   }
 
-  const numeric = Number(normalized.replace(/,/g, "").replace(/%$/, ""));
+  const match = normalized.replace(/,/g, "").match(/^[-+]?\d*\.?\d+/);
+  const numeric = match ? Number(match[0]) : Number(normalized.replace(/%$/, ""));
   return Number.isFinite(numeric) ? numeric : null;
 }
 

@@ -1,16 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
-import { dropdownOptionRowClassName } from "../../components/ui/forms";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
-const CHANGE_MENU_PANEL_CLASS_NAME =
-  "grid gap-1 overflow-hidden rounded-none border border-[color:var(--line)] bg-[var(--surface-raised)] p-2 shadow-none";
 
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
@@ -247,10 +244,6 @@ export default function LogbookPilotStatsSummaryPanel({
   title,
   items,
   onViewAll,
-  onChange,
-  changeOptions = [],
-  selectedChangeKey = "",
-  changeMenuLabel = "Change",
   variant = "ranking",
   maxRows = 5,
   autoFitRows = true,
@@ -261,11 +254,8 @@ export default function LogbookPilotStatsSummaryPanel({
   const bodyRef = useRef(null);
   const measureShellRef = useRef(null);
   const measureRef = useRef(null);
-  const [isChangeMenuOpen, setIsChangeMenuOpen] = useState(false);
   const [fitItems, setFitItems] = useState(maxRows);
   const rafIdRef = useRef(0);
-  const hasChangeOptions = typeof onChange === "function" && Array.isArray(changeOptions) && changeOptions.length > 0;
-  const changeMenuId = `pilot-stats-change-${String(selectedChangeKey || title || "card").replace(/\s+/g, "-").toLowerCase()}`;
   const rowItems = Array.isArray(items) ? items : [];
   const effectiveMaxRows = autoFitRows ? Math.min(maxRows, fitItems) : maxRows;
   const rows = rowItems.slice(0, Math.min(effectiveMaxRows, rowItems.length));
@@ -316,38 +306,6 @@ export default function LogbookPilotStatsSummaryPanel({
       </div>
     );
   }
-
-  useEffect(() => {
-    if (!isChangeMenuOpen) {
-      return undefined;
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        setIsChangeMenuOpen(false);
-      }
-    }
-
-    function handlePointerDown(event) {
-      if (!rootRef.current || rootRef.current.contains(event.target)) {
-        return;
-      }
-
-      setIsChangeMenuOpen(false);
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("pointerdown", handlePointerDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [isChangeMenuOpen]);
-
-  useEffect(() => {
-    setIsChangeMenuOpen(false);
-  }, [changeOptions, selectedChangeKey]);
 
   useLayoutEffect(() => {
     if (!autoFitRows) {
@@ -430,16 +388,11 @@ export default function LogbookPilotStatsSummaryPanel({
     };
   }, [autoFitRows, maxRows, rowItems.length, variant]);
 
-  function handleSelectChange(nextCardKey) {
-    setIsChangeMenuOpen(false);
-    onChange?.(nextCardKey);
-  }
-
   return (
     <Panel
       ref={rootRef}
       className={cn(
-        "relative flex min-h-0 !overflow-visible flex-col gap-2 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3",
+        "relative flex min-h-0 flex-col gap-2 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3",
         cardFrameClassName,
         className
       )}
@@ -447,46 +400,6 @@ export default function LogbookPilotStatsSummaryPanel({
       <div className="flex min-w-0 items-center justify-between gap-2">
         <p className={cn("m-0 min-w-0 flex-1 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          {hasChangeOptions ? (
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={TRANSPARENT_HEADER_ACTION_CLASS_NAME}
-                onClick={() => setIsChangeMenuOpen((current) => !current)}
-                aria-haspopup="menu"
-                aria-expanded={isChangeMenuOpen}
-                aria-controls={changeMenuId}
-                title={`Change ${title}`}
-              >
-                {changeMenuLabel}
-              </Button>
-              {isChangeMenuOpen ? (
-                <div
-                  id={changeMenuId}
-                  className={cn("absolute right-0 top-[calc(100%+0.5rem)] z-20 min-w-[220px]", CHANGE_MENU_PANEL_CLASS_NAME)}
-                  role="menu"
-                  aria-label={`${changeMenuLabel} ${title}`}
-                >
-                  {changeOptions.map((option) => (
-                    <Button
-                      key={option.key}
-                      variant="ghost"
-                      size="sm"
-                      className={cn("w-full justify-start rounded-none", dropdownOptionRowClassName)}
-                      role="menuitem"
-                      onClick={() => handleSelectChange(option.key)}
-                    >
-                      {option.title || option.label}
-                    </Button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {hasChangeOptions && onViewAll ? <span aria-hidden="true" className="h-3 w-px bg-[color:var(--line)]" /> : null}
-
           {onViewAll ? (
             <Button
               variant="ghost"
