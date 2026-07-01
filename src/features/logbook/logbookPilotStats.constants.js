@@ -142,6 +142,45 @@ export function getPilotStatsCardKeys() {
   return Object.keys(PILOT_STATS_CARD_REGISTRY);
 }
 
+// Returns the number of visible dashboard slots for the active layout mode.
+export function getPilotStatsLayoutSlotCount(layoutMode) {
+  const rowCounts = PILOT_STATS_LAYOUT_ROW_COUNTS[String(layoutMode || "").trim()] || PILOT_STATS_LAYOUT_ROW_COUNTS.narrowShort;
+  return rowCounts.reduce((sum, rowCount) => sum + Number(rowCount || 0), 0);
+}
+
+function getPilotStatsLayoutCaps(layoutMode) {
+  return PILOT_STATS_PANEL_CAPS[String(layoutMode || "").trim()] || PILOT_STATS_PANEL_CAPS.narrowShort;
+}
+
+function getPilotStatsLayoutSupportedLayouts(card) {
+  return Array.isArray(card?.supportedLayouts) && card.supportedLayouts.length ? card.supportedLayouts : null;
+}
+
+// Returns the cards that are eligible to appear in the active layout.
+export function getEligiblePilotStatsCards(layoutMode) {
+  const caps = getPilotStatsLayoutCaps(layoutMode);
+
+  return getPilotStatsCardKeys()
+    .map((key) => getPilotStatsCardDefinition(key))
+    .filter((card) => {
+      if (!card) {
+        return false;
+      }
+
+      const supportedLayouts = getPilotStatsLayoutSupportedLayouts(card);
+      if (supportedLayouts && !supportedLayouts.includes(String(layoutMode || "").trim())) {
+        return false;
+      }
+
+      return Number(caps?.[card.capKey] || 0) > 0;
+    });
+}
+
+// Returns only the eligible card keys so JSX can stay registry-driven.
+export function getEligiblePilotStatsCardKeys(layoutMode) {
+  return getEligiblePilotStatsCards(layoutMode).map((card) => card.key);
+}
+
 // Returns the default slot order for the active layout mode.
 export function getPilotStatsDefaultSlots(layoutMode) {
   const defaultSlots = PILOT_STATS_LAYOUT_DEFAULT_SLOTS[String(layoutMode || "").trim()] || PILOT_STATS_LAYOUT_DEFAULT_SLOTS.narrowShort;
@@ -150,47 +189,78 @@ export function getPilotStatsDefaultSlots(layoutMode) {
 
 // Normalizes the persisted dashboard slots for one layout mode so bad state never breaks render.
 export function normalizePilotStatsDashboardSlots(value, layoutMode) {
-  const defaultSlots = getPilotStatsDefaultSlots(layoutMode);
-  const caps = PILOT_STATS_PANEL_CAPS[String(layoutMode || "").trim()] || PILOT_STATS_PANEL_CAPS.narrowShort;
-  const persistedSlots = Array.isArray(value?.[layoutMode]) ? value[layoutMode] : [];
+  const layoutKey = String(layoutMode || "").trim();
+  const defaultSlots = getPilotStatsDefaultSlots(layoutKey);
+  const eligibleCards = getEligiblePilotStatsCards(layoutKey);
+  const eligibleKeys = new Set(eligibleCards.map((card) => card.key));
+  const slotCount = getPilotStatsLayoutSlotCount(layoutKey);
+  const candidateSlots = Array.isArray(value) ? value : Array.isArray(value?.[layoutKey]) ? value[layoutKey] : [];
   const normalized = [];
+  const defaultEligibleSlots = defaultSlots.filter((key) => eligibleKeys.has(key));
 
-  for (const key of persistedSlots) {
-    const card = getPilotStatsCardDefinition(key);
-    if (!card || (caps[card.capKey] || 0) <= 0 || normalized.includes(card.key)) {
-      continue;
+  const addKey = (rawKey) => {
+    const key = String(rawKey || "").trim();
+    if (!key || normalized.includes(key) || !eligibleKeys.has(key)) {
+      return false;
     }
 
-    normalized.push(card.key);
-  }
+    normalized.push(key);
+    return true;
+  };
 
-  for (const key of defaultSlots) {
-    const card = getPilotStatsCardDefinition(key);
-    if (!card || (caps[card.capKey] || 0) <= 0 || normalized.includes(card.key)) {
-      continue;
+  for (const key of candidateSlots) {
+    addKey(key);
+    if (normalized.length >= slotCount) {
+      return normalized.slice(0, slotCount);
     }
-
-    normalized.push(card.key);
   }
 
-  return normalized.slice(0, defaultSlots.length);
+  for (const key of defaultEligibleSlots) {
+    addKey(key);
+    if (normalized.length >= slotCount) {
+      return normalized.slice(0, slotCount);
+    }
+  }
+
+  for (const card of eligibleCards) {
+    addKey(card.key);
+    if (normalized.length >= slotCount) {
+      return normalized.slice(0, slotCount);
+    }
+  }
+
+  if (!normalized.length) {
+    return [...defaultEligibleSlots].slice(0, slotCount);
+  }
+
+  return normalized.slice(0, slotCount);
 }
 
-// Returns the hidden replacement options for one visible card slot.
-export function buildPilotStatsDashboardChangeOptions(visibleCardKeys, layoutMode) {
-  const caps = PILOT_STATS_PANEL_CAPS[String(layoutMode || "").trim()] || PILOT_STATS_PANEL_CAPS.narrowShort;
-  const visibleSet = new Set((Array.isArray(visibleCardKeys) ? visibleCardKeys : []).filter(Boolean));
+// Returns hidden eligible cards as menu options in registry order.
+export function getPilotStatsChangeOptions({ layoutMode, visibleCardKeys, currentCardKey } = {}) {
+  const visibleSet = new Set(
+    (Array.isArray(visibleCardKeys) ? visibleCardKeys : [])
+      .map((key) => String(key || "").trim())
+      .filter(Boolean)
+  );
+  const currentKey = String(currentCardKey || "").trim();
 
-  return getPilotStatsCardKeys().filter((key) => {
-    const card = getPilotStatsCardDefinition(key);
-    return card && (caps[card.capKey] || 0) > 0 && !visibleSet.has(key);
-  }).map((key) => {
-    const card = getPilotStatsCardDefinition(key);
-    return {
-      key,
-      label: card?.title || key
-    };
-  });
+  if (currentKey) {
+    visibleSet.add(currentKey);
+  }
+
+  return getEligiblePilotStatsCards(layoutMode)
+    .filter((card) => !visibleSet.has(card.key))
+    .map((card) => ({
+      key: card.key,
+      title: card.title,
+      label: card.title
+    }));
+}
+
+// Preserves the previous helper name for callers while using the canonical eligibility path.
+export function buildPilotStatsDashboardChangeOptions(visibleCardKeys, layoutMode) {
+  return getPilotStatsChangeOptions({ layoutMode, visibleCardKeys });
 }
 
 // Resolves the data, title, and render variant for one dashboard card slot.
@@ -200,7 +270,7 @@ export function resolvePilotStatsCard({ cardKey, stats, layoutMode }) {
     return null;
   }
 
-  const caps = PILOT_STATS_PANEL_CAPS[String(layoutMode || "").trim()] || PILOT_STATS_PANEL_CAPS.narrowShort;
+  const caps = getPilotStatsLayoutCaps(layoutMode);
   const maxRows = Number(caps?.[card.capKey] || 0);
   if (maxRows <= 0) {
     return null;

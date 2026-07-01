@@ -8,7 +8,7 @@ import LogbookPilotStatsHero from "./LogbookPilotStatsHero.jsx";
 import LogbookPilotStatsSummaryPanel from "./LogbookPilotStatsSummaryPanel.jsx";
 import {
   PILOT_STATS_LAYOUT_ROW_COUNTS,
-  buildPilotStatsDashboardChangeOptions,
+  getPilotStatsChangeOptions,
   normalizePilotStatsDashboardSlots,
   resolvePilotStatsCard
 } from "./logbookPilotStats.constants.js";
@@ -129,7 +129,6 @@ export default function LogbookPilotStats({
   );
   const rowCounts = PILOT_STATS_LAYOUT_ROW_COUNTS[layoutMode] || PILOT_STATS_LAYOUT_ROW_COUNTS.narrowShort;
   const rowCards = useMemo(() => splitCardsIntoRows(visibleCards, rowCounts), [rowCounts, visibleCards]);
-  const changeOptions = useMemo(() => buildPilotStatsDashboardChangeOptions(normalizedSlots, layoutMode), [layoutMode, normalizedSlots]);
   const visibleCardRows = useMemo(() => {
     let slotCursor = 0;
 
@@ -190,6 +189,12 @@ export default function LogbookPilotStats({
                     )}
                   >
                     {row.map((card) => {
+                      const changeOptions = getPilotStatsChangeOptions({
+                        layoutMode,
+                        visibleCardKeys: normalizedSlots,
+                        currentCardKey: card.key
+                      });
+
                       return (
                         <LogbookPilotStatsSummaryPanel
                           key={card.key}

@@ -258,7 +258,7 @@ export default function LogbookPilotStatsSummaryPanel({
                       role="menuitem"
                       onClick={() => handleSelectChange(option.key)}
                     >
-                      {option.label}
+                      {option.title || option.label}
                     </Button>
                   ))}
                 </div>
