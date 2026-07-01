@@ -62,7 +62,6 @@ export default function AppMainWorkspace({
   availableUpdate,
   appBuildGitTag,
   selectedDevWindowPreset,
-  currentWindowSizeLabel,
   devWindowMenuRef,
   isDevWindowMenuOpen,
   onToggleDevWindowMenu,
@@ -158,7 +157,6 @@ export default function AppMainWorkspace({
         hasUpdateAvailable={Boolean(isDesktopAddonScanAvailable && availableUpdate?.updateAvailable)}
         appBuildGitTag={appBuildGitTag}
         selectedDevWindowPreset={selectedDevWindowPreset}
-        currentWindowSizeLabel={currentWindowSizeLabel}
         devWindowMenuRef={devWindowMenuRef}
         isDevWindowMenuOpen={isDevWindowMenuOpen}
         onToggleDevWindowMenu={onToggleDevWindowMenu}

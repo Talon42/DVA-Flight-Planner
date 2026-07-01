@@ -15,6 +15,16 @@ export function readViewportSize() {
   };
 }
 
+function getBucketedViewportSize(viewportSize) {
+  const width = Number(viewportSize?.width || 0);
+  const height = Number(viewportSize?.height || 0);
+
+  return {
+    width: width <= 1024 ? 1024 : width <= 1400 ? 1400 : 1401,
+    height: height < 850 ? 849 : 850
+  };
+}
+
 // Buckets the viewport into the same layout tiers used by the current shell.
 export function getLayoutBucket(viewportSize) {
   if (viewportSize.width <= 1024) {
@@ -48,7 +58,7 @@ export function getDefaultPlannerControlsCollapsed() {
 
 // Owns layout-only state and resize tracking so App.jsx can stay focused on behavior.
 export function useAppLayout() {
-  const initialViewportSize = readViewportSize();
+  const initialViewportSize = getBucketedViewportSize(readViewportSize());
   const initialBasicFilterSections = getDefaultBasicFilterSectionState(initialViewportSize);
   const [viewportSize, setViewportSize] = useState(initialViewportSize);
   const [plannerControlsCollapsed, setPlannerControlsCollapsed] = useState(
@@ -62,13 +72,36 @@ export function useAppLayout() {
   );
 
   useEffect(() => {
-    function handleResize() {
-      setViewportSize(readViewportSize());
+    let rafId = 0;
+
+    function applyViewportSize() {
+      rafId = 0;
+
+      const nextViewportSize = getBucketedViewportSize(readViewportSize());
+
+      setViewportSize((currentViewportSize) =>
+        currentViewportSize.width === nextViewportSize.width &&
+        currentViewportSize.height === nextViewportSize.height
+          ? currentViewportSize
+          : nextViewportSize
+      );
     }
 
+    function handleResize() {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+
+      rafId = requestAnimationFrame(applyViewportSize);
+    }
+
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => {
       window.removeEventListener("resize", handleResize);
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
     };
   }, []);
 
@@ -79,7 +112,6 @@ export function useAppLayout() {
     layoutBucket === "compact" ? "DVA Flight Planner" : "Delta Virtual Airlines Flight Planner";
   const syncButtonLabel =
     layoutBucket === "compact" ? "Sync DVA" : "Sync from Delta Virtual";
-  const currentWindowSizeLabel = `${viewportSize.width}x${viewportSize.height}`;
 
   return {
     viewportSize,
@@ -94,7 +126,6 @@ export function useAppLayout() {
     usesPlannerControlsModal,
     isPlannerControlsInlineCollapsed,
     topbarTitle,
-    syncButtonLabel,
-    currentWindowSizeLabel
+    syncButtonLabel
   };
 }

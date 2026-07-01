@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import Button from "../ui/Button";
 import { cn } from "../ui/cn";
 import {
@@ -5,6 +6,45 @@ import {
   dropdownPanelClassName
 } from "../ui/forms";
 import { bodySmTextClassName } from "../ui/typography";
+import { readViewportSize } from "../../app/useAppLayout.hooks";
+
+// Keeps the live window-size label local to the footer so resize churn does not hit the whole app tree.
+function useCurrentWindowSizeLabel() {
+  const [currentWindowSizeLabel, setCurrentWindowSizeLabel] = useState(() => {
+    const viewportSize = readViewportSize();
+    return `${viewportSize.width}x${viewportSize.height}`;
+  });
+
+  useEffect(() => {
+    let timeoutId = 0;
+
+    function updateLabel() {
+      timeoutId = 0;
+      const viewportSize = readViewportSize();
+      setCurrentWindowSizeLabel(`${viewportSize.width}x${viewportSize.height}`);
+    }
+
+    function handleResize() {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+
+      timeoutId = window.setTimeout(updateLabel, 120);
+    }
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
+  return currentWindowSizeLabel;
+}
 
 function FooterStat({ label, value, className = "" }) {
   return (
@@ -59,7 +99,6 @@ function FooterLinkStat({ label, value, onClick, className = "" }) {
 
 export default function AppFooter({
   appBuildGitTag,
-  currentWindowSizeLabel,
   devWindowMenuRef,
   devWindowWidth,
   devWindowWidthPresets,
@@ -74,6 +113,8 @@ export default function AppFooter({
   selectedDevWindowPreset,
   showFooter
 }) {
+  const currentWindowSizeLabel = useCurrentWindowSizeLabel();
+
   if (!showFooter) {
     return null;
   }

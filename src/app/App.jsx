@@ -241,8 +241,7 @@ export default function App() {
     setBasicAddonFiltersOpen,
     isPlannerControlsInlineCollapsed,
     topbarTitle,
-    syncButtonLabel,
-    currentWindowSizeLabel
+    syncButtonLabel
   } = useAppLayout();
   const [gettingStartedState, setGettingStartedState] = useState(DEFAULT_GETTING_STARTED_STATE);
   const [hasLoadedGettingStartedState, setHasLoadedGettingStartedState] = useState(false);
@@ -2030,12 +2029,11 @@ export default function App() {
     availableUpdate,
     appBuildGitTag: APP_BUILD_GIT_TAG,
     selectedDevWindowPreset,
-    topbarTitle,
-    syncButtonLabel,
-    currentWindowSizeLabel,
-    devWindowMenuRef,
-    isDevWindowMenuOpen,
-    onToggleDevWindowMenu: handleToggleDevWindowMenu,
+      topbarTitle,
+      syncButtonLabel,
+      devWindowMenuRef,
+      isDevWindowMenuOpen,
+      onToggleDevWindowMenu: handleToggleDevWindowMenu,
     devWindowWidth,
     devWindowWidthPresets,
     onSelectDevWindowWidth: handleSelectDevWindowWidth,
