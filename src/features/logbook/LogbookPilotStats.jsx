@@ -191,8 +191,7 @@ export default function LogbookPilotStats({
                     {row.map((card) => {
                       const changeOptions = getPilotStatsChangeOptions({
                         layoutMode,
-                        visibleCardKeys: normalizedSlots,
-                        currentCardKey: card.key
+                        visibleCardKeys: normalizedSlots
                       });
 
                       return (

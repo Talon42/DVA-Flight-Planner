@@ -87,23 +87,23 @@ export const PILOT_STATS_PANEL_CAPS = Object.freeze({
     recentLandings: 4,
     topAirports: 3,
     routes: 3,
-    records: 0
+    records: 2
   },
   narrowTall: {
     airlines: 4,
     equipment: 4,
     recentLandings: 3,
     topAirports: 3,
-    routes: 0,
-    records: 0
+    routes: 3,
+    records: 2
   },
   narrowShort: {
     airlines: 3,
     equipment: 3,
     recentLandings: 3,
-    topAirports: 0,
-    routes: 0,
-    records: 0
+    topAirports: 3,
+    routes: 3,
+    records: 2
   }
 });
 
@@ -237,17 +237,12 @@ export function normalizePilotStatsDashboardSlots(value, layoutMode) {
 }
 
 // Returns hidden eligible cards as menu options in registry order.
-export function getPilotStatsChangeOptions({ layoutMode, visibleCardKeys, currentCardKey } = {}) {
+export function getPilotStatsChangeOptions({ layoutMode, visibleCardKeys } = {}) {
   const visibleSet = new Set(
     (Array.isArray(visibleCardKeys) ? visibleCardKeys : [])
       .map((key) => String(key || "").trim())
       .filter(Boolean)
   );
-  const currentKey = String(currentCardKey || "").trim();
-
-  if (currentKey) {
-    visibleSet.add(currentKey);
-  }
 
   return getEligiblePilotStatsCards(layoutMode)
     .filter((card) => !visibleSet.has(card.key))
