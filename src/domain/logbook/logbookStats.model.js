@@ -194,7 +194,9 @@ function buildRankingItems(counterMap, { totalCount = 0, rowMap = null, labelBui
         label: labelBuilder ? labelBuilder(key, row) : key,
         count,
         value: formatNumber(count),
+        valueRaw: count,
         percentValue: formatPercent(count, totalCount),
+        percentValueRaw: totalCount > 0 ? (count / totalCount) * 100 : null,
         meta: row?.airlineCode || row?.equipment || "",
         row
       };
@@ -241,10 +243,14 @@ function buildCombinedAirportRows(departureCounts, arrivalCounts) {
         id: item.label,
         label: item.label,
         value: formatNumber(totalUses),
+        valueRaw: totalUses,
         meta: `${formatNumber(item.dep)} dep / ${formatNumber(item.arr)} arr`,
         dep: formatNumber(item.dep),
+        depRaw: item.dep,
         arr: formatNumber(item.arr),
+        arrRaw: item.arr,
         percentValue: formatPercent(totalUses, totalUsesAllAirports),
+        percentValueRaw: totalUsesAllAirports > 0 ? (totalUses / totalUsesAllAirports) * 100 : null,
         totalUses
       };
     })
@@ -461,6 +467,7 @@ function buildRecentLandingRows(rows, limit = 10) {
     .map((row) => ({
       id: row.id,
       date: row.dateDisplay,
+      dateSortKey: row.dateSortKey,
       flight: row.compactFlightLabel,
       airline: row.airlineDisplayName,
       route: `${row.departure} -> ${row.arrival}`,

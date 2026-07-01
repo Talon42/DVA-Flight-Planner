@@ -4,12 +4,118 @@ import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, labelTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
+import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
+import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 
-function resolveSortValue(value) {
-  const normalized = String(value ?? "");
-  const numeric = Number(normalized.replace(/,/g, ""));
-  return Number.isFinite(numeric) && normalized !== "" ? numeric : normalized.toLowerCase();
+function resolveNumericSortValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const normalized = String(value ?? "").trim();
+  if (!normalized || normalized === LOGBOOK_EMPTY_VALUE) {
+    return null;
+  }
+
+  const numeric = Number(normalized.replace(/,/g, "").replace(/%$/, ""));
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function resolveTextSortValue(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function formatCompactDashDate(dateSortKey) {
+  const normalized = String(dateSortKey ?? "").trim();
+  if (!normalized || !/^\d{8}$/.test(normalized)) {
+    return LOGBOOK_EMPTY_VALUE;
+  }
+
+  const month = normalized.slice(4, 6);
+  const day = normalized.slice(6, 8);
+  const year = normalized.slice(2, 4);
+  return `${month}-${day}-${year}`;
+}
+
+// Resolves the airport display name from the shared catalog so the detail table can show ICAO and name separately.
+function getAirportActualName(icao) {
+  const airport = getAirportByIcao(icao);
+  return String(airport?.actualName || airport?.name || icao || "").trim();
+}
+
+// Picks the underlying sort value for each detail column so formatting does not affect ordering.
+function getDetailSortValue(detailView, columnKey, row) {
+  switch (detailView) {
+    case "recent-landings":
+      switch (columnKey) {
+        case "date":
+          return resolveNumericSortValue(row?.dateSortKey);
+        case "landingRate":
+          return resolveNumericSortValue(row?.rawLandingRate ?? row?.landingRate);
+        case "grade":
+          return resolveTextSortValue(row?.grade);
+        case "flight":
+        case "airline":
+        case "route":
+        case "equipment":
+          return resolveTextSortValue(row?.[columnKey]);
+        default:
+          return resolveNumericSortValue(row?.[columnKey]) ?? resolveTextSortValue(row?.[columnKey]);
+      }
+
+    case "top-airports":
+      switch (columnKey) {
+        case "rank":
+          return resolveNumericSortValue(row?.rank);
+        case "label":
+          return resolveTextSortValue(row?.label);
+        case "actualName":
+          return resolveTextSortValue(row?.actualName);
+        case "value":
+          return resolveNumericSortValue(row?.valueRaw ?? row?.value);
+        case "dep":
+          return resolveNumericSortValue(row?.depRaw ?? row?.dep);
+        case "arr":
+          return resolveNumericSortValue(row?.arrRaw ?? row?.arr);
+        case "percentValue":
+          return resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue);
+        default:
+          return resolveNumericSortValue(row?.[columnKey]) ?? resolveTextSortValue(row?.[columnKey]);
+      }
+
+    case "equipment":
+    case "routes":
+    case "departure-airports":
+    case "arrival-airports":
+    case "airlines":
+      switch (columnKey) {
+        case "rank":
+          return resolveNumericSortValue(row?.rank);
+        case "label":
+          return resolveTextSortValue(row?.label);
+        case "value":
+          return resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value);
+        case "percentValue":
+          return resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue);
+        default:
+          return resolveNumericSortValue(row?.[columnKey]) ?? resolveTextSortValue(row?.[columnKey]);
+      }
+
+    case "records":
+      if (columnKey === "label" || columnKey === "meta") {
+        return resolveTextSortValue(row?.[columnKey]);
+      }
+
+      if (columnKey === "value") {
+        return resolveNumericSortValue(row?.valueRaw ?? row?.value) ?? resolveTextSortValue(row?.value);
+      }
+
+      return resolveNumericSortValue(row?.[columnKey]) ?? resolveTextSortValue(row?.[columnKey]);
+
+    default:
+      return resolveNumericSortValue(row?.[columnKey]) ?? resolveTextSortValue(row?.[columnKey]);
+  }
 }
 
 // Matches the shared table sort chevron so the detail view uses the same visual cue.
@@ -53,7 +159,12 @@ function buildColumns(detailView, detailRows) {
     case "recent-landings":
       return {
         title: "Recent Landings",
-        rows: detailRows.recentLandings || [],
+        rows: (detailRows.recentLandings || []).map((row) => ({
+          ...row,
+          date: formatCompactDashDate(row?.dateSortKey),
+          landingRate: Number.isFinite(row?.rawLandingRate) ? `${row.rawLandingRate} fpm` : LOGBOOK_EMPTY_VALUE,
+          grade: row?.badge || LOGBOOK_EMPTY_VALUE
+        })),
         columns: [
           { key: "date", label: "Date" },
           { key: "flight", label: "Flight" },
@@ -61,16 +172,20 @@ function buildColumns(detailView, detailRows) {
           { key: "route", label: "Route" },
           { key: "equipment", label: "Equipment" },
           { key: "landingRate", label: "Landing Rate" },
-          { key: "badge", label: "Badge" }
+          { key: "grade", label: "Grade" }
         ]
       };
     case "top-airports":
       return {
         title: "Top Airports",
-        rows: detailRows.topAirports || [],
+        rows: (detailRows.topAirports || []).map((row) => ({
+          ...row,
+          actualName: getAirportActualName(row?.label)
+        })),
         columns: [
           { key: "rank", label: "Rank" },
-          { key: "label", label: "Airport" },
+          { key: "label", label: "ICAO" },
+          { key: "actualName", label: "Airport" },
           { key: "value", label: "Total" },
           { key: "dep", label: "DEP" },
           { key: "arr", label: "ARR" },
@@ -139,6 +254,7 @@ function buildColumns(detailView, detailRows) {
 export default function LogbookPilotStatsDetailView({ detailView, detailRows, onClose }) {
   const [sortKey, setSortKey] = useState("rank");
   const [sortDirection, setSortDirection] = useState("asc");
+  const textCollator = useMemo(() => new Intl.Collator("en", { numeric: true, sensitivity: "base" }), []);
 
   useEffect(() => {
     setSortKey(detailView === "recent-landings" ? "date" : "rank");
@@ -151,28 +267,26 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
     const rows = Array.isArray(config.rows) ? config.rows : [];
 
     return [...rows].sort((left, right) => {
-      const leftValue = resolveSortValue(left?.[sortKey]);
-      const rightValue = resolveSortValue(right?.[sortKey]);
+      const leftValue = getDetailSortValue(detailView, sortKey, left);
+      const rightValue = getDetailSortValue(detailView, sortKey, right);
       const direction = sortDirection === "asc" ? 1 : -1;
 
       if (typeof leftValue === "number" && typeof rightValue === "number") {
         return (leftValue - rightValue) * direction;
       }
 
-      return String(leftValue).localeCompare(String(rightValue)) * direction;
+      return textCollator.compare(String(leftValue), String(rightValue)) * direction;
     });
-  }, [config.rows, sortDirection, sortKey]);
+  }, [config.rows, detailView, sortDirection, sortKey, textCollator]);
 
   function handleSort(columnKey) {
-    setSortKey((current) => {
-      if (current === columnKey) {
-        setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
-        return current;
-      }
+    if (sortKey === columnKey) {
+      setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
+      return;
+    }
 
-      setSortDirection("asc");
-      return columnKey;
-    });
+    setSortKey(columnKey);
+    setSortDirection("asc");
   }
 
   return (
@@ -183,7 +297,12 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
       )}
     >
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onClose} className="justify-self-start">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+          className="justify-self-start text-[0.88rem] bp-1024:text-[0.82rem]"
+        >
           <span className="inline-flex items-center gap-1">
             <svg
               aria-hidden="true"
@@ -197,7 +316,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
             >
               <path d="M12 5L7 10l5 5" />
             </svg>
-            <span>Pilot Stats</span>
+            <span>Back</span>
           </span>
         </Button>
         <p className={cn("m-0 min-w-0 justify-self-center text-center text-[var(--text-heading)]", sectionTitleTextClassName)}>
@@ -242,7 +361,11 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                         /^(rank|value|percentValue|dep|arr|landingRate)$/.test(column.key) && "tabular-nums"
                       )}
                     >
-                      {row[column.key] ?? LOGBOOK_EMPTY_VALUE}
+                      {detailView === "recent-landings" && column.key === "grade" ? (
+                        <LandingGradeBadge grade={row.grade} />
+                      ) : (
+                        row[column.key] ?? LOGBOOK_EMPTY_VALUE
+                      )}
                     </td>
                   ))}
                 </tr>
