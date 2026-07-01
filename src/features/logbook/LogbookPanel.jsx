@@ -99,6 +99,7 @@ export default function LogbookPanel({
   summaryStats,
   pilotStatsComparisonPeriod,
   pilotStatsComparisonOptions,
+  pilotStatsDashboardSlots,
   pilotStatsDetailView,
   isSyncing = false,
   isRefreshingLogbook = false,
@@ -108,6 +109,7 @@ export default function LogbookPanel({
   onSelectRow,
   onActivateRow,
   onPilotStatsComparisonPeriodChange,
+  onPilotStatsDashboardSlotsChange,
   onPilotStatsDetailViewChange
 }) {
   const isRefreshDisabled = Boolean(isSyncing || isRefreshingLogbook);
@@ -166,8 +168,9 @@ export default function LogbookPanel({
               stats={pilotStats}
               summaryStats={summaryStats}
               pilotStatsComparisonPeriod={activePilotStatsComparisonPeriod}
-              pilotStatsComparisonOptions={pilotStatsComparisonOptions}
+              pilotStatsDashboardSlots={pilotStatsDashboardSlots}
               pilotStatsDetailView={pilotStatsDetailView}
+              onPilotStatsDashboardSlotsChange={onPilotStatsDashboardSlotsChange}
               onPilotStatsComparisonPeriodChange={onPilotStatsComparisonPeriodChange}
               onPilotStatsDetailViewChange={onPilotStatsDetailViewChange}
             />

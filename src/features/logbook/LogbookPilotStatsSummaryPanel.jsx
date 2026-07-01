@@ -1,8 +1,15 @@
+import { useEffect, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
+import { dropdownOptionRowClassName } from "../../components/ui/forms";
+
+const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
+  "!bg-transparent hover:!bg-transparent dark:!bg-transparent dark:hover:!bg-transparent";
+const CHANGE_MENU_PANEL_CLASS_NAME =
+  "grid gap-1 overflow-hidden rounded-none border border-[color:var(--line)] bg-[var(--surface-raised)] p-2 shadow-none";
 
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
@@ -158,21 +165,118 @@ export default function LogbookPilotStatsSummaryPanel({
   title,
   items,
   onViewAll,
+  onChange,
+  changeOptions = [],
+  selectedChangeKey = "",
+  changeMenuLabel = "Change",
   variant = "ranking",
   maxRows = 5,
   className = ""
 }) {
   const rows = (Array.isArray(items) ? items : []).slice(0, maxRows);
+  const rootRef = useRef(null);
+  const [isChangeMenuOpen, setIsChangeMenuOpen] = useState(false);
+  const hasChangeOptions = typeof onChange === "function" && Array.isArray(changeOptions) && changeOptions.length > 0;
+  const changeMenuId = `pilot-stats-change-${String(selectedChangeKey || title || "card").replace(/\s+/g, "-").toLowerCase()}`;
+
+  useEffect(() => {
+    if (!isChangeMenuOpen) {
+      return undefined;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsChangeMenuOpen(false);
+      }
+    }
+
+    function handlePointerDown(event) {
+      if (!rootRef.current || rootRef.current.contains(event.target)) {
+        return;
+      }
+
+      setIsChangeMenuOpen(false);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [isChangeMenuOpen]);
+
+  useEffect(() => {
+    setIsChangeMenuOpen(false);
+  }, [changeOptions, selectedChangeKey]);
+
+  function handleSelectChange(nextCardKey) {
+    setIsChangeMenuOpen(false);
+    onChange?.(nextCardKey);
+  }
 
   return (
-    <Panel className={cn("flex min-h-0 flex-col gap-2 overflow-hidden border border-[color:var(--line)] bg-[var(--surface-raised)] p-3", cardFrameClassName, className)}>
+    <Panel
+      ref={rootRef}
+      className={cn(
+        "relative flex min-h-0 !overflow-visible flex-col gap-2 border border-[color:var(--line)] bg-[var(--surface-raised)] p-3",
+        cardFrameClassName,
+        className
+      )}
+    >
       <div className="flex min-w-0 items-center justify-between gap-2">
         <p className={cn("m-0 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
-        {onViewAll ? (
-          <Button variant="ghost" size="sm" className="!bg-transparent hover:!bg-transparent dark:!bg-transparent dark:hover:!bg-transparent" onClick={onViewAll}>
-            View all
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {hasChangeOptions ? (
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={TRANSPARENT_HEADER_ACTION_CLASS_NAME}
+                onClick={() => setIsChangeMenuOpen((current) => !current)}
+                aria-haspopup="menu"
+                aria-expanded={isChangeMenuOpen}
+                aria-controls={changeMenuId}
+                title={`Change ${title}`}
+              >
+                {changeMenuLabel}
+              </Button>
+              {isChangeMenuOpen ? (
+                <div
+                  id={changeMenuId}
+                  className={cn("absolute right-0 top-[calc(100%+0.5rem)] z-20 min-w-[220px]", CHANGE_MENU_PANEL_CLASS_NAME)}
+                  role="menu"
+                  aria-label={`${changeMenuLabel} ${title}`}
+                >
+                  {changeOptions.map((option) => (
+                    <Button
+                      key={option.key}
+                      variant="ghost"
+                      size="sm"
+                      className={cn("w-full justify-start rounded-none", dropdownOptionRowClassName)}
+                      role="menuitem"
+                      onClick={() => handleSelectChange(option.key)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {onViewAll ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={TRANSPARENT_HEADER_ACTION_CLASS_NAME}
+              onClick={onViewAll}
+            >
+              View all
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="min-h-0 overflow-hidden">

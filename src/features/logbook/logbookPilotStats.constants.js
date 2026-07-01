@@ -7,6 +7,80 @@ const STATIC_PILOT_STATS_COMPARISON_OPTIONS = Object.freeze([
   { value: "year-to-date", label: "Year to Date" }
 ]);
 
+export const PILOT_STATS_CARD_ORDER = Object.freeze([
+  "airlines",
+  "equipment",
+  "recent-landings",
+  "top-airports",
+  "routes",
+  "records"
+]);
+
+export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
+  airlines: Object.freeze({
+    key: "airlines",
+    title: "Flights by Airline",
+    detailView: "airlines",
+    variant: "airline",
+    dataKey: "airlines",
+    capKey: "airlines"
+  }),
+  equipment: Object.freeze({
+    key: "equipment",
+    title: "Flights by Equipment",
+    detailView: "equipment",
+    variant: "ranking",
+    dataKey: "equipment",
+    capKey: "equipment"
+  }),
+  "recent-landings": Object.freeze({
+    key: "recent-landings",
+    title: "Recent Landings",
+    detailView: "recent-landings",
+    variant: "landing",
+    dataKey: "recentLandings",
+    capKey: "recentLandings"
+  }),
+  "top-airports": Object.freeze({
+    key: "top-airports",
+    title: "Top Airports",
+    detailView: "top-airports",
+    variant: "airport",
+    dataKey: "topAirports",
+    capKey: "topAirports"
+  }),
+  routes: Object.freeze({
+    key: "routes",
+    title: "Favorite Routes",
+    detailView: "routes",
+    variant: "route",
+    dataKey: "routes",
+    capKey: "routes"
+  }),
+  records: Object.freeze({
+    key: "records",
+    title: "Records Snapshot",
+    detailView: "records",
+    variant: "records",
+    dataKey: "records",
+    capKey: "records"
+  })
+});
+
+export const PILOT_STATS_LAYOUT_DEFAULT_SLOTS = Object.freeze({
+  wideTall: Object.freeze(["airlines", "equipment", "recent-landings", "top-airports", "routes", "records"]),
+  wideShort: Object.freeze(["airlines", "equipment", "recent-landings", "top-airports", "routes"]),
+  narrowTall: Object.freeze(["airlines", "equipment", "recent-landings", "top-airports"]),
+  narrowShort: Object.freeze(["airlines", "equipment", "recent-landings"])
+});
+
+export const PILOT_STATS_LAYOUT_ROW_COUNTS = Object.freeze({
+  wideTall: Object.freeze([3, 3]),
+  wideShort: Object.freeze([3, 2]),
+  narrowTall: Object.freeze([2, 2]),
+  narrowShort: Object.freeze([3])
+});
+
 export const PILOT_STATS_PANEL_CAPS = Object.freeze({
   wideTall: {
     airlines: 5,
@@ -66,6 +140,93 @@ export function buildPilotStatsComparisonOptions(rows = []) {
 }
 
 export const PILOT_STATS_COMPARISON_OPTIONS = STATIC_PILOT_STATS_COMPARISON_OPTIONS;
+
+// Returns the fixed registry entry for a Pilot Stats dashboard card.
+export function getPilotStatsCardDefinition(cardKey) {
+  return PILOT_STATS_CARD_REGISTRY[String(cardKey || "").trim()] || null;
+}
+
+// Returns the default slot order for the active layout mode.
+export function getPilotStatsDefaultSlots(layoutMode) {
+  const defaultSlots = PILOT_STATS_LAYOUT_DEFAULT_SLOTS[String(layoutMode || "").trim()] || PILOT_STATS_LAYOUT_DEFAULT_SLOTS.narrowShort;
+  return [...defaultSlots];
+}
+
+// Normalizes the persisted dashboard slots for one layout mode so bad state never breaks render.
+export function normalizePilotStatsDashboardSlots(value, layoutMode) {
+  const defaultSlots = getPilotStatsDefaultSlots(layoutMode);
+  const caps = PILOT_STATS_PANEL_CAPS[String(layoutMode || "").trim()] || PILOT_STATS_PANEL_CAPS.narrowShort;
+  const persistedSlots = Array.isArray(value?.[layoutMode]) ? value[layoutMode] : [];
+  const normalized = [];
+
+  for (const key of persistedSlots) {
+    const card = getPilotStatsCardDefinition(key);
+    if (!card || (caps[card.capKey] || 0) <= 0 || normalized.includes(card.key)) {
+      continue;
+    }
+
+    normalized.push(card.key);
+  }
+
+  for (const key of defaultSlots) {
+    const card = getPilotStatsCardDefinition(key);
+    if (!card || (caps[card.capKey] || 0) <= 0 || normalized.includes(card.key)) {
+      continue;
+    }
+
+    normalized.push(card.key);
+  }
+
+  return normalized.slice(0, defaultSlots.length);
+}
+
+// Returns the hidden replacement options for one visible card slot.
+export function buildPilotStatsDashboardChangeOptions(visibleCardKeys, layoutMode) {
+  const caps = PILOT_STATS_PANEL_CAPS[String(layoutMode || "").trim()] || PILOT_STATS_PANEL_CAPS.narrowShort;
+  const visibleSet = new Set((Array.isArray(visibleCardKeys) ? visibleCardKeys : []).filter(Boolean));
+
+  return PILOT_STATS_CARD_ORDER.filter((key) => {
+    const card = getPilotStatsCardDefinition(key);
+    return card && (caps[card.capKey] || 0) > 0 && !visibleSet.has(key);
+  }).map((key) => {
+    const card = getPilotStatsCardDefinition(key);
+    return {
+      key,
+      label: card?.title || key
+    };
+  });
+}
+
+// Resolves the data, title, and render variant for one dashboard card slot.
+export function resolvePilotStatsCardData(stats, cardKey, caps) {
+  const card = getPilotStatsCardDefinition(cardKey);
+  if (!card) {
+    return null;
+  }
+
+  const maxRows = Number(caps?.[card.capKey] || 0);
+  if (maxRows <= 0) {
+    return null;
+  }
+
+  const rankings = stats?.rankings || {};
+  const detailRows = stats?.detailRows || {};
+  const records = stats?.records || {};
+  const itemSources = {
+    airlines: rankings.airlines || detailRows.airlines || [],
+    equipment: rankings.equipment || detailRows.equipment || [],
+    recentLandings: stats?.recentLandings || detailRows.recentLandings || [],
+    topAirports: rankings.topAirports || detailRows.topAirports || [],
+    routes: rankings.routes || detailRows.routes || [],
+    records: records.summaryRows || []
+  };
+
+  return {
+    ...card,
+    items: [...(Array.isArray(itemSources[card.dataKey]) ? itemSources[card.dataKey] : [])].slice(0, maxRows),
+    maxRows
+  };
+}
 
 export const PILOT_STATS_LAYOUT_MODES = Object.freeze({
   wideTall: "wideTall",

@@ -37,9 +37,17 @@ export function useLogbookWorkspace({
       logbookFilters: logbook.filters,
       logbookSort: logbook.sort,
       pilotStatsComparisonPeriod: logbook.pilotStatsComparisonPeriod,
+      pilotStatsDashboardSlots: logbook.pilotStatsDashboardSlots,
       pilotStatsDetailView: logbook.pilotStatsDetailView
     }),
-    [logbook.filters, logbook.pilotStatsComparisonPeriod, logbook.pilotStatsDetailView, logbook.selectedTab, logbook.sort]
+    [
+      logbook.filters,
+      logbook.pilotStatsComparisonPeriod,
+      logbook.pilotStatsDashboardSlots,
+      logbook.pilotStatsDetailView,
+      logbook.selectedTab,
+      logbook.sort
+    ]
   );
 
   const mainProps = useMemo(
@@ -55,6 +63,7 @@ export function useLogbookWorkspace({
       summaryStats: logbook.allRowsPilotStats,
       pilotStatsComparisonPeriod: logbook.activePilotStatsComparisonPeriod,
       pilotStatsComparisonOptions: logbook.pilotStatsComparisonOptions,
+      pilotStatsDashboardSlots: logbook.pilotStatsDashboardSlots,
       pilotStatsDetailView: logbook.pilotStatsDetailView,
       isSyncing,
       isRefreshingLogbook,
@@ -64,6 +73,7 @@ export function useLogbookWorkspace({
       onSelectRow: logbook.handleSelectRow,
       onActivateRow: logbook.handleSelectRow,
       onPilotStatsComparisonPeriodChange: logbook.setPilotStatsComparisonPeriod,
+      onPilotStatsDashboardSlotsChange: logbook.setPilotStatsDashboardSlots,
       onPilotStatsDetailViewChange: logbook.setPilotStatsDetailView
     }),
     [
@@ -77,9 +87,11 @@ export function useLogbookWorkspace({
       logbook.selectedTab,
       logbook.activePilotStatsComparisonPeriod,
       logbook.pilotStatsComparisonOptions,
+      logbook.pilotStatsDashboardSlots,
       logbook.pilotStatsDetailView,
       logbook.setSelectedTab,
       logbook.setPilotStatsComparisonPeriod,
+      logbook.setPilotStatsDashboardSlots,
       logbook.setPilotStatsDetailView,
       logbook.sort,
       logbook.sortedFilteredRows,
