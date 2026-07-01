@@ -68,31 +68,41 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
   const valueToneClassName = isWide ? "text-[var(--text-heading)] dark:text-white" : "text-[var(--text-heading)]";
   const kpiCards = [
     {
+      id: "total-flights",
       label: "Total Flights",
       value: summary?.totalFlights || LOGBOOK_EMPTY_VALUE,
       delta: useComparison ? formatDeltaValue(deltas.totalFlights?.rawValue) : "",
       deltaStatus: deltas.totalFlights?.status
     },
     {
+      id: "total-distance",
       label: "Total Distance",
       value: summary?.totalDistance || LOGBOOK_EMPTY_VALUE,
       delta: useComparison ? formatDeltaValue(deltas.totalDistanceNm?.rawValue, "nm") : "",
       deltaStatus: deltas.totalDistanceNm?.status
     },
     {
+      id: "total-block-time",
       label: "Total Block Time",
       value: summary?.totalDuration || LOGBOOK_EMPTY_VALUE,
       delta: useComparison ? formatDeltaValue(deltas.totalDurationMinutes?.rawValue, "", "minutes") : "",
       deltaStatus: deltas.totalDurationMinutes?.status
     },
     {
+      id: "total-flight-time",
       label: "Total Flight Time",
       value: summary?.totalAirborneTime || LOGBOOK_EMPTY_VALUE,
       delta: useComparison ? formatDeltaValue(deltas.totalAirborneMinutes?.rawValue, "", "minutes") : "",
       deltaStatus: deltas.totalAirborneMinutes?.status
     },
     {
-      label: "Average Landing Rate",
+      id: "average-landing-rate",
+      label: (
+        <>
+          <span className="bp-1400:hidden">Landing Rate</span>
+          <span className="hidden bp-1400:inline">Average Landing Rate</span>
+        </>
+      ),
       value: summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE,
       delta: useComparison ? formatDeltaValue(deltas.averageLandingRate?.rawValue, "fpm") : "",
       deltaStatus: deltas.averageLandingRate?.status
@@ -121,7 +131,7 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
           {isWide ? (
             <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 bp-1024:grid-cols-5 bp-1024:gap-x-0 bp-1024:gap-y-0">
               {kpiCards.map((card) => (
-                <div key={card.label} className="min-w-0 px-2 first:pl-0 bp-1024:border-l bp-1024:border-[color:var(--line)] bp-1024:px-3 dark:bp-1024:border-white/10">
+                <div key={card.id} className="min-w-0 px-2 first:pl-0 bp-1024:border-l bp-1024:border-[color:var(--line)] bp-1024:px-3 dark:bp-1024:border-white/10">
                   <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
                     {card.label}
                   </p>
@@ -149,7 +159,7 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
             <div className={cn("grid min-w-0 gap-2", getKpiGridClassName(layoutMode))}>
               {kpiCards.map((card) => (
                 <div
-                  key={card.label}
+                  key={card.id}
                   className={cn(
                     "grid min-w-0 gap-0.5 border px-2 py-1.5",
                     "border-[color:var(--line)] bg-[var(--surface)]",
