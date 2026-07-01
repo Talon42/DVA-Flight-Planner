@@ -79,7 +79,7 @@ function formatPilotMetadataLine(profile) {
 }
 
 function KpiGlyph({ cardId }) {
-  const baseClassName = "h-7 w-7 shrink-0 stroke-current";
+  const baseClassName = "h-6 w-6 shrink-0 stroke-current";
 
   switch (cardId) {
     case "total-flights":
@@ -126,22 +126,30 @@ function KpiGlyph({ cardId }) {
 }
 
 function KpiMetric({ card, labelToneClassName, valueToneClassName }) {
+  const hasBadge = Boolean(card.badge);
+  const cardClassName =
+    card.id === "average-landing-rate"
+      ? "bp-1024:col-span-2 bp-1400:col-span-1"
+      : "bp-1024:col-span-1 bp-1400:col-span-1";
+
   return (
-    <div className="min-w-0 bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-center text-[var(--text-heading)] dark:text-white">
+    <div className={cn("min-w-0", cardClassName, "bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10")}>
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center self-center text-[var(--text-heading)] dark:text-white">
           <KpiGlyph cardId={card.id} />
         </span>
         <div className="min-w-0 flex-1">
           <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.12em]", labelToneClassName)}>
             {card.label}
           </p>
-          <div className="mt-1 flex min-w-0 flex-nowrap items-center gap-3 bp-1400:gap-4">
+          <div className="mt-1 flex min-w-0 flex-nowrap items-center gap-2">
             <p
               className={cn(
                 "m-0 min-w-0 flex-1 truncate font-semibold leading-[1.05] tracking-[0]",
                 valueToneClassName,
-                "text-[0.98rem] bp-1400:text-[1.06rem]"
+                hasBadge
+                  ? "shrink-0 whitespace-nowrap text-[0.98rem] bp-1400:text-[1.06rem]"
+                  : "min-w-0 flex-1 truncate text-[0.98rem] bp-1400:text-[1.06rem]"
               )}
             >
               {card.value}
@@ -264,8 +272,8 @@ export default function LogbookPilotStatsHero({
         />
       ) : null}
 
-      <div className="relative z-20 grid min-w-0 gap-3 p-3 bp-1024:grid-cols-[minmax(15rem,34%)_minmax(0,1fr)] bp-1024:items-center bp-1024:gap-3.5 bp-1024:p-3.5 bp-1400:grid-cols-[minmax(18rem,32%)_minmax(0,1fr)]">
-        <div className="flex min-w-0 items-center gap-3 border-b border-[color:rgba(15,35,58,0.14)] pb-3 dark:border-white/10 bp-1024:border-b-0 bp-1024:pb-0">
+      <div className="relative z-20 grid min-w-0 gap-3 p-3 bp-1024:grid-cols-[minmax(12rem,24%)_minmax(0,1fr)] bp-1024:items-center bp-1024:gap-3.5 bp-1024:p-3.5 bp-1400:grid-cols-[minmax(14rem,26%)_minmax(0,1fr)]">
+        <div className="flex min-w-0 items-center gap-2 border-b border-[color:rgba(15,35,58,0.14)] pb-3 dark:border-white/10 bp-1024:border-b-0 bp-1024:pb-0">
           <SummaryAirlineMark airline={airline} />
           <div className="min-w-0">
             <p className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em]", labelToneClassName)}>
@@ -282,7 +290,7 @@ export default function LogbookPilotStatsHero({
           </div>
         </div>
 
-        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-6 bp-1024:gap-x-4 bp-1024:gap-y-3 bp-1024:[&>*]:col-span-2 bp-1024:[&>*:nth-child(4)]:col-start-2 bp-1024:[&>*:nth-child(5)]:col-start-4 bp-1400:grid-cols-5 bp-1400:gap-x-0 bp-1400:gap-y-0 bp-1400:[&>*]:col-span-1 bp-1400:[&>*]:col-start-auto">
+        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-3 bp-1024:gap-x-4 bp-1024:gap-y-3 bp-1400:grid-cols-5 bp-1400:gap-x-0 bp-1400:gap-y-0">
           {kpiCards.map((card) => (
             <KpiMetric
               key={card.id}
