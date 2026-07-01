@@ -225,9 +225,9 @@ export default function LogbookPilotStatsSummaryPanel({
         className
       )}
     >
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <p className={cn("m-0 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
-        <div className="flex shrink-0 items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-2 gap-y-1">
+        <p className={cn("m-0 min-w-[9rem] flex-1 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {hasChangeOptions ? (
             <div className="relative">
               <Button
