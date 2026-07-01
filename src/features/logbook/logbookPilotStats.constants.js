@@ -16,7 +16,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "airline",
     dataKey: "airlines",
     maxRows: 6,
-    cardClassName: "min-h-[17rem]",
+    cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
   equipment: Object.freeze({
@@ -27,7 +27,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "ranking",
     dataKey: "equipment",
     maxRows: 6,
-    cardClassName: "min-h-[17rem]",
+    cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
   "recent-landings": Object.freeze({
@@ -38,7 +38,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "landing",
     dataKey: "recentLandings",
     maxRows: 6,
-    cardClassName: "min-h-[17rem]",
+    cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
   "top-airports": Object.freeze({
@@ -49,7 +49,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "airport",
     dataKey: "topAirports",
     maxRows: 6,
-    cardClassName: "min-h-[17rem]",
+    cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
   routes: Object.freeze({
@@ -60,7 +60,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "route",
     dataKey: "routes",
     maxRows: 6,
-    cardClassName: "min-h-[17rem]",
+    cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
   records: Object.freeze({
