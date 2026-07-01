@@ -127,26 +127,26 @@ function KpiGlyph({ cardId }) {
 
 function KpiMetric({ card, labelToneClassName, valueToneClassName }) {
   return (
-    <div className="min-w-0 border-l border-[color:rgba(15,35,58,0.14)] pl-3 first:border-l-0 first:pl-0 dark:border-white/10 bp-1024:first:border-l-0 bp-1024:first:pl-0">
+    <div className="min-w-0 bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10">
       <div className="flex min-w-0 items-center gap-3">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-center text-[var(--text-heading)] dark:text-white">
           <KpiGlyph cardId={card.id} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.14em]", labelToneClassName)}>
+          <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.12em]", labelToneClassName)}>
             {card.label}
           </p>
-          <div className="mt-1 flex min-w-0 items-center gap-2">
+          <div className="mt-1 flex min-w-0 flex-nowrap items-center gap-3 bp-1400:gap-4">
             <p
               className={cn(
-                "m-0 min-w-0 truncate font-semibold leading-[1.05] tracking-[0]",
+                "m-0 min-w-0 flex-1 truncate font-semibold leading-[1.05] tracking-[0]",
                 valueToneClassName,
                 "text-[0.98rem] bp-1400:text-[1.06rem]"
               )}
             >
               {card.value}
             </p>
-            {card.badge ? <LandingGradeBadge grade={card.badge} className="h-5 w-auto min-w-[4.2rem] px-2 text-[0.54rem]" /> : null}
+            {card.badge ? <LandingGradeBadge grade={card.badge} className="h-5 w-auto min-w-[4.2rem] shrink-0 px-2 text-[0.54rem]" /> : null}
           </div>
           {card.delta ? (
             <p
@@ -230,8 +230,8 @@ export default function LogbookPilotStatsHero({
       id: "average-landing-rate",
       label: (
         <>
-          <span className="bp-1400:hidden">Landing Rate</span>
-          <span className="hidden bp-1400:inline">Average Landing Rate</span>
+          <span className="bp-1920:hidden">Landing Rate</span>
+          <span className="hidden bp-1920:inline">Average Landing Rate</span>
         </>
       ),
       value: summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE,
@@ -282,7 +282,7 @@ export default function LogbookPilotStatsHero({
           </div>
         </div>
 
-        <div className="grid min-w-0 grid-cols-2 gap-y-3 bp-1024:grid-cols-5 bp-1024:gap-y-0">
+        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-6 bp-1024:gap-x-4 bp-1024:gap-y-3 bp-1024:[&>*]:col-span-2 bp-1024:[&>*:nth-child(4)]:col-start-2 bp-1024:[&>*:nth-child(5)]:col-start-4 bp-1400:grid-cols-5 bp-1400:gap-x-0 bp-1400:gap-y-0 bp-1400:[&>*]:col-span-1 bp-1400:[&>*]:col-start-auto">
           {kpiCards.map((card) => (
             <KpiMetric
               key={card.id}
