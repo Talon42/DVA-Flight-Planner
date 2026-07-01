@@ -1,5 +1,6 @@
 use crate::app::paths::{
-    build_accomplishment_eligibility_path, resolve_existing_logbook_json_path,
+    build_accomplishment_eligibility_path, build_logbook_profile_path,
+    resolve_existing_logbook_json_path,
 };
 use crate::services::deltava::draft::DVA_DRAFT_WEBVIEW_DIR;
 use crate::services::deltava::{
@@ -8,6 +9,9 @@ use crate::services::deltava::{
     },
     auth::clear_auth_settings_internal,
     logbook::{extract_latest_logbook_date_iso, normalize_logbook_entries, store_logbook_json},
+    pilot_profile::{
+        build_unavailable_pilot_profile_metadata, fetch_delta_virtual_pilot_profile_metadata,
+    },
     sync_types::{DeltaAccomplishmentEligibilityStore, DeltaWebSyncResult},
     sync_types::{
         MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES, MAX_DELTAVA_LOGBOOK_JSON_BYTES,
@@ -443,6 +447,90 @@ fn store_deltava_accomplishment_eligibility(
     Ok(store.clone())
 }
 
+fn read_logbook_profile_metadata_from_path(
+    path: &Path,
+) -> Option<crate::DeltaLogbookPilotProfileMetadata> {
+    let text = fs::read_to_string(path).ok()?;
+    serde_json::from_str::<crate::DeltaLogbookPilotProfileMetadata>(&text).ok()
+}
+
+pub(crate) fn read_deltava_logbook_profile_metadata(
+    app: &AppHandle,
+) -> Option<crate::DeltaLogbookPilotProfileMetadata> {
+    let path = build_logbook_profile_path(app).ok()?;
+    if !path.is_file() {
+        return None;
+    }
+
+    read_logbook_profile_metadata_from_path(&path)
+}
+
+fn store_deltava_logbook_profile_metadata(
+    app: &AppHandle,
+    metadata: &crate::DeltaLogbookPilotProfileMetadata,
+) -> Result<crate::DeltaLogbookPilotProfileMetadata, String> {
+    let path = build_logbook_profile_path(app)?;
+    let json = serde_json::to_string_pretty(metadata).map_err(|error| {
+        format!("download_failed: Unable to serialize Delta Virtual pilot profile metadata: {error}")
+    })?;
+
+    fs::write(&path, json).map_err(|error| {
+        format!("download_failed: Unable to write Delta Virtual pilot profile metadata: {error}")
+    })?;
+
+    Ok(metadata.clone())
+}
+
+async fn resolve_deltava_logbook_profile_metadata(
+    app: &AppHandle,
+    export_id: Option<&str>,
+    force_refresh: bool,
+) -> crate::DeltaLogbookPilotProfileMetadata {
+    let normalized_export_id = export_id.map(str::trim).filter(|value| !value.is_empty());
+    let profile_url = normalized_export_id
+        .map(|value| format!("https://www.deltava.org/profile.do?id={value}"));
+
+    let cached_metadata = if force_refresh {
+        None
+    } else {
+        read_deltava_logbook_profile_metadata(app)
+    };
+
+    if let (Some(export_id), Some(metadata)) = (normalized_export_id, cached_metadata.clone()) {
+        if metadata
+            .export_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            == Some(export_id)
+            && metadata.rank.is_some()
+            && metadata.name.is_some()
+            && metadata.pilot_code.is_some()
+        {
+            return metadata;
+        }
+    }
+
+    let Some(export_id) = normalized_export_id else {
+        append_sync_log("profile:fetch-skipped reason=missing-export-id");
+        let metadata = build_unavailable_pilot_profile_metadata(None, profile_url.as_deref());
+        let _ = store_deltava_logbook_profile_metadata(app, &metadata);
+        return metadata;
+    };
+
+    match fetch_delta_virtual_pilot_profile_metadata(export_id).await {
+        Ok(metadata) => {
+            let _ = store_deltava_logbook_profile_metadata(app, &metadata);
+            metadata
+        }
+        Err(_error) => {
+            let metadata = build_unavailable_pilot_profile_metadata(Some(export_id), profile_url.as_deref());
+            let _ = store_deltava_logbook_profile_metadata(app, &metadata);
+            metadata
+        }
+    }
+}
+
 
 /// Builds the final Delta sync payload once the webview has downloaded both artifacts.
 pub(crate) async fn build_delta_sync_payload_from_web_result(
@@ -506,6 +594,15 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         );
         None
     };
+
+    if logbook_json.is_some() {
+        let _ = resolve_deltava_logbook_profile_metadata(
+            app,
+            result.logbook.export_id.as_deref(),
+            false,
+        )
+        .await;
+    }
 
     let accomplishment_eligibility = if let Some(accomplishments) = result.accomplishments {
         if accomplishments.ok {
@@ -625,6 +722,13 @@ pub(crate) async fn build_delta_logbook_refresh_payload_from_web_result(
                 .unwrap_or_else(|| "No logbook artifact was downloaded.".into())
         ));
     };
+
+    let _ = resolve_deltava_logbook_profile_metadata(
+        app,
+        result.logbook.export_id.as_deref(),
+        true,
+    )
+    .await;
 
     Ok(crate::DeltaSyncPayload {
         file_name: Some(logbook_json.file_name.clone()),

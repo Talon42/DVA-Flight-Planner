@@ -97,6 +97,7 @@ export default function LogbookPanel({
   selectedRowId,
   pilotStats,
   summaryStats,
+  profileMetadata,
   pilotStatsComparisonPeriod,
   pilotStatsComparisonOptions,
   pilotStatsDashboardSlots,
@@ -167,6 +168,7 @@ export default function LogbookPanel({
             <LogbookPilotStats
               stats={pilotStats}
               summaryStats={summaryStats}
+              profileMetadata={profileMetadata}
               pilotStatsComparisonPeriod={activePilotStatsComparisonPeriod}
               pilotStatsDashboardSlots={pilotStatsDashboardSlots}
               pilotStatsDetailView={pilotStatsDetailView}

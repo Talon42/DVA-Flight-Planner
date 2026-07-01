@@ -131,6 +131,7 @@ function buildSafeLogbookResult(error = "") {
   return {
     dateIso: null,
     lastSyncAt: null,
+    profileMetadata: null,
     entries: [],
     entryCount: 0,
     error: String(error || "").trim()
@@ -332,6 +333,7 @@ export async function readDeltaVirtualLogbook() {
     return {
       dateIso: result?.dateIso ?? result?.date_iso ?? null,
       lastSyncAt: result?.lastSyncAt ?? result?.last_sync_at ?? null,
+      profileMetadata: result?.profileMetadata ?? result?.profile_metadata ?? null,
       entries,
       entryCount: Number(result?.entryCount ?? result?.entry_count ?? entries.length) || 0,
       error: ""

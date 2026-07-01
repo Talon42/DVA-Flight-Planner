@@ -2,6 +2,7 @@ pub(crate) mod accomplishments;
 pub(crate) mod auth;
 pub(crate) mod constants;
 pub(crate) mod draft;
+pub(crate) mod pilot_profile;
 pub(crate) mod logbook;
 pub(crate) mod pirep_details;
 pub(crate) mod login;

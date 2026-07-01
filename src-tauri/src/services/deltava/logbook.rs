@@ -245,6 +245,7 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
         return crate::DeltaLogbookCachePayload {
             date_iso: None,
             last_sync_at: None,
+            profile_metadata: crate::services::storage::file_store::read_deltava_logbook_profile_metadata(app),
             entries: Vec::new(),
             entry_count: 0,
         };
@@ -255,6 +256,7 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
         return crate::DeltaLogbookCachePayload {
             date_iso: None,
             last_sync_at: None,
+            profile_metadata: crate::services::storage::file_store::read_deltava_logbook_profile_metadata(app),
             entries: Vec::new(),
             entry_count: 0,
         };
@@ -272,6 +274,7 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
     crate::DeltaLogbookCachePayload {
         date_iso: extract_latest_logbook_date_iso(&json),
         last_sync_at,
+        profile_metadata: crate::services::storage::file_store::read_deltava_logbook_profile_metadata(app),
         entry_count: entries.len(),
         entries,
     }

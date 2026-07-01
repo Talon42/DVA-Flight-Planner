@@ -61,6 +61,7 @@ export function useLogbookWorkspace({
       // Pilot stats apply the selected comparison period inside the stats selector.
       pilotStats: logbook.allRowsPilotStats,
       summaryStats: logbook.allRowsPilotStats,
+      profileMetadata: logbook.profileMetadata,
       pilotStatsComparisonPeriod: logbook.activePilotStatsComparisonPeriod,
       pilotStatsComparisonOptions: logbook.pilotStatsComparisonOptions,
       pilotStatsDashboardSlots: logbook.pilotStatsDashboardSlots,
@@ -83,6 +84,7 @@ export function useLogbookWorkspace({
       logbook.allRowsPilotStats,
       logbook.handleSelectRow,
       logbook.handleSort,
+      logbook.profileMetadata,
       logbook.selectedRowId,
       logbook.selectedTab,
       logbook.activePilotStatsComparisonPeriod,

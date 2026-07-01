@@ -12,6 +12,7 @@ import { EMPTY_DETAIL_ROWS, getPilotStatsDashboardCards } from "./logbookPilotSt
 export default function LogbookPilotStats({
   stats,
   summaryStats,
+  profileMetadata,
   pilotStatsComparisonPeriod = "last-90-days",
   pilotStatsDetailView = null,
   onPilotStatsDetailViewChange
@@ -29,6 +30,7 @@ export default function LogbookPilotStats({
           <LogbookPilotStatsHero
             summary={summary}
             comparison={comparisons}
+            profileMetadata={profileMetadata}
             comparisonPeriod={pilotStatsComparisonPeriod}
           />
 

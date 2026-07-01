@@ -52,6 +52,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const [cacheResult, setCacheResult] = useState({
     dateIso: null,
     lastSyncAt: null,
+    profileMetadata: null,
     entries: [],
     entryCount: 0
   });
@@ -108,6 +109,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
       return {
         dateIso: nextResult?.dateIso ?? null,
         lastSyncAt: nextResult?.lastSyncAt ?? null,
+        profileMetadata: nextResult?.profileMetadata ?? null,
         entries: nextEntries,
         entryCount: Number(nextResult?.entryCount ?? nextEntries.length) || 0
       };
@@ -133,7 +135,10 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     [activePilotStatsComparisonPeriod, filteredRows]
   );
   const allRowsPilotStats = useMemo(
-    () => selectLogbookPilotStats(allRows, { comparisonPeriod: activePilotStatsComparisonPeriod }),
+    () =>
+      selectLogbookPilotStats(allRows, {
+        comparisonPeriod: activePilotStatsComparisonPeriod
+      }),
     [activePilotStatsComparisonPeriod, allRows]
   );
   const sortedFilteredRows = useMemo(
@@ -193,6 +198,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     filterOptions,
     pilotStats,
     allRowsPilotStats,
+    profileMetadata: cacheResult.profileMetadata,
     pilotStatsComparisonPeriod,
     activePilotStatsComparisonPeriod,
     pilotStatsComparisonOptions,

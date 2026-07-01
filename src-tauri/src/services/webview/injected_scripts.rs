@@ -447,7 +447,7 @@ const DELTAVA_LOGBOOK_REFRESH_SCRIPT: &str = r#"
     if (!exportResponse.ok) {
       throw new Error(`Logbook JSON export failed with HTTP ${exportResponse.status}.`);
     }
-    return { jsonText, filename, contentType };
+    return { jsonText, filename, contentType, exportId };
   };
   const postRefreshResult = (payload) => {
     if (window.chrome?.webview?.postMessage) {

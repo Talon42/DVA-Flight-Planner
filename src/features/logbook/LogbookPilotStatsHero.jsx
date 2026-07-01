@@ -47,26 +47,18 @@ function SummaryAirlineMark({ airline, className = "" }) {
   );
 }
 
-function parseFormattedNumber(value) {
-  const normalized = Number(String(value || "").replace(/[^0-9.-]/g, ""));
-  return Number.isFinite(normalized) ? normalized : 0;
+function formatPilotName(profile) {
+  const rank = String(profile?.rank || "").trim();
+  const name = String(profile?.name || "").trim();
+  const displayName = [rank, name].filter(Boolean).join(" ");
+  return displayName || "Pilot profile unavailable";
 }
 
-function formatTopAirlineMeta(airline, totalFlights) {
-  const parsedCount = Number(airline?.count ?? 0);
-  const count = Number.isFinite(parsedCount) ? parsedCount : 0;
-  const countLabel = `${new Intl.NumberFormat("en-US").format(count)} ${count === 1 ? "flight" : "flights"}`;
-
-  if (count <= 0 || !Number.isFinite(totalFlights) || totalFlights <= 0) {
-    return countLabel;
-  }
-
-  const percentLabel = new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1
-  }).format((count / totalFlights) * 100);
-
-  return `${countLabel} - ${percentLabel}% of filtered logbook`;
+function formatPilotMetadataLine(profile) {
+  const pilotCode = String(profile?.pilotCode || "").trim();
+  const equipmentType = String(profile?.equipmentType || "").trim();
+  const parts = [pilotCode, equipmentType].filter(Boolean);
+  return parts.join(" \u00b7 ");
 }
 
 function KpiMetric({ card, prominent = false, labelToneClassName, valueToneClassName }) {
@@ -105,8 +97,14 @@ function KpiMetric({ card, prominent = false, labelToneClassName, valueToneClass
   );
 }
 
-// Renders the integrated airline identity and KPI hero at the top of Pilot Stats.
-export default function LogbookPilotStatsHero({ summary, comparison, comparisonPeriod, layoutMode }) {
+// Renders the pilot profile and KPI hero at the top of Pilot Stats.
+export default function LogbookPilotStatsHero({
+  summary,
+  comparison,
+  comparisonPeriod,
+  layoutMode,
+  profileMetadata
+}) {
   const airline = summary?.topAirline || null;
   const useComparison = layoutMode === "wideTall" && comparisonPeriod !== "off" && Boolean(comparison?.deltas);
   const deltas = comparison?.deltas || {};
@@ -120,8 +118,8 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
     "--logbook-hero-brand-color": brandColor,
     "--logbook-hero-accent-color": brandColor
   };
-  const totalFlightsRaw = parseFormattedNumber(summary?.totalFlights);
-  const topAirlineMeta = formatTopAirlineMeta(airline, totalFlightsRaw);
+  const profileDisplayName = formatPilotName(profileMetadata);
+  const profileMetaLine = formatPilotMetadataLine(profileMetadata);
   const logoSrc = String(airline?.airlineLogoSrc || "").trim();
   const logoClassName = String(airline?.airlineLogoClassName || "").trim();
   const labelToneClassName = "text-[var(--text-muted)] dark:text-white/60";
@@ -200,14 +198,16 @@ export default function LogbookPilotStatsHero({ summary, comparison, comparisonP
           <SummaryAirlineMark airline={airline} />
           <div className="min-w-0">
             <p className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em]", labelToneClassName)}>
-              Most flown airline
+              DVA PILOT PROFILE
             </p>
             <p className={cn("m-0 truncate text-[1.08rem] font-semibold leading-[1.1] tracking-[0] bp-1024:text-[1.2rem]", headingToneClassName)}>
-              {airlineName}
+              {profileDisplayName}
             </p>
-            <p className={cn("m-0 truncate text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>
-              {topAirlineMeta}
-            </p>
+            {profileMetaLine ? (
+              <p className={cn("m-0 truncate text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>
+                {profileMetaLine}
+              </p>
+            ) : null}
           </div>
         </div>
 

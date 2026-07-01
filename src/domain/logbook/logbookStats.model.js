@@ -459,6 +459,16 @@ function buildComparisonBundle(rows, periodKey) {
   };
 }
 
+// Pilot stats should ignore rejected logbook entries even if they remain visible in the table.
+function isRejectedLogbookRow(row) {
+  return String(row?.statusRaw || row?.statusDisplay || "").trim().toUpperCase() === "REJECTED";
+}
+
+// Draft rows are not finalized logbook entries and should never contribute to pilot stats.
+function isDraftLogbookRow(row) {
+  return String(row?.statusRaw || row?.statusDisplay || "").trim().toUpperCase() === "DRAFT";
+}
+
 function buildRecentLandingRows(rows, limit = 10) {
   // Keeps the landing summary card fed with the compact fields its row renderer expects.
   return [...rows]
@@ -622,7 +632,9 @@ function buildRecordSummary(rows) {
 
 // Builds the Pilot Stats dashboard model from the normalized logbook rows.
 export function buildLogbookPilotStats(rows, options = {}) {
-  const activeRows = Array.isArray(rows) ? rows : [];
+  const activeRows = (Array.isArray(rows) ? rows : []).filter(
+    (row) => !isRejectedLogbookRow(row) && !isDraftLogbookRow(row)
+  );
   const comparisonPeriod = String(options?.comparisonPeriod || "last-90-days").trim() || "last-90-days";
   const comparison = buildComparisonBundle(activeRows, comparisonPeriod);
   const statsRows = Array.isArray(comparison.currentRows) ? comparison.currentRows : activeRows;

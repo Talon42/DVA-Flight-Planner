@@ -119,6 +119,8 @@ pub(crate) struct DeltaWebLogbookResult {
     pub ok: bool,
     pub json_text: Option<String>,
     pub content_type: Option<String>,
+    #[serde(default)]
+    pub export_id: Option<String>,
     pub error: Option<String>,
 }
 

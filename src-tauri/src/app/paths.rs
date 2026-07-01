@@ -9,6 +9,7 @@ pub(crate) const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
 pub(crate) const MAIN_WINDOW_STATE_FILE: &str = "main-window-state.json";
 pub(crate) const DELTAVA_SYNC_DOWNLOAD_FILE: &str = "deltava-pfpxsched.xml";
 pub(crate) const DELTAVA_LOGBOOK_FILE: &str = "logbook.json";
+pub(crate) const DELTAVA_LOGBOOK_PROFILE_FILE: &str = "dva-logbook-profile.json";
 pub(crate) const DELTAVA_LOGBOOK_FALLBACK_FILE: &str = "dva-logbook.json";
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -91,6 +92,10 @@ pub(crate) fn build_logbook_dir(app: &AppHandle) -> Result<PathBuf, String> {
     fs::create_dir_all(&logbook_dir)
         .map_err(|error| format!("download_failed: Unable to create logbook storage: {error}"))?;
     Ok(logbook_dir)
+}
+
+pub(crate) fn build_logbook_profile_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(build_logbook_dir(app)?.join(DELTAVA_LOGBOOK_PROFILE_FILE))
 }
 
 pub(crate) fn build_accomplishment_eligibility_path(app: &AppHandle) -> Result<PathBuf, String> {
