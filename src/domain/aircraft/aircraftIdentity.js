@@ -1,4 +1,4 @@
-import aircraftIdentityTableData from "../../data/aircraft_identity_table.json";
+import aircraftCatalogData from "../../data/aircraft_catalog.json";
 import {
   buildGroupedAircraftSelectOptions,
   inferAircraftManufacturer,
@@ -57,7 +57,7 @@ function ensureAircraftIdentityLoaded() {
     return;
   }
 
-  const sourceRows = Array.isArray(aircraftIdentityTableData) ? aircraftIdentityTableData : [];
+  const sourceRows = Array.isArray(aircraftCatalogData.aircraftCatalog) ? aircraftCatalogData.aircraftCatalog : [];
   identityRows = sourceRows.map(normalizeIdentityRow);
   rowsByName = new Map();
   rowsByDva = new Map();

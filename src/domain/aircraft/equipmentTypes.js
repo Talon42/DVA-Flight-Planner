@@ -1,4 +1,4 @@
-import equipmentTypeData from "../../data/equipment_type.json";
+import aircraftCatalogData from "../../data/aircraft_catalog.json";
 
 function normalizeText(value) {
   return String(value ?? "").trim();
@@ -49,7 +49,7 @@ export function normalizeEquipmentTypeValue(row) {
   return normalizeText(row);
 }
 
-const equipmentTypeRows = unwrapEquipmentTypeRows(equipmentTypeData);
+const equipmentTypeRows = unwrapEquipmentTypeRows(aircraftCatalogData.equipmentTypes);
 
 export const equipmentTypes = [...new Set(
   equipmentTypeRows.map((row) => normalizeEquipmentTypeValue(row)).filter(Boolean)

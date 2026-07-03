@@ -1,0 +1,154 @@
+/* global console, process */
+
+import fs from "node:fs";
+import path from "node:path";
+
+const ROOT_DIR = process.cwd();
+const AIRCRAFT_CATALOG_FILE = path.join(ROOT_DIR, "src", "data", "aircraft_catalog.json");
+const AIRPORTS_FILE = path.join(ROOT_DIR, "src", "data", "airports.json");
+const AIRLINES_FILE = path.join(ROOT_DIR, "src", "data", "airlines.json");
+const AIRLINE_LOGOS_DIR = path.join(ROOT_DIR, "src", "data", "images", "Logos");
+
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+function normalizeKey(value) {
+  return String(value ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+const catalog = readJson(AIRCRAFT_CATALOG_FILE);
+const aircraftRows = Array.isArray(catalog.aircraftCatalog) ? catalog.aircraftCatalog : [];
+const aircraftFamilies = Array.isArray(catalog.aircraftFamilies) ? catalog.aircraftFamilies : [];
+const equipmentTypes = Array.isArray(catalog.equipmentTypes) ? catalog.equipmentTypes : [];
+
+if (!Array.isArray(catalog.aircraftCatalog) || !Array.isArray(catalog.aircraftFamilies) || !Array.isArray(catalog.equipmentTypes)) {
+  console.error("[aircraft-data] Invalid catalog shape.");
+  process.exit(1);
+}
+
+const profileRows = aircraftRows.filter((row) => row?.kind === "profile" || row?.aircraftProfile);
+const identityOnlyRows = aircraftRows.filter((row) => row?.kind === "identity-only");
+const duplicateBuckets = [];
+const seenByField = {
+  name: new Map(),
+  dva: new Map(),
+  simbrief: new Map()
+};
+
+for (const row of aircraftRows) {
+  for (const [field, normalized] of [
+    ["name", normalizeKey(row?.name)],
+    ["dva", normalizeKey(row?.dva)],
+    ["simbrief", normalizeKey(row?.simbrief)]
+  ]) {
+    if (!normalized) {
+      continue;
+    }
+
+    const existing = seenByField[field].get(normalized);
+    if (existing && existing !== row) {
+      duplicateBuckets.push({ field, normalized, existing, incoming: row });
+    } else if (!existing) {
+      seenByField[field].set(normalized, row);
+    }
+  }
+}
+
+const profileDerivedFamilies = new Set(profileRows.map((row) => String(row?.family || "").trim()).filter(Boolean));
+const unknownFamilyProfiles = profileRows.filter((row) => String(row?.family || "").trim() === "Unknown");
+const missingSimBriefProfiles = profileRows.filter((row) => !String(row?.simbrief || "").trim());
+const familyCoverageGaps = [...profileDerivedFamilies].filter(
+  (family) => family !== "Unknown" && !aircraftFamilies.includes(family)
+);
+
+console.log(`[aircraft-data] Aircraft rows: ${aircraftRows.length}`);
+console.log(`[aircraft-data] Profile rows: ${profileRows.length}`);
+console.log(`[aircraft-data] Identity-only rows: ${identityOnlyRows.length}`);
+console.log(`[aircraft-data] Families: ${aircraftFamilies.length}`);
+console.log(`[aircraft-data] Equipment types: ${equipmentTypes.length}`);
+
+if (duplicateBuckets.length) {
+  console.error(`[aircraft-data] Duplicate aircraft keys found: ${duplicateBuckets.length}`);
+  for (const bucket of duplicateBuckets.slice(0, 10)) {
+    console.error(`  - ${bucket.field}:${bucket.normalized}`);
+  }
+  process.exit(1);
+}
+
+if (unknownFamilyProfiles.length) {
+  console.warn(
+    `[aircraft-data] ${unknownFamilyProfiles.length} profile rows still resolve to Unknown family.`
+  );
+  console.warn(
+    `  Sample: ${unknownFamilyProfiles.slice(0, 8).map((row) => row?.aircraftProfile || row?.name || row?.["Aircraft Profile"] || "").filter(Boolean).join(", ")}`
+  );
+}
+
+if (familyCoverageGaps.length) {
+  console.warn(
+    `[aircraft-data] Families present on rows but missing from aircraftFamilies: ${familyCoverageGaps.join(", ")}`
+  );
+}
+
+if (missingSimBriefProfiles.length) {
+  console.log(
+    `[aircraft-data] ${missingSimBriefProfiles.length} profile rows do not have a direct SimBrief mapping.`
+  );
+}
+
+const airportsData = readJson(AIRPORTS_FILE);
+const airportRows = Array.isArray(airportsData.airports) ? airportsData.airports : [];
+const badAirports = airportRows.filter(
+  (airport) =>
+    !String(airport?.icao || "").trim() ||
+    !String(airport?.name || "").trim() ||
+    !Number.isFinite(Number(airport?.lat)) ||
+    !Number.isFinite(Number(airport?.lng)) ||
+    !String(airport?.timezone || "").trim()
+);
+const airportDuplicateCounts = new Map();
+for (const airport of airportRows) {
+  const key = String(airport?.icao || "").trim().toUpperCase();
+  if (!key) {
+    continue;
+  }
+
+  airportDuplicateCounts.set(key, (airportDuplicateCounts.get(key) || 0) + 1);
+}
+const duplicateAirports = [...airportDuplicateCounts.entries()].filter(([, count]) => count > 1);
+
+console.log(`[aircraft-data] Airports: ${airportRows.length}`);
+if (badAirports.length) {
+  console.warn(
+    `[aircraft-data] ${badAirports.length} airports are missing required lookup fields or coordinates.`
+  );
+}
+if (duplicateAirports.length) {
+  console.warn(`[aircraft-data] ${duplicateAirports.length} duplicate airport ICAO codes found.`);
+}
+
+const airlinesData = readJson(AIRLINES_FILE);
+const airlineRows = Array.isArray(airlinesData) ? airlinesData : [];
+const logoFiles = fs.existsSync(AIRLINE_LOGOS_DIR)
+  ? fs.readdirSync(AIRLINE_LOGOS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => path.basename(entry.name, path.extname(entry.name)).toUpperCase())
+  : [];
+const airlineIcaos = airlineRows.map((row) => String(row?.ICAO || "").trim().toUpperCase()).filter(Boolean);
+const missingLogos = airlineIcaos.filter((icao) => !logoFiles.includes(icao));
+const intentionalOrphanLogos = new Set(["DAL-H", "NCA", "NEH", "PAN-H"]);
+const orphanLogos = logoFiles.filter((icao) => !airlineIcaos.includes(icao) && !intentionalOrphanLogos.has(icao));
+
+console.log(`[aircraft-data] Airlines: ${airlineRows.length}`);
+console.log(`[aircraft-data] Airline logos: ${logoFiles.length}`);
+if (missingLogos.length) {
+  console.warn(
+    `[aircraft-data] ${missingLogos.length} airlines do not have a matching logo file.`
+  );
+}
+if (orphanLogos.length) {
+  console.warn(`[aircraft-data] ${orphanLogos.length} logo files are not mapped to an airline row.`);
+}
+
+console.log("[aircraft-data] Audit complete.");

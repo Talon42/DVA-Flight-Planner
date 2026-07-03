@@ -1,4 +1,4 @@
-import aircraftProfilesData from "../../data/aircraft_profiles.json";
+import aircraftCatalogData from "../../data/aircraft_catalog.json";
 import {
   buildGroupedAircraftSelectOptions,
   inferAircraftManufacturer,
@@ -33,7 +33,9 @@ function ensureAircraftCatalogLoaded() {
     return;
   }
 
-  const aircraftProfileRows = Array.isArray(aircraftProfilesData) ? aircraftProfilesData : [];
+  const aircraftProfileRows = Array.isArray(aircraftCatalogData.aircraftCatalog)
+    ? aircraftCatalogData.aircraftCatalog.filter((row) => row?.kind === "profile" || row?.aircraftProfile)
+    : [];
 
   aircraftCatalog = aircraftProfileRows.map((row) => ({
     equipmentType: String(row["Aircraft Profile"] || "").trim().toUpperCase(),

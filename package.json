@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 1420",
     "build:vatsim-boundaries": "node scripts/build-vatsim-boundary-catalog.mjs",
+    "audit:data": "node scripts/audit-aircraft-data.mjs",
+    "audit:aircraft": "node scripts/audit-aircraft-data.mjs",
     "lint:airports": "node scripts/audit-airport-timezone-labels.mjs",
     "build": "vite build",
     "lint": "eslint . --cache --cache-location .eslintcache",

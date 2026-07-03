@@ -1,9 +1,7 @@
 import { DateTime } from "luxon";
 import airlinesData from "../../data/airlines.json";
 import airportsData from "../../data/airports.json";
-import aircraftProfilesData from "../../data/aircraft_profiles.json";
-import aircraftFamilyData from "../../data/aircraft_family.json";
-import equipmentTypeData from "../../data/equipment_type.json";
+import aircraftCatalogData from "../../data/aircraft_catalog.json";
 import { normalizeEquipmentTypeValue, unwrapEquipmentTypeRows } from "../../domain/aircraft/equipmentTypes.js";
 
 const DATE_FORMAT = "MM/dd/yyyy HH:mm";
@@ -57,10 +55,12 @@ function normalizeReferenceRows(rows, preferredKeys = []) {
 
 const airlineRows = Array.isArray(airlinesData) ? airlinesData : [];
 const airportRows = airportsData.airports || [];
-const aircraftProfileRows = Array.isArray(aircraftProfilesData) ? aircraftProfilesData : [];
+const aircraftProfileRows = Array.isArray(aircraftCatalogData.aircraftCatalog)
+  ? aircraftCatalogData.aircraftCatalog.filter((row) => row?.kind === "profile" || row?.aircraftProfile)
+  : [];
 
-const aircraftFamilies = normalizeReferenceRows(aircraftFamilyData, ["eq_type"]);
-const equipmentTypes = unwrapEquipmentTypeRows(equipmentTypeData)
+const aircraftFamilies = normalizeReferenceRows(aircraftCatalogData.aircraftFamilies, ["eq_type"]);
+const equipmentTypes = unwrapEquipmentTypeRows(aircraftCatalogData.equipmentTypes)
   .map((row) => normalizeEquipmentTypeValue(row))
   .filter(Boolean);
 
