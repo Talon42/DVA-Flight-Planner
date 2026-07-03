@@ -71,3 +71,8 @@ export function buildFooterDateLabel(dateIso) {
   const date = DateTime.fromISO(String(dateIso || ""));
   return date.isValid ? date.toFormat("MMMM d") : "--";
 }
+
+export function buildFooterDateTimeLabel(dateIso) {
+  const date = DateTime.fromISO(String(dateIso || ""));
+  return date.isValid ? date.toLocal().toFormat("MMM d, h:mm a") : "--";
+}

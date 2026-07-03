@@ -302,13 +302,14 @@ export async function readDeltaVirtualLogbookMetadata() {
 
 export async function readDeltaVirtualLogbookProgress() {
   if (!isTauriRuntime()) {
-    return { dateIso: null, visitedAirports: [], arrivalAirports: [] };
+    return { dateIso: null, lastSyncAt: null, visitedAirports: [], arrivalAirports: [] };
   }
 
   try {
     const result = await invokeAppCommand("read_deltava_logbook_progress");
     return {
       dateIso: result?.dateIso ?? result?.date_iso ?? null,
+      lastSyncAt: result?.lastSyncAt ?? result?.last_sync_at ?? null,
       visitedAirports: Array.isArray(result?.visitedAirports ?? result?.visited_airports)
         ? result?.visitedAirports ?? result?.visited_airports
         : [],
@@ -317,7 +318,7 @@ export async function readDeltaVirtualLogbookProgress() {
         : []
     };
   } catch {
-    return { dateIso: null, visitedAirports: [], arrivalAirports: [] };
+    return { dateIso: null, lastSyncAt: null, visitedAirports: [], arrivalAirports: [] };
   }
 }
 

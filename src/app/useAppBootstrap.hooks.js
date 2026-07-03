@@ -556,6 +556,7 @@ export function useAppBootstrap({
           setLogbookAirportProgress(
             logbookProgressResult.value || {
               dateIso: null,
+              lastSyncAt: null,
               visitedAirports: [],
               arrivalAirports: []
             }

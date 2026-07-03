@@ -101,6 +101,7 @@ import {
 import { DEFAULT_DERIVED_TOUR_PROGRESS } from "../features/tours/tours.constants";
 import {
   buildFooterDateLabel,
+  buildFooterDateTimeLabel,
   buildScheduleDateInfo
 } from "../domain/schedule/scheduleDate";
 
@@ -250,6 +251,7 @@ export default function App() {
   const [, setStatusMessage] = useState("Ready");
   const [logbookAirportProgress, setLogbookAirportProgress] = useState({
     dateIso: null,
+    lastSyncAt: null,
     visitedAirports: [],
     arrivalAirports: []
   });
@@ -502,7 +504,8 @@ export default function App() {
   const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
   const isScheduleOutOfDate = Boolean(schedule?.flights?.length) && scheduleDateInfo.isCurrent === false;
   const scheduleDateLabel = scheduleDateInfo.label;
-  const logbookDateLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
+  const logbookLastReportLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
+  const logbookLastSyncLabel = buildFooterDateTimeLabel(logbookAirportProgress.lastSyncAt);
   // Tracks which rows are already assigned to any board so the schedule tables only show available work.
   const boardedFlightIds = useMemo(
     () =>
@@ -539,7 +542,8 @@ export default function App() {
           label: "Imported Flights",
           value: formatNumber(schedule.importSummary.importedRows ?? 0)
         },
-        { kind: "stat", label: "Logbook (Last Flight Report)", value: logbookDateLabel }
+        { kind: "stat", label: "Logbook Sync", value: logbookLastSyncLabel },
+        { kind: "stat", label: "Last Flight Report", value: logbookLastReportLabel }
       ]
     : [];
   const tourSelection = useTourSelection({
@@ -1738,7 +1742,12 @@ export default function App() {
       setSimBriefCustomAirframesDraft([]);
       setSimBriefCustomAirframeIdDraft("");
       setSimBriefCustomAirframeMatchTypeDraft("");
-      setLogbookAirportProgress({ dateIso: null, visitedAirports: [], arrivalAirports: [] });
+      setLogbookAirportProgress({
+        dateIso: null,
+        lastSyncAt: null,
+        visitedAirports: [],
+        arrivalAirports: []
+      });
       setDeltaVirtualAccomplishmentEligibility({ lastSyncAt: null, sourceUrl: null, rows: [] });
       handleSetMapOptions(DEFAULT_MAP_OPTIONS);
       setSimBriefDispatchState({

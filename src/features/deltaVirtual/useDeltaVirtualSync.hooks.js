@@ -18,6 +18,23 @@ import {
   syncDeltaVirtualTours,
   syncScheduleFromDeltaVirtual
 } from "../../services/tauri/deltaVirtual.client.js";
+import { buildScheduleDateInfo } from "../../domain/schedule/scheduleDate.js";
+
+const DELTA_VIRTUAL_SYNC_FAILURE_GUIDANCE =
+  "Delta Virtual Sync failed. Please check your Delta Virtual credentials, try again later, or post the app log on the DVA forums.";
+
+// Shows one consistent recovery message for failed or stale Delta Virtual schedule syncs.
+function showDeltaVirtualSyncFailureWarning(setStatusMessage, setDvaSyncWarning, detail = "") {
+  setStatusMessage?.(DELTA_VIRTUAL_SYNC_FAILURE_GUIDANCE);
+  setDvaSyncWarning?.({
+    kind: "sync_failed",
+    title: "Delta Virtual Sync failed.",
+    message: DELTA_VIRTUAL_SYNC_FAILURE_GUIDANCE,
+    detail,
+    primaryAction: "open_delta_virtual_settings",
+    primaryLabel: "Open Delta Virtual Settings"
+  });
+}
 
 // Owns the Delta Virtual sync workflow so App.jsx can keep the shell and settings wiring thin.
 export function useDeltaVirtualSync({
@@ -151,6 +168,7 @@ export function useDeltaVirtualSync({
         bytes: syncedFile.xmlText?.length || 0,
         logbookJson: syncedFile.logbookJson?.fileName || null,
         warningCount: Array.isArray(syncedFile.warnings) ? syncedFile.warnings.length : 0,
+        warning: Array.isArray(syncedFile.warnings) ? syncedFile.warnings[0] || null : null,
         durationMs: Math.max(
           0,
           Math.round(
@@ -159,7 +177,41 @@ export function useDeltaVirtualSync({
         )
       });
       setStatusMessage?.("Processing Delta Virtual schedule...");
-      await processImportedSchedule?.(syncedFile, "deltava-sync");
+      const importResult = await processImportedSchedule?.(syncedFile, "deltava-sync");
+      if (importResult?.ok === false) {
+        showDeltaVirtualSyncFailureWarning(
+          setStatusMessage,
+          setDvaSyncWarning,
+          "The downloaded schedule could not be imported, so the footer schedule date was not updated."
+        );
+        await logSystemError(
+          "DVA Sync",
+          "failed",
+          importResult.error || new Error("Delta Virtual schedule import failed."),
+          { syncRunId, stage: "schedule-import" }
+        );
+        return;
+      }
+
+      const importedScheduleDateInfo = buildScheduleDateInfo(importResult?.schedule?.flights || []);
+      if (importedScheduleDateInfo.isCurrent === false) {
+        showDeltaVirtualSyncFailureWarning(
+          setStatusMessage,
+          setDvaSyncWarning,
+          `The downloaded schedule still shows ${importedScheduleDateInfo.label}, so the footer schedule date did not update to the current DVA schedule.`
+        );
+        await logSystemError(
+          "DVA Sync",
+          "failed",
+          new Error("Delta Virtual schedule date did not update."),
+          {
+            syncRunId,
+            stage: "schedule-date",
+            scheduleDate: importedScheduleDateInfo.label
+          }
+        );
+        return;
+      }
       onScheduleSyncComplete?.();
       setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());
       onLogbookSyncComplete?.();
@@ -228,16 +280,7 @@ export function useDeltaVirtualSync({
           reason: "cancelled"
         });
       } else if (error?.kind === "auth_failed") {
-        const message =
-          "Delta Virtual Sync failed. Please check that your First Name, Last Name, and Password are correct, then try again.";
-        setStatusMessage?.(message);
-        setDvaSyncWarning?.({
-          kind: "auth_failed",
-          title: "Delta Virtual Sync failed.",
-          message,
-          primaryAction: "open_delta_virtual_settings",
-          primaryLabel: "Open Delta Virtual Settings"
-        });
+        showDeltaVirtualSyncFailureWarning(setStatusMessage, setDvaSyncWarning);
         await logSystemError("DVA Sync", "failed", error, {
           syncRunId,
           reason: "auth_failed",
@@ -248,12 +291,17 @@ export function useDeltaVirtualSync({
         onLogbookSyncComplete?.();
         await reloadAccomplishmentEligibility();
         await refreshSavedCredentials();
-        setStatusMessage?.(error.message || "Delta Virtual sync partially completed.");
+        showDeltaVirtualSyncFailureWarning(
+          setStatusMessage,
+          setDvaSyncWarning,
+          error.message || "The logbook was saved, but the schedule download failed."
+        );
         await logSystemEvent("DVA Sync", "succeeded", {
           syncRunId,
           partial: true,
           logbookJson: error.syncResult?.logbookJson?.fileName || null,
           warningCount: Array.isArray(error.syncResult?.warnings) ? error.syncResult.warnings.length : 0,
+          warning: Array.isArray(error.syncResult?.warnings) ? error.syncResult.warnings[0] || null : null,
           durationMs: Math.max(
             0,
             Math.round(
@@ -262,15 +310,11 @@ export function useDeltaVirtualSync({
           )
         });
       } else {
-        const message = error?.message || "Delta Virtual sync failed.";
-        setStatusMessage?.(message);
-        setDvaSyncWarning?.({
-          kind: "sync_failed",
-          title: "Delta Virtual Sync failed.",
-          message,
-          primaryAction: "open_delta_virtual_settings",
-          primaryLabel: "Open Delta Virtual Settings"
-        });
+        showDeltaVirtualSyncFailureWarning(
+          setStatusMessage,
+          setDvaSyncWarning,
+          error?.message || ""
+        );
         await logSystemError("DVA Sync", "failed", error, {
           syncRunId,
           stage: "unknown"

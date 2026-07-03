@@ -305,6 +305,7 @@ export function useScheduleImport({
           durationMs: Date.now() - startedAtMs
         });
         onScheduleImported?.(imported, nextSchedule);
+        return { ok: true, imported, schedule: nextSchedule };
       } catch (error) {
         setStatusMessage?.(error.message || "Import failed.");
         await logAppError("import-failed", error, {
@@ -312,6 +313,7 @@ export function useScheduleImport({
           file: scheduleFile.fileName,
           durationMs: Date.now() - startedAtMs
         });
+        return { ok: false, error };
       } finally {
         try {
           const sessionEndedAt = new Date().toISOString();

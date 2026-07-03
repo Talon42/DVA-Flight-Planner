@@ -20,8 +20,9 @@ use crate::services::deltava::{
     },
 };
 use crate::{append_sync_log, append_sync_log_debug, DELTAVA_SYNC_DOWNLOAD_FILE};
+use chrono::{DateTime, Utc};
 use serde_json::Value;
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{collections::BTreeSet, fs, path::Path, time::SystemTime};
 use tauri::{AppHandle, Manager};
 
 const WEBVIEW_ROOT_PRUNE_DIRS: &[&str] = &[
@@ -376,11 +377,17 @@ pub(crate) fn read_deltava_logbook_metadata(app: &AppHandle) -> crate::DeltaLogb
     crate::DeltaLogbookMetadata { date_iso }
 }
 
+fn system_time_to_iso(value: SystemTime) -> String {
+    let date_time: DateTime<Utc> = value.into();
+    date_time.to_rfc3339()
+}
+
 /// Reads visited and arrival airports from the newest Delta Virtual logbook file.
 pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogbookProgress {
     let Some(path) = resolve_existing_logbook_json_path(app) else {
         return crate::DeltaLogbookProgress {
             date_iso: None,
+            last_sync_at: None,
             visited_airports: Vec::new(),
             arrival_airports: Vec::new(),
         };
@@ -390,6 +397,7 @@ pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogb
         append_sync_log(&format!("logbook:progress-read-failed {}", path.display()));
         return crate::DeltaLogbookProgress {
             date_iso: None,
+            last_sync_at: None,
             visited_airports: Vec::new(),
             arrival_airports: Vec::new(),
         };
@@ -399,6 +407,7 @@ pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogb
         append_sync_log(&format!("logbook:progress-invalid-json {}", path.display()));
         return crate::DeltaLogbookProgress {
             date_iso: None,
+            last_sync_at: None,
             visited_airports: Vec::new(),
             arrival_airports: Vec::new(),
         };
@@ -416,6 +425,10 @@ pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogb
 
     crate::DeltaLogbookProgress {
         date_iso: extract_latest_logbook_date_iso(&json),
+        last_sync_at: fs::metadata(&path)
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .map(system_time_to_iso),
         visited_airports: visited_airports.into_iter().collect(),
         arrival_airports: arrival_airports.into_iter().collect(),
     }

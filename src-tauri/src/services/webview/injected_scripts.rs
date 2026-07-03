@@ -152,6 +152,10 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
       window.chrome.webview.postMessage(syncResultPrefix + JSON.stringify({ nonce, ...payload }));
     }
   };
+  const shouldTryScheduleFallback = (errorMessage) => {
+    const normalizedMessage = String(errorMessage || '').toLowerCase();
+    return !normalizedMessage.includes('exceeded the') && !normalizedMessage.includes('byte limit');
+  };
   const runSyncDownloads = async () => {
     if (window.__flightPlannerDeltaDownloadsPosted) {
       emitDebug('state:downloads-already-posted');
@@ -190,6 +194,12 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
         error: error?.message || 'Accomplishment eligibility download failed.'
       };
       emitDebug(`accomplishments:error:${payload.accomplishments.error}`);
+    }
+
+    if (!payload.xml.ok && window.location.href !== targetUrl && shouldTryScheduleFallback(payload.xml.error)) {
+      emitDebug(`xml:fallback-navigation:${targetUrl}`);
+      window.__flightPlannerDeltaDownloadsPosted = false;
+      return false;
     }
 
     postSyncResult(payload);

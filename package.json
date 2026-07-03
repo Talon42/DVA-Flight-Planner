@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.8.1-beta",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 1420",
     "build:vatsim-boundaries": "node scripts/build-vatsim-boundary-catalog.mjs",

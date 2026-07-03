@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub(crate) const MAX_DELTAVA_SCHEDULE_XML_BYTES: usize = 10 * 1024 * 1024;
+pub(crate) const MAX_DELTAVA_SCHEDULE_XML_BYTES: usize = 25 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_LOGBOOK_JSON_BYTES: usize = 25 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_LOGBOOK_PAGE_HTML_BYTES: usize = 5 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES: usize = 5 * 1024 * 1024;
@@ -44,6 +44,7 @@ pub(crate) struct DeltaLogbookMetadata {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeltaLogbookProgress {
     pub date_iso: Option<String>,
+    pub last_sync_at: Option<String>,
     pub visited_airports: Vec<String>,
     pub arrival_airports: Vec<String>,
 }
