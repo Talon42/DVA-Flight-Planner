@@ -4,6 +4,7 @@ import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName } from "../../components/ui/typography";
 import { nestedPanelFrameClassName } from "../../components/ui/patterns";
+import { getAirlinePrimaryColor } from "../../domain/airlines/airlineBranding.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getAircraftGlyphSources } from "../../domain/aircraft/aircraftGlyphs.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
@@ -14,6 +15,10 @@ import { buildLogbookPirepId, useVisibleLogbookPirepDetails } from "./useLogbook
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
 const TWO_COLUMN_TILE_VARIANTS = new Set(["records", "equipment-grid", "airline-grid"]);
+// Keeps the airline and equipment metric bands visually aligned across both tile families.
+const TILE_METRIC_NUMBER_CLASS_NAME = "m-0 leading-none text-[1.45rem] font-semibold tabular-nums text-[var(--text-heading)]";
+const TILE_METRIC_LABEL_CLASS_NAME = "m-0 text-[0.56rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]";
+const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]";
 
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
@@ -48,24 +53,45 @@ function RankingRow({ item, showProgressBar = true, showPercentValue = true }) {
   );
 }
 
-// Renders the airline summary as a compact two-column tile with a logo and bottom metric band.
+// Renders the airline summary as a logo-forward two-column tile with a subtle brand watermark.
 function AirlineTile({ item }) {
   const airlineCode = String(item?.meta || item?.row?.airlineCode || "").trim();
   const logoSrc = String(item?.row?.airlineLogoSrc || "").trim();
   const logoClassName = String(item?.row?.airlineLogoClassName || "").trim();
   const airlineName = String(item?.label || "").trim();
+  const brandColor = getAirlinePrimaryColor({
+    airlineName,
+    airlineIata: airlineCode,
+    airlineIcao: airlineCode
+  });
   const fallbackMark = airlineCode ? airlineCode.slice(0, 3).toUpperCase() : airlineName ? airlineName.slice(0, 2).toUpperCase() : "?";
 
   return (
-    <div className="flex min-h-[5.85rem] flex-col overflow-hidden border border-[color:var(--line)] bg-[var(--surface)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
-      <div className="flex min-h-0 flex-1 items-start gap-2 px-2 py-2">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+    <div
+      className="relative isolate flex min-h-[7.25rem] flex-col overflow-hidden border border-[color:var(--line)] bg-[var(--surface)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]"
+      style={{ "--airline-accent-color": brandColor }}
+    >
+      {logoSrc ? (
+        <img
+          src={logoSrc}
+          alt=""
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute left-2 top-1/2 h-24 w-24 -translate-y-1/2 object-contain opacity-[0.0675]",
+            logoClassName
+          )}
+          loading="lazy"
+        />
+      ) : null}
+
+      <div className="relative flex min-h-0 flex-1 items-center gap-3 px-3 py-3">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center">
           {logoSrc ? (
-            <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-10 w-10 object-contain", logoClassName)} loading="lazy" />
+            <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-14 w-14 object-contain", logoClassName)} loading="lazy" />
           ) : (
             <span
               className={cn(
-                "inline-flex h-10 w-10 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] px-1 text-center text-[0.78rem] font-semibold uppercase text-[var(--text-heading)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)] dark:text-white",
+                "inline-flex h-14 w-14 items-center justify-center px-1 text-center text-[0.8rem] font-semibold uppercase text-[var(--text-heading)] dark:text-white",
                 bodyMdTextClassName
               )}
             >
@@ -75,23 +101,26 @@ function AirlineTile({ item }) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{airlineName || LOGBOOK_EMPTY_VALUE}</p>
-          {airlineCode ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{airlineCode}</p> : null}
+          <p className={cn("m-0 truncate font-semibold text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
+            {airlineName || LOGBOOK_EMPTY_VALUE}
+          </p>
+          {airlineCode ? (
+            <div className="mt-0.5 flex min-w-0 flex-col items-start">
+              <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{airlineCode}</p>
+              <div className="mt-1 h-0.5 w-6 shrink-0 bg-[var(--airline-accent-color)]" />
+            </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--line)] bg-[var(--surface-raised)] px-2 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]">
+      <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--line)] bg-[var(--surface-raised)] px-3 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]">
         <div className="min-w-0">
-          <p className="m-0 leading-none text-[1.45rem] font-semibold tabular-nums text-[var(--text-heading)]">{item?.value}</p>
-          <p className={cn("m-0 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]", bodyMdTextClassName)}>
-            FLIGHTS
-          </p>
+          <p className={TILE_METRIC_NUMBER_CLASS_NAME}>{item?.value}</p>
+          <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>FLIGHTS</p>
         </div>
         <div aria-hidden="true" />
         {item?.percentValue ? (
-          <p className={cn("m-0 text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]", bodyMdTextClassName)}>
-            {item.percentValue}
-          </p>
+          <p className={cn(TILE_METRIC_PERCENT_CLASS_NAME, bodyMdTextClassName)}>{item.percentValue}</p>
         ) : (
           <span aria-hidden="true" />
         )}
@@ -567,16 +596,12 @@ function EquipmentTile({ item }) {
 
       <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--line)] bg-[var(--surface-raised)] px-2 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]">
         <div className="min-w-0">
-          <p className="m-0 leading-none text-[1.6rem] font-semibold tabular-nums text-[var(--text-heading)]">{item?.value}</p>
-          <p className={cn("m-0 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]", bodyMdTextClassName)}>
-            FLIGHTS
-          </p>
+          <p className={TILE_METRIC_NUMBER_CLASS_NAME}>{item?.value}</p>
+          <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>FLIGHTS</p>
         </div>
         <div aria-hidden="true" />
         {item?.percentValue ? (
-          <p className={cn("m-0 text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]", bodyMdTextClassName)}>
-            {item.percentValue}
-          </p>
+          <p className={cn(TILE_METRIC_PERCENT_CLASS_NAME, bodyMdTextClassName)}>{item.percentValue}</p>
         ) : (
           <span aria-hidden="true" />
         )}

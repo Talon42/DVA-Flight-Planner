@@ -152,6 +152,7 @@ export function getEstimatedPilotStatsRowHeight(variant) {
     case "records":
       return 56;
     case "airline-grid":
+      return 96;
     case "equipment-grid":
       return 84;
     case "ranking":
