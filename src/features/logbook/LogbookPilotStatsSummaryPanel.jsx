@@ -33,7 +33,7 @@ function TileMetricBand({ value, percentValue, paddingClassName = "px-3", classN
   return (
     <div
       className={cn(
-        "grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--surface-border)] bg-[var(--surface-soft)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]",
+        "h-11 shrink-0 grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--surface-border)] bg-[var(--surface-soft)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]",
         paddingClassName,
         className
       )}
@@ -440,11 +440,10 @@ export default function LogbookPilotStatsSummaryPanel({
     }
 
     const bodyNode = bodyRef.current;
-    const measureShellNode = measureShellRef.current;
     const measureNode = measureRef.current;
     const candidateCount = Math.min(maxRows, rowItems.length);
 
-    if (!bodyNode || !measureShellNode || !measureNode || typeof ResizeObserver === "undefined") {
+    if (!bodyNode || !measureNode || typeof ResizeObserver === "undefined") {
       const fallbackFitItems = getFallbackPilotStatsFitCount({
         bodyHeight: bodyNode?.clientHeight || 0,
         variant,
@@ -501,8 +500,6 @@ export default function LogbookPilotStatsSummaryPanel({
     scheduleUpdate();
     const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(bodyNode);
-    observer.observe(measureShellNode);
-    observer.observe(measureNode);
 
     return () => {
       if (rafIdRef.current) {
@@ -523,7 +520,7 @@ export default function LogbookPilotStatsSummaryPanel({
         className
       )}
     >
-      <div className="flex min-w-0 items-center justify-between gap-2">
+      <div className="flex min-w-0 shrink-0 items-center justify-between gap-2">
         <p className={cn("m-0 min-w-0 flex-1 truncate text-[var(--text-heading)] font-semibold uppercase tracking-[0.12em]", bodyMdTextClassName)}>{title}</p>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {onViewAll ? (
