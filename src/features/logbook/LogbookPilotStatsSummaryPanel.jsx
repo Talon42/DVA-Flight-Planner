@@ -21,7 +21,7 @@ const TILE_METRIC_LABEL_CLASS_NAME = "m-0 text-[0.32rem] tracking-[0.14em] text-
 const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]";
 // Gives the airline and equipment tiles a shared frame treatment in light mode while preserving the dark look.
 const TILE_STAT_FRAME_CLASS_NAME =
-  "relative isolate flex min-h-[7.25rem] flex-col overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
+  "relative isolate grid min-h-[7.25rem] grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
 
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
@@ -108,7 +108,7 @@ function AirlineTile({ item }) {
         />
       ) : null}
 
-      <div className="relative flex min-h-0 flex-1 items-center gap-3 px-3 py-3">
+      <div className="relative flex min-h-0 items-center gap-3 px-3 py-3">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center">
           {logoSrc ? (
             <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-14 w-14 object-contain", logoClassName)} loading="lazy" />
@@ -341,7 +341,7 @@ export default function LogbookPilotStatsSummaryPanel({
   const measureShellRef = useRef(null);
   const measureRef = useRef(null);
   const [fitItems, setFitItems] = useState(maxRows);
-  const rafIdRef = useRef(0);
+  const resizeTimeoutRef = useRef(0);
   const rowItems = Array.isArray(items) ? items : [];
   const departureAirportItems = Array.isArray(departureItems) ? departureItems : [];
   const arrivalAirportItems = Array.isArray(arrivalItems) ? arrivalItems : [];
@@ -487,24 +487,24 @@ export default function LogbookPilotStatsSummaryPanel({
     };
 
     const scheduleUpdate = () => {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
       }
 
-      rafIdRef.current = requestAnimationFrame(() => {
-        rafIdRef.current = 0;
+      resizeTimeoutRef.current = window.setTimeout(() => {
+        resizeTimeoutRef.current = 0;
         updateFitItems();
-      });
+      }, 100);
     };
 
-    scheduleUpdate();
+    updateFitItems();
     const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(bodyNode);
 
     return () => {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = 0;
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+        resizeTimeoutRef.current = 0;
       }
 
       observer.disconnect();
@@ -589,7 +589,7 @@ function EquipmentTile({ item }) {
 
   return (
     <div className={TILE_STAT_FRAME_CLASS_NAME}>
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2">
+      <div className="flex min-h-0 flex-col items-center justify-center gap-1 px-2 py-2">
         <div className="flex h-12 w-12 items-center justify-center">
           {glyphSources ? (
             <LogbookEquipmentGlyph equipment={label} className="h-11 w-11" />
