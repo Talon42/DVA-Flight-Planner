@@ -125,6 +125,11 @@ function KpiGlyph({ cardId }) {
   }
 }
 
+const kpiEyebrowTextClassName = "text-[clamp(0.52rem,0.44rem+0.12vw,0.66rem)]";
+const kpiValueTextClassName = "text-[clamp(0.98rem,0.82rem+0.22vw,1.2rem)]";
+const kpiLandingRateValueTextClassName = "text-[clamp(0.98rem,0.82rem+0.18vw,1.14rem)]";
+const kpiBadgeTextClassName = "text-[clamp(0.54rem,0.49rem+0.06vw,0.6rem)]";
+
 function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "" }) {
   const hasBadge = Boolean(card.badge);
 
@@ -135,7 +140,7 @@ function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "
           <KpiGlyph cardId={card.id} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate text-[0.52rem] font-semibold uppercase tracking-[0.12em]", labelToneClassName)}>
+          <p className={cn("m-0 truncate font-semibold uppercase tracking-[0.12em]", kpiEyebrowTextClassName, labelToneClassName)}>
             {card.label}
           </p>
           <div className="mt-1 flex min-w-0 flex-nowrap items-center gap-2">
@@ -144,13 +149,13 @@ function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "
                 "m-0 min-w-0 flex-1 truncate font-semibold leading-[1.05] tracking-[0]",
                 valueToneClassName,
                 hasBadge
-                  ? "flex-none shrink-0 whitespace-nowrap text-[0.98rem] bp-1400:text-[1.06rem]"
-                  : "min-w-0 flex-1 truncate text-[0.98rem] bp-1400:text-[1.06rem]"
+                  ? cn("flex-none shrink-0 whitespace-nowrap", kpiLandingRateValueTextClassName)
+                  : cn("min-w-0 flex-1 truncate", kpiValueTextClassName)
               )}
             >
               {card.value}
             </p>
-            {card.badge ? <LandingGradeBadge grade={card.badge} className="h-5 w-auto min-w-[4.2rem] shrink-0 px-2 text-[0.54rem]" /> : null}
+            {card.badge ? <LandingGradeBadge grade={card.badge} className={cn("h-5 w-auto min-w-[4.2rem] shrink-0 px-2", kpiBadgeTextClassName)} /> : null}
           </div>
           {card.delta ? (
             <p
