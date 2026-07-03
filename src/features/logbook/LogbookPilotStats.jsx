@@ -55,7 +55,7 @@ export default function LogbookPilotStats({
                       arrivalItems={card.arrivalItems}
                       variant={card.variant}
                       maxRows={card.maxRows}
-                      autoFitRows={false}
+                      autoFitRows={card.autoFitRows ?? true}
                       showProgressBar={card.key !== "equipment"}
                       onViewAll={card.hasData ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
                       className={cn(card.spanClassName, card.cardClassName)}

@@ -104,7 +104,7 @@ function buildLandingLocationLabel(item, pirepDetails) {
   const formattedArrivalRunway = arrivalRunway ? `RW${arrivalRunway}` : "";
 
   if (arrivalAirport && formattedArrivalRunway) {
-    return `${arrivalAirport} • ${formattedArrivalRunway}`;
+    return `${arrivalAirport}\u00A0\u00A0\u2022\u00A0\u00A0${formattedArrivalRunway}`;
   }
 
   return arrivalAirport || item?.meta || LOGBOOK_EMPTY_VALUE;
@@ -509,7 +509,7 @@ export default function LogbookPilotStatsSummaryPanel({
         </div>
       </div>
 
-      <div ref={bodyRef} className="relative min-h-0 overflow-hidden">
+      <div ref={bodyRef} className="relative min-h-0 flex-1 overflow-hidden">
         {hasAirportColumns ? (
           <div className="grid min-h-0 grid-cols-2 divide-x divide-[color:var(--line)]">
             {renderAirportColumns("Departure", departureRows)}
@@ -561,13 +561,13 @@ function EquipmentTile({ item }) {
   const fallbackMark = getEquipmentFallbackMark(label);
 
   return (
-    <div className="flex min-h-[8.5rem] flex-col overflow-hidden border border-[color:var(--line)] bg-[var(--surface)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
+    <div className="flex min-h-[7.25rem] flex-col overflow-hidden border border-[color:var(--line)] bg-[var(--surface)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2">
-        <div className="flex h-16 w-16 items-center justify-center">
+        <div className="flex h-12 w-12 items-center justify-center">
           {glyphSources ? (
-            <LogbookEquipmentGlyph equipment={label} className="h-14 w-14" />
+            <LogbookEquipmentGlyph equipment={label} className="h-11 w-11" />
           ) : (
-            <span className="inline-flex h-14 w-14 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[0.95rem] font-semibold uppercase text-[var(--text-heading)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)] dark:text-white">
+            <span className="inline-flex h-11 w-11 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[0.95rem] font-semibold uppercase text-[var(--text-heading)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)] dark:text-white">
               {fallbackMark}
             </span>
           )}

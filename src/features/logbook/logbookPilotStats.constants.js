@@ -15,7 +15,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "airlines",
     variant: "airline",
     dataKey: "airlines",
-    maxRows: 6,
+    maxRows: 10,
     cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
@@ -26,7 +26,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "equipment",
     variant: "equipment-grid",
     dataKey: "equipment",
-    maxRows: 6,
+    maxRows: 10,
     cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
@@ -37,7 +37,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "recent-landings",
     variant: "landing",
     dataKey: "recentLandings",
-    maxRows: 6,
+    maxRows: 10,
     cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
@@ -48,7 +48,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "top-airports",
     variant: "airport",
     dataKey: "topAirports",
-    maxRows: 6,
+    maxRows: 10,
     cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
@@ -59,7 +59,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "routes",
     variant: "route",
     dataKey: "routes",
-    maxRows: 6,
+    maxRows: 10,
     cardClassName: "min-h-[16rem]",
     spanClassName: "col-span-1"
   }),
@@ -152,7 +152,7 @@ export function getEstimatedPilotStatsRowHeight(variant) {
     case "records":
       return 56;
     case "equipment-grid":
-      return 92;
+      return 84;
     case "ranking":
     default:
       return 56;
