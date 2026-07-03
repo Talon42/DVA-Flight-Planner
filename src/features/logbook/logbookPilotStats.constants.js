@@ -1,5 +1,5 @@
 export const DEFAULT_PILOT_STATS_COMPARISON_PERIOD = "off";
-export const PILOT_STATS_SUMMARY_CARD_CLASS_NAME = "min-h-[14rem]";
+export const PILOT_STATS_SUMMARY_CARD_CLASS_NAME = "min-h-[12rem]";
 
 const STATIC_PILOT_STATS_COMPARISON_OPTIONS = Object.freeze([
   { value: "off", label: "All" },
