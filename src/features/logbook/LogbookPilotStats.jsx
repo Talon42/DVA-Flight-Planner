@@ -24,7 +24,7 @@ export default function LogbookPilotStats({
   const dashboardCards = useMemo(() => getPilotStatsDashboardCards(displayStats), [displayStats]);
 
   return (
-    <div className="logbook-pilot-stats flex h-full min-h-0 flex-col gap-3 overflow-hidden px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
+    <div className="logbook-pilot-stats flex h-full min-h-0 flex-col gap-3 overflow-hidden pb-2 pt-0 bp-1024:pb-2">
       {summary ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           <LogbookPilotStatsHero
