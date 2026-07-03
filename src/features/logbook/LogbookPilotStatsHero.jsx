@@ -165,7 +165,7 @@ const kpiBadgeTextClassName = "text-[clamp(0.56rem,0.51rem+0.08vw,0.64rem)]";
 const kpiCompactDividerClassName =
   "pointer-events-none absolute left-3 right-3 top-1/2 hidden h-px bg-[color:rgba(15,35,58,0.10)] bp-1024:block bp-1400:hidden dark:bg-white/10";
 const kpiCompactColumnDividerClassName =
-  "bp-1024:pr-3 bp-1024:after:pointer-events-none bp-1024:after:absolute bp-1024:after:inset-y-2 bp-1024:after:right-0 bp-1024:after:w-px bp-1024:after:content-[''] bp-1024:after:bg-[color:rgba(15,35,58,0.18)] dark:bp-1024:after:bg-white/15";
+  "bp-1024:pr-3 bp-1024:after:pointer-events-none bp-1024:after:absolute bp-1024:after:inset-y-2 bp-1024:after:right-0 bp-1024:after:w-px bp-1024:after:content-[''] bp-1024:after:bg-[color:rgba(15,35,58,0.18)] bp-1400:after:content-none dark:bp-1024:after:bg-white/15";
 
 function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "" }) {
   const hasBadge = Boolean(card.badge);
