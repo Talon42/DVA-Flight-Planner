@@ -11,6 +11,8 @@ const darkGlyphModules = import.meta.glob("../../data/images/aircraft-glyphs/dar
 });
 
 const FAMILY_GLYPH_ALIASES = new Map([
+  ["A318", "A320"],
+  ["A319", "A320"],
   ["CONC", "CONCORDE"],
   ["DO328JET", "DO328"],
   ["MARTIN4", "MARTIN404"],

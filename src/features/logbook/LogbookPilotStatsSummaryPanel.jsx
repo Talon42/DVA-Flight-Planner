@@ -5,6 +5,7 @@ import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName } from "../../components/ui/typography";
 import { nestedPanelFrameClassName } from "../../components/ui/patterns";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
+import { getAircraftGlyphSources } from "../../domain/aircraft/aircraftGlyphs.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
@@ -225,6 +226,29 @@ function getMeasuredPilotStatsFitCount({
     return Math.max(1, Math.min(safeItemCount, fittedVisualRows * 2));
   }
 
+  if (variant === "equipment-grid") {
+    let fittedVisualRows = 0;
+    let usedTiles = 0;
+    let consumedHeight = 0;
+
+    while (usedTiles < measuredHeights.length && fittedVisualRows < safeMaxRows) {
+      const firstTileHeight = measuredHeights[usedTiles] || 0;
+      const secondTileHeight = measuredHeights[usedTiles + 1];
+      const rowHeight = Math.max(firstTileHeight, Number.isFinite(secondTileHeight) ? secondTileHeight : firstTileHeight);
+      const nextHeight = consumedHeight + (fittedVisualRows > 0 ? safeRowGap : 0) + rowHeight;
+
+      if (nextHeight > safeBodyHeight) {
+        break;
+      }
+
+      consumedHeight = nextHeight;
+      fittedVisualRows += 1;
+      usedTiles += 2;
+    }
+
+    return Math.max(1, Math.min(safeItemCount, fittedVisualRows * 2));
+  }
+
   let fittedRows = 0;
   let consumedHeight = 0;
 
@@ -253,6 +277,10 @@ function getFallbackPilotStatsFitCount({ bodyHeight, variant, maxRows, itemCount
 
   const estimatedRowHeight = getEstimatedPilotStatsRowHeight(variant);
   const estimatedRows = Math.max(1, Math.floor(safeBodyHeight / estimatedRowHeight));
+
+  if (variant === "equipment-grid") {
+    return Math.max(1, Math.min(safeItemCount, safeMaxRows, estimatedRows * 2));
+  }
 
   return Math.max(1, Math.min(safeItemCount, safeMaxRows, estimatedRows));
 }
@@ -303,14 +331,16 @@ export default function LogbookPilotStatsSummaryPanel({
       <AirportRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
     ) : variant === "route" ? (
       <RouteRow key={`${item?.label || item?.value || "route"}-${index}`} item={item} />
-      ) : (
-        <RankingRow
-          key={`${item?.label || item?.value || "ranking"}-${index}`}
-          item={item}
-          showProgressBar={showProgressBar}
-          leadingGlyphLabel={variant === "ranking" ? item?.label : ""}
-        />
-      );
+    ) : variant === "equipment-grid" ? (
+      <EquipmentTile key={`${item?.label || item?.value || "equipment"}-${index}`} item={item} />
+    ) : (
+      <RankingRow
+        key={`${item?.label || item?.value || "ranking"}-${index}`}
+        item={item}
+        showProgressBar={showProgressBar}
+        leadingGlyphLabel={variant === "ranking" ? item?.label : ""}
+      />
+    );
   }
 
   function renderRows(rowItemsToRender, { containerRef = null } = {}) {
@@ -331,6 +361,16 @@ export default function LogbookPilotStatsSummaryPanel({
               />
             );
           })}
+        </div>
+      );
+    }
+
+    if (variant === "equipment-grid") {
+      return (
+        <div ref={containerRef} className="grid grid-cols-2 gap-2">
+          {safeRowItems.map((item, index) => (
+            <EquipmentTile key={`${item?.label || item?.value || "equipment"}-${index}`} item={item} />
+          ))}
         </div>
       );
     }
@@ -497,5 +537,53 @@ export default function LogbookPilotStatsSummaryPanel({
         )}
       </div>
     </Panel>
+  );
+}
+
+function getEquipmentFallbackMark(label) {
+  const safeLabel = String(label || "").trim();
+
+  if (!safeLabel) {
+    return "?";
+  }
+
+  const initials = safeLabel
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((token) => token[0] || "")
+    .join("")
+    .toUpperCase();
+
+  return initials || safeLabel.slice(0, 2).toUpperCase() || "?";
+}
+
+// Renders the equipment summary as a compact tile with the glyph above the label and stats below.
+function EquipmentTile({ item }) {
+  const label = String(item?.label || "").trim();
+  const glyphSources = getAircraftGlyphSources(label);
+  const fallbackMark = getEquipmentFallbackMark(label);
+
+  return (
+    <div className="flex min-h-[8.5rem] flex-col justify-between border border-[color:var(--line)] bg-[var(--surface)] px-2 py-2.5 text-center shadow-[0_1px_0_rgba(0,0,0,0.03)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1">
+        <div className="flex h-16 w-16 items-center justify-center">
+          {glyphSources ? (
+            <LogbookEquipmentGlyph equipment={label} className="h-14 w-14" />
+          ) : (
+            <span className="inline-flex h-14 w-14 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[0.95rem] font-semibold uppercase text-[var(--text-heading)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)] dark:text-white">
+              {fallbackMark}
+            </span>
+          )}
+        </div>
+        <p className={cn("m-0 w-full truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
+          {label || LOGBOOK_EMPTY_VALUE}
+        </p>
+      </div>
+
+      <div className="flex min-h-0 flex-col items-center gap-0.5">
+        <p className={cn("m-0 text-[var(--text-heading)] tabular-nums", bodyMdTextClassName)}>{item?.value}</p>
+      </div>
+    </div>
   );
 }

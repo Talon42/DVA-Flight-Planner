@@ -24,7 +24,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     dashboardOrder: 20,
     title: "Flights by Equipment",
     detailView: "equipment",
-    variant: "ranking",
+    variant: "equipment-grid",
     dataKey: "equipment",
     maxRows: 6,
     cardClassName: "min-h-[16rem]",
@@ -151,6 +151,8 @@ export function getEstimatedPilotStatsRowHeight(variant) {
       return 58;
     case "records":
       return 56;
+    case "equipment-grid":
+      return 92;
     case "ranking":
     default:
       return 56;
