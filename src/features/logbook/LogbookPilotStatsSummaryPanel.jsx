@@ -23,7 +23,7 @@ const TILE_METRIC_LABEL_CLASS_NAME = "m-0 text-[0.32rem] tracking-[0.14em] text-
 const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 min-w-0 truncate text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]";
 // Gives the airline and equipment tiles a shared frame treatment in light mode while preserving the dark look.
 const TILE_STAT_FRAME_CLASS_NAME =
-  "relative isolate grid min-w-0 min-h-[7.25rem] grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
+  "relative isolate grid h-[8.25rem] min-w-0 grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
 const FIXED_TILE_ROW_HEIGHT_PX = 116;
 const FIXED_TILE_ROW_GAP_PX = 8;
 
