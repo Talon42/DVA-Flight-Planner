@@ -255,7 +255,6 @@ export default function LogbookPilotStatsHero({
         cardFrameClassName
       )}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[3px] bg-[var(--logbook-hero-accent-color)] opacity-90" />
       {logoSrc ? (
         <img
           src={logoSrc}
@@ -268,7 +267,7 @@ export default function LogbookPilotStatsHero({
         />
       ) : null}
 
-      <div className="relative z-20 grid min-w-0 gap-3 p-3 bp-1024:grid-cols-[minmax(12rem,24%)_minmax(0,1fr)] bp-1024:items-center bp-1024:gap-3.5 bp-1024:p-3.5 bp-1400:grid-cols-[minmax(14rem,26%)_minmax(0,1fr)]">
+      <div className="relative z-20 grid min-w-0 gap-3 p-3 bp-1024:grid-cols-[minmax(21rem,22rem)_minmax(0,1fr)] bp-1024:items-center bp-1024:gap-3.5 bp-1024:p-3.5 bp-1400:grid-cols-[minmax(20rem,22rem)_minmax(0,1fr)]">
         <div className="flex min-w-0 items-center gap-2 border-b border-[color:rgba(15,35,58,0.14)] pb-3 dark:border-white/10 bp-1024:border-b-0 bp-1024:pb-0">
           <SummaryAirlineMark airline={airline} />
           <div className="min-w-0">
