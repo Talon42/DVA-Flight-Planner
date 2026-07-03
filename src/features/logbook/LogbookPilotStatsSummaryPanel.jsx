@@ -20,10 +20,10 @@ const FIXED_HEIGHT_TILE_GRID_VARIANTS = new Set(["airline-grid", "equipment-grid
 // Keeps the airline and equipment metric bands visually aligned across both tile families.
 const TILE_METRIC_NUMBER_CLASS_NAME = "m-0 leading-none text-[1.1rem] font-semibold tabular-nums text-[var(--text-heading)]";
 const TILE_METRIC_LABEL_CLASS_NAME = "m-0 text-[0.32rem] tracking-[0.14em] text-[var(--text-muted)]";
-const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]";
+const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 min-w-0 truncate text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]";
 // Gives the airline and equipment tiles a shared frame treatment in light mode while preserving the dark look.
 const TILE_STAT_FRAME_CLASS_NAME =
-  "relative isolate grid min-h-[7.25rem] grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
+  "relative isolate grid min-w-0 min-h-[7.25rem] grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
 const FIXED_TILE_ROW_HEIGHT_PX = 116;
 const FIXED_TILE_ROW_GAP_PX = 8;
 
@@ -37,7 +37,7 @@ function TileMetricBand({ value, percentValue, paddingClassName = "px-3", classN
   return (
     <div
       className={cn(
-        "h-11 shrink-0 grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--surface-border)] bg-[var(--surface-soft)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]",
+        "h-11 shrink-0 min-w-0 overflow-hidden grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--surface-border)] bg-[var(--surface-soft)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]",
         paddingClassName,
         className
       )}
@@ -112,10 +112,10 @@ function AirlineTile({ item }) {
         />
       ) : null}
 
-      <div className="relative flex min-h-0 items-center gap-3 px-3 py-3">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center">
+      <div className="relative flex min-h-0 items-center gap-2 px-3 py-3">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center">
           {logoSrc ? (
-            <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-14 w-14 object-contain", logoClassName)} loading="lazy" />
+            <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-12 w-12 object-contain", logoClassName)} loading="lazy" />
           ) : (
             <span
               className={cn(
@@ -129,13 +129,12 @@ function AirlineTile({ item }) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate font-semibold text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
+          <p className={cn("m-0 truncate whitespace-nowrap font-semibold text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
             {airlineName || LOGBOOK_EMPTY_VALUE}
           </p>
           {airlineCode ? (
             <div className="mt-0.5 flex min-w-0 flex-col items-start">
               <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{airlineCode}</p>
-              <div className="mt-1 h-0.5 w-6 shrink-0 bg-[var(--airline-accent-color)]" />
             </div>
           ) : null}
         </div>
