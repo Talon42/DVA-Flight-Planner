@@ -125,11 +125,11 @@ function KpiGlyph({ cardId }) {
   }
 }
 
-function KpiMetric({ card, labelToneClassName, valueToneClassName }) {
+function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "" }) {
   const hasBadge = Boolean(card.badge);
 
   return (
-    <div className="min-w-0 w-full bp-1024:max-w-[15rem] bp-1400:max-w-none bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10">
+    <div className={cn("min-w-0 w-full bp-1024:max-w-[15rem] bp-1400:max-w-none bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10", className)}>
       <div className="flex min-w-0 items-center gap-2">
         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center self-center text-[var(--text-heading)] dark:text-white">
           <KpiGlyph cardId={card.id} />
@@ -201,6 +201,18 @@ export default function LogbookPilotStatsHero({
   const labelToneClassName = "text-[var(--text-muted)] dark:text-white/60";
   const headingToneClassName = "text-[var(--text-heading)] dark:text-white";
   const valueToneClassName = "text-[var(--text-heading)] dark:text-white";
+  const getKpiLayoutClassName = (index) => {
+    if (index === 3) {
+      return "bp-1024:col-span-2 bp-1024:col-start-2 bp-1400:col-span-1 bp-1400:col-start-auto";
+    }
+
+    if (index === 4) {
+      return "bp-1024:col-span-2 bp-1024:col-start-4 bp-1400:col-span-1 bp-1400:col-start-auto";
+    }
+
+    return "bp-1024:col-span-2 bp-1400:col-span-1";
+  };
+
   const kpiCards = [
     {
       id: "total-flights",
@@ -285,13 +297,14 @@ export default function LogbookPilotStatsHero({
           </div>
         </div>
 
-        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-6 bp-1024:justify-items-center bp-1024:gap-x-4 bp-1024:gap-y-3 bp-1024:[&>*]:col-span-2 bp-1024:[&>*:nth-child(4)]:col-start-2 bp-1024:[&>*:nth-child(5)]:col-start-4 bp-1400:grid-cols-5 bp-1400:justify-items-stretch bp-1400:gap-x-0 bp-1400:gap-y-0 bp-1400:[&>*]:col-span-1 bp-1400:[&>*]:col-start-auto">
-          {kpiCards.map((card) => (
+        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-6 bp-1400:grid-cols-5 bp-1400:gap-x-0 bp-1400:gap-y-0">
+          {kpiCards.map((card, index) => (
             <KpiMetric
               key={card.id}
               card={card}
               labelToneClassName={labelToneClassName}
               valueToneClassName={valueToneClassName}
+              className={getKpiLayoutClassName(index)}
             />
           ))}
         </div>
