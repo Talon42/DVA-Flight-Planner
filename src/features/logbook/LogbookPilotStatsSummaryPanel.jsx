@@ -19,19 +19,16 @@ function parsePercentValue(percentValue) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function RankingRow({ item, showProgressBar = true, showPercentValue = true, leadingGlyphLabel = "" }) {
+function RankingRow({ item, showProgressBar = true, showPercentValue = true }) {
   const barWidth = Math.max(0, Math.min(100, parsePercentValue(item?.percentValue)));
 
   return (
     <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex min-w-0 items-baseline justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className={cn("flex min-w-0 gap-2", leadingGlyphLabel ? "items-center" : "items-baseline")}>
-            {leadingGlyphLabel ? <LogbookEquipmentGlyph equipment={leadingGlyphLabel} className="h-[3.125rem] w-[3.125rem]" /> : null}
-            <div className="min-w-0 flex-1">
-              <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
-              {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
-            </div>
+          <div className="min-w-0 flex-1">
+            <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
+            {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
           </div>
         </div>
         <div className="shrink-0 text-right">
@@ -338,7 +335,6 @@ export default function LogbookPilotStatsSummaryPanel({
         key={`${item?.label || item?.value || "ranking"}-${index}`}
         item={item}
         showProgressBar={showProgressBar}
-        leadingGlyphLabel={variant === "ranking" ? item?.label : ""}
       />
     );
   }
@@ -565,8 +561,8 @@ function EquipmentTile({ item }) {
   const fallbackMark = getEquipmentFallbackMark(label);
 
   return (
-    <div className="flex min-h-[8.5rem] flex-col justify-between border border-[color:var(--line)] bg-[var(--surface)] px-2 py-2.5 text-center shadow-[0_1px_0_rgba(0,0,0,0.03)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1">
+    <div className="flex min-h-[8.5rem] flex-col overflow-hidden border border-[color:var(--line)] bg-[var(--surface)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2">
         <div className="flex h-16 w-16 items-center justify-center">
           {glyphSources ? (
             <LogbookEquipmentGlyph equipment={label} className="h-14 w-14" />
@@ -576,13 +572,26 @@ function EquipmentTile({ item }) {
             </span>
           )}
         </div>
-        <p className={cn("m-0 w-full truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
+        <p className={cn("m-0 w-full truncate text-center text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
           {label || LOGBOOK_EMPTY_VALUE}
         </p>
       </div>
 
-      <div className="flex min-h-0 flex-col items-center gap-0.5">
-        <p className={cn("m-0 text-[var(--text-heading)] tabular-nums", bodyMdTextClassName)}>{item?.value}</p>
+      <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--line)] bg-[var(--surface-raised)] px-2 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]">
+        <div className="min-w-0">
+          <p className="m-0 leading-none text-[1.6rem] font-semibold tabular-nums text-[var(--text-heading)]">{item?.value}</p>
+          <p className={cn("m-0 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]", bodyMdTextClassName)}>
+            FLIGHTS
+          </p>
+        </div>
+        <div aria-hidden="true" />
+        {item?.percentValue ? (
+          <p className={cn("m-0 text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]", bodyMdTextClassName)}>
+            {item.percentValue}
+          </p>
+        ) : (
+          <span aria-hidden="true" />
+        )}
       </div>
     </div>
   );
