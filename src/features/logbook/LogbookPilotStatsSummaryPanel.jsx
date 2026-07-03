@@ -16,9 +16,12 @@ const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
 const TWO_COLUMN_TILE_VARIANTS = new Set(["records", "equipment-grid", "airline-grid"]);
 // Keeps the airline and equipment metric bands visually aligned across both tile families.
-const TILE_METRIC_NUMBER_CLASS_NAME = "m-0 leading-none text-[1.45rem] font-semibold tabular-nums text-[var(--text-heading)]";
-const TILE_METRIC_LABEL_CLASS_NAME = "m-0 text-[0.56rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]";
+const TILE_METRIC_NUMBER_CLASS_NAME = "m-0 leading-none text-[1.1rem] font-semibold tabular-nums text-[var(--text-heading)]";
+const TILE_METRIC_LABEL_CLASS_NAME = "m-0 text-[0.32rem] tracking-[0.14em] text-[var(--text-muted)]";
 const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]";
+// Gives the airline and equipment tiles a shared frame treatment in light mode while preserving the dark look.
+const TILE_STAT_FRAME_CLASS_NAME =
+  "relative isolate flex min-h-[7.25rem] flex-col overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
 
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
@@ -37,7 +40,7 @@ function TileMetricBand({ value, percentValue, paddingClassName = "px-3", classN
     >
       <div className="min-w-0">
         <p className={TILE_METRIC_NUMBER_CLASS_NAME}>{value}</p>
-        <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>FLIGHTS</p>
+        <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>Flights</p>
       </div>
       <div aria-hidden="true" />
       {percentValue ? (
@@ -91,10 +94,7 @@ function AirlineTile({ item }) {
   const fallbackMark = airlineCode ? airlineCode.slice(0, 3).toUpperCase() : airlineName ? airlineName.slice(0, 2).toUpperCase() : "?";
 
   return (
-    <div
-      className="relative isolate flex min-h-[7.25rem] flex-col overflow-hidden border border-[color:var(--line)] bg-[var(--surface)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]"
-      style={{ "--airline-accent-color": brandColor }}
-    >
+    <div className={TILE_STAT_FRAME_CLASS_NAME} style={{ "--airline-accent-color": brandColor }}>
       {logoSrc ? (
         <img
           src={logoSrc}
@@ -591,7 +591,7 @@ function EquipmentTile({ item }) {
   const fallbackMark = getEquipmentFallbackMark(label);
 
   return (
-    <div className="flex min-h-[7.25rem] flex-col overflow-hidden border border-[color:var(--line)] bg-[var(--surface)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
+    <div className={TILE_STAT_FRAME_CLASS_NAME}>
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-2 py-2">
         <div className="flex h-12 w-12 items-center justify-center">
           {glyphSources ? (
@@ -607,7 +607,7 @@ function EquipmentTile({ item }) {
         </p>
       </div>
 
-      <TileMetricBand value={item?.value} percentValue={item?.percentValue} paddingClassName="px-2" />
+      <TileMetricBand value={item?.value} percentValue={item?.percentValue} />
     </div>
   );
 }

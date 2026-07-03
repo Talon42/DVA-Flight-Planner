@@ -1,4 +1,5 @@
 export const DEFAULT_PILOT_STATS_COMPARISON_PERIOD = "off";
+export const PILOT_STATS_SUMMARY_CARD_CLASS_NAME = "min-h-[14rem]";
 
 const STATIC_PILOT_STATS_COMPARISON_OPTIONS = Object.freeze([
   { value: "off", label: "All" },
@@ -16,7 +17,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "airline-grid",
     dataKey: "airlines",
     maxRows: 10,
-    cardClassName: "min-h-[16rem]",
+    cardClassName: PILOT_STATS_SUMMARY_CARD_CLASS_NAME,
     spanClassName: "col-span-1"
   }),
   equipment: Object.freeze({
@@ -27,7 +28,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "equipment-grid",
     dataKey: "equipment",
     maxRows: 10,
-    cardClassName: "min-h-[16rem]",
+    cardClassName: PILOT_STATS_SUMMARY_CARD_CLASS_NAME,
     spanClassName: "col-span-1"
   }),
   "recent-landings": Object.freeze({
@@ -38,7 +39,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "landing",
     dataKey: "recentLandings",
     maxRows: 10,
-    cardClassName: "min-h-[16rem]",
+    cardClassName: PILOT_STATS_SUMMARY_CARD_CLASS_NAME,
     spanClassName: "col-span-1"
   }),
   "top-airports": Object.freeze({
@@ -49,7 +50,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "airport",
     dataKey: "topAirports",
     maxRows: 10,
-    cardClassName: "min-h-[16rem]",
+    cardClassName: PILOT_STATS_SUMMARY_CARD_CLASS_NAME,
     spanClassName: "col-span-1"
   }),
   routes: Object.freeze({
@@ -60,7 +61,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "route",
     dataKey: "routes",
     maxRows: 10,
-    cardClassName: "min-h-[16rem]",
+    cardClassName: PILOT_STATS_SUMMARY_CARD_CLASS_NAME,
     spanClassName: "col-span-1"
   }),
   records: Object.freeze({
@@ -71,7 +72,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     variant: "records",
     dataKey: "records",
     maxRows: 4,
-    cardClassName: "min-h-[15rem]",
+    cardClassName: PILOT_STATS_SUMMARY_CARD_CLASS_NAME,
     spanClassName: "col-span-1"
   })
 });
