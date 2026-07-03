@@ -7,6 +7,7 @@ import { nestedPanelFrameClassName } from "../../components/ui/patterns";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
+import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
 import { buildLogbookPirepId, useVisibleLogbookPirepDetails } from "./useLogbookPirepDetails.hooks.js";
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
@@ -17,15 +18,20 @@ function parsePercentValue(percentValue) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function RankingRow({ item, showProgressBar = true, showPercentValue = true }) {
+function RankingRow({ item, showProgressBar = true, showPercentValue = true, leadingGlyphLabel = "" }) {
   const barWidth = Math.max(0, Math.min(100, parsePercentValue(item?.percentValue)));
 
   return (
     <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex min-w-0 items-baseline justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
-          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
+          <div className={cn("flex min-w-0 gap-2", leadingGlyphLabel ? "items-center" : "items-baseline")}>
+            {leadingGlyphLabel ? <LogbookEquipmentGlyph equipment={leadingGlyphLabel} className="h-[3.125rem] w-[3.125rem]" /> : null}
+            <div className="min-w-0 flex-1">
+              <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
+              {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
+            </div>
+          </div>
         </div>
         <div className="shrink-0 text-right">
           <p className={cn("m-0 text-[var(--text-heading)]", bodyMdTextClassName)}>{item?.value}</p>
@@ -297,13 +303,14 @@ export default function LogbookPilotStatsSummaryPanel({
       <AirportRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
     ) : variant === "route" ? (
       <RouteRow key={`${item?.label || item?.value || "route"}-${index}`} item={item} />
-    ) : (
-      <RankingRow
-        key={`${item?.label || item?.value || "ranking"}-${index}`}
-        item={item}
-        showProgressBar={showProgressBar}
-      />
-    );
+      ) : (
+        <RankingRow
+          key={`${item?.label || item?.value || "ranking"}-${index}`}
+          item={item}
+          showProgressBar={showProgressBar}
+          leadingGlyphLabel={variant === "ranking" ? item?.label : ""}
+        />
+      );
   }
 
   function renderRows(rowItemsToRender, { containerRef = null } = {}) {

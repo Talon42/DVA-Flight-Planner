@@ -7,6 +7,7 @@ import { cardFrameClassName } from "../../components/ui/patterns";
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
+import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
 
 function resolveNumericSortValue(value) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -364,6 +365,11 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                     >
                       {detailView === "recent-landings" && column.key === "grade" ? (
                         <LandingGradeBadge grade={row.grade} />
+                      ) : detailView === "equipment" && column.key === "label" ? (
+                        <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
+                          <LogbookEquipmentGlyph equipment={row[column.key]} className="h-10 w-10" />
+                          <span className="min-w-0 truncate">{row[column.key] ?? LOGBOOK_EMPTY_VALUE}</span>
+                        </span>
                       ) : detailView === "airlines" && column.key === "label" && row.row?.airlineLogoSrc ? (
                         <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
                           <img
