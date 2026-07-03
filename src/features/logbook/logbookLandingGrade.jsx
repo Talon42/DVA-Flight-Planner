@@ -20,6 +20,25 @@ export function getLandingGradePaletteClassName(grade) {
   return "border-[#93C5FD] bg-[#DBEAFE] text-[#1D4ED8] dark:border-[#60A5FA] dark:bg-[#10243B] dark:text-[#93C5FD]";
 }
 
+// Reuses the same grade colors, but only for inline text instead of the full badge treatment.
+export function getLandingGradeTextClassName(grade) {
+  const normalizedGrade = String(grade || "").trim();
+
+  if (normalizedGrade === "Damaging") {
+    return "text-[#991B1B] dark:text-[#FCA5A5]";
+  }
+
+  if (normalizedGrade === "Firm") {
+    return "text-[#9A3412] dark:text-[#FDBA74]";
+  }
+
+  if (normalizedGrade === "Optimal") {
+    return "text-[#166534] dark:text-[#86EFAC]";
+  }
+
+  return "text-[#1D4ED8] dark:text-[#93C5FD]";
+}
+
 // Renders the same landing-rate badge treatment used in the logbook flights table.
 export function LandingGradeBadge({ grade, className = "" }) {
   const normalizedGrade = String(grade || "").trim();

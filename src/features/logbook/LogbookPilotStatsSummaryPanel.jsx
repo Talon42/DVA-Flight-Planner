@@ -15,6 +15,7 @@ import { buildLogbookPirepId, useVisibleLogbookPirepDetails } from "./useLogbook
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
 const TWO_COLUMN_TILE_VARIANTS = new Set(["records"]);
+const TILE_GRID_RENDER_VARIANTS = new Set(["records", "airline-grid", "equipment-grid"]);
 const FIXED_HEIGHT_TILE_GRID_VARIANTS = new Set(["airline-grid", "equipment-grid"]);
 // Keeps the airline and equipment metric bands visually aligned across both tile families.
 const TILE_METRIC_NUMBER_CLASS_NAME = "m-0 leading-none text-[1.1rem] font-semibold tabular-nums text-[var(--text-heading)]";
@@ -406,7 +407,7 @@ export default function LogbookPilotStatsSummaryPanel({
       return null;
     }
 
-    if (TWO_COLUMN_TILE_VARIANTS.has(variant)) {
+    if (TILE_GRID_RENDER_VARIANTS.has(variant)) {
       return (
         <div ref={containerRef} className="grid grid-cols-2 gap-2">
           {safeRowItems.map((item, index) =>

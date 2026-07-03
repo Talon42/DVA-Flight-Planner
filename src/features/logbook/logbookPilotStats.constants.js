@@ -1,5 +1,5 @@
 export const DEFAULT_PILOT_STATS_COMPARISON_PERIOD = "off";
-export const PILOT_STATS_SUMMARY_CARD_CLASS_NAME = "h-[22rem] [@media_(min-height:1024px)]:h-[30rem]";
+export const PILOT_STATS_SUMMARY_CARD_CLASS_NAME = "h-[22rem] [@media_(min-height:1024px)]:h-[31rem]";
 
 const STATIC_PILOT_STATS_COMPARISON_OPTIONS = Object.freeze([
   { value: "off", label: "All" },

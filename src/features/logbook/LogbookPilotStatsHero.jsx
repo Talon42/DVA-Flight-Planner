@@ -4,7 +4,12 @@ import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typ
 import { cardFrameClassName } from "../../components/ui/patterns";
 import { getAirlinePrimaryColor } from "../../domain/airlines/airlineBranding.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
-import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
+import { getLandingGradeTextClassName } from "./logbookLandingGrade.jsx";
+import stopwatchGlyphSrc from "../../data/images/logbook-hero-glyphs/stopwatch.svg";
+import landingGlyphSrc from "../../data/images/logbook-hero-glyphs/landing.svg";
+import cloudsGlyphSrc from "../../data/images/logbook-hero-glyphs/clouds.svg";
+import measureGlyphSrc from "../../data/images/logbook-hero-glyphs/measure.svg";
+import pilotGlyphSrc from "../../data/images/logbook-hero-glyphs/pilot.svg";
 
 function formatDeltaValue(delta, unit = "", format = "number") {
   if (!Number.isFinite(delta)) {
@@ -111,69 +116,47 @@ function readProfileBlockTimeValue(profile, fallbackValue) {
   return fallbackValue || LOGBOOK_EMPTY_VALUE;
 }
 
-function KpiGlyph({ cardId }) {
-  const baseClassName = "h-6 w-6 shrink-0 stroke-current";
+const kpiGlyphSourcesById = {
+  "total-flights": pilotGlyphSrc,
+  "total-distance": measureGlyphSrc,
+  "total-block-time": stopwatchGlyphSrc,
+  "total-flight-time": cloudsGlyphSrc,
+  "average-landing-rate": landingGlyphSrc
+};
 
-  switch (cardId) {
-    case "total-flights":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
-          <path d="M3 15.5 21 9l-7.5 6.5L13 21l-2.5-4.5L5 19l1.5-3.5L3 15.5Z" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="m9.5 13.5 3 1.5" strokeWidth="1.75" strokeLinecap="round" />
-        </svg>
-      );
-    case "total-distance":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
-          <path d="M4 17c2.5-4 5.5-6 8-6s5.5 2 8 6" strokeWidth="1.75" strokeLinecap="round" />
-          <path d="M6 7h3m6 0h3" strokeWidth="1.75" strokeLinecap="round" />
-          <circle cx="12" cy="10" r="1.5" strokeWidth="1.75" />
-        </svg>
-      );
-    case "total-block-time":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
-          <circle cx="12" cy="12" r="7.5" strokeWidth="1.75" />
-          <path d="M12 8.5v4l2.75 1.75" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M9.5 4.5 8 3m8 1.5 1.5-1.5" strokeWidth="1.75" strokeLinecap="round" />
-        </svg>
-      );
-    case "total-flight-time":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
-          <path d="M3.5 14.5 20.5 9l-6.5 5 1 4.5-3-2-2.5 3.5.5-4.5-6.5-1Z" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M8 11.5 6.5 10" strokeWidth="1.75" strokeLinecap="round" />
-        </svg>
-      );
-    case "average-landing-rate":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className={baseClassName} fill="none">
-          <path d="M4 18h16" strokeWidth="1.75" strokeLinecap="round" />
-          <path d="M6 13.5 12 8l6 5.5" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M12 5.5v10" strokeWidth="1.75" strokeLinecap="round" />
-        </svg>
-      );
-    default:
-      return null;
+// Uses the supplied KPI glyphs and forces them to white in dark mode without changing light mode.
+function KpiGlyph({ cardId }) {
+  const glyphSrc = kpiGlyphSourcesById[cardId];
+
+  if (!glyphSrc) {
+    return null;
   }
+
+  return (
+    <img
+      src={glyphSrc}
+      alt=""
+      aria-hidden="true"
+      className="h-[1.875rem] w-[1.875rem] shrink-0 object-contain dark:[filter:brightness(0)_invert(1)]"
+    />
+  );
 }
 
 const kpiEyebrowTextClassName = "text-[clamp(0.55rem,0.47rem+0.18vw,0.74rem)]";
 const kpiValueTextClassName = "text-[clamp(1.02rem,0.88rem+0.32vw,1.3rem)]";
-const kpiLandingRateValueTextClassName = "text-[clamp(1.02rem,0.88rem+0.26vw,1.18rem)]";
-const kpiBadgeTextClassName = "text-[clamp(0.56rem,0.51rem+0.08vw,0.64rem)]";
 const kpiCompactDividerClassName =
   "pointer-events-none absolute left-3 right-3 top-1/2 hidden h-px bg-[color:rgba(15,35,58,0.10)] bp-1024:block bp-1400:hidden dark:bg-white/10";
 const kpiCompactColumnDividerClassName =
   "bp-1024:pr-3 bp-1024:after:pointer-events-none bp-1024:after:absolute bp-1024:after:inset-y-2 bp-1024:after:right-0 bp-1024:after:w-px bp-1024:after:content-[''] bp-1024:after:bg-[color:rgba(15,35,58,0.18)] bp-1400:after:content-none dark:bp-1024:after:bg-white/15";
 
 function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "" }) {
-  const hasBadge = Boolean(card.badge);
+  const valueToneOverrideClassName = String(card.valueToneClassName || "").trim();
+  const resolvedValueToneClassName = valueToneOverrideClassName || valueToneClassName;
 
   return (
     <div className={cn("relative z-10 min-w-0 w-full bp-1024:max-w-none bp-1400:max-w-none bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10", className)}>
       <div className="flex min-w-0 items-center gap-2">
-        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center self-center text-[var(--text-heading)] dark:text-white">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center self-center">
           <KpiGlyph cardId={card.id} />
         </span>
         <div className="min-w-0 flex-1">
@@ -184,15 +167,12 @@ function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "
             <p
               className={cn(
                 "m-0 min-w-0 flex-1 truncate font-semibold leading-[1.05] tracking-[0]",
-                valueToneClassName,
-                hasBadge
-                  ? cn("flex-none shrink-0 whitespace-nowrap", kpiLandingRateValueTextClassName)
-                  : cn("min-w-0 flex-1 truncate", kpiValueTextClassName)
+                resolvedValueToneClassName,
+                kpiValueTextClassName
               )}
             >
               {card.value}
             </p>
-            {card.badge ? <LandingGradeBadge grade={card.badge} className={cn("h-5 w-auto min-w-[4.2rem] shrink-0 px-2", kpiBadgeTextClassName)} /> : null}
           </div>
           {card.delta ? (
             <p
@@ -301,7 +281,7 @@ export default function LogbookPilotStatsHero({
         </>
       ),
       value: summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE,
-      badge: summary?.averageLandingRateGrade || "",
+      valueToneClassName: getLandingGradeTextClassName(summary?.averageLandingRateGrade),
       delta: useComparison ? formatDeltaValue(deltas.averageLandingRate?.rawValue, "fpm") : "",
       deltaStatus: deltas.averageLandingRate?.status
     }
