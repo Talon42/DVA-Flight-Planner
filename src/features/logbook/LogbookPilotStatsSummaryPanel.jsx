@@ -13,6 +13,7 @@ import { buildLogbookPirepId, useVisibleLogbookPirepDetails } from "./useLogbook
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
+const TWO_COLUMN_TILE_VARIANTS = new Set(["records", "equipment-grid", "airline-grid"]);
 
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
@@ -47,32 +48,53 @@ function RankingRow({ item, showProgressBar = true, showPercentValue = true }) {
   );
 }
 
-// Renders the airline ranking row with a dedicated logo column and no progress bar.
-function AirlineRow({ item }) {
+// Renders the airline summary as a compact two-column tile with a logo and bottom metric band.
+function AirlineTile({ item }) {
   const airlineCode = String(item?.meta || item?.row?.airlineCode || "").trim();
   const logoSrc = String(item?.row?.airlineLogoSrc || "").trim();
   const logoClassName = String(item?.row?.airlineLogoClassName || "").trim();
+  const airlineName = String(item?.label || "").trim();
+  const fallbackMark = airlineCode ? airlineCode.slice(0, 3).toUpperCase() : airlineName ? airlineName.slice(0, 2).toUpperCase() : "?";
 
   return (
-    <div className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-        {logoSrc ? (
-          <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-6 w-6 object-contain", logoClassName)} loading="lazy" />
+    <div className="flex min-h-[5.85rem] flex-col overflow-hidden border border-[color:var(--line)] bg-[var(--surface)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
+      <div className="flex min-h-0 flex-1 items-start gap-2 px-2 py-2">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+          {logoSrc ? (
+            <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-10 w-10 object-contain", logoClassName)} loading="lazy" />
+          ) : (
+            <span
+              className={cn(
+                "inline-flex h-10 w-10 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] px-1 text-center text-[0.78rem] font-semibold uppercase text-[var(--text-heading)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)] dark:text-white",
+                bodyMdTextClassName
+              )}
+            >
+              {fallbackMark}
+            </span>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{airlineName || LOGBOOK_EMPTY_VALUE}</p>
+          {airlineCode ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{airlineCode}</p> : null}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--line)] bg-[var(--surface-raised)] px-2 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]">
+        <div className="min-w-0">
+          <p className="m-0 leading-none text-[1.45rem] font-semibold tabular-nums text-[var(--text-heading)]">{item?.value}</p>
+          <p className={cn("m-0 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]", bodyMdTextClassName)}>
+            FLIGHTS
+          </p>
+        </div>
+        <div aria-hidden="true" />
+        {item?.percentValue ? (
+          <p className={cn("m-0 text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]", bodyMdTextClassName)}>
+            {item.percentValue}
+          </p>
         ) : (
-          <span className={cn("truncate px-1 text-center text-[0.88rem] font-semibold uppercase", bodyMdTextClassName)}>
-            {airlineCode ? airlineCode.slice(0, 3) : "?"}
-          </span>
+          <span aria-hidden="true" />
         )}
-      </div>
-
-      <div className="min-w-0">
-        <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
-        {airlineCode ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{airlineCode}</p> : null}
-      </div>
-
-      <div className="shrink-0 text-right">
-        <p className={cn("m-0 text-[var(--text-heading)]", bodyMdTextClassName)}>{item?.value}</p>
-        {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>{item.percentValue}</p> : null}
       </div>
     </div>
   );
@@ -200,30 +222,7 @@ function getMeasuredPilotStatsFitCount({
     return Math.max(1, Math.min(safeMaxRows, safeItemCount));
   }
 
-  if (variant === "records") {
-    let fittedVisualRows = 0;
-    let usedTiles = 0;
-    let consumedHeight = 0;
-
-    while (usedTiles < measuredHeights.length && fittedVisualRows < safeMaxRows) {
-      const firstTileHeight = measuredHeights[usedTiles] || 0;
-      const secondTileHeight = measuredHeights[usedTiles + 1];
-      const rowHeight = Math.max(firstTileHeight, Number.isFinite(secondTileHeight) ? secondTileHeight : firstTileHeight);
-      const nextHeight = consumedHeight + (fittedVisualRows > 0 ? safeRowGap : 0) + rowHeight;
-
-      if (nextHeight > safeBodyHeight) {
-        break;
-      }
-
-      consumedHeight = nextHeight;
-      fittedVisualRows += 1;
-      usedTiles += 2;
-    }
-
-    return Math.max(1, Math.min(safeItemCount, fittedVisualRows * 2));
-  }
-
-  if (variant === "equipment-grid") {
+  if (TWO_COLUMN_TILE_VARIANTS.has(variant)) {
     let fittedVisualRows = 0;
     let usedTiles = 0;
     let consumedHeight = 0;
@@ -275,7 +274,7 @@ function getFallbackPilotStatsFitCount({ bodyHeight, variant, maxRows, itemCount
   const estimatedRowHeight = getEstimatedPilotStatsRowHeight(variant);
   const estimatedRows = Math.max(1, Math.floor(safeBodyHeight / estimatedRowHeight));
 
-  if (variant === "equipment-grid") {
+  if (TWO_COLUMN_TILE_VARIANTS.has(variant)) {
     return Math.max(1, Math.min(safeItemCount, safeMaxRows, estimatedRows * 2));
   }
 
@@ -316,9 +315,7 @@ export default function LogbookPilotStatsSummaryPanel({
   });
 
   function renderRow(item, index) {
-    return variant === "airline" ? (
-      <AirlineRow key={`${item?.label || item?.value || "airline"}-${index}`} item={item} />
-    ) : variant === "landing" ? (
+    return variant === "landing" ? (
       <LandingRow
         key={`${item?.label || item?.value || "landing"}-${index}`}
         item={item}
@@ -346,27 +343,18 @@ export default function LogbookPilotStatsSummaryPanel({
       return null;
     }
 
-    if (variant === "records") {
+    if (TWO_COLUMN_TILE_VARIANTS.has(variant)) {
       return (
         <div ref={containerRef} className="grid grid-cols-2 gap-2">
-          {safeRowItems.map((item, index) => {
-            return (
-              <RecordTile
-                key={`${item?.recordType || item?.label || item?.value || "record"}-${index}`}
-                item={item}
-              />
-            );
-          })}
-        </div>
-      );
-    }
-
-    if (variant === "equipment-grid") {
-      return (
-        <div ref={containerRef} className="grid grid-cols-2 gap-2">
-          {safeRowItems.map((item, index) => (
-            <EquipmentTile key={`${item?.label || item?.value || "equipment"}-${index}`} item={item} />
-          ))}
+          {safeRowItems.map((item, index) =>
+            variant === "records" ? (
+              <RecordTile key={`${item?.recordType || item?.label || item?.value || "record"}-${index}`} item={item} />
+            ) : variant === "airline-grid" ? (
+              <AirlineTile key={`${item?.label || item?.value || "airline"}-${index}`} item={item} />
+            ) : (
+              <EquipmentTile key={`${item?.label || item?.value || "equipment"}-${index}`} item={item} />
+            )
+          )}
         </div>
       );
     }

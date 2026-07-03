@@ -13,7 +13,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     dashboardOrder: 10,
     title: "Flights by Airline",
     detailView: "airlines",
-    variant: "airline",
+    variant: "airline-grid",
     dataKey: "airlines",
     maxRows: 10,
     cardClassName: "min-h-[16rem]",
@@ -151,6 +151,7 @@ export function getEstimatedPilotStatsRowHeight(variant) {
       return 58;
     case "records":
       return 56;
+    case "airline-grid":
     case "equipment-grid":
       return 84;
     case "ranking":
