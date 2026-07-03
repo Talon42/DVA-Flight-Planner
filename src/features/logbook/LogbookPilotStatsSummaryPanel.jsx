@@ -128,7 +128,7 @@ function AirlineTile({ item }) {
           )}
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <p className={cn("m-0 truncate whitespace-nowrap font-semibold text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
             {airlineName || LOGBOOK_EMPTY_VALUE}
           </p>
@@ -408,7 +408,7 @@ export default function LogbookPilotStatsSummaryPanel({
 
     if (TILE_GRID_RENDER_VARIANTS.has(variant)) {
       return (
-        <div ref={containerRef} className="grid grid-cols-2 gap-2">
+        <div ref={containerRef} className="grid min-w-0 grid-cols-2 gap-2">
           {safeRowItems.map((item, index) =>
             variant === "records" ? (
               <RecordTile key={`${item?.recordType || item?.label || item?.value || "record"}-${index}`} item={item} />
@@ -549,7 +549,7 @@ export default function LogbookPilotStatsSummaryPanel({
     <Panel
       ref={rootRef}
       className={cn(
-        "relative flex min-h-0 flex-col gap-2 p-3",
+        "relative flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden p-3",
         nestedPanelFrameClassName,
         className
       )}
