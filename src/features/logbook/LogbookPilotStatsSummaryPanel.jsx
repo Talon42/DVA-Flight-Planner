@@ -112,14 +112,14 @@ function AirlineTile({ item }) {
         />
       ) : null}
 
-      <div className="relative flex min-h-0 items-center gap-2 px-3 py-3">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center">
+      <div className="relative flex min-h-0 items-center gap-2 px-2 py-2">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center">
           {logoSrc ? (
-            <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-12 w-12 object-contain", logoClassName)} loading="lazy" />
+            <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-9 w-9 object-contain", logoClassName)} loading="lazy" />
           ) : (
             <span
               className={cn(
-                "inline-flex h-14 w-14 items-center justify-center px-1 text-center text-[0.8rem] font-semibold uppercase text-[var(--text-heading)] dark:text-white",
+                "inline-flex h-10 w-10 items-center justify-center px-1 text-center text-[0.8rem] font-semibold uppercase text-[var(--text-heading)] dark:text-white",
                 bodyMdTextClassName
               )}
             >
@@ -129,18 +129,23 @@ function AirlineTile({ item }) {
         </div>
 
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p className={cn("m-0 truncate whitespace-nowrap font-semibold text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
+          <p
+            className={cn(
+              "m-0 block w-full min-w-0 truncate whitespace-nowrap text-left font-semibold text-[var(--text-primary)] dark:text-white",
+              bodyMdTextClassName
+            )}
+          >
             {airlineName || LOGBOOK_EMPTY_VALUE}
           </p>
           {airlineCode ? (
             <div className="mt-0.5 flex min-w-0 flex-col items-start">
-              <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{airlineCode}</p>
+              <p className={cn("m-0 truncate text-left text-[var(--text-muted)]", bodyMdTextClassName)}>{airlineCode}</p>
             </div>
           ) : null}
         </div>
       </div>
 
-      <TileMetricBand value={item?.value} percentValue={item?.percentValue} />
+      <TileMetricBand value={item?.value} percentValue={item?.percentValue} paddingClassName="px-2" />
     </div>
   );
 }
