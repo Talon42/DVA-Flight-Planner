@@ -550,6 +550,7 @@ fn is_complete_cached_pilot_profile_metadata(
         == Some(export_id)
         && metadata.display_name.is_some()
         && metadata.pilot_code.is_some()
+        && metadata.total_block_time_minutes.is_some()
 }
 
 async fn resolve_deltava_logbook_profile_metadata(
@@ -673,10 +674,11 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
     };
 
     if logbook_json.is_some() {
+        // Keep profile-backed pilot stats stable during ordinary reads and only refresh them on an explicit DVA sync.
         let _ = resolve_deltava_logbook_profile_metadata(
             app,
             result.logbook.export_id.as_deref(),
-            false,
+            true,
         )
         .await;
     }
@@ -800,6 +802,7 @@ pub(crate) async fn build_delta_logbook_refresh_payload_from_web_result(
         ));
     };
 
+    // Logbook refresh is the other explicit user action that is allowed to refresh profile-backed pilot stats.
     let _ = resolve_deltava_logbook_profile_metadata(
         app,
         result.logbook.export_id.as_deref(),
@@ -1017,6 +1020,7 @@ mod tests {
             name: Some("Jacob Benjamin".to_string()),
             pilot_code: Some("DVA11384".to_string()),
             equipment_type: Some("A350-900".to_string()),
+            total_block_time_minutes: Some(32_922),
             fetched_at_utc: Some("2026-07-01T00:00:00Z".to_string()),
         };
 
@@ -1037,6 +1041,7 @@ mod tests {
             name: Some("Jacob Benjamin".to_string()),
             pilot_code: Some("DVA11384".to_string()),
             equipment_type: Some("A350-900".to_string()),
+            total_block_time_minutes: None,
             fetched_at_utc: Some("2026-07-01T00:00:00Z".to_string()),
         };
 

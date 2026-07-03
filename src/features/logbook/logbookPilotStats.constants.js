@@ -179,6 +179,9 @@ export function resolvePilotStatsCard({ cardKey, stats }) {
   return {
     ...card,
     items: [...(Array.isArray(itemSources[card.dataKey]) ? itemSources[card.dataKey] : [])],
+    // The airport summary card splits the rankings into departure and arrival columns.
+    departureItems: [...(Array.isArray(detailRows.departureAirports) ? detailRows.departureAirports : [])],
+    arrivalItems: [...(Array.isArray(detailRows.arrivalAirports) ? detailRows.arrivalAirports : [])],
     maxRows: Number(card.maxRows || 0) || 0,
     hasData: Array.isArray(itemSources[card.dataKey]) && itemSources[card.dataKey].length > 0
   };

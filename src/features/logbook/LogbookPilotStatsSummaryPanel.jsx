@@ -17,7 +17,7 @@ function parsePercentValue(percentValue) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function RankingRow({ item, showProgressBar = true }) {
+function RankingRow({ item, showProgressBar = true, showPercentValue = true }) {
   const barWidth = Math.max(0, Math.min(100, parsePercentValue(item?.percentValue)));
 
   return (
@@ -29,7 +29,9 @@ function RankingRow({ item, showProgressBar = true }) {
         </div>
         <div className="shrink-0 text-right">
           <p className={cn("m-0 text-[var(--text-heading)]", bodySmTextClassName)}>{item?.value}</p>
-          {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>{item.percentValue}</p> : null}
+          {showPercentValue && item?.percentValue ? (
+            <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>{item.percentValue}</p>
+          ) : null}
         </div>
       </div>
       {showProgressBar ? (
@@ -253,6 +255,8 @@ function getFallbackPilotStatsFitCount({ bodyHeight, variant, maxRows, itemCount
 export default function LogbookPilotStatsSummaryPanel({
   title,
   items,
+  departureItems = [],
+  arrivalItems = [],
   onViewAll,
   variant = "ranking",
   maxRows = 5,
@@ -267,8 +271,14 @@ export default function LogbookPilotStatsSummaryPanel({
   const [fitItems, setFitItems] = useState(maxRows);
   const rafIdRef = useRef(0);
   const rowItems = Array.isArray(items) ? items : [];
+  const departureAirportItems = Array.isArray(departureItems) ? departureItems : [];
+  const arrivalAirportItems = Array.isArray(arrivalItems) ? arrivalItems : [];
   const effectiveMaxRows = autoFitRows ? Math.min(maxRows, fitItems) : maxRows;
   const rows = rowItems.slice(0, Math.min(effectiveMaxRows, rowItems.length));
+  const airportMaxRows = Math.max(1, Math.floor(Number(maxRows) || 1));
+  const departureRows = departureAirportItems.slice(0, airportMaxRows);
+  const arrivalRows = arrivalAirportItems.slice(0, airportMaxRows);
+  const hasAirportColumns = variant === "airport" && (departureRows.length > 0 || arrivalRows.length > 0);
   const landingPirepDetailsById = useVisibleLogbookPirepDetails(rows, {
     enabled: variant === "landing",
     limit: rows.length
@@ -321,6 +331,31 @@ export default function LogbookPilotStatsSummaryPanel({
     return (
       <div ref={containerRef} className="grid gap-1.5">
         {safeRowItems.map((item, index) => renderRow(item, index))}
+      </div>
+    );
+  }
+
+  // Renders the airport rankings as two fixed columns so departures and arrivals stay visually separate.
+  function renderAirportColumns(columnTitle, rowItemsToRender) {
+    const safeRowItems = Array.isArray(rowItemsToRender) ? rowItemsToRender : [];
+
+    return (
+      <div className="flex min-h-0 flex-col gap-2 px-3">
+        <p className={cn("m-0 truncate text-[var(--text-heading)]", labelTextClassName)}>{columnTitle}</p>
+        {safeRowItems.length ? (
+          <div className="grid gap-1.5">
+            {safeRowItems.map((item, index) => (
+              <RankingRow
+                key={`${item?.label || item?.value || columnTitle.toLowerCase()}-${index}`}
+                item={item}
+                showProgressBar={false}
+                showPercentValue={false}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>No data available.</p>
+        )}
       </div>
     );
   }
@@ -432,7 +467,12 @@ export default function LogbookPilotStatsSummaryPanel({
       </div>
 
       <div ref={bodyRef} className="relative min-h-0 overflow-hidden">
-        {rows.length ? (
+        {hasAirportColumns ? (
+          <div className="grid min-h-0 grid-cols-2 divide-x divide-[color:var(--line)]">
+            {renderAirportColumns("Departure", departureRows)}
+            {renderAirportColumns("Arrival", arrivalRows)}
+          </div>
+        ) : rows.length ? (
           <>
             {renderRows(rows)}
             {autoFitRows ? (

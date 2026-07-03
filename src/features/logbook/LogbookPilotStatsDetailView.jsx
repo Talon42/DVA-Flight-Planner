@@ -2,7 +2,7 @@
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
-import { bodySmTextClassName, labelTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
+import { bodyMdTextClassName, labelTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
@@ -358,12 +358,23 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                       key={column.key}
                       className={cn(
                         "px-3 py-1.5 align-top text-[var(--text-primary)] dark:text-white",
-                        bodySmTextClassName,
+                        bodyMdTextClassName,
                         /^(rank|value|percentValue|dep|arr|landingRate)$/.test(column.key) && "tabular-nums"
                       )}
                     >
                       {detailView === "recent-landings" && column.key === "grade" ? (
                         <LandingGradeBadge grade={row.grade} />
+                      ) : detailView === "airlines" && column.key === "label" && row.row?.airlineLogoSrc ? (
+                        <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
+                          <img
+                            src={row.row.airlineLogoSrc}
+                            alt=""
+                            aria-hidden="true"
+                            className={cn("h-5 w-5 shrink-0 object-contain", row.row.airlineLogoClassName)}
+                            loading="lazy"
+                          />
+                          <span className="min-w-0 truncate">{row[column.key] ?? LOGBOOK_EMPTY_VALUE}</span>
+                        </span>
                       ) : (
                         row[column.key] ?? LOGBOOK_EMPTY_VALUE
                       )}
@@ -373,7 +384,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
               ))
             ) : (
               <tr>
-                <td colSpan={config.columns.length} className={cn("px-3 py-6 text-center text-[var(--text-muted)]", bodySmTextClassName)}>
+                <td colSpan={config.columns.length} className={cn("px-3 py-6 text-center text-[var(--text-muted)]", bodyMdTextClassName)}>
                   No data available.
                 </td>
               </tr>

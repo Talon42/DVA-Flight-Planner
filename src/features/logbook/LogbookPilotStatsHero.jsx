@@ -78,6 +78,27 @@ function formatPilotMetadataLine(profile) {
   return parts.join(" \u00b7 ");
 }
 
+function formatMinutesValue(totalMinutes) {
+  const minutes = Number(totalMinutes);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return "";
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = Math.round(minutes % 60);
+  return `${hours}h ${String(remainingMinutes).padStart(2, "0")}m`;
+}
+
+// Uses the DVA profile total-flight-time snapshot when available, falling back to the current logbook total.
+function readProfileBlockTimeValue(profile, fallbackValue) {
+  const profileMinutes = Number(profile?.totalBlockTimeMinutes ?? profile?.total_block_time_minutes);
+  if (Number.isFinite(profileMinutes) && profileMinutes > 0) {
+    return formatMinutesValue(profileMinutes);
+  }
+
+  return fallbackValue || LOGBOOK_EMPTY_VALUE;
+}
+
 function KpiGlyph({ cardId }) {
   const baseClassName = "h-6 w-6 shrink-0 stroke-current";
 
@@ -125,16 +146,20 @@ function KpiGlyph({ cardId }) {
   }
 }
 
-const kpiEyebrowTextClassName = "text-[clamp(0.52rem,0.44rem+0.12vw,0.66rem)]";
-const kpiValueTextClassName = "text-[clamp(0.98rem,0.82rem+0.22vw,1.2rem)]";
-const kpiLandingRateValueTextClassName = "text-[clamp(0.98rem,0.82rem+0.18vw,1.14rem)]";
-const kpiBadgeTextClassName = "text-[clamp(0.54rem,0.49rem+0.06vw,0.6rem)]";
+const kpiEyebrowTextClassName = "text-[clamp(0.55rem,0.47rem+0.18vw,0.74rem)]";
+const kpiValueTextClassName = "text-[clamp(1.02rem,0.88rem+0.32vw,1.3rem)]";
+const kpiLandingRateValueTextClassName = "text-[clamp(1.02rem,0.88rem+0.26vw,1.18rem)]";
+const kpiBadgeTextClassName = "text-[clamp(0.56rem,0.51rem+0.08vw,0.64rem)]";
+const kpiCompactDividerClassName =
+  "pointer-events-none absolute left-3 right-3 top-1/2 hidden h-px bg-[color:rgba(15,35,58,0.10)] bp-1024:block bp-1400:hidden dark:bg-white/10";
+const kpiCompactColumnDividerClassName =
+  "bp-1024:pr-3 bp-1024:after:pointer-events-none bp-1024:after:absolute bp-1024:after:inset-y-2 bp-1024:after:right-0 bp-1024:after:w-px bp-1024:after:content-[''] bp-1024:after:bg-[color:rgba(15,35,58,0.18)] dark:bp-1024:after:bg-white/15";
 
 function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "" }) {
   const hasBadge = Boolean(card.badge);
 
   return (
-    <div className={cn("min-w-0 w-full bp-1024:max-w-[15rem] bp-1400:max-w-none bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10", className)}>
+    <div className={cn("relative z-10 min-w-0 w-full bp-1024:max-w-none bp-1400:max-w-none bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10", className)}>
       <div className="flex min-w-0 items-center gap-2">
         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center self-center text-[var(--text-heading)] dark:text-white">
           <KpiGlyph cardId={card.id} />
@@ -207,15 +232,22 @@ export default function LogbookPilotStatsHero({
   const headingToneClassName = "text-[var(--text-heading)] dark:text-white";
   const valueToneClassName = "text-[var(--text-heading)] dark:text-white";
   const getKpiLayoutClassName = (index) => {
+    if (index === 0 || index === 1) {
+      return cn("bp-1024:col-span-2 bp-1400:col-span-1 bp-1400:pr-0", kpiCompactColumnDividerClassName);
+    }
+
     if (index === 3) {
-      return "bp-1024:col-span-2 bp-1024:col-start-2 bp-1400:col-span-1 bp-1400:col-start-auto";
+      return cn(
+        "bp-1024:col-span-2 bp-1024:col-start-2 bp-1024:pt-2 bp-1400:col-span-1 bp-1400:col-start-auto bp-1400:pt-0 bp-1400:pr-0",
+        kpiCompactColumnDividerClassName
+      );
     }
 
     if (index === 4) {
-      return "bp-1024:col-span-2 bp-1024:col-start-4 bp-1400:col-span-1 bp-1400:col-start-auto";
+      return "bp-1024:col-span-2 bp-1024:col-start-4 bp-1024:pt-2 bp-1400:col-span-1 bp-1400:col-start-auto bp-1400:pt-0";
     }
 
-    return "bp-1024:col-span-2 bp-1400:col-span-1";
+    return "bp-1024:col-span-2 bp-1024:pb-2 bp-1400:col-span-1 bp-1400:pb-0 bp-1400:pr-0";
   };
 
   const kpiCards = [
@@ -236,7 +268,7 @@ export default function LogbookPilotStatsHero({
     {
       id: "total-block-time",
       label: "Total Block Time",
-      value: summary?.totalDuration || LOGBOOK_EMPTY_VALUE,
+      value: readProfileBlockTimeValue(profileMetadata, summary?.totalDuration),
       delta: useComparison ? formatDeltaValue(deltas.totalDurationMinutes?.rawValue, "", "minutes") : "",
       deltaStatus: deltas.totalDurationMinutes?.status
     },
@@ -302,7 +334,8 @@ export default function LogbookPilotStatsHero({
           </div>
         </div>
 
-        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-6 bp-1400:grid-cols-5 bp-1400:gap-x-0 bp-1400:gap-y-0">
+        <div className="relative grid min-w-0 grid-cols-2 gap-x-4 gap-y-4 bp-1024:grid-cols-6 bp-1024:justify-items-stretch bp-1024:gap-y-4 bp-1400:grid-cols-5 bp-1400:justify-items-stretch bp-1400:gap-x-0 bp-1400:gap-y-0">
+          <div aria-hidden="true" className={kpiCompactDividerClassName} />
           {kpiCards.map((card, index) => (
             <KpiMetric
               key={card.id}

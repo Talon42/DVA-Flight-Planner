@@ -51,6 +51,8 @@ export default function LogbookPilotStats({
                       key={card.key}
                       title={card.title}
                       items={card.items}
+                      departureItems={card.departureItems}
+                      arrivalItems={card.arrivalItems}
                       variant={card.variant}
                       maxRows={card.maxRows}
                       autoFitRows={false}

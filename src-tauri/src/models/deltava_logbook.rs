@@ -21,6 +21,8 @@ pub(crate) struct DeltaLogbookPilotProfileMetadata {
     pub pilot_code: Option<String>,
     #[serde(alias = "equipment_type")]
     pub equipment_type: Option<String>,
+    #[serde(alias = "total_block_time_minutes")]
+    pub total_block_time_minutes: Option<i64>,
     #[serde(alias = "fetched_at_utc")]
     pub fetched_at_utc: Option<String>,
 }

@@ -1,5 +1,6 @@
 use chrono::Utc;
 use reqwest::redirect::Policy;
+use regex::Regex;
 use scraper::{Html, Selector};
 
 use crate::{append_sync_log, models::DeltaLogbookPilotProfileMetadata};
@@ -15,6 +16,25 @@ fn normalize_text(value: &str) -> String {
         .join(" ")
         .trim()
         .to_string()
+}
+
+fn parse_hours_to_minutes(value: &str) -> Option<i64> {
+    let normalized = normalize_text(value);
+    if normalized.is_empty() {
+        return None;
+    }
+
+    let hours = Regex::new(r"(?i)(\d[\d,]*(?:\.\d+)?)\s+hours?\b")
+        .ok()
+        .and_then(|regex| regex.captures(&normalized))
+        .and_then(|captures| captures.get(1))
+        .and_then(|value| value.as_str().replace(',', "").parse::<f64>().ok())?;
+
+    if !hours.is_finite() || hours <= 0.0 {
+        return None;
+    }
+
+    Some((hours * 60.0).round() as i64)
 }
 
 fn to_title_case(value: &str) -> String {
@@ -139,6 +159,44 @@ fn extract_equipment_type(document: &Html) -> Option<String> {
     None
 }
 
+fn extract_total_block_time_minutes(document: &Html) -> Option<i64> {
+    let row_selector = Selector::parse("tr").expect("valid row selector");
+    let cell_selector = Selector::parse("td, th").expect("valid cell selector");
+
+    for row in document.select(&row_selector) {
+        let cells = row.select(&cell_selector).collect::<Vec<_>>();
+        let row_text = normalize_text(&row.text().collect::<String>());
+        if row_text.is_empty() {
+            continue;
+        }
+
+        let label_text = cells
+            .first()
+            .map(|cell| normalize_text(&cell.text().collect::<String>()))
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+
+        if label_text != "total flights" && !row_text.to_ascii_lowercase().contains("total flights") {
+            continue;
+        }
+
+        if let Some(minutes) = parse_hours_to_minutes(&row_text) {
+            return Some(minutes);
+        }
+
+        if let Some(value_text) = cells
+            .get(1)
+            .map(|cell| normalize_text(&cell.text().collect::<String>()))
+        {
+            if let Some(minutes) = parse_hours_to_minutes(&value_text) {
+                return Some(minutes);
+            }
+        }
+    }
+
+    None
+}
+
 pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     export_id: &str,
 ) -> Result<DeltaLogbookPilotProfileMetadata, String> {
@@ -184,6 +242,7 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     let document = Html::parse_document(&html_text);
     let (raw_profile_header, display_name, pilot_code) = parse_profile_header_text(&document);
     let equipment_type = extract_equipment_type(&document);
+    let total_block_time_minutes = extract_total_block_time_minutes(&document);
 
     if pilot_code.is_none()
         && raw_profile_header.is_none()
@@ -205,6 +264,7 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
         name: None,
         pilot_code,
         equipment_type,
+        total_block_time_minutes,
         fetched_at_utc: Some(Utc::now().to_rfc3339()),
     };
 
@@ -231,6 +291,7 @@ pub(crate) fn build_unavailable_pilot_profile_metadata(
         name: None,
         pilot_code: None,
         equipment_type: None,
+        total_block_time_minutes: None,
         fetched_at_utc: Some(Utc::now().to_rfc3339()),
     }
 }
@@ -279,5 +340,22 @@ mod tests {
 
         assert_eq!(display_name.as_deref(), Some("Senior Captain Jane Doe"));
         assert_eq!(pilot_code.as_deref(), Some("DVA9999"));
+    }
+
+    #[test]
+    fn extract_total_block_time_minutes_parses_total_flights_hours() {
+        let document = Html::parse_document(
+            r#"
+            <html>
+              <body>
+                <table>
+                  <tr><td>Total Flights</td><td>420 legs, 548.7 hours</td></tr>
+                </table>
+              </body>
+            </html>
+            "#,
+        );
+
+        assert_eq!(extract_total_block_time_minutes(&document), Some(32_922));
     }
 }
