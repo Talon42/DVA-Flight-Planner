@@ -129,7 +129,7 @@ function KpiMetric({ card, labelToneClassName, valueToneClassName }) {
   const hasBadge = Boolean(card.badge);
 
   return (
-    <div className="min-w-0 bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10">
+    <div className="min-w-0 w-full bp-1024:max-w-[15rem] bp-1400:max-w-none bp-1400:border-l bp-1400:border-[color:rgba(15,35,58,0.14)] bp-1400:pl-3 bp-1400:first:border-l-0 bp-1400:first:pl-0 dark:bp-1400:border-white/10">
       <div className="flex min-w-0 items-center gap-2">
         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center self-center text-[var(--text-heading)] dark:text-white">
           <KpiGlyph cardId={card.id} />
@@ -267,8 +267,8 @@ export default function LogbookPilotStatsHero({
         />
       ) : null}
 
-      <div className="relative z-20 grid min-w-0 grid-cols-1 gap-3 p-3 bp-1400:grid-cols-[minmax(20rem,22rem)_minmax(0,1fr)] bp-1400:items-center bp-1400:gap-3.5 bp-1400:p-3.5">
-        <div className="flex min-w-0 items-center gap-2 border-b border-[color:rgba(15,35,58,0.14)] pb-3 dark:border-white/10 bp-1400:border-b-0 bp-1400:pb-0">
+      <div className="relative z-20 grid min-w-0 gap-3 p-3 bp-1024:grid-cols-[minmax(19.5rem,20.5rem)_minmax(0,1fr)] bp-1024:items-center bp-1024:gap-3.5 bp-1024:p-3.5 bp-1400:grid-cols-[minmax(20rem,22rem)_minmax(0,1fr)]">
+        <div className="flex min-w-0 items-center gap-2 border-b border-[color:rgba(15,35,58,0.14)] pb-3 dark:border-white/10 bp-1024:border-b-0 bp-1024:pb-0">
           <SummaryAirlineMark airline={airline} />
           <div className="min-w-0">
             <p className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em]", labelToneClassName)}>
@@ -285,7 +285,7 @@ export default function LogbookPilotStatsHero({
           </div>
         </div>
 
-        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-6 bp-1024:gap-x-4 bp-1024:gap-y-3 bp-1024:[&>*]:col-span-2 bp-1024:[&>*:nth-child(4)]:col-start-2 bp-1024:[&>*:nth-child(5)]:col-start-4 bp-1400:grid-cols-5 bp-1400:gap-x-0 bp-1400:gap-y-0 bp-1400:[&>*]:col-span-1 bp-1400:[&>*]:col-start-auto">
+        <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 bp-1024:grid-cols-6 bp-1024:justify-items-center bp-1024:gap-x-4 bp-1024:gap-y-3 bp-1024:[&>*]:col-span-2 bp-1024:[&>*:nth-child(4)]:col-start-2 bp-1024:[&>*:nth-child(5)]:col-start-4 bp-1400:grid-cols-5 bp-1400:justify-items-stretch bp-1400:gap-x-0 bp-1400:gap-y-0 bp-1400:[&>*]:col-span-1 bp-1400:[&>*]:col-start-auto">
           {kpiCards.map((card) => (
             <KpiMetric
               key={card.id}
