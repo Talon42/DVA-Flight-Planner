@@ -78,6 +78,18 @@ function formatPilotMetadataLine(profile) {
   return parts.join(" \u00b7 ");
 }
 
+// Uses the joined-on year from the DVA profile page so the hero can show the pilot's start year.
+function formatFlyingSinceLine(profile) {
+  const flyingSinceYearText = readProfileField(profile, "flyingSinceYear", "flying_since_year");
+  const flyingSinceYear = Number.parseInt(flyingSinceYearText, 10);
+
+  if (!Number.isFinite(flyingSinceYear) || flyingSinceYear < 1900) {
+    return "";
+  }
+
+  return `Flying Since: ${flyingSinceYear}`;
+}
+
 function formatMinutesValue(totalMinutes) {
   const minutes = Number(totalMinutes);
   if (!Number.isFinite(minutes) || minutes <= 0) {
@@ -226,6 +238,7 @@ export default function LogbookPilotStatsHero({
   const topAirlineLabel = airlineName || "Top Flight by Airline";
   const profileDisplayName = formatPilotName(profileMetadata);
   const profileMetaLine = formatPilotMetadataLine(profileMetadata);
+  const flyingSinceLine = formatFlyingSinceLine(profileMetadata);
   const logoSrc = String(airline?.airlineLogoSrc || "").trim();
   const logoClassName = String(airline?.airlineLogoClassName || "").trim();
   const labelToneClassName = "text-[var(--text-muted)] dark:text-white/60";
@@ -329,6 +342,11 @@ export default function LogbookPilotStatsHero({
             {profileMetaLine ? (
               <p className={cn("m-0 truncate text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>
                 {profileMetaLine}
+              </p>
+            ) : null}
+            {flyingSinceLine ? (
+              <p className={cn("m-0 truncate text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>
+                {flyingSinceLine}
               </p>
             ) : null}
           </div>

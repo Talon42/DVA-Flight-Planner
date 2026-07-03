@@ -37,6 +37,19 @@ fn parse_hours_to_minutes(value: &str) -> Option<i64> {
     Some((hours * 60.0).round() as i64)
 }
 
+fn parse_year_from_text(value: &str) -> Option<i32> {
+    let normalized = normalize_text(value);
+    if normalized.is_empty() {
+        return None;
+    }
+
+    Regex::new(r"\b((?:19|20)\d{2})\b")
+        .ok()
+        .and_then(|regex| regex.captures(&normalized))
+        .and_then(|captures| captures.get(1))
+        .and_then(|value| value.as_str().parse::<i32>().ok())
+}
+
 fn to_title_case(value: &str) -> String {
     normalize_text(value)
         .split_whitespace()
@@ -197,6 +210,43 @@ fn extract_total_block_time_minutes(document: &Html) -> Option<i64> {
     None
 }
 
+fn extract_joined_on_year(document: &Html) -> Option<i32> {
+    let row_selector = Selector::parse("tr").expect("valid row selector");
+    let cell_selector = Selector::parse("td, th").expect("valid cell selector");
+
+    for row in document.select(&row_selector) {
+        let cells = row.select(&cell_selector).collect::<Vec<_>>();
+        let row_text = normalize_text(&row.text().collect::<String>());
+        if row_text.is_empty() {
+            continue;
+        }
+
+        let label_text = cells
+            .first()
+            .map(|cell| normalize_text(&cell.text().collect::<String>()))
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+
+        if label_text != "joined on" && !row_text.to_ascii_lowercase().contains("joined on") {
+            continue;
+        }
+
+        if let Some(year) = cells
+            .get(1)
+            .map(|cell| normalize_text(&cell.text().collect::<String>()))
+            .and_then(|value| parse_year_from_text(&value))
+        {
+            return Some(year);
+        }
+
+        if let Some(year) = parse_year_from_text(&row_text) {
+            return Some(year);
+        }
+    }
+
+    None
+}
+
 pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     export_id: &str,
 ) -> Result<DeltaLogbookPilotProfileMetadata, String> {
@@ -242,6 +292,7 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     let document = Html::parse_document(&html_text);
     let (raw_profile_header, display_name, pilot_code) = parse_profile_header_text(&document);
     let equipment_type = extract_equipment_type(&document);
+    let flying_since_year = extract_joined_on_year(&document);
     let total_block_time_minutes = extract_total_block_time_minutes(&document);
 
     if pilot_code.is_none()
@@ -264,6 +315,7 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
         name: None,
         pilot_code,
         equipment_type,
+        flying_since_year,
         total_block_time_minutes,
         fetched_at_utc: Some(Utc::now().to_rfc3339()),
     };
@@ -291,6 +343,7 @@ pub(crate) fn build_unavailable_pilot_profile_metadata(
         name: None,
         pilot_code: None,
         equipment_type: None,
+        flying_since_year: None,
         total_block_time_minutes: None,
         fetched_at_utc: Some(Utc::now().to_rfc3339()),
     }
@@ -357,5 +410,22 @@ mod tests {
         );
 
         assert_eq!(extract_total_block_time_minutes(&document), Some(32_922));
+    }
+
+    #[test]
+    fn extract_joined_on_year_parses_joined_on_value() {
+        let document = Html::parse_document(
+            r#"
+            <html>
+              <body>
+                <table>
+                  <tr><td>Joined On</td><td>March 4, 2013</td></tr>
+                </table>
+              </body>
+            </html>
+            "#,
+        );
+
+        assert_eq!(extract_joined_on_year(&document), Some(2013));
     }
 }

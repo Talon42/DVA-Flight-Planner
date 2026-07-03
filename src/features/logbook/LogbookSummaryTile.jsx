@@ -1,5 +1,5 @@
 import { cn } from "../../components/ui/cn";
-import { bodySmTextClassName, labelTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
+import { bodyMdTextClassName } from "../../components/ui/typography";
 
 // Renders a compact dashboard tile for logbook summary values.
 export default function LogbookSummaryTile({
@@ -16,19 +16,18 @@ export default function LogbookSummaryTile({
         className
       )}
     >
-      <p className={cn("m-0 text-[var(--eyebrow)] bp-1920:text-[0.8rem]", labelTextClassName)}>{label}</p>
+      <p className={cn("m-0 text-[var(--eyebrow)] font-semibold uppercase tracking-[0.12em]", bodyMdTextClassName)}>{label}</p>
       <p
         className={cn(
-          "m-0 min-w-0 text-[var(--text-heading)]",
-          sectionTitleTextClassName,
-          "break-words bp-1920:text-[1.2rem]"
+          "m-0 min-w-0 break-words text-[var(--text-heading)] font-semibold",
+          bodyMdTextClassName
         )}
         title={title || undefined}
       >
         {value || "N/A"}
       </p>
       {meta ? (
-        <p className={cn("m-0 text-[var(--text-muted)] bp-1920:text-[0.88rem]", bodySmTextClassName)} title={title || undefined}>
+        <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)} title={title || undefined}>
           {meta}
         </p>
       ) : null}

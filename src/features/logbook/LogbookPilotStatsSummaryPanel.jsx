@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
-import { bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
+import { bodyMdTextClassName } from "../../components/ui/typography";
 import { nestedPanelFrameClassName } from "../../components/ui/patterns";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
@@ -24,13 +24,13 @@ function RankingRow({ item, showProgressBar = true, showPercentValue = true }) {
     <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex min-w-0 items-baseline justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
-          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodySmTextClassName)}>{item.meta}</p> : null}
+          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
+          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
         </div>
         <div className="shrink-0 text-right">
-          <p className={cn("m-0 text-[var(--text-heading)]", bodySmTextClassName)}>{item?.value}</p>
+          <p className={cn("m-0 text-[var(--text-heading)]", bodyMdTextClassName)}>{item?.value}</p>
           {showPercentValue && item?.percentValue ? (
-            <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>{item.percentValue}</p>
+            <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>{item.percentValue}</p>
           ) : null}
         </div>
       </div>
@@ -55,20 +55,20 @@ function AirlineRow({ item }) {
         {logoSrc ? (
           <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-6 w-6 object-contain", logoClassName)} loading="lazy" />
         ) : (
-          <span className={cn("truncate px-1 text-center text-[0.62rem] font-semibold uppercase", labelTextClassName)}>
+          <span className={cn("truncate px-1 text-center text-[0.88rem] font-semibold uppercase", bodyMdTextClassName)}>
             {airlineCode ? airlineCode.slice(0, 3) : "?"}
           </span>
         )}
       </div>
 
       <div className="min-w-0">
-        <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
-        {airlineCode ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodySmTextClassName)}>{airlineCode}</p> : null}
+        <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
+        {airlineCode ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{airlineCode}</p> : null}
       </div>
 
       <div className="shrink-0 text-right">
-        <p className={cn("m-0 text-[var(--text-heading)]", bodySmTextClassName)}>{item?.value}</p>
-        {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>{item.percentValue}</p> : null}
+        <p className={cn("m-0 text-[var(--text-heading)]", bodyMdTextClassName)}>{item?.value}</p>
+        {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>{item.percentValue}</p> : null}
       </div>
     </div>
   );
@@ -81,12 +81,12 @@ function RouteRow({ item }) {
     <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex min-w-0 items-baseline justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
-          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodySmTextClassName)}>{item.meta}</p> : null}
+          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
+          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
         </div>
-        <p className={cn("m-0 shrink-0 text-right text-[var(--text-heading)]", bodySmTextClassName)}>{item?.value}</p>
+        <p className={cn("m-0 shrink-0 text-right text-[var(--text-heading)]", bodyMdTextClassName)}>{item?.value}</p>
       </div>
-      {item?.percentValue ? <p className={cn("m-0 text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-muted)]")}>{item.percentValue}</p> : null}
+      {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>{item.percentValue}</p> : null}
       <div className="h-1 w-full overflow-hidden bg-[color:var(--line)]">
         <div className="h-full bg-[var(--delta-blue)] dark:bg-[#4d91d8]" style={{ width: `${barWidth}%` }} />
       </div>
@@ -112,18 +112,18 @@ function LandingRow({ item, pirepDetails }) {
   return (
     <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_auto] items-center gap-3">
-        <p className={cn("m-0 shrink-0 truncate text-[var(--text-primary)] tabular-nums", bodySmTextClassName)}>
+        <p className={cn("m-0 shrink-0 truncate text-[var(--text-primary)] tabular-nums", bodyMdTextClassName)}>
           {item?.date || LOGBOOK_EMPTY_VALUE}
         </p>
         <div className="min-w-0">
-          <p className={cn("m-0 truncate text-[var(--text-primary)]", bodySmTextClassName)}>
+          <p className={cn("m-0 truncate text-[var(--text-primary)]", bodyMdTextClassName)}>
             {buildLandingLocationLabel(item, pirepDetails)}
           </p>
-          <p className={cn("m-0 truncate text-[var(--text-primary)]", bodySmTextClassName)}>
+          <p className={cn("m-0 truncate text-[var(--text-primary)]", bodyMdTextClassName)}>
             {item?.equipment || LOGBOOK_EMPTY_VALUE}
           </p>
         </div>
-        <p className={cn("m-0 shrink-0 truncate text-center font-semibold tabular-nums text-[var(--text-primary)]", bodySmTextClassName)}>
+        <p className={cn("m-0 shrink-0 truncate text-center font-semibold tabular-nums text-[var(--text-primary)]", bodyMdTextClassName)}>
           {landingRateValue}
         </p>
         <div className="flex shrink-0 items-center justify-end">
@@ -139,15 +139,15 @@ function AirportRow({ item }) {
     <div className="grid gap-1.5 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodySmTextClassName)}>{item?.label}</p>
-          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodySmTextClassName)}>{item.meta}</p> : null}
+          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
+          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
         </div>
         <div className="shrink-0 text-right">
-          <p className={cn("m-0 text-[var(--text-heading)]", bodySmTextClassName)}>{item?.value}</p>
-          {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>{item.percentValue}</p> : null}
+          <p className={cn("m-0 text-[var(--text-heading)]", bodyMdTextClassName)}>{item?.value}</p>
+          {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>{item.percentValue}</p> : null}
         </div>
       </div>
-      <div className="flex gap-2 text-[0.68rem] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+      <div className={cn("flex gap-2 uppercase tracking-[0.12em] text-[var(--text-muted)]", bodyMdTextClassName)}>
         <span>{`DEP ${item?.dep ?? "0"}`}</span>
         <span>{`ARR ${item?.arr ?? "0"}`}</span>
       </div>
@@ -165,9 +165,9 @@ function RecordTile({ item }) {
 
   return (
     <div className={cn("grid min-h-0 gap-1 border p-2", toneClassName)}>
-      <p className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.14em]")}>{item?.label}</p>
-      <p className={cn("m-0 truncate", bodySmTextClassName)}>{item?.value}</p>
-      {item?.meta ? <p className={cn("m-0 truncate opacity-80", bodySmTextClassName)}>{item.meta}</p> : null}
+      <p className={cn("m-0 truncate text-[0.88rem] font-semibold uppercase tracking-[0.12em]")}>{item?.label}</p>
+      <p className={cn("m-0 truncate", bodyMdTextClassName)}>{item?.value}</p>
+      {item?.meta ? <p className={cn("m-0 truncate opacity-80", bodyMdTextClassName)}>{item.meta}</p> : null}
     </div>
   );
 }
@@ -341,7 +341,7 @@ export default function LogbookPilotStatsSummaryPanel({
 
     return (
       <div className="flex min-h-0 flex-col gap-2 px-3">
-        <p className={cn("m-0 truncate text-[var(--text-heading)]", labelTextClassName)}>{columnTitle}</p>
+        <p className={cn("m-0 truncate text-[var(--text-heading)] font-semibold uppercase tracking-[0.12em]", bodyMdTextClassName)}>{columnTitle}</p>
         {safeRowItems.length ? (
           <div className="grid gap-1.5">
             {safeRowItems.map((item, index) => (
@@ -354,7 +354,7 @@ export default function LogbookPilotStatsSummaryPanel({
             ))}
           </div>
         ) : (
-          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>No data available.</p>
+          <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>No data available.</p>
         )}
       </div>
     );
@@ -451,7 +451,7 @@ export default function LogbookPilotStatsSummaryPanel({
       )}
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <p className={cn("m-0 min-w-0 flex-1 truncate text-[var(--text-heading)]", labelTextClassName)}>{title}</p>
+        <p className={cn("m-0 min-w-0 flex-1 truncate text-[var(--text-heading)] font-semibold uppercase tracking-[0.12em]", bodyMdTextClassName)}>{title}</p>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {onViewAll ? (
             <Button
@@ -486,7 +486,7 @@ export default function LogbookPilotStatsSummaryPanel({
             ) : null}
           </>
         ) : (
-          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>No data available.</p>
+          <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>No data available.</p>
         )}
       </div>
     </Panel>

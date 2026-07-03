@@ -550,6 +550,7 @@ fn is_complete_cached_pilot_profile_metadata(
         == Some(export_id)
         && metadata.display_name.is_some()
         && metadata.pilot_code.is_some()
+        && metadata.flying_since_year.is_some()
         && metadata.total_block_time_minutes.is_some()
 }
 
@@ -1020,6 +1021,7 @@ mod tests {
             name: Some("Jacob Benjamin".to_string()),
             pilot_code: Some("DVA11384".to_string()),
             equipment_type: Some("A350-900".to_string()),
+            flying_since_year: Some(2013),
             total_block_time_minutes: Some(32_922),
             fetched_at_utc: Some("2026-07-01T00:00:00Z".to_string()),
         };
@@ -1041,6 +1043,7 @@ mod tests {
             name: Some("Jacob Benjamin".to_string()),
             pilot_code: Some("DVA11384".to_string()),
             equipment_type: Some("A350-900".to_string()),
+            flying_since_year: Some(2013),
             total_block_time_minutes: None,
             fetched_at_utc: Some("2026-07-01T00:00:00Z".to_string()),
         };
