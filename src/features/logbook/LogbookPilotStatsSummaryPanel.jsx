@@ -25,6 +25,30 @@ function parsePercentValue(percentValue) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+// Renders the shared count, label, and percent band used by airline and equipment tiles.
+function TileMetricBand({ value, percentValue, paddingClassName = "px-3", className = "" }) {
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--surface-border)] bg-[var(--surface-soft)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]",
+        paddingClassName,
+        className
+      )}
+    >
+      <div className="min-w-0">
+        <p className={TILE_METRIC_NUMBER_CLASS_NAME}>{value}</p>
+        <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>FLIGHTS</p>
+      </div>
+      <div aria-hidden="true" />
+      {percentValue ? (
+        <p className={cn(TILE_METRIC_PERCENT_CLASS_NAME, bodyMdTextClassName)}>{percentValue}</p>
+      ) : (
+        <span aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
 function RankingRow({ item, showProgressBar = true, showPercentValue = true }) {
   const barWidth = Math.max(0, Math.min(100, parsePercentValue(item?.percentValue)));
 
@@ -113,18 +137,7 @@ function AirlineTile({ item }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--line)] bg-[var(--surface-raised)] px-3 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]">
-        <div className="min-w-0">
-          <p className={TILE_METRIC_NUMBER_CLASS_NAME}>{item?.value}</p>
-          <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>FLIGHTS</p>
-        </div>
-        <div aria-hidden="true" />
-        {item?.percentValue ? (
-          <p className={cn(TILE_METRIC_PERCENT_CLASS_NAME, bodyMdTextClassName)}>{item.percentValue}</p>
-        ) : (
-          <span aria-hidden="true" />
-        )}
-      </div>
+      <TileMetricBand value={item?.value} percentValue={item?.percentValue} />
     </div>
   );
 }
@@ -594,18 +607,7 @@ function EquipmentTile({ item }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2 border-t border-[color:var(--line)] bg-[var(--surface-raised)] px-2 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)]">
-        <div className="min-w-0">
-          <p className={TILE_METRIC_NUMBER_CLASS_NAME}>{item?.value}</p>
-          <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>FLIGHTS</p>
-        </div>
-        <div aria-hidden="true" />
-        {item?.percentValue ? (
-          <p className={cn(TILE_METRIC_PERCENT_CLASS_NAME, bodyMdTextClassName)}>{item.percentValue}</p>
-        ) : (
-          <span aria-hidden="true" />
-        )}
-      </div>
+      <TileMetricBand value={item?.value} percentValue={item?.percentValue} paddingClassName="px-2" />
     </div>
   );
 }
