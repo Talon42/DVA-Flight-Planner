@@ -14,7 +14,8 @@ import { buildLogbookPirepId, useVisibleLogbookPirepDetails } from "./useLogbook
 
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
-const TWO_COLUMN_TILE_VARIANTS = new Set(["records", "equipment-grid", "airline-grid"]);
+const TWO_COLUMN_TILE_VARIANTS = new Set(["records"]);
+const FIXED_HEIGHT_TILE_GRID_VARIANTS = new Set(["airline-grid", "equipment-grid"]);
 // Keeps the airline and equipment metric bands visually aligned across both tile families.
 const TILE_METRIC_NUMBER_CLASS_NAME = "m-0 leading-none text-[1.1rem] font-semibold tabular-nums text-[var(--text-heading)]";
 const TILE_METRIC_LABEL_CLASS_NAME = "m-0 text-[0.32rem] tracking-[0.14em] text-[var(--text-muted)]";
@@ -22,6 +23,8 @@ const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 text-right text-[0.82rem] tabular-nu
 // Gives the airline and equipment tiles a shared frame treatment in light mode while preserving the dark look.
 const TILE_STAT_FRAME_CLASS_NAME =
   "relative isolate grid min-h-[7.25rem] grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
+const FIXED_TILE_ROW_HEIGHT_PX = 116;
+const FIXED_TILE_ROW_GAP_PX = 8;
 
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
@@ -260,6 +263,15 @@ function getMeasuredPilotStatsFitCount({
     return 0;
   }
 
+  if (FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant)) {
+    const fittedVisualRows = Math.max(
+      1,
+      Math.floor((safeBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX))
+    );
+
+    return Math.max(1, Math.min(safeItemCount, fittedVisualRows * 2));
+  }
+
   if (!(safeBodyHeight > 0) || !measuredHeights.length) {
     return Math.max(1, Math.min(safeMaxRows, safeItemCount));
   }
@@ -316,6 +328,15 @@ function getFallbackPilotStatsFitCount({ bodyHeight, variant, maxRows, itemCount
   const estimatedRowHeight = getEstimatedPilotStatsRowHeight(variant);
   const estimatedRows = Math.max(1, Math.floor(safeBodyHeight / estimatedRowHeight));
 
+  if (FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant)) {
+    const fittedVisualRows = Math.max(
+      1,
+      Math.floor((safeBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX))
+    );
+
+    return Math.max(1, Math.min(safeItemCount, fittedVisualRows * 2));
+  }
+
   if (TWO_COLUMN_TILE_VARIANTS.has(variant)) {
     return Math.max(1, Math.min(safeItemCount, safeMaxRows, estimatedRows * 2));
   }
@@ -341,7 +362,7 @@ export default function LogbookPilotStatsSummaryPanel({
   const measureShellRef = useRef(null);
   const measureRef = useRef(null);
   const [fitItems, setFitItems] = useState(maxRows);
-  const resizeTimeoutRef = useRef(0);
+  const rafIdRef = useRef(0);
   const rowItems = Array.isArray(items) ? items : [];
   const departureAirportItems = Array.isArray(departureItems) ? departureItems : [];
   const arrivalAirportItems = Array.isArray(arrivalItems) ? arrivalItems : [];
@@ -442,8 +463,9 @@ export default function LogbookPilotStatsSummaryPanel({
     const bodyNode = bodyRef.current;
     const measureNode = measureRef.current;
     const candidateCount = Math.min(maxRows, rowItems.length);
+    const needsMeasuredChildren = !FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant);
 
-    if (!bodyNode || !measureNode || typeof ResizeObserver === "undefined") {
+    if (!bodyNode || (needsMeasuredChildren && !measureNode) || typeof ResizeObserver === "undefined") {
       const fallbackFitItems = getFallbackPilotStatsFitCount({
         bodyHeight: bodyNode?.clientHeight || 0,
         variant,
@@ -457,6 +479,18 @@ export default function LogbookPilotStatsSummaryPanel({
 
     const updateFitItems = () => {
       const bodyHeight = Math.max(0, Math.floor(bodyNode.clientHeight || 0));
+
+      if (FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant)) {
+        const fittedVisualRows = Math.max(
+          1,
+          Math.floor((bodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX))
+        );
+        const nextFitItems = Math.max(1, Math.min(candidateCount, fittedVisualRows * 2));
+
+        setFitItems((current) => (current === nextFitItems ? current : nextFitItems));
+        return;
+      }
+
       const rowGap = (() => {
         const computedStyle = window.getComputedStyle(measureNode);
         const gapValue = computedStyle.rowGap || computedStyle.gap || "0";
@@ -487,14 +521,14 @@ export default function LogbookPilotStatsSummaryPanel({
     };
 
     const scheduleUpdate = () => {
-      if (resizeTimeoutRef.current) {
-        clearTimeout(resizeTimeoutRef.current);
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
       }
 
-      resizeTimeoutRef.current = window.setTimeout(() => {
-        resizeTimeoutRef.current = 0;
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = 0;
         updateFitItems();
-      }, 100);
+      });
     };
 
     updateFitItems();
@@ -502,9 +536,9 @@ export default function LogbookPilotStatsSummaryPanel({
     observer.observe(bodyNode);
 
     return () => {
-      if (resizeTimeoutRef.current) {
-        clearTimeout(resizeTimeoutRef.current);
-        resizeTimeoutRef.current = 0;
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = 0;
       }
 
       observer.disconnect();
