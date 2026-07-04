@@ -118,6 +118,10 @@ function getDetailSortValue(detailView, columnKey, row) {
           return resolveNumericSortValue(row?.rank);
         case "label":
           return resolveTextSortValue(row?.label);
+        case "dep":
+          return resolveTextSortValue(row?.dep ?? row?.departureCode ?? row?.departure);
+        case "arr":
+          return resolveTextSortValue(row?.arr ?? row?.arrivalCode ?? row?.arrival);
         case "value":
           return resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value);
         case "percentValue":
@@ -221,10 +225,17 @@ function buildColumns(detailView, detailRows) {
     case "routes":
       return {
         title: "All Routes",
-        rows: detailRows.routes || [],
+        rows: (detailRows.routes || []).map((row) => ({
+          ...row,
+          dep: String(row?.departureCode || row?.row?.departure || "").trim(),
+          arr: String(row?.arrivalCode || row?.row?.arrival || "").trim(),
+          departureName: String(row?.departureName || "").trim(),
+          arrivalName: String(row?.arrivalName || "").trim()
+        })),
         columns: [
           { key: "rank", label: "Rank" },
-          { key: "label", label: "Route" },
+          { key: "dep", label: "DEP", wideLabel: "Departure", ariaLabel: "Departure" },
+          { key: "arr", label: "ARR", wideLabel: "Arrival", ariaLabel: "Arrival" },
           { key: "value", label: "Flights" },
           { key: "percentValue", label: "% of Total" }
         ]
@@ -379,7 +390,14 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                     )}
                     onClick={() => handleSort(column.key)}
                   >
-                    {column.label}
+                    {column.wideLabel ? (
+                      <>
+                        <span className="bp-1024:hidden">{column.label}</span>
+                        <span className="hidden bp-1024:inline">{column.wideLabel}</span>
+                      </>
+                    ) : (
+                      column.label
+                    )}
                     <SortChevron direction={sortDirection} active={column.key === sortKey} />
                   </button>
                 </th>
@@ -438,6 +456,33 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                           return (
                             <span className="whitespace-nowrap text-left tabular-nums" title={routeValue || undefined}>
                               {arrival}
+                            </span>
+                          );
+                        })()
+                      ) : detailView === "routes" && (column.key === "dep" || column.key === "arr") ? (
+                        (() => {
+                          const departure = String(row.dep || LOGBOOK_EMPTY_VALUE).trim();
+                          const arrival = String(row.arr || LOGBOOK_EMPTY_VALUE).trim();
+                          const departureName = String(row.departureName || "").trim();
+                          const arrivalName = String(row.arrivalName || "").trim();
+
+                          if (column.key === "dep") {
+                            return (
+                              <span className="flex min-w-0 flex-col">
+                                <span className="whitespace-nowrap text-left tabular-nums" title={departureName || undefined}>
+                                  {departure}
+                                </span>
+                                {departureName ? <span className="truncate text-[var(--text-muted)]">{departureName}</span> : null}
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span className="flex min-w-0 flex-col items-start text-left">
+                              <span className="whitespace-nowrap tabular-nums" title={arrivalName || undefined}>
+                                {arrival}
+                              </span>
+                              {arrivalName ? <span className="truncate text-[var(--text-muted)]">{arrivalName}</span> : null}
                             </span>
                           );
                         })()

@@ -8,6 +8,7 @@ import { getAirlinePrimaryColor } from "../../domain/airlines/airlineBranding.js
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getAircraftGlyphSources } from "../../domain/aircraft/aircraftGlyphs.js";
+import planeLight from "../../data/images/plane_light.png";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
@@ -27,6 +28,11 @@ const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 min-w-0 text-right tabular-nums text
 // Gives the airline and equipment tiles a shared frame treatment in light mode while preserving the dark look.
 const TILE_STAT_FRAME_CLASS_NAME =
   "relative isolate grid h-[8.25rem] min-w-0 grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
+// Matches the flight-board route banner line treatment so the route card reads like the existing flight-board UI.
+const ROUTE_LEFT_LINE_CLASS =
+  "block h-[2px] w-full bg-gradient-to-r from-transparent from-0% via-[rgba(200,16,46,0.7)] via-60% to-[rgba(200,16,46,1)] to-100%";
+const ROUTE_RIGHT_LINE_CLASS =
+  "block h-[2px] w-full bg-gradient-to-r from-[rgba(200,16,46,1)] from-0% via-[rgba(200,16,46,0.7)] via-40% to-transparent to-100%";
 // Leaves a tiny buffer so fractional layout math does not clip the last visible row by a pixel.
 const FIT_HEIGHT_BUFFER_PX = 3;
 // Must match TILE_STAT_FRAME_CLASS_NAME's h-[8.25rem] so fixed tile paging only counts full rows.
@@ -214,21 +220,83 @@ function AirlineTile({ item }) {
   );
 }
 
-function RouteRow({ item }) {
-  const barWidth = Math.max(0, Math.min(100, parsePercentValue(item?.percentValue)));
+// Renders a compact route-board card with flight-board styling and average metrics.
+function FavoriteRouteBoardCard({
+  route = null,
+  departureCode = "",
+  arrivalCode = "",
+  departureName = "",
+  arrivalName = "",
+  averageDistanceDisplay = "-",
+  averageBlockDisplay = "-"
+}) {
+  const resolvedDepartureCode = String(departureCode || route?.departureCode || route?.row?.departure || "").trim();
+  const resolvedArrivalCode = String(arrivalCode || route?.arrivalCode || route?.row?.arrival || "").trim();
+  const resolvedDepartureName = String(departureName || route?.departureName || "").trim();
+  const resolvedArrivalName = String(arrivalName || route?.arrivalName || "").trim();
+  const resolvedAverageDistanceDisplay = String(averageDistanceDisplay || route?.averageDistanceDisplay || "-").trim() || "-";
+  const resolvedAverageBlockDisplay = String(averageBlockDisplay || route?.averageBlockDisplay || "-").trim() || "-";
+  const resolvedFlightCountDisplay = String(route?.value || route?.count || "-").trim() || "-";
 
   return (
-    <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
-      <div className="flex min-w-0 items-baseline justify-between gap-3 text-left">
-        <div className="min-w-0 flex-1 text-left">
-          <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.label}</p>
-          {item?.meta ? <p className={STAT_CARD_META_CLASS_NAME}>{item.meta}</p> : null}
+    <div className="grid min-w-0 gap-2 border border-[color:var(--line)] bg-[var(--surface-raised)] px-3 py-2 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
+      <div className="grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_auto_minmax(0,1fr)_3.7rem] items-center gap-2.5">
+        <div className="min-w-0 text-left">
+          <p className="m-0 whitespace-nowrap text-[0.98rem] font-semibold tracking-[-0.03em] text-[var(--text-heading)] dark:text-white">
+            {resolvedDepartureCode || LOGBOOK_EMPTY_VALUE}
+          </p>
         </div>
-        <p className={STAT_CARD_VALUE_CLASS_NAME}>{item?.value}</p>
+
+        <span aria-hidden="true" className={ROUTE_LEFT_LINE_CLASS} />
+        <div className="flex justify-center" aria-hidden="true">
+          <img
+            src={planeLight}
+            alt=""
+            aria-hidden="true"
+            className="h-[18px] w-[34px] shrink-0 object-contain brightness-0 opacity-80 dark:brightness-100 dark:opacity-100"
+            loading="lazy"
+          />
+        </div>
+        <span aria-hidden="true" className={ROUTE_RIGHT_LINE_CLASS} />
+
+        <div className="min-w-0 text-right">
+          <p className="m-0 whitespace-nowrap text-[0.98rem] font-semibold tracking-[-0.03em] text-[var(--text-heading)] dark:text-white">
+            {resolvedArrivalCode || LOGBOOK_EMPTY_VALUE}
+          </p>
+        </div>
       </div>
-      {item?.percentValue ? <p className={STAT_CARD_META_CLASS_NAME}>{item.percentValue}</p> : null}
-      <div className="h-1 w-full overflow-hidden bg-[color:var(--line)]">
-        <div className="h-full bg-[var(--delta-blue)] dark:bg-[#4d91d8]" style={{ width: `${barWidth}%` }} />
+
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
+        <div className="min-w-0">
+          {resolvedDepartureName ? <p className="m-0 truncate text-[0.68rem] text-[var(--text-muted)]">{resolvedDepartureName}</p> : null}
+        </div>
+
+        <div aria-hidden="true" />
+
+        <div className="min-w-0 text-right">
+          {resolvedArrivalName ? <p className="m-0 truncate text-[0.68rem] text-[var(--text-muted)]">{resolvedArrivalName}</p> : null}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center justify-items-center gap-3 border-t border-[color:var(--line)] pt-2 dark:border-[color:var(--line-strong)]">
+        <div className="min-w-0 text-center">
+          <p className="m-0 text-[0.54rem] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">AVG DIST</p>
+          <p className="m-0 truncate text-[0.8rem] font-semibold tabular-nums text-[var(--text-heading)] dark:text-white">
+            {resolvedAverageDistanceDisplay}
+          </p>
+        </div>
+        <div className="min-w-0 text-center">
+          <p className="m-0 text-[0.54rem] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Flights</p>
+          <p className="m-0 truncate text-[0.8rem] font-semibold tabular-nums text-[var(--text-heading)] dark:text-white">
+            {resolvedFlightCountDisplay}
+          </p>
+        </div>
+        <div className="min-w-0 text-center">
+          <p className="m-0 text-[0.54rem] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">AVG BLOCK</p>
+          <p className="m-0 truncate text-[0.8rem] font-semibold tabular-nums text-[var(--text-heading)] dark:text-white">
+            {resolvedAverageBlockDisplay}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -460,10 +528,8 @@ export default function LogbookPilotStatsSummaryPanel({
         item={item}
         pirepDetails={landingPirepDetailsById[buildLogbookPirepId(item)] || null}
       />
-      ) : variant === "airport" ? (
+    ) : variant === "airport" ? (
       <AirportColumnRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
-    ) : variant === "route" ? (
-      <RouteRow key={`${item?.label || item?.value || "route"}-${index}`} item={item} />
     ) : variant === "equipment-grid" ? (
       <EquipmentTile key={`${item?.label || item?.value || "equipment"}-${index}`} item={item} />
     ) : (
@@ -480,6 +546,25 @@ export default function LogbookPilotStatsSummaryPanel({
 
     if (!safeRowItems.length) {
       return null;
+    }
+
+    if (variant === "route") {
+      return (
+        <div ref={containerRef} className="grid min-w-0 gap-2">
+          {safeRowItems.map((item, index) => (
+            <FavoriteRouteBoardCard
+              key={`${item?.key || item?.label || item?.value || "route"}-${index}`}
+              route={item}
+              departureCode={item?.departureCode}
+              arrivalCode={item?.arrivalCode}
+              departureName={item?.departureName}
+              arrivalName={item?.arrivalName}
+              averageDistanceDisplay={item?.averageDistanceDisplay}
+              averageBlockDisplay={item?.averageBlockDisplay}
+            />
+          ))}
+        </div>
+      );
     }
 
     if (TILE_GRID_RENDER_VARIANTS.has(variant)) {

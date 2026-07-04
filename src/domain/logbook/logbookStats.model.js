@@ -1,3 +1,4 @@
+import { getAirportByIcao } from "../airports/airportCatalog.js";
 import { LOGBOOK_EMPTY_VALUE, formatLandingGrade } from "./logbook.model.js";
 
 function formatNumber(value, options = {}) {
@@ -31,6 +32,25 @@ function formatUnit(value, unit, options = {}) {
   }
 
   return `${formatNumber(value, options)} ${unit}`;
+}
+
+function formatAverageDistanceNm(value) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+
+  return `${formatNumber(Math.round(value))} nm`;
+}
+
+function formatAverageBlockMinutes(value) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+
+  const roundedMinutes = Math.max(0, Math.round(value));
+  const hours = Math.floor(roundedMinutes / 60);
+  const minutes = roundedMinutes % 60;
+  return `${hours}h ${String(minutes).padStart(2, "0")}m`;
 }
 
 function formatPercent(value, total) {
@@ -157,6 +177,80 @@ function buildRouteKey(row) {
 
 function buildRouteLabel(row) {
   return `${String(row?.departure || "").trim()} -> ${String(row?.arrival || "").trim()}`;
+}
+
+function getAirportDisplayName(icao) {
+  const airport = getAirportByIcao(icao);
+  return String(airport?.actualName || airport?.name || "").trim();
+}
+
+// Keeps per-route totals together so the summary card can show averages without recomputing them in React.
+function createRouteAggregate(row) {
+  const departureCode = String(row?.departure || "").trim();
+  const arrivalCode = String(row?.arrival || "").trim();
+
+  return {
+    departureCode,
+    arrivalCode,
+    departureName: getAirportDisplayName(departureCode),
+    arrivalName: getAirportDisplayName(arrivalCode),
+    distanceTotal: 0,
+    distanceCount: 0,
+    blockTimeTotal: 0,
+    blockTimeCount: 0
+  };
+}
+
+function updateRouteAggregate(aggregate, row) {
+  if (Number.isFinite(row.distanceNm)) {
+    aggregate.distanceTotal += row.distanceNm;
+    aggregate.distanceCount += 1;
+  }
+
+  if (Number.isFinite(row.blockTimeMinutes)) {
+    aggregate.blockTimeTotal += row.blockTimeMinutes;
+    aggregate.blockTimeCount += 1;
+  }
+
+  return aggregate;
+}
+
+function buildRouteRankingItems(routeCounts, { totalCount = 0, rowMap = null, routeAggregateMap = null, labelBuilder = null } = {}) {
+  return sortByCount(
+    Array.from(routeCounts.entries()).map(([key, count]) => {
+      const row = rowMap?.get(key) || null;
+      const routeAggregate = routeAggregateMap?.get(key) || null;
+      const averageDistanceNm =
+        routeAggregate && routeAggregate.distanceCount > 0 ? routeAggregate.distanceTotal / routeAggregate.distanceCount : null;
+      const averageBlockMinutes =
+        routeAggregate && routeAggregate.blockTimeCount > 0
+          ? routeAggregate.blockTimeTotal / routeAggregate.blockTimeCount
+          : null;
+
+      return {
+        key,
+        label: labelBuilder ? labelBuilder(key, row) : key,
+        count,
+        value: formatNumber(count),
+        valueRaw: count,
+        percentValue: formatPercent(count, totalCount),
+        percentValueRaw: totalCount > 0 ? (count / totalCount) * 100 : null,
+        meta: row?.airlineCode || row?.equipment || "",
+        row,
+        departureCode: routeAggregate?.departureCode || "",
+        arrivalCode: routeAggregate?.arrivalCode || "",
+        departureName: routeAggregate?.departureName || "",
+        arrivalName: routeAggregate?.arrivalName || "",
+        averageDistanceNm,
+        averageBlockMinutes,
+        averageDistanceDisplay: formatAverageDistanceNm(averageDistanceNm),
+        averageBlockDisplay: formatAverageBlockMinutes(averageBlockMinutes)
+      };
+    })
+  ).map((item, index) => ({
+    ...item,
+    rank: index + 1
+  }));
 }
 
 function buildMonthKey(row) {
@@ -649,6 +743,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
   const routeCounts = new Map();
   const routeRowsByKey = new Map();
   const routeFirstSeenOrder = new Map();
+  const routeAggregateByKey = new Map();
   const landingRows = [];
   let totalDistance = 0;
   let totalBlockTime = 0;
@@ -681,6 +776,13 @@ export function buildLogbookPilotStats(rows, options = {}) {
     incrementCount(departureCounts, row.departure);
     incrementCount(arrivalCounts, row.arrival);
     incrementCountWithRow(routeCounts, routeFirstSeenOrder, routeRowsByKey, buildRouteKey(row), row);
+
+    const routeKey = buildRouteKey(row);
+    if (routeKey && routeKey !== LOGBOOK_EMPTY_VALUE) {
+      const routeAggregate = routeAggregateByKey.get(routeKey) || createRouteAggregate(row);
+      updateRouteAggregate(routeAggregate, row);
+      routeAggregateByKey.set(routeKey, routeAggregate);
+    }
 
     if (Number.isFinite(row.landingRate)) {
       landingRows.push(row);
@@ -768,9 +870,10 @@ export function buildLogbookPilotStats(rows, options = {}) {
       topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
       departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
       arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
-      routes: buildRankingItems(routeCounts, {
+      routes: buildRouteRankingItems(routeCounts, {
         totalCount: statsRows.length,
         rowMap: routeRowsByKey,
+        routeAggregateMap: routeAggregateByKey,
         labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
       }),
       status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),
@@ -783,9 +886,10 @@ export function buildLogbookPilotStats(rows, options = {}) {
       topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
       departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
       arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
-      routes: buildRankingItems(routeCounts, {
+      routes: buildRouteRankingItems(routeCounts, {
         totalCount: statsRows.length,
         rowMap: routeRowsByKey,
+        routeAggregateMap: routeAggregateByKey,
         labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
       }),
       status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),
@@ -796,9 +900,10 @@ export function buildLogbookPilotStats(rows, options = {}) {
       equipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length }),
       departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
       arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
-      routes: buildRankingItems(routeCounts, {
+      routes: buildRouteRankingItems(routeCounts, {
         totalCount: statsRows.length,
         rowMap: routeRowsByKey,
+        routeAggregateMap: routeAggregateByKey,
         labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
       }),
       status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),

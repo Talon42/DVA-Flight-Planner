@@ -149,7 +149,7 @@ export function getEstimatedPilotStatsRowHeight(variant) {
     case "airport":
       return 54;
     case "route":
-      return 58;
+      return 96;
     case "records":
       return 56;
     case "airline-grid":
