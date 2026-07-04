@@ -301,6 +301,122 @@ function buildRankingItems(counterMap, { totalCount = 0, rowMap = null, labelBui
   }));
 }
 
+// Builds an average landing-rate lookup keyed by equipment type.
+function buildEquipmentLandingRateMap(rows) {
+  const landingRateMap = new Map();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!Number.isFinite(row?.landingRate)) {
+      continue;
+    }
+
+    const equipment = String(row?.equipment || "").trim();
+    if (!equipment || equipment === LOGBOOK_EMPTY_VALUE) {
+      continue;
+    }
+
+    const current = landingRateMap.get(equipment) || {
+      totalLandingRate: 0,
+      landingCount: 0
+    };
+
+    current.totalLandingRate += row.landingRate;
+    current.landingCount += 1;
+    landingRateMap.set(equipment, current);
+  }
+
+  return landingRateMap;
+}
+
+// Enriches the equipment ranking rows with an average landing rate per type.
+function buildEquipmentRankingItems(counterMap, rows, { totalCount = 0 } = {}) {
+  const landingRateMap = buildEquipmentLandingRateMap(rows);
+
+  return buildRankingItems(counterMap, { totalCount }).map((item) => {
+    const landingRateStats = landingRateMap.get(item.key) || null;
+    const averageLandingRate =
+      landingRateStats && landingRateStats.landingCount > 0
+        ? landingRateStats.totalLandingRate / landingRateStats.landingCount
+        : null;
+
+    return {
+      ...item,
+      averageLandingRate,
+      averageLandingRateValue: averageLandingRate,
+      averageLandingRateGrade:
+        averageLandingRate === null ? LOGBOOK_EMPTY_VALUE : formatLandingGrade(averageLandingRate),
+      averageLandingRateDisplay:
+        averageLandingRate === null ? LOGBOOK_EMPTY_VALUE : formatUnit(averageLandingRate, "fpm", { maximumFractionDigits: 0 })
+    };
+  });
+}
+
+// Builds per-airline airport frequency maps so the airline table can show the most common DEP and ARR.
+function buildAirlineAirportFrequencyMap(rows) {
+  const frequencyMap = new Map();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const airlineKey = String(row?.airlineDisplayName || "").trim();
+    if (!airlineKey || airlineKey === LOGBOOK_EMPTY_VALUE) {
+      continue;
+    }
+
+    const current = frequencyMap.get(airlineKey) || {
+      departureCounts: new Map(),
+      arrivalCounts: new Map()
+    };
+
+    incrementCount(current.departureCounts, row?.departure);
+    incrementCount(current.arrivalCounts, row?.arrival);
+    frequencyMap.set(airlineKey, current);
+  }
+
+  return frequencyMap;
+}
+
+// Picks the most common airport code from a count map, using alphabetical order to break ties.
+function selectMostCommonAirport(countMap) {
+  let topCode = "";
+  let topCount = 0;
+
+  for (const [code, count] of countMap.entries()) {
+    const normalizedCode = String(code || "").trim();
+    if (!normalizedCode || normalizedCode === LOGBOOK_EMPTY_VALUE) {
+      continue;
+    }
+
+    if (!topCode || count > topCount || (count === topCount && normalizedCode.localeCompare(topCode) < 0)) {
+      topCode = normalizedCode;
+      topCount = count;
+    }
+  }
+
+  return topCode ? { code: topCode, count: topCount } : null;
+}
+
+// Enriches the airline ranking rows with their most common departure and arrival airports.
+function buildAirlineRankingItems(counterMap, rows, { totalCount = 0, rowMap = null } = {}) {
+  const airportFrequencyMap = buildAirlineAirportFrequencyMap(rows);
+
+  return buildRankingItems(counterMap, { totalCount, rowMap }).map((item) => {
+    const airportFrequency = airportFrequencyMap.get(item.key) || null;
+    const departureAirport = airportFrequency ? selectMostCommonAirport(airportFrequency.departureCounts) : null;
+    const arrivalAirport = airportFrequency ? selectMostCommonAirport(airportFrequency.arrivalCounts) : null;
+
+    return {
+      ...item,
+      departureAirportCode: departureAirport?.code || "",
+      departureAirportCount: departureAirport?.count || 0,
+      departureAirportDisplay:
+        departureAirport && departureAirport.code ? `${departureAirport.code} (${departureAirport.count})` : LOGBOOK_EMPTY_VALUE,
+      arrivalAirportCode: arrivalAirport?.code || "",
+      arrivalAirportCount: arrivalAirport?.count || 0,
+      arrivalAirportDisplay:
+        arrivalAirport && arrivalAirport.code ? `${arrivalAirport.code} (${arrivalAirport.count})` : LOGBOOK_EMPTY_VALUE
+    };
+  });
+}
+
 function buildCombinedAirportRows(departureCounts, arrivalCounts) {
   const airportMap = new Map();
 
@@ -805,12 +921,17 @@ export function buildLogbookPilotStats(rows, options = {}) {
       : null;
   const topAirline = selectTopCountEntry(airlineCounts, airlineFirstSeenOrder, airlineRowsByKey);
   const records = buildRecordSummary(statsRows);
+  const airlineRankingItems = buildAirlineRankingItems(airlineCounts, statsRows, {
+    totalCount: statsRows.length,
+    rowMap: airlineRowsByKey
+  });
+  const equipmentRankingItems = buildEquipmentRankingItems(equipmentCounts, statsRows, { totalCount: statsRows.length });
 
   return {
     totalFlights: statsRows.length,
     summary: {
       topAirline,
-      topEquipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length })[0] || null,
+      topEquipment: equipmentRankingItems[0] || null,
       totalFlights: formatNumber(statsRows.length),
       totalDistance: formatUnit(totalDistance, "nm"),
       totalDuration: formatMinutes(totalBlockTime),
@@ -865,8 +986,8 @@ export function buildLogbookPilotStats(rows, options = {}) {
     records,
     recentLandings: buildRecentLandingRows(statsRows, 20),
     rankings: {
-      airlines: buildRankingItems(airlineCounts, { totalCount: statsRows.length, rowMap: airlineRowsByKey }),
-      equipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length }),
+      airlines: airlineRankingItems,
+      equipment: equipmentRankingItems,
       topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
       departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
       arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
@@ -880,8 +1001,8 @@ export function buildLogbookPilotStats(rows, options = {}) {
       simulatorUsage: buildRankingItems(simulatorCounts, { totalCount: statsRows.length })
     },
     detailRows: {
-      airlines: buildRankingItems(airlineCounts, { totalCount: statsRows.length, rowMap: airlineRowsByKey }),
-      equipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length }),
+      airlines: airlineRankingItems,
+      equipment: equipmentRankingItems,
       recentLandings: buildRecentLandingRows(statsRows, 20),
       topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
       departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
@@ -896,8 +1017,8 @@ export function buildLogbookPilotStats(rows, options = {}) {
       records: records.summaryRows
     },
     layoutSafeLists: {
-      airlines: buildRankingItems(airlineCounts, { totalCount: statsRows.length, rowMap: airlineRowsByKey }),
-      equipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length }),
+      airlines: airlineRankingItems,
+      equipment: equipmentRankingItems,
       departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
       arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
       routes: buildRouteRankingItems(routeCounts, {
