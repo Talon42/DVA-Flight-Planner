@@ -47,6 +47,20 @@ function getRecentLandingPirepUrl(row) {
   return pirepId ? `https://www.deltava.org/pirep.do?id=${pirepId}` : "";
 }
 
+// Splits the recent-landing route into fixed-width airport codes so the arrow stays aligned.
+function getRecentLandingRouteSegments(routeValue) {
+  const normalizedRoute = String(routeValue ?? "").trim();
+  if (!normalizedRoute) {
+    return { departure: LOGBOOK_EMPTY_VALUE, arrival: LOGBOOK_EMPTY_VALUE };
+  }
+
+  const [departure = "", arrival = ""] = normalizedRoute.split(/\s*(?:->|→)\s*/);
+  return {
+    departure: departure.trim() || LOGBOOK_EMPTY_VALUE,
+    arrival: arrival.trim() || LOGBOOK_EMPTY_VALUE
+  };
+}
+
 // Resolves the airport display name from the shared catalog so the detail table can show ICAO and name separately.
 function getAirportActualName(icao) {
   const airport = getAirportByIcao(icao);
@@ -402,6 +416,24 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                             >
                               <span className="min-w-0 truncate">{flightValue}</span>
                             </button>
+                          );
+                        })()
+                      ) : detailView === "recent-landings" && column.key === "route" ? (
+                        (() => {
+                          const routeValue = String(row[column.key] ?? "").trim();
+                          const { departure, arrival } = getRecentLandingRouteSegments(routeValue);
+
+                          return (
+                            <span
+                              className="grid min-w-0 grid-cols-[4ch_1.75rem_4ch] items-center"
+                              title={routeValue || undefined}
+                            >
+                              <span className="min-w-0 truncate text-right tabular-nums">{departure}</span>
+                              <span className="text-center text-[var(--text-muted)]" aria-hidden="true">
+                                →
+                              </span>
+                              <span className="min-w-0 truncate text-left tabular-nums">{arrival}</span>
+                            </span>
                           );
                         })()
                       ) : detailView === "equipment" && column.key === "label" ? (
