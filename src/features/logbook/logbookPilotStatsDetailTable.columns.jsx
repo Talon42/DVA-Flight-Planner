@@ -432,16 +432,20 @@ function buildRecentLandingColumns() {
       getSortValue: (row) => resolveTextSortValue(row?.equipment),
       renderCell: renderRecentLandingEquipmentCell
     }),
-    buildNumericColumn({
+    buildSharedDetailColumn({
       key: "landingRate",
       label: "Landing Rate",
       compactLabel: "Landing",
       wideLabel: "Landing Rate",
       ariaLabel: "Landing Rate",
+      role: "secondary",
       sortKey: "landingRate",
       getSortValue: (row) => resolveNumericSortValue(row?.rawLandingRate ?? row?.landingRate),
       renderCell: renderRecentLandingRateCell,
-      align: "right"
+      align: "left",
+      minWidth: 190,
+      compactMinWidth: 160,
+      fr: 0.9
     })
   ];
 }
