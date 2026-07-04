@@ -18,7 +18,7 @@ const DETAIL_TH_COMPACT_CLASSNAME = "px-1.5 py-1.5 align-bottom text-left";
 const DETAIL_TD_BASE_CLASSNAME = "min-w-0 px-2 py-1.5 align-middle text-[var(--text-primary)] dark:text-white bp-1024:px-3";
 const DETAIL_TD_COMPACT_CLASSNAME = "min-w-0 px-1.5 py-1.5 align-middle text-[var(--text-primary)] dark:text-white";
 const DETAIL_SORT_BUTTON_CLASSNAME =
-  "m-0 inline-flex min-w-0 w-full items-center gap-1 rounded-none bg-transparent uppercase tracking-[0.14em] text-[var(--text-muted)] hover:text-[var(--text-heading)]";
+  "m-0 inline-flex min-w-0 items-center gap-1 rounded-none bg-transparent uppercase tracking-[0.14em] text-[var(--text-muted)] hover:text-[var(--text-heading)]";
 
 // Measures the rendered detail container width so routes can switch schemas without relying on viewport breakpoints.
 function useMeasuredElementWidth() {
@@ -203,11 +203,12 @@ function getDetailSortValue(detailView, columnKey, row) {
 }
 
 // Matches the shared table sort chevron so the detail view uses the same visual cue.
-function SortChevron({ direction, active }) {
+function SortChevron({ direction, active, className = "h-4 w-4" }) {
   return (
     <span
       className={cn(
-        "pointer-events-none flex h-4 w-4 shrink-0 items-center justify-center text-[var(--text-muted)] transition-transform duration-150",
+        "pointer-events-none flex shrink-0 items-center justify-center text-[var(--text-muted)] transition-transform duration-150",
+        className,
         active ? "" : "opacity-35",
         active && direction === "asc" && "rotate-180"
       )}
@@ -253,11 +254,11 @@ function renderRouteAirportCell({ code, name, title = "", align = "left", showNa
   const safeName = String(name || "").trim();
 
   return (
-    <span className={cn("flex min-w-0 max-w-full flex-col overflow-hidden", align === "right" ? "items-end text-right" : "items-start text-left")}>
-      <span className="whitespace-nowrap tabular-nums text-[var(--text-primary)] dark:text-white" title={title || undefined}>
+    <span className={cn("block min-w-0 max-w-full overflow-hidden", align === "right" ? "text-right" : "text-left")}>
+      <span className="block whitespace-nowrap tabular-nums text-[var(--text-primary)] dark:text-white" title={title || undefined}>
         {safeCode}
       </span>
-      {showName && safeName ? <span className="min-w-0 max-w-full truncate text-[var(--text-muted)]">{safeName}</span> : null}
+      {showName && safeName ? <span className="block min-w-0 max-w-full truncate text-[var(--text-muted)]">{safeName}</span> : null}
     </span>
   );
 }
@@ -269,15 +270,19 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "rank",
         label: "#",
         ariaLabel: "Rank",
-        widthClassName: "w-9",
+        colClassName: "w-[7%]",
+        headerClassName: "min-w-0",
+        headerButtonClassName: "w-full justify-start",
         getSortValue: (row) => resolveNumericSortValue(row?.rank)
       },
       {
         key: "dep",
         label: "DEP",
         ariaLabel: "Departure",
-        widthClassName: "w-[34%] min-w-0",
-        cellClassName: "overflow-hidden",
+        colClassName: "w-[36%]",
+        headerClassName: "min-w-0",
+        cellClassName: "min-w-0 overflow-hidden",
+        headerButtonClassName: "w-full justify-start",
         renderCell: (row) => renderRouteAirportCell({ code: row?.dep, name: row?.departureName, title: row?.departureName, showName: false }),
         getSortValue: (row) => resolveTextSortValue(row?.dep)
       },
@@ -285,8 +290,10 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "arr",
         label: "ARR",
         ariaLabel: "Arrival",
-        widthClassName: "w-[34%] min-w-0",
-        cellClassName: "overflow-hidden",
+        colClassName: "w-[36%]",
+        headerClassName: "min-w-0",
+        cellClassName: "min-w-0 overflow-hidden",
+        headerButtonClassName: "w-full justify-start",
         renderCell: (row) => renderRouteAirportCell({ code: row?.arr, name: row?.arrivalName, title: row?.arrivalName, showName: false }),
         getSortValue: (row) => resolveTextSortValue(row?.arr)
       },
@@ -294,18 +301,24 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "value",
         label: "Flt",
         ariaLabel: "Flights",
-        widthClassName: "w-12",
+        colClassName: "w-[10%]",
+        headerClassName: "min-w-0",
         align: "right",
         numeric: true,
+        headerButtonClassName: "w-full justify-end gap-0.5",
+        chevronClassName: "h-3 w-3",
         getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value)
       },
       {
         key: "percentValue",
         label: "%",
         ariaLabel: "% of Total",
-        widthClassName: "w-12",
+        colClassName: "w-[11%]",
+        headerClassName: "min-w-0",
         align: "right",
         numeric: true,
+        headerButtonClassName: "w-full justify-end gap-0.5",
+        chevronClassName: "h-3 w-3",
         getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue)
       }
     ];
@@ -315,15 +328,19 @@ function buildRoutesColumns(compactRoutesDetail) {
     {
       key: "rank",
       label: "Rank",
-      widthClassName: "w-14",
+      colClassName: "w-14",
+      headerClassName: "min-w-0",
+      headerButtonClassName: "w-full justify-start",
       getSortValue: (row) => resolveNumericSortValue(row?.rank)
     },
     {
       key: "dep",
       label: "Departure",
       ariaLabel: "Departure",
-      widthClassName: "w-[34%] min-w-0",
-      cellClassName: "overflow-hidden",
+      colClassName: "w-[34%]",
+      headerClassName: "min-w-0",
+      cellClassName: "min-w-0 overflow-hidden",
+      headerButtonClassName: "w-full justify-start",
       renderCell: (row) => renderRouteAirportCell({ code: row?.dep, name: row?.departureName, title: row?.departureName, showName: true }),
       getSortValue: (row) => resolveTextSortValue(row?.dep)
     },
@@ -331,25 +348,33 @@ function buildRoutesColumns(compactRoutesDetail) {
       key: "arr",
       label: "Arrival",
       ariaLabel: "Arrival",
-      widthClassName: "w-[34%] min-w-0",
-      cellClassName: "overflow-hidden",
+      colClassName: "w-[34%]",
+      headerClassName: "min-w-0",
+      cellClassName: "min-w-0 overflow-hidden",
+      headerButtonClassName: "w-full justify-start",
       renderCell: (row) => renderRouteAirportCell({ code: row?.arr, name: row?.arrivalName, title: row?.arrivalName, showName: true }),
       getSortValue: (row) => resolveTextSortValue(row?.arr)
     },
     {
       key: "value",
       label: "Flights",
-      widthClassName: "w-20",
+      colClassName: "w-20",
+      headerClassName: "min-w-0",
       align: "right",
       numeric: true,
+      headerButtonClassName: "w-full justify-end gap-0.5",
+      chevronClassName: "h-3.5 w-3.5",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value)
     },
     {
       key: "percentValue",
       label: "% of Total",
-      widthClassName: "w-24",
+      colClassName: "w-24",
+      headerClassName: "min-w-0",
       align: "right",
       numeric: true,
+      headerButtonClassName: "w-full justify-end gap-0.5",
+      chevronClassName: "h-3.5 w-3.5",
       getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue)
     }
   ];
@@ -570,7 +595,19 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
       </div>
 
       <div ref={detailTableWrapperRef} className="app-scrollbar min-w-0 min-h-0 flex-1 overflow-auto">
-        <table className={cn(DETAIL_TABLE_BASE_CLASSNAME, config.tableLayout === "fixed" && DETAIL_TABLE_FIXED_CLASSNAME)}>
+        <table
+          className={cn(
+            config.tableLayout === "fixed" ? "w-full border-collapse" : DETAIL_TABLE_BASE_CLASSNAME,
+            config.tableLayout === "fixed" && DETAIL_TABLE_FIXED_CLASSNAME
+          )}
+        >
+          {config.columns.some((column) => column.colClassName) ? (
+            <colgroup>
+              {config.columns.map((column) => (
+                <col key={column.key} className={column.colClassName} />
+              ))}
+            </colgroup>
+          ) : null}
           <thead className="sticky top-0 z-10 bg-[var(--surface-raised)]">
             <tr className="border-b border-[color:var(--line)]">
               {config.columns.map((column) => (
@@ -578,7 +615,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                   key={column.key}
                   className={cn(
                     config.density === "compact" ? DETAIL_TH_COMPACT_CLASSNAME : DETAIL_TH_BASE_CLASSNAME,
-                    column.widthClassName,
+                    column.colClassName,
                     column.headerClassName,
                     getDetailAlignmentClassName(column)
                   )}
@@ -589,14 +626,16 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                       DETAIL_SORT_BUTTON_CLASSNAME,
                       labelTextClassName,
                       column.key === sortKey && "text-[var(--text-heading)]",
-                      getDetailAlignmentClassName(column) === "text-right" ? "ml-auto justify-end" : "justify-start",
-                      column.headerButtonClassName
+                      column.headerButtonClassName ||
+                        (getDetailAlignmentClassName(column) === "text-right"
+                          ? "w-full ml-auto justify-end"
+                          : "w-full justify-start")
                     )}
                     aria-label={column.ariaLabel || column.wideLabel || column.label}
                     onClick={() => handleSort(column.key)}
                   >
                     {resolveDetailHeaderLabel(column)}
-                    <SortChevron direction={sortDirection} active={column.key === sortKey} />
+                    <SortChevron direction={sortDirection} active={column.key === sortKey} className={column.chevronClassName} />
                   </button>
                 </th>
               ))}
@@ -612,7 +651,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                       className={cn(
                         config.density === "compact" ? DETAIL_TD_COMPACT_CLASSNAME : DETAIL_TD_BASE_CLASSNAME,
                         bodyMdTextClassName,
-                        column.widthClassName,
+                        column.colClassName,
                         column.cellClassName,
                         getDetailAlignmentClassName(column),
                         column.numeric && "tabular-nums",
