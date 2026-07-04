@@ -2,11 +2,15 @@ import { useMemo } from "react";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName } from "../../components/ui/typography";
-import { cardFrameClassName } from "../../components/ui/patterns";
+import { cardFrameClassName, tableFrameClassName } from "../../components/ui/patterns";
 import LogbookPilotStatsDetailView from "./LogbookPilotStatsDetailView.jsx";
 import LogbookPilotStatsHero from "./LogbookPilotStatsHero.jsx";
 import LogbookPilotStatsSummaryPanel from "./LogbookPilotStatsSummaryPanel.jsx";
-import { EMPTY_DETAIL_ROWS, getPilotStatsDashboardCards } from "./logbookPilotStats.constants.js";
+import {
+  EMPTY_DETAIL_ROWS,
+  getPilotStatsDashboardCards,
+  PILOT_STATS_DASHBOARD_PAGE_CLASS_NAME
+} from "./logbookPilotStats.constants.js";
 
 // Renders the Pilot Stats overview and drill-in detail view.
 export default function LogbookPilotStats({
@@ -24,15 +28,22 @@ export default function LogbookPilotStats({
   const dashboardCards = useMemo(() => getPilotStatsDashboardCards(displayStats), [displayStats]);
 
   return (
-    <div className="logbook-pilot-stats flex h-full min-h-0 flex-col gap-3 overflow-hidden pb-2 pt-0 bp-1024:pb-2">
+    <div
+      className={cn(
+        "logbook-pilot-stats flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden",
+        tableFrameClassName
+      )}
+    >
       {summary ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-          <LogbookPilotStatsHero
-            summary={summary}
-            comparison={comparisons}
-            profileMetadata={profileMetadata}
-            comparisonPeriod={pilotStatsComparisonPeriod}
-          />
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 bp-1024:p-3.5">
+          <div className="min-w-0 shrink-0">
+            <LogbookPilotStatsHero
+              summary={summary}
+              comparison={comparisons}
+              profileMetadata={profileMetadata}
+              comparisonPeriod={pilotStatsComparisonPeriod}
+            />
+          </div>
 
           {pilotStatsDetailView ? (
             <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -44,7 +55,12 @@ export default function LogbookPilotStats({
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-3 pr-1 [scrollbar-gutter:stable]">
+              <div
+                className={cn(
+                  "app-scrollbar min-h-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] snap-y snap-mandatory",
+                  PILOT_STATS_DASHBOARD_PAGE_CLASS_NAME
+                )}
+              >
                 <div className="grid auto-rows-min grid-cols-2 gap-3 bp-1400:grid-cols-3 bp-1920:grid-cols-4">
                   {dashboardCards.map((card) => (
                     <LogbookPilotStatsSummaryPanel
@@ -58,7 +74,7 @@ export default function LogbookPilotStats({
                       autoFitRows={card.autoFitRows ?? true}
                       showProgressBar={card.key !== "equipment"}
                       onViewAll={card.hasData ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
-                      className={cn(card.spanClassName, card.cardClassName)}
+                      className={cn("snap-start", card.spanClassName, card.cardClassName)}
                     />
                   ))}
                 </div>
