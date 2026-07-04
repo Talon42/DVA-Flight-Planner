@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName } from "../../components/ui/typography";
 import { nestedPanelFrameClassName } from "../../components/ui/patterns";
 import { getAirlinePrimaryColor } from "../../domain/airlines/airlineBranding.js";
+import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { getAircraftGlyphSources } from "../../domain/aircraft/aircraftGlyphs.js";
 import { getEstimatedPilotStatsRowHeight } from "./logbookPilotStats.constants.js";
@@ -37,36 +38,10 @@ function parsePercentValue(percentValue) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-// Tracks when the viewport is short enough to switch the airline/equipment tiles into compact rows.
-function useShortViewportMode() {
-  const [isShortViewport, setIsShortViewport] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return undefined;
-    }
-
-    const mediaQueryList = window.matchMedia("(max-height: 900px)");
-    const updateViewportMode = () => {
-      setIsShortViewport(Boolean(mediaQueryList.matches));
-    };
-
-    updateViewportMode();
-
-    if (typeof mediaQueryList.addEventListener === "function") {
-      mediaQueryList.addEventListener("change", updateViewportMode);
-      return () => mediaQueryList.removeEventListener("change", updateViewportMode);
-    }
-
-    if (typeof mediaQueryList.addListener === "function") {
-      mediaQueryList.addListener(updateViewportMode);
-      return () => mediaQueryList.removeListener(updateViewportMode);
-    }
-
-    return undefined;
-  }, []);
-
-  return isShortViewport;
+// Resolves the airport name so Top Airports can show the ICAO and actual name together.
+function getAirportActualName(icao) {
+  const airport = getAirportByIcao(icao);
+  return String(airport?.actualName || airport?.name || "").trim();
 }
 
 // Renders the shared count, label, and percent band used by airline and equipment tiles.
@@ -291,22 +266,21 @@ function LandingRow({ item, pirepDetails }) {
   );
 }
 
-function AirportRow({ item }) {
+// Renders one airport ranking row with the ICAO code and resolved airport name stacked together.
+function AirportColumnRow({ item }) {
+  const airportName = getAirportActualName(item?.label);
+
   return (
     <div className="grid gap-1.5 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
-      <div className="flex min-w-0 items-center justify-between gap-3">
+      <div className="flex min-w-0 items-baseline justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.label}</p>
-          {item?.meta ? <p className={STAT_CARD_META_CLASS_NAME}>{item.meta}</p> : null}
+          {airportName ? <p className={STAT_CARD_META_CLASS_NAME}>{airportName}</p> : null}
         </div>
         <div className="shrink-0 text-right">
           <p className={STAT_CARD_VALUE_CLASS_NAME}>{item?.value}</p>
           {item?.percentValue ? <p className={STAT_CARD_META_CLASS_NAME}>{item.percentValue}</p> : null}
         </div>
-      </div>
-      <div className={cn("flex gap-2 text-[var(--text-muted)]", bodyMdTextClassName)}>
-        <span>{`DEP ${item?.dep ?? "0"}`}</span>
-        <span>{`ARR ${item?.arr ?? "0"}`}</span>
       </div>
     </div>
   );
@@ -331,6 +305,16 @@ function RecordTile({ item }) {
 
 function getAvailablePilotStatsBodyHeight(bodyHeight) {
   return Math.max(0, Math.floor(Number(bodyHeight) || 0) - FIT_HEIGHT_BUFFER_PX);
+}
+
+// Switches the tile grids to compact rows only when the normal two-column tiles cannot fit three rows.
+function getTileGridCompactMode(bodyHeight) {
+  const availableBodyHeight = getAvailablePilotStatsBodyHeight(bodyHeight);
+  const fittedNormalTileRows = Math.floor(
+    (availableBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX)
+  );
+
+  return fittedNormalTileRows < 3;
 }
 
 function getMeasuredPilotStatsFitCount({
@@ -451,11 +435,10 @@ export default function LogbookPilotStatsSummaryPanel({
   const measureShellRef = useRef(null);
   const measureRef = useRef(null);
   const [fitItems, setFitItems] = useState(maxRows);
+  const [isCompactTileMode, setIsCompactTileMode] = useState(false);
   const rafIdRef = useRef(0);
-  const isShortViewport = useShortViewportMode();
-  const isCompactTileMode =
-    isShortViewport && (variant === "airline-grid" || variant === "equipment-grid");
-  const usesFixedTileFit = (variant === "airline-grid" || variant === "equipment-grid") && !isCompactTileMode;
+  const isTileGridVariant = variant === "airline-grid" || variant === "equipment-grid";
+  const usesFixedTileFit = isTileGridVariant && !isCompactTileMode;
   const rowItems = Array.isArray(items) ? items : [];
   const departureAirportItems = Array.isArray(departureItems) ? departureItems : [];
   const arrivalAirportItems = Array.isArray(arrivalItems) ? arrivalItems : [];
@@ -477,8 +460,8 @@ export default function LogbookPilotStatsSummaryPanel({
         item={item}
         pirepDetails={landingPirepDetailsById[buildLogbookPirepId(item)] || null}
       />
-    ) : variant === "airport" ? (
-      <AirportRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
+      ) : variant === "airport" ? (
+      <AirportColumnRow key={`${item?.label || item?.value || "airport"}-${index}`} item={item} />
     ) : variant === "route" ? (
       <RouteRow key={`${item?.label || item?.value || "route"}-${index}`} item={item} />
     ) : variant === "equipment-grid" ? (
@@ -546,12 +529,7 @@ export default function LogbookPilotStatsSummaryPanel({
         {safeRowItems.length ? (
           <div className="grid gap-1.5">
             {safeRowItems.map((item, index) => (
-              <RankingRow
-                key={`${item?.label || item?.value || columnTitle.toLowerCase()}-${index}`}
-                item={item}
-                showProgressBar={false}
-                showPercentValue={false}
-              />
+              <AirportColumnRow key={`${item?.label || item?.value || columnTitle.toLowerCase()}-${index}`} item={item} />
             ))}
           </div>
         ) : (
@@ -572,11 +550,28 @@ export default function LogbookPilotStatsSummaryPanel({
     const candidateCount = Math.min(maxRows, rowItems.length);
     const needsMeasuredChildren = !usesFixedTileFit;
 
+    const getTileGridFitState = (bodyHeight) => {
+      const nextIsCompactTileMode = isTileGridVariant ? getTileGridCompactMode(bodyHeight) : false;
+
+      return {
+        nextIsCompactTileMode,
+        nextUsesFixedTileFit: isTileGridVariant ? !nextIsCompactTileMode : usesFixedTileFit
+      };
+    };
+
     if (!bodyNode || (needsMeasuredChildren && !measureNode) || typeof ResizeObserver === "undefined") {
+      const { nextIsCompactTileMode, nextUsesFixedTileFit } = getTileGridFitState(bodyNode?.clientHeight || 0);
+
+      if (isTileGridVariant) {
+        setIsCompactTileMode((current) =>
+          current === nextIsCompactTileMode ? current : nextIsCompactTileMode
+        );
+      }
+
       const fallbackFitItems = getFallbackPilotStatsFitCount({
         bodyHeight: bodyNode?.clientHeight || 0,
         variant,
-        usesFixedTileFit,
+        usesFixedTileFit: nextUsesFixedTileFit,
         maxRows,
         itemCount: candidateCount
       });
@@ -587,8 +582,15 @@ export default function LogbookPilotStatsSummaryPanel({
 
     const updateFitItems = () => {
       const bodyHeight = Math.max(0, Math.floor(bodyNode.clientHeight || 0));
+      const { nextIsCompactTileMode, nextUsesFixedTileFit } = getTileGridFitState(bodyHeight);
 
-      if (usesFixedTileFit) {
+      if (isTileGridVariant) {
+        setIsCompactTileMode((current) =>
+          current === nextIsCompactTileMode ? current : nextIsCompactTileMode
+        );
+      }
+
+      if (nextUsesFixedTileFit) {
         const availableBodyHeight = getAvailablePilotStatsBodyHeight(bodyHeight);
         const fittedVisualRows = Math.floor(
           (availableBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX)
@@ -614,7 +616,7 @@ export default function LogbookPilotStatsSummaryPanel({
         rowHeights: childHeights,
         rowGap,
         variant,
-        usesFixedTileFit,
+        usesFixedTileFit: nextUsesFixedTileFit,
         maxRows,
         itemCount: candidateCount
       });
@@ -645,7 +647,7 @@ export default function LogbookPilotStatsSummaryPanel({
 
       observer.disconnect();
     };
-  }, [autoFitRows, maxRows, rowItems.length, variant, usesFixedTileFit]);
+  }, [autoFitRows, maxRows, rowItems.length, variant, isTileGridVariant, isCompactTileMode, usesFixedTileFit]);
 
   return (
     <Panel

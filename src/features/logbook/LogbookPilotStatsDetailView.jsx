@@ -212,7 +212,6 @@ function buildColumns(detailView, detailRows) {
         columns: [
           { key: "rank", label: "Rank" },
           { key: "label", label: "ICAO" },
-          { key: "actualName", label: "Airport" },
           { key: "value", label: "Total" },
           { key: "dep", label: "DEP" },
           { key: "arr", label: "ARR" },
@@ -446,6 +445,15 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                         <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
                           <LogbookEquipmentGlyph equipment={row[column.key]} className="h-10 w-10" />
                           <span className="min-w-0 truncate">{row[column.key] ?? LOGBOOK_EMPTY_VALUE}</span>
+                        </span>
+                      ) : detailView === "top-airports" && column.key === "label" ? (
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate text-[var(--text-primary)] dark:text-white">
+                            {row[column.key] ?? LOGBOOK_EMPTY_VALUE}
+                          </span>
+                          {row?.actualName ? (
+                            <span className="truncate text-[var(--text-muted)]">{row.actualName}</span>
+                          ) : null}
                         </span>
                       ) : detailView === "airlines" && column.key === "label" && row.row?.airlineLogoSrc ? (
                         <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
