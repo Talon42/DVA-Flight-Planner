@@ -110,13 +110,13 @@ function PilotStatsDashboardPageRail({
   const pageNumbers = useMemo(() => Array.from({ length: pageCount }, (_, index) => index), [pageCount]);
 
   return (
-    <div className="flex h-full w-8 shrink-0 flex-col items-center justify-center gap-1">
+    <div className="flex h-full w-9 shrink-0 flex-col items-center justify-center gap-1.5 border border-[color:var(--line)] bg-[var(--surface)] px-1.5 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
       <button
         type="button"
         aria-label="Previous dashboard page"
         onClick={onPrevPage}
         disabled={pageIndex <= 0}
-        className="inline-flex h-7 w-7 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[color:var(--line-strong)]"
+        className="inline-flex h-7 w-7 items-center justify-center border border-[color:var(--line)] bg-transparent text-[var(--text-heading)] transition-colors hover:border-[color:var(--delta-blue)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:cursor-not-allowed disabled:border-[color:var(--line)] disabled:bg-transparent disabled:text-[var(--text-muted)] disabled:opacity-50 dark:border-[color:var(--line-strong)] dark:text-[var(--text-muted)] dark:hover:border-[color:var(--delta-blue)] dark:hover:bg-[var(--surface-soft)] dark:disabled:border-[color:var(--line-strong)] dark:disabled:text-[var(--text-muted)]"
       >
         <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
           <path
@@ -145,8 +145,8 @@ function PilotStatsDashboardPageRail({
               className={cn(
                 "inline-flex h-4 w-4 items-center justify-center border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:cursor-default",
                 isActive
-                  ? "border-[color:var(--delta-blue)] bg-[var(--delta-blue)]"
-                  : "border-[color:var(--line)] bg-[var(--surface-raised)] hover:border-[color:var(--delta-blue)] hover:bg-[var(--surface-soft)] dark:border-[color:var(--line-strong)]"
+                  ? "border-[color:var(--delta-blue)] bg-[var(--delta-blue)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.24)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)]"
+                  : "border-[color:var(--line)] bg-[var(--surface-raised)] opacity-95 hover:border-[color:var(--delta-blue)] hover:bg-[var(--surface-soft)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)] dark:hover:bg-[var(--surface-soft)]"
               )}
             />
           );
@@ -158,7 +158,7 @@ function PilotStatsDashboardPageRail({
         aria-label="Next dashboard page"
         onClick={onNextPage}
         disabled={pageIndex >= pageCount - 1}
-        className="inline-flex h-7 w-7 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[color:var(--line-strong)]"
+        className="inline-flex h-7 w-7 items-center justify-center border border-[color:var(--line)] bg-transparent text-[var(--text-heading)] transition-colors hover:border-[color:var(--delta-blue)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:cursor-not-allowed disabled:border-[color:var(--line)] disabled:bg-transparent disabled:text-[var(--text-muted)] disabled:opacity-50 dark:border-[color:var(--line-strong)] dark:text-[var(--text-muted)] dark:hover:border-[color:var(--delta-blue)] dark:hover:bg-[var(--surface-soft)] dark:disabled:border-[color:var(--line-strong)] dark:disabled:text-[var(--text-muted)]"
       >
         <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
           <path
