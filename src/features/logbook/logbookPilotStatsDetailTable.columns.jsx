@@ -72,6 +72,18 @@ function renderEquipmentCell(row) {
   );
 }
 
+// Recent landings stores the compact flight label in `label`, so this cell reads the actual equipment field directly.
+function renderRecentLandingEquipmentCell(row) {
+  const equipment = String(row?.equipment || "").trim() || LOGBOOK_EMPTY_VALUE;
+
+  return (
+    <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
+      <LogbookEquipmentGlyph equipment={equipment} className="h-10 w-10" />
+      <span className="min-w-0 truncate">{equipment}</span>
+    </span>
+  );
+}
+
 function renderLandingRateCell(row) {
   const landingRate = row.averageLandingRateDisplay ?? LOGBOOK_EMPTY_VALUE;
   const landingGrade = row.averageLandingRateGrade ?? LOGBOOK_EMPTY_VALUE;
@@ -84,6 +96,23 @@ function renderLandingRateCell(row) {
     <span className="inline-flex min-w-0 items-center gap-2">
       <span className="w-[4.5rem] shrink-0 whitespace-nowrap tabular-nums">{landingRate}</span>
       <LandingGradeBadge grade={landingGrade} />
+    </span>
+  );
+}
+
+// Keeps recent landings compact by pairing the landing rate and its grade in one right-aligned cell.
+function renderRecentLandingRateCell(row) {
+  const landingRate = row.landingRate ?? LOGBOOK_EMPTY_VALUE;
+  const landingGrade = row.grade ?? LOGBOOK_EMPTY_VALUE;
+
+  if (!landingRate || landingRate === LOGBOOK_EMPTY_VALUE) {
+    return <span className="min-w-0 truncate">{LOGBOOK_EMPTY_VALUE}</span>;
+  }
+
+  return (
+    <span className="inline-flex min-w-0 items-center justify-start gap-2">
+      <span className="w-[4.5rem] shrink-0 whitespace-nowrap tabular-nums">{landingRate}</span>
+      {landingGrade && landingGrade !== LOGBOOK_EMPTY_VALUE ? <LandingGradeBadge grade={landingGrade} /> : null}
     </span>
   );
 }
@@ -401,7 +430,7 @@ function buildRecentLandingColumns() {
       role: "secondary",
       sortKey: "equipment",
       getSortValue: (row) => resolveTextSortValue(row?.equipment),
-      renderCell: renderEquipmentCell
+      renderCell: renderRecentLandingEquipmentCell
     }),
     buildNumericColumn({
       key: "landingRate",
@@ -411,17 +440,8 @@ function buildRecentLandingColumns() {
       ariaLabel: "Landing Rate",
       sortKey: "landingRate",
       getSortValue: (row) => resolveNumericSortValue(row?.rawLandingRate ?? row?.landingRate),
-      renderCell: (row) => row.landingRate
-    }),
-    buildSharedDetailColumn({
-      key: "grade",
-      label: "Grade",
-      compactLabel: "Grade",
-      wideLabel: "Grade",
-      role: "icon",
-      sortKey: "grade",
-      getSortValue: (row) => resolveTextSortValue(row?.grade),
-      renderCell: (row) => <LandingGradeBadge grade={row.grade} />
+      renderCell: renderRecentLandingRateCell,
+      align: "right"
     })
   ];
 }
