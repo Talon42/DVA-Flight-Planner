@@ -5,9 +5,10 @@ import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName, labelTextClassName, sectionTitleTextClassName } from "../../components/ui/typography";
 import { cardFrameClassName } from "../../components/ui/patterns";
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
-import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
+import { buildDvaPirepId, LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
+import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
 
 function resolveNumericSortValue(value) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -38,6 +39,12 @@ function formatCompactDashDate(dateSortKey) {
   const day = normalized.slice(6, 8);
   const year = normalized.slice(2, 4);
   return `${month}-${day}-${year}`;
+}
+
+// Builds the Delta Virtual PIREP URL for a recent landing row so the flight label can open the report page.
+function getRecentLandingPirepUrl(row) {
+  const pirepId = buildDvaPirepId(row?.dvaPirepId || row?.rawLogbookId || row?.id);
+  return pirepId ? `https://www.deltava.org/pirep.do?id=${pirepId}` : "";
 }
 
 // Resolves the airport display name from the shared catalog so the detail table can show ICAO and name separately.
@@ -291,6 +298,18 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
     setSortDirection("asc");
   }
 
+  function handleOpenPirep(event, pirepUrl) {
+    event.stopPropagation();
+
+    if (!pirepUrl) {
+      return;
+    }
+
+    void openDesktopUrl(pirepUrl).catch((error) => {
+      console.error("Unable to open DVA PIREP page.", error);
+    });
+  }
+
   return (
     <Panel
       className={cn(
@@ -365,6 +384,26 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                     >
                       {detailView === "recent-landings" && column.key === "grade" ? (
                         <LandingGradeBadge grade={row.grade} />
+                      ) : detailView === "recent-landings" && column.key === "flight" ? (
+                        (() => {
+                          const pirepUrl = getRecentLandingPirepUrl(row);
+                          const flightValue = row[column.key] ?? LOGBOOK_EMPTY_VALUE;
+
+                          if (!pirepUrl) {
+                            return flightValue;
+                          }
+
+                          return (
+                            <button
+                              type="button"
+                              title={`Open DVA PIREP ${String(row?.dvaPirepId || row?.rawLogbookId || row?.id || "").trim()}`}
+                              className="m-0 inline-flex min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit hover:underline focus-visible:underline focus-visible:outline-none"
+                              onClick={(event) => handleOpenPirep(event, pirepUrl)}
+                            >
+                              <span className="min-w-0 truncate">{flightValue}</span>
+                            </button>
+                          );
+                        })()
                       ) : detailView === "equipment" && column.key === "label" ? (
                         <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
                           <LogbookEquipmentGlyph equipment={row[column.key]} className="h-10 w-10" />
