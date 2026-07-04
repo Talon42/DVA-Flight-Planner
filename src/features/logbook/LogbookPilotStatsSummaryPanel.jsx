@@ -254,8 +254,8 @@ function RouteRow({ item }) {
 
   return (
     <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
-      <div className="flex min-w-0 items-baseline justify-between gap-3">
-        <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 items-baseline justify-between gap-3 text-left">
+        <div className="min-w-0 flex-1 text-left">
           <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
           {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
         </div>
