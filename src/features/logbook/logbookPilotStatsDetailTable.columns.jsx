@@ -82,7 +82,7 @@ function renderLandingRateCell(row) {
 
   return (
     <span className="inline-flex min-w-0 items-center gap-2">
-      <span className="w-[5.25rem] shrink-0 whitespace-nowrap text-right tabular-nums">{landingRate}</span>
+      <span className="w-[4.5rem] shrink-0 whitespace-nowrap tabular-nums">{landingRate}</span>
       <LandingGradeBadge grade={landingGrade} />
     </span>
   );
@@ -253,6 +253,16 @@ function buildPercentColumn(overrides = {}) {
     renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE,
     ...overrides
   });
+}
+
+// Keeps the All Equipment columns balanced so the table reads as one even block.
+function getEquipmentColumnWidthProfile(overrides = {}) {
+  return {
+    minWidth: 132,
+    compactMinWidth: 132,
+    fr: 1,
+    ...overrides
+  };
 }
 
 function buildRecentLandingRows(detailRows = {}) {
@@ -593,7 +603,8 @@ function buildEquipmentColumns() {
       role: "primaryText",
       sortKey: "label",
       getSortValue: (row) => resolveTextSortValue(row?.label),
-      renderCell: renderEquipmentCell
+      renderCell: renderEquipmentCell,
+      ...getEquipmentColumnWidthProfile()
     }),
     buildNumericColumn({
       key: "value",
@@ -603,7 +614,8 @@ function buildEquipmentColumns() {
       ariaLabel: "Flights",
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
-      renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
+      renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE,
+      ...getEquipmentColumnWidthProfile()
     }),
     buildNumericColumn({
       key: "averageLandingRate",
@@ -613,9 +625,10 @@ function buildEquipmentColumns() {
       ariaLabel: "Average Landing Rate",
       sortKey: "averageLandingRate",
       getSortValue: (row) => resolveNumericSortValue(row?.averageLandingRateValue ?? row?.averageLandingRate),
-      renderCell: renderLandingRateCell
+      renderCell: renderLandingRateCell,
+      ...getEquipmentColumnWidthProfile()
     }),
-    buildPercentColumn()
+    buildPercentColumn(getEquipmentColumnWidthProfile())
   ];
 }
 
