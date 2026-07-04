@@ -1,5 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
@@ -13,6 +12,7 @@ import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
 
 const DETAIL_TABLE_BASE_CLASSNAME = "min-w-full border-collapse";
 const DETAIL_TABLE_FIXED_CLASSNAME = "table-fixed";
+const ROUTES_COMPACT_WIDTH_THRESHOLD = 1120;
 const DETAIL_TH_BASE_CLASSNAME = "px-2 py-2 align-bottom text-left bp-1024:px-3";
 const DETAIL_TH_COMPACT_CLASSNAME = "px-1.5 py-1.5 align-bottom text-left";
 const DETAIL_TD_BASE_CLASSNAME = "min-w-0 px-2 py-1.5 align-middle text-[var(--text-primary)] dark:text-white bp-1024:px-3";
@@ -228,7 +228,7 @@ function SortChevron({ direction, active, className = "h-4 w-4" }) {
   );
 }
 
-// Resolves the most readable header label for the current viewport without duplicating table markup.
+// Resolves the most readable header label for the measured table width without duplicating table markup.
 function resolveDetailHeaderLabel(column) {
   if (column?.shortLabel || column?.wideLabel) {
     return (
@@ -279,7 +279,7 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "dep",
         label: "DEP",
         ariaLabel: "Departure",
-        colClassName: "w-[36%]",
+        colClassName: "w-[37%]",
         headerClassName: "min-w-0",
         cellClassName: "min-w-0 overflow-hidden",
         headerButtonClassName: "w-full justify-start",
@@ -290,7 +290,7 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "arr",
         label: "ARR",
         ariaLabel: "Arrival",
-        colClassName: "w-[36%]",
+        colClassName: "w-[37%]",
         headerClassName: "min-w-0",
         cellClassName: "min-w-0 overflow-hidden",
         headerButtonClassName: "w-full justify-start",
@@ -301,7 +301,7 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "value",
         label: "Flt",
         ariaLabel: "Flights",
-        colClassName: "w-[10%]",
+        colClassName: "w-[9%]",
         headerClassName: "min-w-0",
         align: "right",
         numeric: true,
@@ -313,7 +313,7 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "percentValue",
         label: "%",
         ariaLabel: "% of Total",
-        colClassName: "w-[11%]",
+        colClassName: "w-[10%]",
         headerClassName: "min-w-0",
         align: "right",
         numeric: true,
@@ -328,7 +328,7 @@ function buildRoutesColumns(compactRoutesDetail) {
     {
       key: "rank",
       label: "Rank",
-      colClassName: "w-14",
+      colClassName: "w-[7%]",
       headerClassName: "min-w-0",
       headerButtonClassName: "w-full justify-start",
       getSortValue: (row) => resolveNumericSortValue(row?.rank)
@@ -358,7 +358,7 @@ function buildRoutesColumns(compactRoutesDetail) {
     {
       key: "value",
       label: "Flights",
-      colClassName: "w-20",
+      colClassName: "w-[12%]",
       headerClassName: "min-w-0",
       align: "right",
       numeric: true,
@@ -369,7 +369,7 @@ function buildRoutesColumns(compactRoutesDetail) {
     {
       key: "percentValue",
       label: "% of Total",
-      colClassName: "w-24",
+      colClassName: "w-[13%]",
       headerClassName: "min-w-0",
       align: "right",
       numeric: true,
@@ -506,7 +506,8 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
   const [sortDirection, setSortDirection] = useState("asc");
   const [detailTableWrapperRef, detailTableWidth] = useMeasuredElementWidth();
   const textCollator = useMemo(() => new Intl.Collator("en", { numeric: true, sensitivity: "base" }), []);
-  const isCompactRoutesDetail = detailView === "routes" && detailTableWidth > 0 && detailTableWidth < 900;
+  const isCompactRoutesDetail =
+    detailView === "routes" && detailTableWidth > 0 && detailTableWidth < ROUTES_COMPACT_WIDTH_THRESHOLD;
 
   useEffect(() => {
     setSortKey(detailView === "recent-landings" ? "date" : "rank");
@@ -615,7 +616,6 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                   key={column.key}
                   className={cn(
                     config.density === "compact" ? DETAIL_TH_COMPACT_CLASSNAME : DETAIL_TH_BASE_CLASSNAME,
-                    column.colClassName,
                     column.headerClassName,
                     getDetailAlignmentClassName(column)
                   )}
@@ -651,7 +651,6 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                       className={cn(
                         config.density === "compact" ? DETAIL_TD_COMPACT_CLASSNAME : DETAIL_TD_BASE_CLASSNAME,
                         bodyMdTextClassName,
-                        column.colClassName,
                         column.cellClassName,
                         getDetailAlignmentClassName(column),
                         column.numeric && "tabular-nums",
@@ -747,3 +746,5 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
     </Panel>
   );
 }
+
+
