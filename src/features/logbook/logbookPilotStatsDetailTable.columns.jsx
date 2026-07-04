@@ -6,8 +6,6 @@ import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
 import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
 
-const FIXED_FR = 0.01;
-
 function resolveNumericSortValue(value) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -49,12 +47,12 @@ function getAirportActualName(icao) {
   return String(airport?.actualName || airport?.name || icao || "").trim();
 }
 
-function renderAirportCell({ code, name, showName = true, align = "left" }) {
+function renderAirportCell({ code, name, showName = true }) {
   const safeCode = String(code || "").trim() || LOGBOOK_EMPTY_VALUE;
   const safeName = String(name || "").trim();
 
   return (
-    <span className={cn("block min-w-0 max-w-full overflow-hidden", align === "right" ? "text-right" : "text-left")}>
+    <span className="block min-w-0 max-w-full overflow-hidden">
       <span className="block whitespace-nowrap tabular-nums text-[var(--text-primary)] dark:text-white">{safeCode}</span>
       {showName && safeName ? <span className="block min-w-0 max-w-full truncate text-[var(--text-muted)]">{safeName}</span> : null}
     </span>
@@ -89,138 +87,224 @@ function renderAirlineCell(row) {
   );
 }
 
-function renderFlightCell(row) {
-  return row.flight ?? LOGBOOK_EMPTY_VALUE;
-}
-
-function buildRankColumn(overrides = {}) {
+function buildRankColumn() {
   return {
     key: "rank",
     label: "Rank",
     compactLabel: "#",
+    wideLabel: "Rank",
+    ariaLabel: "Rank",
     role: "shortCode",
-    minWidth: 56,
-    compactMinWidth: 44,
-    contentWidth: 64,
-    compactContentWidth: 64,
-    fr: FIXED_FR,
+    minWidth: 52,
+    compactMinWidth: 42,
+    fr: 0.4,
     sortable: true,
     sortKey: "rank",
     getSortValue: (row) => resolveNumericSortValue(row?.rank),
-    renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE,
-    ...overrides
+    renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE
   };
 }
 
-function buildCountColumn({
-  key = "value",
-  label = "Flights",
+function buildTextColumn({
+  key,
+  label,
   compactLabel = label,
+  wideLabel = label,
+  ariaLabel = label,
+  role = "secondary",
+  minWidth = 160,
+  compactMinWidth = 120,
+  fr = 1,
   sortKey = key,
   getSortValue,
   renderCell,
-  overrides = {}
+  sortable = true,
+  truncate = true,
+  required = true,
+  align = "left",
+  onCellClick,
+  cellAriaLabel,
+  cellTitle,
+  stopRowSelectOnClick = false
 } = {}) {
   return {
     key,
     label,
     compactLabel,
-    role: "numeric",
-    minWidth: 92,
-    compactMinWidth: 64,
-    contentWidth: 104,
-    compactContentWidth: 72,
-    fr: FIXED_FR,
-    align: "right",
-    sortable: true,
+    wideLabel,
+    ariaLabel,
+    role,
+    minWidth,
+    compactMinWidth,
+    fr,
+    sortable,
     sortKey,
     getSortValue,
     renderCell,
-    ...overrides
+    truncate,
+    required,
+    align,
+    onCellClick,
+    cellAriaLabel,
+    cellTitle,
+    stopRowSelectOnClick
   };
 }
 
+function buildAirportColumn({
+  key,
+  label,
+  compactLabel = label,
+  wideLabel = label,
+  ariaLabel = label,
+  codeResolver,
+  nameResolver,
+  minWidth = 188,
+  compactMinWidth = 92,
+  fr = 1.2,
+  sortKey = key,
+  getSortValue,
+  sortable = true,
+  required = true
+} = {}) {
+  return buildTextColumn({
+    key,
+    label,
+    compactLabel,
+    wideLabel,
+    ariaLabel,
+    role: "airportCode",
+    minWidth,
+    compactMinWidth,
+    fr,
+    sortKey,
+    getSortValue,
+    sortable,
+    required,
+    renderCell: (row, column) =>
+      renderAirportCell({
+        code: codeResolver(row, column),
+        name: nameResolver(row, column),
+        showName: column.presetKey !== "compact"
+      })
+  });
+}
+
+function buildNumericColumn({
+  key = "value",
+  label = "Flights",
+  compactLabel = "Flt",
+  wideLabel = label,
+  ariaLabel = label,
+  minWidth = 96,
+  compactMinWidth = 64,
+  fr = 0.65,
+  sortKey = key,
+  getSortValue,
+  renderCell,
+  sortable = true,
+  required = true
+} = {}) {
+  return buildTextColumn({
+    key,
+    label,
+    compactLabel,
+    wideLabel,
+    ariaLabel,
+    role: "numeric",
+    minWidth,
+    compactMinWidth,
+    fr,
+    sortKey,
+    getSortValue,
+    sortable,
+    required,
+    align: "right",
+    renderCell
+  });
+}
+
 function buildPercentColumn(overrides = {}) {
-  return {
+  return buildNumericColumn({
     key: "percentValue",
     label: "% of Total",
     compactLabel: "%",
-    role: "numeric",
-    minWidth: 104,
-    compactMinWidth: 56,
-    contentWidth: 112,
-    compactContentWidth: 56,
-    fr: FIXED_FR,
-    align: "right",
-    sortable: true,
+    wideLabel: "% of Total",
+    ariaLabel: "Percent of Total",
+    minWidth: 96,
+    compactMinWidth: 52,
+    fr: 0.6,
     sortKey: "percentValue",
     getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue),
     renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE,
     ...overrides
-  };
+  });
 }
 
-function buildLandingRateColumn(overrides = {}) {
-  return {
-    key: "landingRate",
-    label: "Landing Rate",
-    compactLabel: "Landing",
-    wideLabel: "Landing Rate",
-    role: "time",
-    minWidth: 120,
-    compactMinWidth: 120,
-    contentWidth: 120,
-    compactContentWidth: 120,
-    fr: FIXED_FR,
-    truncate: true,
-    sortable: true,
-    sortKey: "landingRate",
-    getSortValue: (row) => resolveNumericSortValue(row?.rawLandingRate ?? row?.landingRate),
-    ...overrides
-  };
+function buildRecentLandingRows(detailRows = {}) {
+  return (detailRows.recentLandings || []).map((row) => ({
+    ...row,
+    date: formatCompactDashDate(row?.dateSortKey),
+    flight: String(row?.flight || row?.label || "").trim() || LOGBOOK_EMPTY_VALUE,
+    route: String(row?.route || "").trim() || LOGBOOK_EMPTY_VALUE,
+    airline: String(row?.airline || "").trim() || LOGBOOK_EMPTY_VALUE,
+    equipment: String(row?.equipment || "").trim() || LOGBOOK_EMPTY_VALUE,
+    landingRate: Number.isFinite(row?.rawLandingRate) ? `${row.rawLandingRate} fpm` : LOGBOOK_EMPTY_VALUE,
+    grade: row?.badge || LOGBOOK_EMPTY_VALUE
+  }));
 }
 
-function getDetailRowId(detailView, row) {
-  switch (detailView) {
-    case "routes":
-      return row?.id || `${row?.dep || "route"}-${row?.arr || "route"}-${row?.rank ?? ""}`;
-    case "recent-landings":
-      return row?.id || row?.dvaPirepId || `${row?.flight || "landing"}-${row?.rank ?? row?.dateSortKey ?? ""}`;
-    default:
-      return row?.id || `${row?.label || row?.rank || "row"}-${row?.rank ?? ""}`;
-  }
+function buildRouteRows(detailRows = {}) {
+  return (detailRows.routes || []).map((row) => ({
+    ...row,
+    dep: String(row?.departureCode || "").trim(),
+    arr: String(row?.arrivalCode || "").trim(),
+    departureName: String(row?.departureName || "").trim(),
+    arrivalName: String(row?.arrivalName || "").trim()
+  }));
+}
+
+function buildTopAirportRows(detailRows = {}) {
+  return (detailRows.topAirports || []).map((row) => ({
+    ...row,
+    actualName: getAirportActualName(row?.label)
+  }));
+}
+
+function buildAirportRankingRows(rows = []) {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    ...row,
+    actualName: getAirportActualName(row?.label)
+  }));
 }
 
 function buildRecentLandingColumns() {
   return [
-    {
+    buildTextColumn({
       key: "date",
       label: "Date",
       compactLabel: "Date",
       wideLabel: "Date",
       role: "time",
-      minWidth: 108,
+      minWidth: 104,
       compactMinWidth: 78,
-      fr: FIXED_FR,
-      truncate: true,
-      sortable: true,
+      fr: 0.62,
       sortKey: "date",
       getSortValue: (row) => resolveNumericSortValue(row?.dateSortKey),
       renderCell: (row) => row.date
-    },
-    {
+    }),
+    buildTextColumn({
       key: "flight",
       label: "Flight",
       compactLabel: "Flight",
       wideLabel: "Flight",
       role: "primaryText",
       minWidth: 136,
-      compactMinWidth: 118,
-      fr: 1.1,
-      truncate: true,
-      sortable: true,
+      compactMinWidth: 116,
+      fr: 1.05,
       sortKey: "flight",
-      renderCell: renderFlightCell,
+      getSortValue: (row) => resolveTextSortValue(row?.flight),
+      renderCell: (row) => row.flight,
       onCellClick: async (row) => {
         const pirepUrl = getRecentLandingPirepUrl(row);
 
@@ -243,74 +327,60 @@ function buildRecentLandingColumns() {
         return pirepId ? `Open DVA PIREP ${pirepId}` : "Open DVA PIREP";
       },
       stopRowSelectOnClick: true
-    },
-    {
+    }),
+    buildTextColumn({
       key: "airline",
       label: "Airline",
       compactLabel: "Airline",
       wideLabel: "Airline",
       role: "primaryText",
-      minWidth: 132,
+      minWidth: 144,
       compactMinWidth: 118,
       fr: 1,
-      truncate: true,
-      sortable: true,
       sortKey: "airline",
       getSortValue: (row) => resolveTextSortValue(row?.airline),
-      renderCell: (row) => row.airline ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
-      key: "dep",
-      label: "Departure",
-      compactLabel: "DEP",
-      wideLabel: "Departure",
-      ariaLabel: "Departure",
-      role: "airportCode",
-      minWidth: 92,
-      compactMinWidth: 72,
-      fr: FIXED_FR,
-      truncate: true,
-      sortable: true,
-      sortKey: "dep",
-      getSortValue: (row) => resolveTextSortValue(row?.dep),
-      renderCell: (row) => row.dep ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
-      key: "arr",
-      label: "Arrival",
-      compactLabel: "ARR",
-      wideLabel: "Arrival",
-      ariaLabel: "Arrival",
-      role: "airportCode",
-      minWidth: 92,
-      compactMinWidth: 72,
-      fr: FIXED_FR,
-      truncate: true,
-      sortable: true,
-      sortKey: "arr",
-      getSortValue: (row) => resolveTextSortValue(row?.arr),
-      renderCell: (row) => row.arr ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
+      renderCell: (row) => row.airline
+    }),
+    buildTextColumn({
+      key: "route",
+      label: "Route",
+      compactLabel: "Route",
+      wideLabel: "Route",
+      role: "secondary",
+      minWidth: 188,
+      compactMinWidth: 152,
+      fr: 1.15,
+      sortKey: "route",
+      getSortValue: (row) => resolveTextSortValue(row?.route),
+      renderCell: (row) => row.route
+    }),
+    buildTextColumn({
       key: "equipment",
       label: "Equipment",
       compactLabel: "Eqp",
       wideLabel: "Equipment",
       role: "secondary",
-      minWidth: 220,
-      compactMinWidth: 180,
-      fr: 1,
-      truncate: true,
-      sortable: true,
+      minWidth: 204,
+      compactMinWidth: 176,
+      fr: 1.05,
       sortKey: "equipment",
       getSortValue: (row) => resolveTextSortValue(row?.equipment),
       renderCell: renderEquipmentCell
-    },
-    {
+    }),
+    buildNumericColumn({
       key: "landingRate",
-      ...buildLandingRateColumn()
-    },
-    {
+      label: "Landing Rate",
+      compactLabel: "Landing",
+      wideLabel: "Landing Rate",
+      ariaLabel: "Landing Rate",
+      minWidth: 120,
+      compactMinWidth: 96,
+      fr: 0.7,
+      sortKey: "landingRate",
+      getSortValue: (row) => resolveNumericSortValue(row?.rawLandingRate ?? row?.landingRate),
+      renderCell: (row) => row.landingRate
+    }),
+    buildTextColumn({
       key: "grade",
       label: "Grade",
       compactLabel: "Grade",
@@ -318,288 +388,158 @@ function buildRecentLandingColumns() {
       role: "icon",
       minWidth: 90,
       compactMinWidth: 80,
-      fr: FIXED_FR,
-      sortable: true,
+      fr: 0.38,
       sortKey: "grade",
       getSortValue: (row) => resolveTextSortValue(row?.grade),
       renderCell: (row) => <LandingGradeBadge grade={row.grade} />
-    }
+    })
   ];
 }
 
 function buildRouteColumns() {
   return [
-    {
-      key: "rank",
-      label: "Rank",
-      compactLabel: "#",
-      wideLabel: "Rank",
-      role: "shortCode",
-      minWidth: 56,
-      compactMinWidth: 44,
-      fr: FIXED_FR,
-      align: "left",
-      sortable: true,
-      sortKey: "rank",
-      getSortValue: (row) => resolveNumericSortValue(row?.rank),
-      renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
+    buildRankColumn(),
+    buildAirportColumn({
       key: "dep",
       label: "Departure",
       compactLabel: "DEP",
       wideLabel: "Departure",
-      ariaLabel: "Departure",
-      role: "primaryText",
-      minWidth: 220,
-      compactMinWidth: 88,
-      contentWidth: "minmax(180px, 320px)",
-      compactContentWidth: "minmax(160px, 260px)",
-      fr: 1,
-      truncate: true,
-      sortable: true,
+      ariaLabel: "Departure airport",
+      codeResolver: (row) => row.dep,
+      nameResolver: (row) => row.departureName,
+      minWidth: 188,
+      compactMinWidth: 92,
+      fr: 1.15,
       sortKey: "dep",
-      getSortValue: (row) => resolveTextSortValue(row?.dep),
-      renderCell: (row, column) =>
-        renderAirportCell({
-          code: row.dep,
-          name: row.departureName,
-          showName: column.presetKey !== "compact"
-        })
-    },
-    {
+      getSortValue: (row) => resolveTextSortValue(row?.dep)
+    }),
+    buildAirportColumn({
       key: "arr",
       label: "Arrival",
       compactLabel: "ARR",
       wideLabel: "Arrival",
-      ariaLabel: "Arrival",
-      role: "primaryText",
-      minWidth: 220,
-      compactMinWidth: 88,
-      contentWidth: "minmax(180px, 320px)",
-      compactContentWidth: "minmax(160px, 260px)",
-      fr: 1,
-      truncate: true,
-      sortable: true,
+      ariaLabel: "Arrival airport",
+      codeResolver: (row) => row.arr,
+      nameResolver: (row) => row.arrivalName,
+      minWidth: 188,
+      compactMinWidth: 92,
+      fr: 1.15,
       sortKey: "arr",
-      getSortValue: (row) => resolveTextSortValue(row?.arr),
-      renderCell: (row, column) =>
-        renderAirportCell({
-          code: row.arr,
-          name: row.arrivalName,
-          showName: column.presetKey !== "compact"
-        })
-    },
-    {
-      key: "value",
+      getSortValue: (row) => resolveTextSortValue(row?.arr)
+    }),
+    buildNumericColumn({
       label: "Flights",
       compactLabel: "Flt",
       wideLabel: "Flights",
-      role: "numeric",
-      minWidth: 92,
+      ariaLabel: "Flights",
+      minWidth: 96,
       compactMinWidth: 64,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
+      fr: 0.65,
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
-      key: "percentValue",
-      label: "% of Total",
-      compactLabel: "%",
-      wideLabel: "% of Total",
-      role: "numeric",
-      minWidth: 104,
-      compactMinWidth: 56,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
-      sortKey: "percentValue",
-      getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue),
-      renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE
-    }
+    }),
+    buildPercentColumn()
   ];
 }
 
 function buildTopAirportColumns() {
   return [
-    {
-      key: "rank",
-      label: "Rank",
-      compactLabel: "#",
-      role: "shortCode",
-      minWidth: 56,
-      compactMinWidth: 44,
-      fr: FIXED_FR,
-      sortable: true,
-      sortKey: "rank",
-      getSortValue: (row) => resolveNumericSortValue(row?.rank),
-      renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
+    buildRankColumn(),
+    buildAirportColumn({
       key: "label",
       label: "ICAO",
       compactLabel: "ICAO",
       wideLabel: "ICAO",
-      ariaLabel: "ICAO",
-      role: "airportCode",
-      minWidth: 220,
+      ariaLabel: "Airport code",
+      codeResolver: (row) => row.label,
+      nameResolver: (row) => row.actualName,
+      minWidth: 210,
       compactMinWidth: 96,
-      contentWidth: "minmax(240px, 420px)",
-      compactContentWidth: "minmax(180px, 300px)",
-      fr: 1,
-      truncate: true,
-      sortable: true,
+      fr: 1.2,
       sortKey: "label",
-      getSortValue: (row) => resolveTextSortValue(row?.label),
-      renderCell: (row, column) =>
-        renderAirportCell({
-          code: row.label,
-          name: row.actualName,
-          showName: column.presetKey !== "compact"
-        })
-    },
-    {
-      key: "value",
+      getSortValue: (row) => resolveTextSortValue(row?.label)
+    }),
+    buildNumericColumn({
       label: "Total",
       compactLabel: "Total",
       wideLabel: "Total",
-      role: "numeric",
+      ariaLabel: "Total",
       minWidth: 96,
       compactMinWidth: 72,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
+      fr: 0.7,
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
+    }),
+    buildNumericColumn({
       key: "dep",
       label: "DEP",
       compactLabel: "DEP",
       wideLabel: "Departure",
-      role: "numeric",
+      ariaLabel: "Departures",
       minWidth: 84,
       compactMinWidth: 64,
-      contentWidth: 88,
-      compactContentWidth: 72,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
+      fr: 0.55,
       sortKey: "dep",
       getSortValue: (row) => resolveNumericSortValue(row?.depRaw ?? row?.dep),
       renderCell: (row) => row.dep ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
+    }),
+    buildNumericColumn({
       key: "arr",
       label: "ARR",
       compactLabel: "ARR",
       wideLabel: "Arrival",
-      role: "numeric",
+      ariaLabel: "Arrivals",
       minWidth: 84,
       compactMinWidth: 64,
-      contentWidth: 88,
-      compactContentWidth: 72,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
+      fr: 0.55,
       sortKey: "arr",
       getSortValue: (row) => resolveNumericSortValue(row?.arrRaw ?? row?.arr),
       renderCell: (row) => row.arr ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
-      key: "percentValue",
-      label: "% of Total",
-      compactLabel: "%",
-      wideLabel: "% of Total",
-      role: "numeric",
-      minWidth: 104,
-      compactMinWidth: 56,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
-      sortKey: "percentValue",
-      getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue),
-      renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE
-    }
+    }),
+    buildPercentColumn()
   ];
 }
 
-function buildRecordColumns() {
+function buildSimpleAirportColumns(rowLabel = "Airport", valueLabel = "Total") {
   return [
-    {
+    buildRankColumn(),
+    buildAirportColumn({
       key: "label",
-      label: "Record",
-      compactLabel: "Record",
-      wideLabel: "Record",
-      role: "primaryText",
-      minWidth: 180,
-      compactMinWidth: 152,
-      contentWidth: "minmax(180px, 260px)",
-      compactContentWidth: "minmax(160px, 220px)",
-      fr: 0.8,
-      truncate: true,
-      sortable: true,
+      label: rowLabel,
+      compactLabel: rowLabel,
+      wideLabel: rowLabel,
+      ariaLabel: rowLabel,
+      codeResolver: (row) => row.label,
+      nameResolver: (row) => row.actualName,
+      minWidth: 196,
+      compactMinWidth: 96,
+      fr: 1.2,
       sortKey: "label",
-      getSortValue: (row) => resolveTextSortValue(row?.label),
-      renderCell: (row) => row.label ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
+      getSortValue: (row) => resolveTextSortValue(row?.label)
+    }),
+    buildNumericColumn({
       key: "value",
-      label: "Value",
-      compactLabel: "Value",
-      wideLabel: "Value",
-      role: "secondary",
-      minWidth: 148,
-      compactMinWidth: 124,
-      contentWidth: "minmax(148px, 220px)",
-      compactContentWidth: "minmax(124px, 180px)",
-      fr: 0.6,
-      truncate: true,
-      sortable: true,
+      label: valueLabel,
+      compactLabel: valueLabel,
+      wideLabel: valueLabel,
+      ariaLabel: valueLabel,
+      minWidth: 96,
+      compactMinWidth: 72,
+      fr: 0.7,
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
-      key: "meta",
-      label: "Detail",
-      compactLabel: "Detail",
-      wideLabel: "Detail",
-      role: "secondary",
-      minWidth: 220,
-      compactMinWidth: 168,
-      contentWidth: "minmax(220px, 360px)",
-      compactContentWidth: "minmax(168px, 280px)",
-      fr: 1.2,
-      truncate: true,
-      sortable: true,
-      sortKey: "meta",
-      getSortValue: (row) => resolveTextSortValue(row?.meta),
-      renderCell: (row) => row.meta ?? LOGBOOK_EMPTY_VALUE
-    }
+    }),
+    buildPercentColumn()
   ];
 }
 
 function buildAirlineColumns() {
   return [
-    {
-      key: "rank",
-      label: "Rank",
-      compactLabel: "#",
-      role: "shortCode",
-      minWidth: 56,
-      compactMinWidth: 44,
-      fr: FIXED_FR,
-      sortable: true,
-      sortKey: "rank",
-      getSortValue: (row) => resolveNumericSortValue(row?.rank),
-      renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
+    buildRankColumn(),
+    buildTextColumn({
       key: "label",
       label: "Airline",
       compactLabel: "Airline",
@@ -607,160 +547,111 @@ function buildAirlineColumns() {
       role: "primaryText",
       minWidth: 220,
       compactMinWidth: 160,
-      contentWidth: "minmax(260px, 460px)",
-      compactContentWidth: "minmax(200px, 360px)",
-      fr: 1,
-      truncate: true,
-      sortable: true,
+      fr: 1.25,
       sortKey: "label",
       getSortValue: (row) => resolveTextSortValue(row?.label),
       renderCell: renderAirlineCell
-    },
-    {
+    }),
+    buildNumericColumn({
       key: "value",
       label: "Flights",
-      compactLabel: "Flights",
+      compactLabel: "Flt",
       wideLabel: "Flights",
-      role: "numeric",
-      minWidth: 92,
+      ariaLabel: "Flights",
+      minWidth: 96,
       compactMinWidth: 64,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
+      fr: 0.65,
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
-      key: "percentValue",
-      label: "% of Total",
-      compactLabel: "%",
-      wideLabel: "% of Total",
-      role: "numeric",
-      minWidth: 104,
-      compactMinWidth: 56,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
-      sortKey: "percentValue",
-      getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue),
-      renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE
-    }
+    }),
+    buildPercentColumn()
   ];
 }
 
-function buildSimpleAirportColumns(rowLabel = "Airport", valueLabel = "Total") {
+function buildRecordColumns() {
   return [
-    {
-      key: "rank",
-      label: "Rank",
-      compactLabel: "#",
-      role: "shortCode",
-      minWidth: 56,
-      compactMinWidth: 44,
-      fr: FIXED_FR,
-      sortable: true,
-      sortKey: "rank",
-      getSortValue: (row) => resolveNumericSortValue(row?.rank),
-      renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
+    buildTextColumn({
       key: "label",
-      label: rowLabel,
-      compactLabel: rowLabel,
-      wideLabel: rowLabel,
-      role: "airportCode",
-      minWidth: 220,
-      compactMinWidth: 96,
-      contentWidth: "minmax(240px, 420px)",
-      compactContentWidth: "minmax(180px, 300px)",
-      fr: 1,
-      truncate: true,
-      sortable: true,
+      label: "Record",
+      compactLabel: "Record",
+      wideLabel: "Record",
+      role: "primaryText",
+      minWidth: 180,
+      compactMinWidth: 152,
+      fr: 0.95,
       sortKey: "label",
       getSortValue: (row) => resolveTextSortValue(row?.label),
       renderCell: (row) => row.label ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
+    }),
+    buildTextColumn({
       key: "value",
-      label: valueLabel,
-      compactLabel: valueLabel,
-      wideLabel: valueLabel,
-      role: "numeric",
-      minWidth: 96,
-      compactMinWidth: 72,
-      contentWidth: 96,
-      compactContentWidth: 72,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
+      label: "Value",
+      compactLabel: "Value",
+      wideLabel: "Value",
+      role: "secondary",
+      minWidth: 148,
+      compactMinWidth: 124,
+      fr: 0.7,
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
-    },
-    {
-      key: "percentValue",
-      label: "% of Total",
-      compactLabel: "%",
-      wideLabel: "% of Total",
-      role: "numeric",
-      minWidth: 104,
-      compactMinWidth: 56,
-      contentWidth: 112,
-      compactContentWidth: 56,
-      fr: FIXED_FR,
-      align: "right",
-      sortable: true,
-      sortKey: "percentValue",
-      getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue),
-      renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE
-    }
+    }),
+    buildTextColumn({
+      key: "meta",
+      label: "Detail",
+      compactLabel: "Detail",
+      wideLabel: "Detail",
+      role: "secondary",
+      minWidth: 220,
+      compactMinWidth: 168,
+      fr: 1.25,
+      sortKey: "meta",
+      getSortValue: (row) => resolveTextSortValue(row?.meta),
+      renderCell: (row) => row.meta ?? LOGBOOK_EMPTY_VALUE
+    })
   ];
 }
 
+// Keeps detail rows keyed by the natural identity for each pilot stats view.
+function getDetailRowId(detailView, row) {
+  switch (detailView) {
+    case "routes":
+      return row?.id || `${row?.dep || "route"}-${row?.arr || "route"}-${row?.rank ?? ""}`;
+    case "recent-landings":
+      return row?.id || row?.dvaPirepId || `${row?.flight || "landing"}-${row?.rank ?? row?.dateSortKey ?? ""}`;
+    default:
+      return row?.id || `${row?.label || row?.rank || "row"}-${row?.rank ?? ""}`;
+  }
+}
+
+// Builds the pilot stats detail table config using the shared table shell and fill-based widths.
 export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
   switch (detailView) {
     case "recent-landings":
       return {
         title: "Recent Landings",
-        rows: (detailRows.recentLandings || []).map((row) => ({
-          ...row,
-          date: formatCompactDashDate(row?.dateSortKey),
-          landingRate: Number.isFinite(row?.rawLandingRate) ? `${row.rawLandingRate} fpm` : LOGBOOK_EMPTY_VALUE,
-          grade: row?.badge || LOGBOOK_EMPTY_VALUE
-        })),
+        rows: buildRecentLandingRows(detailRows),
         columns: buildRecentLandingColumns(),
         rowHeight: 46,
-        tableLayoutMode: "fill",
         defaultSortKey: "date",
         defaultSortDirection: "desc"
       };
     case "routes":
       return {
         title: "All Routes",
-        rows: (detailRows.routes || []).map((row) => ({
-          ...row,
-          dep: String(row?.departureCode || row?.row?.departure || "").trim(),
-          arr: String(row?.arrivalCode || row?.row?.arrival || "").trim(),
-          departureName: String(row?.departureName || "").trim(),
-          arrivalName: String(row?.arrivalName || "").trim()
-        })),
+        rows: buildRouteRows(detailRows),
         columns: buildRouteColumns(),
         rowHeight: 54,
-        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
     case "top-airports":
       return {
         title: "Top Airports",
-        rows: (detailRows.topAirports || []).map((row) => ({
-          ...row,
-          actualName: getAirportActualName(row?.label)
-        })),
+        rows: buildTopAirportRows(detailRows),
         columns: buildTopAirportColumns(),
         rowHeight: 54,
-        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
@@ -770,7 +661,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         rows: detailRows.equipment || [],
         columns: [
           buildRankColumn(),
-          {
+          buildTextColumn({
             key: "label",
             label: "Equipment",
             compactLabel: "Eqp",
@@ -778,45 +669,45 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
             role: "primaryText",
             minWidth: 220,
             compactMinWidth: 180,
-            contentWidth: "minmax(260px, 420px)",
-            compactContentWidth: "minmax(220px, 360px)",
-            fr: 1,
-            truncate: true,
-            sortable: true,
+            fr: 1.4,
             sortKey: "label",
             getSortValue: (row) => resolveTextSortValue(row?.label),
             renderCell: renderEquipmentCell
-          },
-          buildCountColumn({
+          }),
+          buildNumericColumn({
+            key: "value",
             label: "Flights",
-            compactLabel: "Flights",
+            compactLabel: "Flt",
+            wideLabel: "Flights",
+            ariaLabel: "Flights",
+            minWidth: 96,
+            compactMinWidth: 64,
+            fr: 0.65,
+            sortKey: "value",
             getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
             renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
           }),
           buildPercentColumn()
         ],
         rowHeight: 46,
-        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
     case "departure-airports":
       return {
         title: "All Departure Airports",
-        rows: detailRows.departureAirports || [],
+        rows: buildAirportRankingRows(detailRows.departureAirports || []),
         columns: buildSimpleAirportColumns("Airport", "Departures"),
         rowHeight: 46,
-        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
     case "arrival-airports":
       return {
         title: "All Arrival Airports",
-        rows: detailRows.arrivalAirports || [],
+        rows: buildAirportRankingRows(detailRows.arrivalAirports || []),
         columns: buildSimpleAirportColumns("Airport", "Arrivals"),
         rowHeight: 46,
-        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
@@ -826,7 +717,6 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         rows: detailRows.airlines || [],
         columns: buildAirlineColumns(),
         rowHeight: 46,
-        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
@@ -837,7 +727,6 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         rows: detailRows.records || [],
         columns: buildRecordColumns(),
         rowHeight: 46,
-        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
