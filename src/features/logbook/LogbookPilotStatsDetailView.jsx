@@ -80,7 +80,8 @@ function getDetailSortValue(detailView, columnKey, row) {
           return resolveTextSortValue(row?.grade);
         case "flight":
         case "airline":
-        case "route":
+        case "dep":
+        case "arr":
         case "equipment":
           return resolveTextSortValue(row?.[columnKey]);
         default:
@@ -185,6 +186,8 @@ function buildColumns(detailView, detailRows) {
         rows: (detailRows.recentLandings || []).map((row) => ({
           ...row,
           date: formatCompactDashDate(row?.dateSortKey),
+          dep: getRecentLandingRouteSegments(row?.route).departure,
+          arr: getRecentLandingRouteSegments(row?.route).arrival,
           landingRate: Number.isFinite(row?.rawLandingRate) ? `${row.rawLandingRate} fpm` : LOGBOOK_EMPTY_VALUE,
           grade: row?.badge || LOGBOOK_EMPTY_VALUE
         })),
@@ -192,7 +195,8 @@ function buildColumns(detailView, detailRows) {
           { key: "date", label: "Date" },
           { key: "flight", label: "Flight" },
           { key: "airline", label: "Airline" },
-          { key: "route", label: "Route" },
+          { key: "dep", label: "DEP" },
+          { key: "arr", label: "ARR" },
           { key: "equipment", label: "Equipment" },
           { key: "landingRate", label: "Landing Rate" },
           { key: "grade", label: "Grade" }
@@ -418,21 +422,23 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                             </button>
                           );
                         })()
-                      ) : detailView === "recent-landings" && column.key === "route" ? (
+                      ) : detailView === "recent-landings" && (column.key === "dep" || column.key === "arr") ? (
                         (() => {
-                          const routeValue = String(row[column.key] ?? "").trim();
-                          const { departure, arrival } = getRecentLandingRouteSegments(routeValue);
+                          const departure = String(row.dep || LOGBOOK_EMPTY_VALUE).trim();
+                          const arrival = String(row.arr || LOGBOOK_EMPTY_VALUE).trim();
+                          const routeValue = String(row.route || "").trim();
+
+                          if (column.key === "dep") {
+                            return (
+                              <span className="whitespace-nowrap text-left tabular-nums" title={routeValue || undefined}>
+                                {departure}
+                              </span>
+                            );
+                          }
 
                           return (
-                            <span
-                              className="inline-grid min-w-0 grid-cols-[5ch_1.25rem_5ch] items-center justify-start"
-                              title={routeValue || undefined}
-                            >
-                              <span className="whitespace-nowrap text-left tabular-nums">{departure}</span>
-                              <span className="text-center text-[var(--text-muted)]" aria-hidden="true">
-                                →
-                              </span>
-                              <span className="whitespace-nowrap text-left tabular-nums">{arrival}</span>
+                            <span className="whitespace-nowrap text-left tabular-nums" title={routeValue || undefined}>
+                              {arrival}
                             </span>
                           );
                         })()
