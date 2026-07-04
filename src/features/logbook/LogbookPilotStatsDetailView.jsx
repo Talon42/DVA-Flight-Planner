@@ -11,8 +11,7 @@ import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
 import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
 
 const DETAIL_TABLE_BASE_CLASSNAME = "min-w-full border-collapse";
-const DETAIL_TABLE_FIXED_CLASSNAME = "table-fixed";
-const ROUTES_COMPACT_WIDTH_THRESHOLD = 1120;
+const ROUTES_COMPACT_WIDTH_THRESHOLD = 920;
 const DETAIL_TH_BASE_CLASSNAME = "px-2 py-2 align-bottom text-left bp-1024:px-3";
 const DETAIL_TH_COMPACT_CLASSNAME = "px-1.5 py-1.5 align-bottom text-left";
 const DETAIL_TD_BASE_CLASSNAME = "min-w-0 px-2 py-1.5 align-middle text-[var(--text-primary)] dark:text-white bp-1024:px-3";
@@ -20,7 +19,7 @@ const DETAIL_TD_COMPACT_CLASSNAME = "min-w-0 px-1.5 py-1.5 align-middle text-[va
 const DETAIL_SORT_BUTTON_CLASSNAME =
   "m-0 inline-flex min-w-0 items-center gap-1 rounded-none bg-transparent uppercase tracking-[0.14em] text-[var(--text-muted)] hover:text-[var(--text-heading)]";
 
-// Measures the rendered detail container width so routes can switch schemas without relying on viewport breakpoints.
+// Measures the rendered detail container width so routes can switch schemas without relying on viewport rules.
 function useMeasuredElementWidth() {
   const elementRef = useRef(null);
   const [width, setWidth] = useState(0);
@@ -270,7 +269,7 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "rank",
         label: "#",
         ariaLabel: "Rank",
-        colClassName: "w-[7%]",
+        colClassName: "w-[8%]",
         headerClassName: "min-w-0",
         headerButtonClassName: "w-full justify-start",
         getSortValue: (row) => resolveNumericSortValue(row?.rank)
@@ -279,7 +278,7 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "dep",
         label: "DEP",
         ariaLabel: "Departure",
-        colClassName: "w-[37%]",
+        colClassName: "w-[33%]",
         headerClassName: "min-w-0",
         cellClassName: "min-w-0 overflow-hidden",
         headerButtonClassName: "w-full justify-start",
@@ -290,7 +289,7 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "arr",
         label: "ARR",
         ariaLabel: "Arrival",
-        colClassName: "w-[37%]",
+        colClassName: "w-[33%]",
         headerClassName: "min-w-0",
         cellClassName: "min-w-0 overflow-hidden",
         headerButtonClassName: "w-full justify-start",
@@ -301,7 +300,7 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "value",
         label: "Flt",
         ariaLabel: "Flights",
-        colClassName: "w-[9%]",
+        colClassName: "w-[12%]",
         headerClassName: "min-w-0",
         align: "right",
         numeric: true,
@@ -313,7 +312,7 @@ function buildRoutesColumns(compactRoutesDetail) {
         key: "percentValue",
         label: "%",
         ariaLabel: "% of Total",
-        colClassName: "w-[10%]",
+        colClassName: "w-[14%]",
         headerClassName: "min-w-0",
         align: "right",
         numeric: true,
@@ -328,7 +327,7 @@ function buildRoutesColumns(compactRoutesDetail) {
     {
       key: "rank",
       label: "Rank",
-      colClassName: "w-[7%]",
+      colClassName: "w-[8%]",
       headerClassName: "min-w-0",
       headerButtonClassName: "w-full justify-start",
       getSortValue: (row) => resolveNumericSortValue(row?.rank)
@@ -358,7 +357,7 @@ function buildRoutesColumns(compactRoutesDetail) {
     {
       key: "value",
       label: "Flights",
-      colClassName: "w-[12%]",
+      colClassName: "w-[11%]",
       headerClassName: "min-w-0",
       align: "right",
       numeric: true,
@@ -447,6 +446,8 @@ function buildColumns(detailView, detailRows, options = {}) {
         })),
         tableLayout: "fixed",
         density: compactRoutesDetail ? "compact" : "standard",
+        tableWidthClassName: compactRoutesDetail ? "w-full max-w-[48rem]" : "w-full max-w-[72rem]",
+        tableContainerClassName: "mx-auto",
         columns: buildRoutesColumns(compactRoutesDetail)
       };
     case "records":
@@ -596,152 +597,155 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
       </div>
 
       <div ref={detailTableWrapperRef} className="app-scrollbar min-w-0 min-h-0 flex-1 overflow-auto">
-        <table
-          className={cn(
-            config.tableLayout === "fixed" ? "w-full border-collapse" : DETAIL_TABLE_BASE_CLASSNAME,
-            config.tableLayout === "fixed" && DETAIL_TABLE_FIXED_CLASSNAME
-          )}
-        >
-          {config.columns.some((column) => column.colClassName) ? (
-            <colgroup>
-              {config.columns.map((column) => (
-                <col key={column.key} className={column.colClassName} />
-              ))}
-            </colgroup>
-          ) : null}
-          <thead className="sticky top-0 z-10 bg-[var(--surface-raised)]">
-            <tr className="border-b border-[color:var(--line)]">
-              {config.columns.map((column) => (
-                <th
-                  key={column.key}
-                  className={cn(
-                    config.density === "compact" ? DETAIL_TH_COMPACT_CLASSNAME : DETAIL_TH_BASE_CLASSNAME,
-                    column.headerClassName,
-                    getDetailAlignmentClassName(column)
-                  )}
-                >
-                  <button
-                    type="button"
+        <div className={cn("min-w-0", config.tableContainerClassName)}>
+          <table
+            className={cn(
+              config.tableLayout === "fixed"
+                ? cn("border-collapse table-fixed", config.tableWidthClassName || "w-full")
+                : DETAIL_TABLE_BASE_CLASSNAME
+            )}
+          >
+            {config.columns.some((column) => column.colClassName) ? (
+              <colgroup>
+                {config.columns.map((column) => (
+                  <col key={column.key} className={column.colClassName} />
+                ))}
+              </colgroup>
+            ) : null}
+            <thead className="sticky top-0 z-10 bg-[var(--surface-raised)]">
+              <tr className="border-b border-[color:var(--line)]">
+                {config.columns.map((column) => (
+                  <th
+                    key={column.key}
                     className={cn(
-                      DETAIL_SORT_BUTTON_CLASSNAME,
-                      labelTextClassName,
-                      column.key === sortKey && "text-[var(--text-heading)]",
-                      column.headerButtonClassName ||
-                        (getDetailAlignmentClassName(column) === "text-right"
-                          ? "w-full ml-auto justify-end"
-                          : "w-full justify-start")
+                      config.density === "compact" ? DETAIL_TH_COMPACT_CLASSNAME : DETAIL_TH_BASE_CLASSNAME,
+                      column.headerClassName,
+                      getDetailAlignmentClassName(column)
                     )}
-                    aria-label={column.ariaLabel || column.wideLabel || column.label}
-                    onClick={() => handleSort(column.key)}
                   >
-                    {resolveDetailHeaderLabel(column)}
-                    <SortChevron direction={sortDirection} active={column.key === sortKey} className={column.chevronClassName} />
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedRows.length ? (
-              sortedRows.map((row) => (
-                <tr key={row.id || `${row.label}-${row.rank}`} className="border-b border-[color:var(--line)] last:border-b-0">
-                  {config.columns.map((column) => (
-                    <td
-                      key={column.key}
+                    <button
+                      type="button"
                       className={cn(
-                        config.density === "compact" ? DETAIL_TD_COMPACT_CLASSNAME : DETAIL_TD_BASE_CLASSNAME,
-                        bodyMdTextClassName,
-                        column.cellClassName,
-                        getDetailAlignmentClassName(column),
-                        column.numeric && "tabular-nums",
-                        column.truncate && "overflow-hidden"
+                        DETAIL_SORT_BUTTON_CLASSNAME,
+                        labelTextClassName,
+                        column.key === sortKey && "text-[var(--text-heading)]",
+                        column.headerButtonClassName ||
+                          (getDetailAlignmentClassName(column) === "text-right"
+                            ? "w-full ml-auto justify-end"
+                            : "w-full justify-start")
                       )}
+                      aria-label={column.ariaLabel || column.wideLabel || column.label}
+                      onClick={() => handleSort(column.key)}
                     >
-                      {detailView === "recent-landings" && column.key === "grade" ? (
-                        <LandingGradeBadge grade={row.grade} />
-                      ) : detailView === "recent-landings" && column.key === "flight" ? (
-                        (() => {
-                          const pirepUrl = getRecentLandingPirepUrl(row);
-                          const flightValue = row[column.key] ?? LOGBOOK_EMPTY_VALUE;
+                      {resolveDetailHeaderLabel(column)}
+                      <SortChevron direction={sortDirection} active={column.key === sortKey} className={column.chevronClassName} />
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRows.length ? (
+                sortedRows.map((row) => (
+                  <tr key={row.id || `${row.label}-${row.rank}`} className="border-b border-[color:var(--line)] last:border-b-0">
+                    {config.columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className={cn(
+                          config.density === "compact" ? DETAIL_TD_COMPACT_CLASSNAME : DETAIL_TD_BASE_CLASSNAME,
+                          bodyMdTextClassName,
+                          column.cellClassName,
+                          getDetailAlignmentClassName(column),
+                          column.numeric && "tabular-nums",
+                          column.truncate && "overflow-hidden"
+                        )}
+                      >
+                        {detailView === "recent-landings" && column.key === "grade" ? (
+                          <LandingGradeBadge grade={row.grade} />
+                        ) : detailView === "recent-landings" && column.key === "flight" ? (
+                          (() => {
+                            const pirepUrl = getRecentLandingPirepUrl(row);
+                            const flightValue = row[column.key] ?? LOGBOOK_EMPTY_VALUE;
 
-                          if (!pirepUrl) {
-                            return flightValue;
-                          }
+                            if (!pirepUrl) {
+                              return flightValue;
+                            }
 
-                          return (
-                            <button
-                              type="button"
-                              title={`Open DVA PIREP ${String(row?.dvaPirepId || row?.rawLogbookId || row?.id || "").trim()}`}
-                              className="m-0 inline-flex min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit hover:underline focus-visible:underline focus-visible:outline-none"
-                              onClick={(event) => handleOpenPirep(event, pirepUrl)}
-                            >
-                              <span className="min-w-0 truncate">{flightValue}</span>
-                            </button>
-                          );
-                        })()
-                      ) : detailView === "recent-landings" && (column.key === "dep" || column.key === "arr") ? (
-                        (() => {
-                          const departure = String(row.dep || LOGBOOK_EMPTY_VALUE).trim();
-                          const arrival = String(row.arr || LOGBOOK_EMPTY_VALUE).trim();
-                          const routeValue = String(row.route || "").trim();
+                            return (
+                              <button
+                                type="button"
+                                title={`Open DVA PIREP ${String(row?.dvaPirepId || row?.rawLogbookId || row?.id || "").trim()}`}
+                                className="m-0 inline-flex min-w-0 cursor-pointer border-0 bg-transparent p-0 text-left font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit hover:underline focus-visible:underline focus-visible:outline-none"
+                                onClick={(event) => handleOpenPirep(event, pirepUrl)}
+                              >
+                                <span className="min-w-0 truncate">{flightValue}</span>
+                              </button>
+                            );
+                          })()
+                        ) : detailView === "recent-landings" && (column.key === "dep" || column.key === "arr") ? (
+                          (() => {
+                            const departure = String(row.dep || LOGBOOK_EMPTY_VALUE).trim();
+                            const arrival = String(row.arr || LOGBOOK_EMPTY_VALUE).trim();
+                            const routeValue = String(row.route || "").trim();
 
-                          if (column.key === "dep") {
+                            if (column.key === "dep") {
+                              return (
+                                <span className="whitespace-nowrap text-left tabular-nums" title={routeValue || undefined}>
+                                  {departure}
+                                </span>
+                              );
+                            }
+
                             return (
                               <span className="whitespace-nowrap text-left tabular-nums" title={routeValue || undefined}>
-                                {departure}
+                                {arrival}
                               </span>
                             );
-                          }
-
-                          return (
-                            <span className="whitespace-nowrap text-left tabular-nums" title={routeValue || undefined}>
-                              {arrival}
-                            </span>
-                          );
-                        })()
-                      ) : column.renderCell ? (
-                        column.renderCell(row)
-                      ) : detailView === "equipment" && column.key === "label" ? (
-                        <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
-                          <LogbookEquipmentGlyph equipment={row[column.key]} className="h-10 w-10" />
-                          <span className="min-w-0 truncate">{row[column.key] ?? LOGBOOK_EMPTY_VALUE}</span>
-                        </span>
-                      ) : detailView === "top-airports" && column.key === "label" ? (
-                        <span className="flex min-w-0 flex-col">
-                          <span className="truncate text-[var(--text-primary)] dark:text-white">
-                            {row[column.key] ?? LOGBOOK_EMPTY_VALUE}
+                          })()
+                        ) : column.renderCell ? (
+                          column.renderCell(row)
+                        ) : detailView === "equipment" && column.key === "label" ? (
+                          <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
+                            <LogbookEquipmentGlyph equipment={row[column.key]} className="h-10 w-10" />
+                            <span className="min-w-0 truncate">{row[column.key] ?? LOGBOOK_EMPTY_VALUE}</span>
                           </span>
-                          {row?.actualName ? (
-                            <span className="truncate text-[var(--text-muted)]">{row.actualName}</span>
-                          ) : null}
-                        </span>
-                      ) : detailView === "airlines" && column.key === "label" && row.row?.airlineLogoSrc ? (
-                        <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
-                          <img
-                            src={row.row.airlineLogoSrc}
-                            alt=""
-                            aria-hidden="true"
-                            className={cn("h-5 w-5 shrink-0 object-contain", row.row.airlineLogoClassName)}
-                            loading="lazy"
-                          />
-                          <span className="min-w-0 truncate">{row[column.key] ?? LOGBOOK_EMPTY_VALUE}</span>
-                        </span>
-                      ) : (
-                        row[column.key] ?? LOGBOOK_EMPTY_VALUE
-                      )}
-                    </td>
-                  ))}
+                        ) : detailView === "top-airports" && column.key === "label" ? (
+                          <span className="flex min-w-0 flex-col">
+                            <span className="truncate text-[var(--text-primary)] dark:text-white">
+                              {row[column.key] ?? LOGBOOK_EMPTY_VALUE}
+                            </span>
+                            {row?.actualName ? (
+                              <span className="truncate text-[var(--text-muted)]">{row.actualName}</span>
+                            ) : null}
+                          </span>
+                        ) : detailView === "airlines" && column.key === "label" && row.row?.airlineLogoSrc ? (
+                          <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
+                            <img
+                              src={row.row.airlineLogoSrc}
+                              alt=""
+                              aria-hidden="true"
+                              className={cn("h-5 w-5 shrink-0 object-contain", row.row.airlineLogoClassName)}
+                              loading="lazy"
+                            />
+                            <span className="min-w-0 truncate">{row[column.key] ?? LOGBOOK_EMPTY_VALUE}</span>
+                          </span>
+                        ) : (
+                          row[column.key] ?? LOGBOOK_EMPTY_VALUE
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={config.columns.length} className={cn("px-3 py-6 text-center text-[var(--text-muted)]", bodyMdTextClassName)}>
+                    No data available.
+                  </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={config.columns.length} className={cn("px-3 py-6 text-center text-[var(--text-muted)]", bodyMdTextClassName)}>
-                  No data available.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </Panel>
   );
