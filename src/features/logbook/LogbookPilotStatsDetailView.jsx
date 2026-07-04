@@ -425,14 +425,14 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
 
                           return (
                             <span
-                              className="grid min-w-0 grid-cols-[4ch_1.75rem_4ch] items-center"
+                              className="inline-grid min-w-0 grid-cols-[5ch_1.25rem_5ch] items-center justify-start"
                               title={routeValue || undefined}
                             >
-                              <span className="min-w-0 truncate text-right tabular-nums">{departure}</span>
+                              <span className="whitespace-nowrap text-left tabular-nums">{departure}</span>
                               <span className="text-center text-[var(--text-muted)]" aria-hidden="true">
                                 →
                               </span>
-                              <span className="min-w-0 truncate text-left tabular-nums">{arrival}</span>
+                              <span className="whitespace-nowrap text-left tabular-nums">{arrival}</span>
                             </span>
                           );
                         })()
