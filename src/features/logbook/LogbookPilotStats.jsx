@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName } from "../../components/ui/typography";
@@ -21,25 +21,98 @@ function chunkPilotStatsCards(cards, pageSize) {
   return pages;
 }
 
-// Renders one breakpoint-specific page stack so each dashboard page snaps by row.
-function LogbookPilotStatsDashboardPages({
-  cards,
-  pageSize,
-  gridClassName,
-  className = "",
-  onPilotStatsDetailViewChange
-}) {
+function getPilotStatsDashboardPageSize() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return 2;
+  }
+
+  if (window.matchMedia("(min-width: 120rem)").matches) {
+    return 4;
+  }
+
+  if (window.matchMedia("(min-width: 87.5rem)").matches) {
+    return 3;
+  }
+
+  return 2;
+}
+
+function addMediaQueryListener(mediaQueryList, listener) {
+  if (!mediaQueryList) {
+    return () => {};
+  }
+
+  if (typeof mediaQueryList.addEventListener === "function") {
+    mediaQueryList.addEventListener("change", listener);
+    return () => mediaQueryList.removeEventListener("change", listener);
+  }
+
+  if (typeof mediaQueryList.addListener === "function") {
+    mediaQueryList.addListener(listener);
+    return () => mediaQueryList.removeListener(listener);
+  }
+
+  return () => {};
+}
+
+function usePilotStatsDashboardPageSize() {
+  const [pageSize, setPageSize] = useState(getPilotStatsDashboardPageSize);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
+
+    const bp1920Query = window.matchMedia("(min-width: 120rem)");
+    const bp1400Query = window.matchMedia("(min-width: 87.5rem)");
+    const updatePageSize = () => {
+      setPageSize(getPilotStatsDashboardPageSize());
+    };
+
+    updatePageSize();
+
+    const remove1920Listener = addMediaQueryListener(bp1920Query, updatePageSize);
+    const remove1400Listener = addMediaQueryListener(bp1400Query, updatePageSize);
+
+    return () => {
+      remove1920Listener();
+      remove1400Listener();
+    };
+  }, []);
+
+  return pageSize;
+}
+
+function getPilotStatsDashboardGridClassName(pageSize) {
+  if (pageSize >= 4) {
+    return "grid-cols-4";
+  }
+
+  if (pageSize >= 3) {
+    return "grid-cols-3";
+  }
+
+  return "grid-cols-2";
+}
+
+// Renders one active dashboard page stack so each page snaps as a single full-height row.
+function LogbookPilotStatsDashboardPages({ cards, pageSize, onPilotStatsDetailViewChange }) {
   const pages = useMemo(() => chunkPilotStatsCards(cards, pageSize), [cards, pageSize]);
 
   if (!pages.length) {
     return null;
   }
 
+  const gridClassName = getPilotStatsDashboardGridClassName(pageSize);
+
   return (
-    <div className={cn("flex min-h-full w-full min-w-0 flex-col gap-3", className)}>
+    <div className="flex h-full min-h-full w-full min-w-0 flex-col">
       {pages.map((pageCards, pageIndex) => (
-        <div key={`${pageSize}-${pageIndex}`} className="snap-start min-h-full h-full w-full min-w-0">
-          <div className={cn("grid h-full min-h-full min-w-0 auto-rows-min gap-3", gridClassName)}>
+        <div
+          key={`${pageSize}-${pageIndex}`}
+          className="h-full min-h-full w-full min-w-0 shrink-0 snap-start snap-always overflow-hidden"
+        >
+          <div className={cn("grid h-full min-h-0 w-full min-w-0 grid-rows-1 gap-3", gridClassName)}>
             {pageCards.map((card) => (
               <LogbookPilotStatsSummaryPanel
                 key={card.key}
@@ -52,7 +125,7 @@ function LogbookPilotStatsDashboardPages({
                 autoFitRows={card.autoFitRows ?? true}
                 showProgressBar={card.key !== "equipment"}
                 onViewAll={card.hasData ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
-                className={cn(card.spanClassName, card.cardClassName)}
+                className={cn("h-full min-h-0", card.spanClassName, card.cardClassName)}
               />
             ))}
           </div>
@@ -75,6 +148,7 @@ export default function LogbookPilotStats({
   const comparisons = displayStats.comparisons || null;
   const detailRows = useMemo(() => displayStats.detailRows || EMPTY_DETAIL_ROWS, [displayStats.detailRows]);
   const dashboardCards = useMemo(() => getPilotStatsDashboardCards(displayStats), [displayStats]);
+  const dashboardPageSize = usePilotStatsDashboardPageSize();
 
   return (
     <div
@@ -104,28 +178,10 @@ export default function LogbookPilotStats({
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              <div className="app-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] snap-y snap-mandatory">
+              <div className="app-scrollbar h-full min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] snap-y snap-mandatory">
                 <LogbookPilotStatsDashboardPages
                   cards={dashboardCards}
-                  pageSize={2}
-                  gridClassName="grid-cols-2"
-                  className="bp-1400:hidden"
-                  onPilotStatsDetailViewChange={onPilotStatsDetailViewChange}
-                />
-
-                <LogbookPilotStatsDashboardPages
-                  cards={dashboardCards}
-                  pageSize={3}
-                  gridClassName="grid-cols-3"
-                  className="hidden bp-1400:flex bp-1920:hidden"
-                  onPilotStatsDetailViewChange={onPilotStatsDetailViewChange}
-                />
-
-                <LogbookPilotStatsDashboardPages
-                  cards={dashboardCards}
-                  pageSize={4}
-                  gridClassName="grid-cols-4"
-                  className="hidden bp-1920:flex"
+                  pageSize={dashboardPageSize}
                   onPilotStatsDetailViewChange={onPilotStatsDetailViewChange}
                 />
               </div>
