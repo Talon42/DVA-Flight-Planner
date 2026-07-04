@@ -71,7 +71,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "records",
     variant: "records",
     dataKey: "records",
-    maxRows: 4,
+    maxRows: 10,
     cardClassName: PILOT_STATS_SUMMARY_CARD_CLASS_NAME,
     spanClassName: "col-span-1"
   })

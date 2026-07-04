@@ -1,6 +1,8 @@
 import { getAirportByIcao } from "../airports/airportCatalog.js";
 import { LOGBOOK_EMPTY_VALUE, formatLandingGrade } from "./logbook.model.js";
 
+const BEST_LANDING_TARGET_FPM = -250;
+
 function formatNumber(value, options = {}) {
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: options.minimumFractionDigits ?? 0,
@@ -59,6 +61,14 @@ function formatPercent(value, total) {
   }
 
   return `${formatNumber((value / total) * 100, { maximumFractionDigits: 1 })}%`;
+}
+
+// Ranks landings by closeness to the target touchdown rate, then newest flight.
+function compareBestLandingRate(left, right) {
+  const leftDistance = Math.abs(left.landingRate - BEST_LANDING_TARGET_FPM);
+  const rightDistance = Math.abs(right.landingRate - BEST_LANDING_TARGET_FPM);
+
+  return leftDistance - rightDistance || right.dateSortKey - left.dateSortKey;
 }
 
 function parseDateSortKey(dateSortKey) {
@@ -717,7 +727,7 @@ function buildRecordSummary(rows) {
   const landingRows = activeRows.filter((row) => Number.isFinite(row.landingRate));
   const bestLandingRate =
       landingRows.length > 0
-      ? [...landingRows].sort((left, right) => right.landingRate - left.landingRate || right.dateSortKey - left.dateSortKey)[0]
+      ? [...landingRows].sort(compareBestLandingRate)[0]
       : null;
   const worstLandingRate =
       landingRows.length > 0
@@ -835,7 +845,7 @@ function buildRecordSummary(rows) {
             id: "busiest-month",
             recordType: "busiest-month",
             label: "Busiest Month",
-            value: formatNumber(busiestMonthCount),
+            value: `${formatNumber(busiestMonthCount)} Flights`,
             meta: buildMonthLabel(busiestMonthKey),
             tone: "neutral"
           }
@@ -915,7 +925,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
       : null;
   const bestLandingRate =
     landingRows.length > 0
-      ? [...landingRows].sort((left, right) => right.landingRate - left.landingRate || right.dateSortKey - left.dateSortKey)[0]
+      ? [...landingRows].sort(compareBestLandingRate)[0]
       : null;
   const worstLandingRate =
     landingRows.length > 0
