@@ -78,6 +78,7 @@ export default function DataTable({
   getRowId = (row) => row.id,
   getRowClassName,
   renderRowOverlay,
+  frameClassName = "",
   rowHeight = TABLE_ROW_HEIGHT,
   virtualized = true,
   initialVisibleRows = INITIAL_VISIBLE_ROWS,
@@ -246,7 +247,8 @@ export default function DataTable({
     <div
       ref={tableRef}
       className={cn(
-        "flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)]",
+        frameClassName ||
+          "flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)]",
         tableCanvasClassName
       )}
     >
