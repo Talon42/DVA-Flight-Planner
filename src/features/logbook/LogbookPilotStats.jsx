@@ -200,16 +200,16 @@ function LogbookPilotStatsDashboardPages({ cards, pageSize, onPilotStatsDetailVi
                 items={card.items}
                 departureItems={card.departureItems}
                 arrivalItems={card.arrivalItems}
-                variant={card.variant}
-                maxRows={card.maxRows}
-                autoFitRows={card.autoFitRows ?? true}
-                showProgressBar={card.key !== "equipment"}
-                onViewAll={card.hasData ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
-                className={cn("h-full min-h-0", card.spanClassName, card.cardClassName)}
-              />
-            ))}
-          </div>
+              variant={card.variant}
+              maxRows={card.maxRows}
+              autoFitRows={card.autoFitRows ?? true}
+              showProgressBar={card.key !== "equipment"}
+              onViewAll={card.hasData ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
+              className={cn("h-full min-h-0", card.spanClassName)}
+            />
+          ))}
         </div>
+      </div>
       ))}
     </div>
   );

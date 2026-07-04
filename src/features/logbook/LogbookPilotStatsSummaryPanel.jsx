@@ -26,7 +26,8 @@ const TILE_STAT_FRAME_CLASS_NAME =
   "relative isolate grid h-[8.25rem] min-w-0 grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
 // Leaves a tiny buffer so fractional layout math does not clip the last visible row by a pixel.
 const FIT_HEIGHT_BUFFER_PX = 3;
-const FIXED_TILE_ROW_HEIGHT_PX = 116;
+// Must match TILE_STAT_FRAME_CLASS_NAME's h-[8.25rem] so fixed tile paging only counts full rows.
+const FIXED_TILE_ROW_HEIGHT_PX = 132;
 const FIXED_TILE_ROW_GAP_PX = 8;
 
 function parsePercentValue(percentValue) {
