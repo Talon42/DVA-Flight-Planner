@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName } from "../../components/ui/typography";
@@ -95,6 +95,10 @@ function getPilotStatsDashboardGridClassName(pageSize) {
   return "grid-cols-2";
 }
 
+function clampPilotStatsPageIndex(pageIndex, pageCount) {
+  return Math.max(0, Math.min(Math.max(0, pageCount - 1), pageIndex));
+}
+
 // Renders one active dashboard page stack so each page snaps as a single full-height row.
 function LogbookPilotStatsDashboardPages({ cards, pageSize, onPilotStatsDetailViewChange }) {
   const pages = useMemo(() => chunkPilotStatsCards(cards, pageSize), [cards, pageSize]);
@@ -149,6 +153,158 @@ export default function LogbookPilotStats({
   const detailRows = useMemo(() => displayStats.detailRows || EMPTY_DETAIL_ROWS, [displayStats.detailRows]);
   const dashboardCards = useMemo(() => getPilotStatsDashboardCards(displayStats), [displayStats]);
   const dashboardPageSize = usePilotStatsDashboardPageSize();
+  const dashboardPageCount = Math.max(1, Math.ceil(dashboardCards.length / dashboardPageSize));
+  const dashboardScrollRef = useRef(null);
+  const dashboardPageIndexRef = useRef(0);
+  const dashboardPageCountRef = useRef(dashboardPageCount);
+  const dashboardWheelLockUntilRef = useRef(0);
+  const previousDetailViewRef = useRef(Boolean(pilotStatsDetailView));
+  const [dashboardPageIndex, setDashboardPageIndex] = useState(0);
+
+  useEffect(() => {
+    dashboardPageCountRef.current = dashboardPageCount;
+  }, [dashboardPageCount]);
+
+  useEffect(() => {
+    dashboardPageIndexRef.current = dashboardPageIndex;
+  }, [dashboardPageIndex]);
+
+  useEffect(() => {
+    setDashboardPageIndex(0);
+  }, [dashboardPageSize]);
+
+  useEffect(() => {
+    setDashboardPageIndex(0);
+  }, [dashboardCards.length]);
+
+  useEffect(() => {
+    const wasDetailView = previousDetailViewRef.current;
+    const isDetailView = Boolean(pilotStatsDetailView);
+
+    previousDetailViewRef.current = isDetailView;
+
+    if (wasDetailView && !isDetailView) {
+      setDashboardPageIndex(0);
+    }
+  }, [pilotStatsDetailView]);
+
+  useEffect(() => {
+    setDashboardPageIndex((currentPageIndex) =>
+      clampPilotStatsPageIndex(currentPageIndex, dashboardPageCount)
+    );
+  }, [dashboardPageCount]);
+
+  useEffect(() => {
+    if (pilotStatsDetailView) {
+      return undefined;
+    }
+
+    const scrollNode = dashboardScrollRef.current;
+
+    if (!scrollNode) {
+      return undefined;
+    }
+
+    const nextTop = scrollNode.clientHeight * dashboardPageIndex;
+
+    if (typeof scrollNode.scrollTo === "function") {
+      scrollNode.scrollTo({ top: nextTop, behavior: "auto" });
+    } else {
+      scrollNode.scrollTop = nextTop;
+    }
+
+    return undefined;
+  }, [dashboardPageIndex, dashboardPageSize, dashboardCards.length, pilotStatsDetailView]);
+
+  useEffect(() => {
+    if (pilotStatsDetailView) {
+      return undefined;
+    }
+
+    const scrollNode = dashboardScrollRef.current;
+
+    if (!scrollNode) {
+      return undefined;
+    }
+
+    const handleWheel = (event) => {
+      if (Math.abs(event.deltaY) < 8) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now < dashboardWheelLockUntilRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const direction = event.deltaY > 0 ? 1 : -1;
+      const currentPageIndex = dashboardPageIndexRef.current;
+      const nextPageIndex = clampPilotStatsPageIndex(
+        currentPageIndex + direction,
+        dashboardPageCountRef.current
+      );
+
+      dashboardWheelLockUntilRef.current = now + 220;
+
+      if (nextPageIndex === currentPageIndex) {
+        return;
+      }
+
+      dashboardPageIndexRef.current = nextPageIndex;
+      setDashboardPageIndex(nextPageIndex);
+
+      const nextTop = scrollNode.clientHeight * nextPageIndex;
+      if (typeof scrollNode.scrollTo === "function") {
+        scrollNode.scrollTo({ top: nextTop, behavior: "auto" });
+      } else {
+        scrollNode.scrollTop = nextTop;
+      }
+    };
+
+    scrollNode.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      scrollNode.removeEventListener("wheel", handleWheel);
+    };
+  }, [dashboardPageCount, dashboardPageSize, pilotStatsDetailView]);
+
+  function handleDashboardKeyDown(event) {
+    const isNextKey =
+      event.key === "PageDown" || event.key === "ArrowDown" || event.key === " " || event.code === "Space";
+    const isPreviousKey = event.key === "PageUp" || event.key === "ArrowUp";
+
+    if (!isNextKey && !isPreviousKey) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const currentPageIndex = dashboardPageIndexRef.current;
+    const nextPageIndex = clampPilotStatsPageIndex(
+      currentPageIndex + (isNextKey ? 1 : -1),
+      dashboardPageCountRef.current
+    );
+
+    if (nextPageIndex === currentPageIndex) {
+      return;
+    }
+
+    dashboardPageIndexRef.current = nextPageIndex;
+    setDashboardPageIndex(nextPageIndex);
+
+    const scrollNode = dashboardScrollRef.current;
+    if (!scrollNode) {
+      return;
+    }
+
+    const nextTop = scrollNode.clientHeight * nextPageIndex;
+    if (typeof scrollNode.scrollTo === "function") {
+      scrollNode.scrollTo({ top: nextTop, behavior: "auto" });
+    } else {
+      scrollNode.scrollTop = nextTop;
+    }
+  }
 
   return (
     <div
@@ -178,7 +334,17 @@ export default function LogbookPilotStats({
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              <div className="app-scrollbar h-full min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] snap-y snap-mandatory">
+              <div
+                ref={dashboardScrollRef}
+                tabIndex={0}
+                role="region"
+                aria-label="Pilot stats dashboard pages"
+                onKeyDown={handleDashboardKeyDown}
+                className={cn(
+                  "logbook-pilot-stats__paged-dashboard app-scrollbar h-full min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] snap-y snap-mandatory [&::-webkit-scrollbar]:hidden",
+                )}
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              >
                 <LogbookPilotStatsDashboardPages
                   cards={dashboardCards}
                   pageSize={dashboardPageSize}
