@@ -98,6 +98,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
           columns={config.columns}
           viewportWidth={0}
           layoutMode="fill"
+          activeSortClassName="border-b-[color:transparent]"
           sort={sort}
           onSort={handleSort}
           getRowId={(row) => getDetailRowId(detailView, row)}

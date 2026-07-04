@@ -89,6 +89,7 @@ export default function DataTable({
   renderRowOverlay,
   frameClassName = "",
   layoutMode = "fill",
+  activeSortClassName = "",
   rowHeight = TABLE_ROW_HEIGHT,
   virtualized = true,
   initialVisibleRows = INITIAL_VISIBLE_ROWS,
@@ -279,6 +280,7 @@ export default function DataTable({
           onSort={onSort}
           scrollbarOffset={headerScrollbarOffset}
           layoutMode={layoutMode}
+          activeSortClassName={activeSortClassName}
         />
       </div>
 

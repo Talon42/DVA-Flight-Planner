@@ -15,7 +15,7 @@ function getContentAlignmentClass(column) {
 }
 
 // Renders sortable headers as buttons and static headers as plain text while preserving layout.
-function HeaderButton({ column, sort, onSort }) {
+function HeaderButton({ column, sort, onSort, activeSortClassName = "" }) {
   if (column.filler) {
     return <div className="h-full w-full" aria-hidden="true" />;
   }
@@ -61,7 +61,7 @@ function HeaderButton({ column, sort, onSort }) {
     "flex h-full w-full overflow-hidden border-b border-[color:transparent] bg-[inherit] p-0 text-[var(--text-muted)] transition-colors duration-150",
     labelTextClassName,
     sortable ? "hover:text-[var(--text-heading)]" : "cursor-default",
-    isActive && "border-b-[color:var(--delta-red)] text-[var(--text-heading)]"
+    isActive && cn(activeSortClassName, "text-[var(--text-heading)]")
   );
 
   if (!sortable) {
@@ -96,7 +96,8 @@ export default function TableHeader({
   sort,
   onSort,
   scrollbarOffset = 0,
-  layoutMode = "fill"
+  layoutMode = "fill",
+  activeSortClassName = ""
 }) {
   return (
     <div
@@ -109,7 +110,7 @@ export default function TableHeader({
     >
       {columns.map((column) => (
         <div key={column.key} className="min-w-0">
-          <HeaderButton column={column} sort={sort} onSort={onSort} />
+          <HeaderButton column={column} sort={sort} onSort={onSort} activeSortClassName={activeSortClassName} />
         </div>
       ))}
     </div>

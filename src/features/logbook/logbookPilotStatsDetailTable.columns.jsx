@@ -6,6 +6,8 @@ import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
 import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
 
+const DETAIL_COLUMN_MIN_WIDTH = 96;
+
 function resolveNumericSortValue(value) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -87,41 +89,20 @@ function renderAirlineCell(row) {
   );
 }
 
-function buildRankColumn() {
-  return {
-    key: "rank",
-    label: "Rank",
-    compactLabel: "#",
-    wideLabel: "Rank",
-    ariaLabel: "Rank",
-    role: "shortCode",
-    minWidth: 52,
-    compactMinWidth: 42,
-    fr: 0.4,
-    sortable: true,
-    sortKey: "rank",
-    getSortValue: (row) => resolveNumericSortValue(row?.rank),
-    renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE
-  };
-}
-
-function buildTextColumn({
+function buildSharedDetailColumn({
   key,
   label,
   compactLabel = label,
   wideLabel = label,
   ariaLabel = label,
   role = "secondary",
-  minWidth = 160,
-  compactMinWidth = 120,
-  fr = 1,
   sortKey = key,
   getSortValue,
   renderCell,
   sortable = true,
-  truncate = true,
   required = true,
   align = "left",
+  truncate = true,
   onCellClick,
   cellAriaLabel,
   cellTitle,
@@ -134,9 +115,9 @@ function buildTextColumn({
     wideLabel,
     ariaLabel,
     role,
-    minWidth,
-    compactMinWidth,
-    fr,
+    minWidth: DETAIL_COLUMN_MIN_WIDTH,
+    compactMinWidth: DETAIL_COLUMN_MIN_WIDTH,
+    fr: 1,
     sortable,
     sortKey,
     getSortValue,
@@ -151,6 +132,49 @@ function buildTextColumn({
   };
 }
 
+function buildRankColumn() {
+  return buildSharedDetailColumn({
+    key: "rank",
+    label: "Rank",
+    compactLabel: "#",
+    wideLabel: "Rank",
+    ariaLabel: "Rank",
+    role: "shortCode",
+    sortKey: "rank",
+    getSortValue: (row) => resolveNumericSortValue(row?.rank),
+    renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE
+  });
+}
+
+function buildNumericColumn({
+  key = "value",
+  label = "Flights",
+  compactLabel = "Flt",
+  wideLabel = label,
+  ariaLabel = label,
+  sortKey = key,
+  getSortValue,
+  renderCell,
+  sortable = true,
+  required = true,
+  align = "right"
+} = {}) {
+  return buildSharedDetailColumn({
+    key,
+    label,
+    compactLabel,
+    wideLabel,
+    ariaLabel,
+    role: "numeric",
+    sortKey,
+    getSortValue,
+    renderCell,
+    sortable,
+    required,
+    align
+  });
+}
+
 function buildAirportColumn({
   key,
   label,
@@ -159,24 +183,18 @@ function buildAirportColumn({
   ariaLabel = label,
   codeResolver,
   nameResolver,
-  minWidth = 188,
-  compactMinWidth = 92,
-  fr = 1.2,
   sortKey = key,
   getSortValue,
   sortable = true,
   required = true
 } = {}) {
-  return buildTextColumn({
+  return buildSharedDetailColumn({
     key,
     label,
     compactLabel,
     wideLabel,
     ariaLabel,
     role: "airportCode",
-    minWidth,
-    compactMinWidth,
-    fr,
     sortKey,
     getSortValue,
     sortable,
@@ -190,40 +208,6 @@ function buildAirportColumn({
   });
 }
 
-function buildNumericColumn({
-  key = "value",
-  label = "Flights",
-  compactLabel = "Flt",
-  wideLabel = label,
-  ariaLabel = label,
-  minWidth = 96,
-  compactMinWidth = 64,
-  fr = 0.65,
-  sortKey = key,
-  getSortValue,
-  renderCell,
-  sortable = true,
-  required = true
-} = {}) {
-  return buildTextColumn({
-    key,
-    label,
-    compactLabel,
-    wideLabel,
-    ariaLabel,
-    role: "numeric",
-    minWidth,
-    compactMinWidth,
-    fr,
-    sortKey,
-    getSortValue,
-    sortable,
-    required,
-    align: "right",
-    renderCell
-  });
-}
-
 function buildPercentColumn(overrides = {}) {
   return buildNumericColumn({
     key: "percentValue",
@@ -231,9 +215,6 @@ function buildPercentColumn(overrides = {}) {
     compactLabel: "%",
     wideLabel: "% of Total",
     ariaLabel: "Percent of Total",
-    minWidth: 96,
-    compactMinWidth: 52,
-    fr: 0.6,
     sortKey: "percentValue",
     getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue),
     renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE,
@@ -245,9 +226,10 @@ function buildRecentLandingRows(detailRows = {}) {
   return (detailRows.recentLandings || []).map((row) => ({
     ...row,
     date: formatCompactDashDate(row?.dateSortKey),
-    flight: String(row?.flight || row?.label || "").trim() || LOGBOOK_EMPTY_VALUE,
-    route: String(row?.route || "").trim() || LOGBOOK_EMPTY_VALUE,
-    airline: String(row?.airline || "").trim() || LOGBOOK_EMPTY_VALUE,
+    flight: String(row?.compactFlightLabel || row?.flight || row?.label || "").trim() || LOGBOOK_EMPTY_VALUE,
+    airline: String(row?.airlineDisplayName || row?.airline || "").trim() || LOGBOOK_EMPTY_VALUE,
+    dep: String(row?.dep || row?.departure || row?.departureCode || "").trim() || LOGBOOK_EMPTY_VALUE,
+    arr: String(row?.arr || row?.arrival || row?.arrivalCode || "").trim() || LOGBOOK_EMPTY_VALUE,
     equipment: String(row?.equipment || "").trim() || LOGBOOK_EMPTY_VALUE,
     landingRate: Number.isFinite(row?.rawLandingRate) ? `${row.rawLandingRate} fpm` : LOGBOOK_EMPTY_VALUE,
     grade: row?.badge || LOGBOOK_EMPTY_VALUE
@@ -257,8 +239,8 @@ function buildRecentLandingRows(detailRows = {}) {
 function buildRouteRows(detailRows = {}) {
   return (detailRows.routes || []).map((row) => ({
     ...row,
-    dep: String(row?.departureCode || "").trim(),
-    arr: String(row?.arrivalCode || "").trim(),
+    dep: String(row?.departureCode || row?.dep || "").trim(),
+    arr: String(row?.arrivalCode || row?.arr || "").trim(),
     departureName: String(row?.departureName || "").trim(),
     arrivalName: String(row?.arrivalName || "").trim()
   }));
@@ -280,28 +262,22 @@ function buildAirportRankingRows(rows = []) {
 
 function buildRecentLandingColumns() {
   return [
-    buildTextColumn({
+    buildSharedDetailColumn({
       key: "date",
       label: "Date",
       compactLabel: "Date",
       wideLabel: "Date",
       role: "time",
-      minWidth: 104,
-      compactMinWidth: 78,
-      fr: 0.62,
       sortKey: "date",
       getSortValue: (row) => resolveNumericSortValue(row?.dateSortKey),
       renderCell: (row) => row.date
     }),
-    buildTextColumn({
+    buildSharedDetailColumn({
       key: "flight",
       label: "Flight",
       compactLabel: "Flight",
       wideLabel: "Flight",
       role: "primaryText",
-      minWidth: 136,
-      compactMinWidth: 116,
-      fr: 1.05,
       sortKey: "flight",
       getSortValue: (row) => resolveTextSortValue(row?.flight),
       renderCell: (row) => row.flight,
@@ -328,41 +304,44 @@ function buildRecentLandingColumns() {
       },
       stopRowSelectOnClick: true
     }),
-    buildTextColumn({
+    buildSharedDetailColumn({
       key: "airline",
       label: "Airline",
       compactLabel: "Airline",
       wideLabel: "Airline",
       role: "primaryText",
-      minWidth: 144,
-      compactMinWidth: 118,
-      fr: 1,
       sortKey: "airline",
       getSortValue: (row) => resolveTextSortValue(row?.airline),
       renderCell: (row) => row.airline
     }),
-    buildTextColumn({
-      key: "route",
-      label: "Route",
-      compactLabel: "Route",
-      wideLabel: "Route",
-      role: "secondary",
-      minWidth: 188,
-      compactMinWidth: 152,
-      fr: 1.15,
-      sortKey: "route",
-      getSortValue: (row) => resolveTextSortValue(row?.route),
-      renderCell: (row) => row.route
+    buildSharedDetailColumn({
+      key: "dep",
+      label: "Departure",
+      compactLabel: "DEP",
+      wideLabel: "Departure",
+      ariaLabel: "Departure",
+      role: "airportCode",
+      sortKey: "dep",
+      getSortValue: (row) => resolveTextSortValue(row?.dep),
+      renderCell: (row) => row.dep
     }),
-    buildTextColumn({
+    buildSharedDetailColumn({
+      key: "arr",
+      label: "Arrival",
+      compactLabel: "ARR",
+      wideLabel: "Arrival",
+      ariaLabel: "Arrival",
+      role: "airportCode",
+      sortKey: "arr",
+      getSortValue: (row) => resolveTextSortValue(row?.arr),
+      renderCell: (row) => row.arr
+    }),
+    buildSharedDetailColumn({
       key: "equipment",
       label: "Equipment",
       compactLabel: "Eqp",
       wideLabel: "Equipment",
       role: "secondary",
-      minWidth: 204,
-      compactMinWidth: 176,
-      fr: 1.05,
       sortKey: "equipment",
       getSortValue: (row) => resolveTextSortValue(row?.equipment),
       renderCell: renderEquipmentCell
@@ -373,22 +352,16 @@ function buildRecentLandingColumns() {
       compactLabel: "Landing",
       wideLabel: "Landing Rate",
       ariaLabel: "Landing Rate",
-      minWidth: 120,
-      compactMinWidth: 96,
-      fr: 0.7,
       sortKey: "landingRate",
       getSortValue: (row) => resolveNumericSortValue(row?.rawLandingRate ?? row?.landingRate),
       renderCell: (row) => row.landingRate
     }),
-    buildTextColumn({
+    buildSharedDetailColumn({
       key: "grade",
       label: "Grade",
       compactLabel: "Grade",
       wideLabel: "Grade",
       role: "icon",
-      minWidth: 90,
-      compactMinWidth: 80,
-      fr: 0.38,
       sortKey: "grade",
       getSortValue: (row) => resolveTextSortValue(row?.grade),
       renderCell: (row) => <LandingGradeBadge grade={row.grade} />
@@ -407,9 +380,6 @@ function buildRouteColumns() {
       ariaLabel: "Departure airport",
       codeResolver: (row) => row.dep,
       nameResolver: (row) => row.departureName,
-      minWidth: 188,
-      compactMinWidth: 92,
-      fr: 1.15,
       sortKey: "dep",
       getSortValue: (row) => resolveTextSortValue(row?.dep)
     }),
@@ -421,9 +391,6 @@ function buildRouteColumns() {
       ariaLabel: "Arrival airport",
       codeResolver: (row) => row.arr,
       nameResolver: (row) => row.arrivalName,
-      minWidth: 188,
-      compactMinWidth: 92,
-      fr: 1.15,
       sortKey: "arr",
       getSortValue: (row) => resolveTextSortValue(row?.arr)
     }),
@@ -432,9 +399,6 @@ function buildRouteColumns() {
       compactLabel: "Flt",
       wideLabel: "Flights",
       ariaLabel: "Flights",
-      minWidth: 96,
-      compactMinWidth: 64,
-      fr: 0.65,
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
@@ -454,9 +418,6 @@ function buildTopAirportColumns() {
       ariaLabel: "Airport code",
       codeResolver: (row) => row.label,
       nameResolver: (row) => row.actualName,
-      minWidth: 210,
-      compactMinWidth: 96,
-      fr: 1.2,
       sortKey: "label",
       getSortValue: (row) => resolveTextSortValue(row?.label)
     }),
@@ -465,9 +426,6 @@ function buildTopAirportColumns() {
       compactLabel: "Total",
       wideLabel: "Total",
       ariaLabel: "Total",
-      minWidth: 96,
-      compactMinWidth: 72,
-      fr: 0.7,
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
@@ -478,9 +436,6 @@ function buildTopAirportColumns() {
       compactLabel: "DEP",
       wideLabel: "Departure",
       ariaLabel: "Departures",
-      minWidth: 84,
-      compactMinWidth: 64,
-      fr: 0.55,
       sortKey: "dep",
       getSortValue: (row) => resolveNumericSortValue(row?.depRaw ?? row?.dep),
       renderCell: (row) => row.dep ?? LOGBOOK_EMPTY_VALUE
@@ -491,9 +446,6 @@ function buildTopAirportColumns() {
       compactLabel: "ARR",
       wideLabel: "Arrival",
       ariaLabel: "Arrivals",
-      minWidth: 84,
-      compactMinWidth: 64,
-      fr: 0.55,
       sortKey: "arr",
       getSortValue: (row) => resolveNumericSortValue(row?.arrRaw ?? row?.arr),
       renderCell: (row) => row.arr ?? LOGBOOK_EMPTY_VALUE
@@ -513,9 +465,6 @@ function buildSimpleAirportColumns(rowLabel = "Airport", valueLabel = "Total") {
       ariaLabel: rowLabel,
       codeResolver: (row) => row.label,
       nameResolver: (row) => row.actualName,
-      minWidth: 196,
-      compactMinWidth: 96,
-      fr: 1.2,
       sortKey: "label",
       getSortValue: (row) => resolveTextSortValue(row?.label)
     }),
@@ -525,9 +474,6 @@ function buildSimpleAirportColumns(rowLabel = "Airport", valueLabel = "Total") {
       compactLabel: valueLabel,
       wideLabel: valueLabel,
       ariaLabel: valueLabel,
-      minWidth: 96,
-      compactMinWidth: 72,
-      fr: 0.7,
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
@@ -539,15 +485,12 @@ function buildSimpleAirportColumns(rowLabel = "Airport", valueLabel = "Total") {
 function buildAirlineColumns() {
   return [
     buildRankColumn(),
-    buildTextColumn({
+    buildSharedDetailColumn({
       key: "label",
       label: "Airline",
       compactLabel: "Airline",
       wideLabel: "Airline",
       role: "primaryText",
-      minWidth: 220,
-      compactMinWidth: 160,
-      fr: 1.25,
       sortKey: "label",
       getSortValue: (row) => resolveTextSortValue(row?.label),
       renderCell: renderAirlineCell
@@ -558,9 +501,33 @@ function buildAirlineColumns() {
       compactLabel: "Flt",
       wideLabel: "Flights",
       ariaLabel: "Flights",
-      minWidth: 96,
-      compactMinWidth: 64,
-      fr: 0.65,
+      sortKey: "value",
+      getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
+      renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
+    }),
+    buildPercentColumn()
+  ];
+}
+
+function buildEquipmentColumns() {
+  return [
+    buildRankColumn(),
+    buildSharedDetailColumn({
+      key: "label",
+      label: "Equipment",
+      compactLabel: "Eqp",
+      wideLabel: "Equipment",
+      role: "primaryText",
+      sortKey: "label",
+      getSortValue: (row) => resolveTextSortValue(row?.label),
+      renderCell: renderEquipmentCell
+    }),
+    buildNumericColumn({
+      key: "value",
+      label: "Flights",
+      compactLabel: "Flt",
+      wideLabel: "Flights",
+      ariaLabel: "Flights",
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
@@ -571,41 +538,32 @@ function buildAirlineColumns() {
 
 function buildRecordColumns() {
   return [
-    buildTextColumn({
+    buildSharedDetailColumn({
       key: "label",
       label: "Record",
       compactLabel: "Record",
       wideLabel: "Record",
       role: "primaryText",
-      minWidth: 180,
-      compactMinWidth: 152,
-      fr: 0.95,
       sortKey: "label",
       getSortValue: (row) => resolveTextSortValue(row?.label),
       renderCell: (row) => row.label ?? LOGBOOK_EMPTY_VALUE
     }),
-    buildTextColumn({
+    buildSharedDetailColumn({
       key: "value",
       label: "Value",
       compactLabel: "Value",
       wideLabel: "Value",
       role: "secondary",
-      minWidth: 148,
-      compactMinWidth: 124,
-      fr: 0.7,
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
     }),
-    buildTextColumn({
+    buildSharedDetailColumn({
       key: "meta",
       label: "Detail",
       compactLabel: "Detail",
       wideLabel: "Detail",
       role: "secondary",
-      minWidth: 220,
-      compactMinWidth: 168,
-      fr: 1.25,
       sortKey: "meta",
       getSortValue: (row) => resolveTextSortValue(row?.meta),
       renderCell: (row) => row.meta ?? LOGBOOK_EMPTY_VALUE
@@ -625,7 +583,7 @@ function getDetailRowId(detailView, row) {
   }
 }
 
-// Builds the pilot stats detail table config using the shared table shell and fill-based widths.
+// Builds the pilot stats detail table config using one shared equal-width column strategy.
 export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
   switch (detailView) {
     case "recent-landings":
@@ -659,36 +617,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
       return {
         title: "All Equipment",
         rows: detailRows.equipment || [],
-        columns: [
-          buildRankColumn(),
-          buildTextColumn({
-            key: "label",
-            label: "Equipment",
-            compactLabel: "Eqp",
-            wideLabel: "Equipment",
-            role: "primaryText",
-            minWidth: 220,
-            compactMinWidth: 180,
-            fr: 1.4,
-            sortKey: "label",
-            getSortValue: (row) => resolveTextSortValue(row?.label),
-            renderCell: renderEquipmentCell
-          }),
-          buildNumericColumn({
-            key: "value",
-            label: "Flights",
-            compactLabel: "Flt",
-            wideLabel: "Flights",
-            ariaLabel: "Flights",
-            minWidth: 96,
-            compactMinWidth: 64,
-            fr: 0.65,
-            sortKey: "value",
-            getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
-            renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
-          }),
-          buildPercentColumn()
-        ],
+        columns: buildEquipmentColumns(),
         rowHeight: 46,
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
