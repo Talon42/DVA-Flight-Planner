@@ -110,7 +110,7 @@ function PilotStatsDashboardPageRail({
   const pageNumbers = useMemo(() => Array.from({ length: pageCount }, (_, index) => index), [pageCount]);
 
   return (
-    <div className="flex h-full w-9 shrink-0 items-center justify-center">
+    <div className="flex h-full w-10 shrink-0 items-center justify-center px-1">
       <div className="flex flex-col items-center justify-center gap-2.5 border border-[color:var(--surface-border)] bg-[var(--surface-raised)] px-1 py-2.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
         <button
           type="button"
@@ -202,16 +202,16 @@ function LogbookPilotStatsDashboardPages({ cards, pageSize, onPilotStatsDetailVi
                 items={card.items}
                 departureItems={card.departureItems}
                 arrivalItems={card.arrivalItems}
-              variant={card.variant}
-              maxRows={card.maxRows}
-              autoFitRows={card.autoFitRows ?? true}
-              showProgressBar={card.key !== "equipment"}
-              onViewAll={card.hasData ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
-              className={cn("h-full min-h-0", card.spanClassName)}
-            />
-          ))}
+                variant={card.variant}
+                maxRows={card.maxRows}
+                autoFitRows={card.autoFitRows ?? true}
+                showProgressBar={card.key !== "equipment"}
+                onViewAll={card.hasData ? () => onPilotStatsDetailViewChange?.(card.detailView) : null}
+                className={cn("h-full min-h-0", card.spanClassName)}
+              />
+            ))}
+          </div>
         </div>
-      </div>
       ))}
     </div>
   );
