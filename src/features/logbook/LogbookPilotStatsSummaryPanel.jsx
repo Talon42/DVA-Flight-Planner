@@ -24,6 +24,8 @@ const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 min-w-0 truncate text-right text-[0.
 // Gives the airline and equipment tiles a shared frame treatment in light mode while preserving the dark look.
 const TILE_STAT_FRAME_CLASS_NAME =
   "relative isolate grid h-[8.25rem] min-w-0 grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
+// Leaves a tiny buffer so fractional layout math does not clip the last visible row by a pixel.
+const FIT_HEIGHT_BUFFER_PX = 3;
 const FIXED_TILE_ROW_HEIGHT_PX = 116;
 const FIXED_TILE_ROW_GAP_PX = 8;
 
@@ -248,6 +250,10 @@ function RecordTile({ item }) {
   );
 }
 
+function getAvailablePilotStatsBodyHeight(bodyHeight) {
+  return Math.max(0, Math.floor(Number(bodyHeight) || 0) - FIT_HEIGHT_BUFFER_PX);
+}
+
 function getMeasuredPilotStatsFitCount({
   bodyHeight,
   rowHeights,
@@ -256,10 +262,10 @@ function getMeasuredPilotStatsFitCount({
   maxRows,
   itemCount
 }) {
-  const safeBodyHeight = Math.max(0, Math.floor(Number(bodyHeight) || 0));
   const safeRowGap = Math.max(0, Math.floor(Number(rowGap) || 0));
   const safeMaxRows = Math.max(1, Math.floor(Number(maxRows) || 1));
   const safeItemCount = Math.max(0, Math.floor(Number(itemCount) || 0));
+  const availableBodyHeight = getAvailablePilotStatsBodyHeight(bodyHeight);
   const measuredHeights = (Array.isArray(rowHeights) ? rowHeights : []).map((height) =>
     Math.max(0, Math.floor(Number(height) || 0))
   );
@@ -269,16 +275,15 @@ function getMeasuredPilotStatsFitCount({
   }
 
   if (FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant)) {
-    const fittedVisualRows = Math.max(
-      1,
-      Math.floor((safeBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX))
+    const fittedVisualRows = Math.floor(
+      (availableBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX)
     );
 
-    return Math.max(1, Math.min(safeItemCount, fittedVisualRows * 2));
+    return Math.max(0, Math.min(safeItemCount, fittedVisualRows * 2));
   }
 
-  if (!(safeBodyHeight > 0) || !measuredHeights.length) {
-    return Math.max(1, Math.min(safeMaxRows, safeItemCount));
+  if (!(availableBodyHeight > 0) || !measuredHeights.length) {
+    return 0;
   }
 
   if (TWO_COLUMN_TILE_VARIANTS.has(variant)) {
@@ -292,7 +297,7 @@ function getMeasuredPilotStatsFitCount({
       const rowHeight = Math.max(firstTileHeight, Number.isFinite(secondTileHeight) ? secondTileHeight : firstTileHeight);
       const nextHeight = consumedHeight + (fittedVisualRows > 0 ? safeRowGap : 0) + rowHeight;
 
-      if (nextHeight > safeBodyHeight) {
+      if (nextHeight > availableBodyHeight) {
         break;
       }
 
@@ -301,7 +306,7 @@ function getMeasuredPilotStatsFitCount({
       usedTiles += 2;
     }
 
-    return Math.max(1, Math.min(safeItemCount, fittedVisualRows * 2));
+    return Math.max(0, Math.min(safeItemCount, fittedVisualRows * 2));
   }
 
   let fittedRows = 0;
@@ -310,7 +315,7 @@ function getMeasuredPilotStatsFitCount({
   for (const rowHeight of measuredHeights.slice(0, safeMaxRows)) {
     const nextHeight = consumedHeight + (fittedRows > 0 ? safeRowGap : 0) + rowHeight;
 
-    if (nextHeight > safeBodyHeight) {
+    if (nextHeight > availableBodyHeight) {
       break;
     }
 
@@ -318,35 +323,34 @@ function getMeasuredPilotStatsFitCount({
     fittedRows += 1;
   }
 
-  return Math.max(1, Math.min(safeItemCount, fittedRows));
+  return Math.max(0, Math.min(safeItemCount, fittedRows));
 }
 
 function getFallbackPilotStatsFitCount({ bodyHeight, variant, maxRows, itemCount }) {
-  const safeBodyHeight = Math.max(0, Math.floor(Number(bodyHeight) || 0));
   const safeMaxRows = Math.max(1, Math.floor(Number(maxRows) || 1));
   const safeItemCount = Math.max(0, Math.floor(Number(itemCount) || 0));
+  const availableBodyHeight = getAvailablePilotStatsBodyHeight(bodyHeight);
 
   if (!safeItemCount) {
     return 0;
   }
 
   const estimatedRowHeight = getEstimatedPilotStatsRowHeight(variant);
-  const estimatedRows = Math.max(1, Math.floor(safeBodyHeight / estimatedRowHeight));
+  const estimatedRows = Math.max(0, Math.floor(availableBodyHeight / estimatedRowHeight));
 
   if (FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant)) {
-    const fittedVisualRows = Math.max(
-      1,
-      Math.floor((safeBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX))
+    const fittedVisualRows = Math.floor(
+      (availableBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX)
     );
 
-    return Math.max(1, Math.min(safeItemCount, fittedVisualRows * 2));
+    return Math.max(0, Math.min(safeItemCount, fittedVisualRows * 2));
   }
 
   if (TWO_COLUMN_TILE_VARIANTS.has(variant)) {
-    return Math.max(1, Math.min(safeItemCount, safeMaxRows, estimatedRows * 2));
+    return Math.max(0, Math.min(safeItemCount, safeMaxRows, estimatedRows * 2));
   }
 
-  return Math.max(1, Math.min(safeItemCount, safeMaxRows, estimatedRows));
+  return Math.max(0, Math.min(safeItemCount, safeMaxRows, estimatedRows));
 }
 
 // Renders the summary cards for the overview dashboard without letting any card scroll.
@@ -486,11 +490,11 @@ export default function LogbookPilotStatsSummaryPanel({
       const bodyHeight = Math.max(0, Math.floor(bodyNode.clientHeight || 0));
 
       if (FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant)) {
-        const fittedVisualRows = Math.max(
-          1,
-          Math.floor((bodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX))
+        const availableBodyHeight = getAvailablePilotStatsBodyHeight(bodyHeight);
+        const fittedVisualRows = Math.floor(
+          (availableBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX)
         );
-        const nextFitItems = Math.max(1, Math.min(candidateCount, fittedVisualRows * 2));
+        const nextFitItems = Math.max(0, Math.min(candidateCount, fittedVisualRows * 2));
 
         setFitItems((current) => (current === nextFitItems ? current : nextFitItems));
         return;
@@ -514,15 +518,8 @@ export default function LogbookPilotStatsSummaryPanel({
         maxRows,
         itemCount: candidateCount
       });
-      const fallbackFitItems = getFallbackPilotStatsFitCount({
-        bodyHeight,
-        variant,
-        maxRows,
-        itemCount: candidateCount
-      });
-      const nextFitItems = measuredFitItems > 0 ? measuredFitItems : fallbackFitItems;
 
-      setFitItems((current) => (current === nextFitItems ? current : nextFitItems));
+      setFitItems((current) => (current === measuredFitItems ? current : measuredFitItems));
     };
 
     const scheduleUpdate = () => {

@@ -38,7 +38,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
     detailView: "recent-landings",
     variant: "landing",
     dataKey: "recentLandings",
-    maxRows: Number.POSITIVE_INFINITY,
+    maxRows: 20,
     cardClassName: PILOT_STATS_SUMMARY_CARD_CLASS_NAME,
     spanClassName: "col-span-1"
   }),
