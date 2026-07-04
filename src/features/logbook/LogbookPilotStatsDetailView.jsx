@@ -377,7 +377,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
                     <td
                       key={column.key}
                       className={cn(
-                        "px-3 py-1.5 align-top text-[var(--text-primary)] dark:text-white",
+                        "px-3 py-1.5 align-middle text-[var(--text-primary)] dark:text-white",
                         bodyMdTextClassName,
                         /^(rank|value|percentValue|dep|arr|landingRate)$/.test(column.key) && "tabular-nums"
                       )}
