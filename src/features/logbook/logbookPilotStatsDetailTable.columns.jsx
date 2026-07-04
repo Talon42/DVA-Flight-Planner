@@ -93,6 +93,67 @@ function renderFlightCell(row) {
   return row.flight ?? LOGBOOK_EMPTY_VALUE;
 }
 
+function buildRankColumn(overrides = {}) {
+  return {
+    key: "rank",
+    label: "Rank",
+    compactLabel: "#",
+    role: "shortCode",
+    minWidth: 56,
+    compactMinWidth: 44,
+    fr: FIXED_FR,
+    sortable: true,
+    sortKey: "rank",
+    getSortValue: (row) => resolveNumericSortValue(row?.rank),
+    renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE,
+    ...overrides
+  };
+}
+
+function buildCountColumn({
+  key = "value",
+  label = "Flights",
+  compactLabel = label,
+  sortKey = key,
+  getSortValue,
+  renderCell,
+  overrides = {}
+} = {}) {
+  return {
+    key,
+    label,
+    compactLabel,
+    role: "numeric",
+    minWidth: 92,
+    compactMinWidth: 64,
+    fr: FIXED_FR,
+    align: "right",
+    sortable: true,
+    sortKey,
+    getSortValue,
+    renderCell,
+    ...overrides
+  };
+}
+
+function buildPercentColumn(overrides = {}) {
+  return {
+    key: "percentValue",
+    label: "% of Total",
+    compactLabel: "%",
+    role: "numeric",
+    minWidth: 104,
+    compactMinWidth: 56,
+    fr: FIXED_FR,
+    align: "right",
+    sortable: true,
+    sortKey: "percentValue",
+    getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue),
+    renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE,
+    ...overrides
+  };
+}
+
 function getDetailRowId(detailView, row) {
   switch (detailView) {
     case "routes":
@@ -364,8 +425,8 @@ function buildTopAirportColumns() {
       wideLabel: "ICAO",
       ariaLabel: "ICAO",
       role: "airportCode",
-      minWidth: 120,
-      compactMinWidth: 76,
+      minWidth: 220,
+      compactMinWidth: 96,
       fr: 1,
       truncate: true,
       sortable: true,
@@ -665,64 +726,29 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         title: "All Equipment",
         rows: detailRows.equipment || [],
         columns: [
-          {
-            key: "rank",
-            label: "Rank",
-            compactLabel: "#",
-            role: "shortCode",
-            minWidth: 56,
-            compactMinWidth: 44,
-            fr: 0.35,
-            sortable: true,
-            sortKey: "rank",
-            getSortValue: (row) => resolveNumericSortValue(row?.rank),
-            renderCell: (row) => row.rank ?? LOGBOOK_EMPTY_VALUE
-          },
+          buildRankColumn(),
           {
             key: "label",
             label: "Equipment",
             compactLabel: "Eqp",
             wideLabel: "Equipment",
             role: "primaryText",
-            minWidth: 180,
-            compactMinWidth: 120,
-            fr: 1.1,
+            minWidth: 220,
+            compactMinWidth: 180,
+            fr: 1,
             truncate: true,
             sortable: true,
             sortKey: "label",
             getSortValue: (row) => resolveTextSortValue(row?.label),
             renderCell: renderEquipmentCell
           },
-          {
-            key: "value",
+          buildCountColumn({
             label: "Flights",
             compactLabel: "Flights",
-            wideLabel: "Flights",
-            role: "numeric",
-            minWidth: 92,
-            compactMinWidth: 64,
-            fr: 0.6,
-            align: "right",
-            sortable: true,
-            sortKey: "value",
             getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
             renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
-          },
-          {
-            key: "percentValue",
-            label: "% of Total",
-            compactLabel: "%",
-            wideLabel: "% of Total",
-            role: "numeric",
-            minWidth: 104,
-            compactMinWidth: 56,
-            fr: 0.55,
-            align: "right",
-            sortable: true,
-            sortKey: "percentValue",
-            getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue),
-            renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE
-          }
+          }),
+          buildPercentColumn()
         ],
         rowHeight: 46,
         defaultSortKey: "rank",
