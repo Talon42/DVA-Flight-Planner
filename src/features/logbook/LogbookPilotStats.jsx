@@ -235,39 +235,62 @@ export default function LogbookPilotStats({
   const dashboardScrollRef = useRef(null);
   const dashboardPageIndexRef = useRef(0);
   const dashboardWheelLockUntilRef = useRef(0);
+  const dashboardRestoreFrameRef = useRef(0);
   const previousDetailViewRef = useRef(Boolean(pilotStatsDetailView));
   const [dashboardPageIndex, setDashboardPageIndex] = useState(0);
 
-  const goToDashboardPage = useCallback(
-    (nextPageIndex) => {
+  // Keeps the dashboard page index clamped and the scroll position aligned to the selected page.
+  const syncDashboardPagePosition = useCallback(
+    (nextPageIndex = dashboardPageIndexRef.current, { deferScroll = false } = {}) => {
       const scrollNode = dashboardScrollRef.current;
       const nextDashboardPageIndex = clampPilotStatsPageIndex(nextPageIndex, dashboardPageCount);
+      const applyScrollPosition = () => {
+        const activeScrollNode = dashboardScrollRef.current;
+
+        if (!activeScrollNode) {
+          return;
+        }
+
+        const nextTop = activeScrollNode.clientHeight * nextDashboardPageIndex;
+
+        if (typeof activeScrollNode.scrollTo === "function") {
+          activeScrollNode.scrollTo({ top: nextTop, behavior: "auto" });
+        } else {
+          activeScrollNode.scrollTop = nextTop;
+        }
+      };
 
       dashboardPageIndexRef.current = nextDashboardPageIndex;
       setDashboardPageIndex(nextDashboardPageIndex);
+
+      if (deferScroll) {
+        if (dashboardRestoreFrameRef.current) {
+          cancelAnimationFrame(dashboardRestoreFrameRef.current);
+        }
+
+        dashboardRestoreFrameRef.current = requestAnimationFrame(() => {
+          dashboardRestoreFrameRef.current = 0;
+          applyScrollPosition();
+        });
+        return;
+      }
 
       if (!scrollNode) {
         return;
       }
 
-      const nextTop = scrollNode.clientHeight * nextDashboardPageIndex;
-
-      if (typeof scrollNode.scrollTo === "function") {
-        scrollNode.scrollTo({ top: nextTop, behavior: "auto" });
-      } else {
-        scrollNode.scrollTop = nextTop;
-      }
+      applyScrollPosition();
     },
     [dashboardPageCount]
   );
 
   useEffect(() => {
-    goToDashboardPage(0);
-  }, [dashboardPageSize, goToDashboardPage]);
+    syncDashboardPagePosition();
+  }, [dashboardPageSize, syncDashboardPagePosition]);
 
   useEffect(() => {
-    goToDashboardPage(0);
-  }, [dashboardCards.length, goToDashboardPage]);
+    syncDashboardPagePosition();
+  }, [dashboardCards.length, syncDashboardPagePosition]);
 
   useEffect(() => {
     const wasDetailView = previousDetailViewRef.current;
@@ -276,9 +299,9 @@ export default function LogbookPilotStats({
     previousDetailViewRef.current = isDetailView;
 
     if (wasDetailView && !isDetailView) {
-      goToDashboardPage(0);
+      syncDashboardPagePosition(dashboardPageIndexRef.current, { deferScroll: true });
     }
-  }, [goToDashboardPage, pilotStatsDetailView]);
+  }, [pilotStatsDetailView, syncDashboardPagePosition]);
 
   useEffect(() => {
     if (pilotStatsDetailView) {
@@ -313,14 +336,24 @@ export default function LogbookPilotStats({
         return;
       }
 
-      goToDashboardPage(nextPageIndex);
+      syncDashboardPagePosition(nextPageIndex);
     };
 
     scrollNode.addEventListener("wheel", handleWheel, { passive: false });
     return () => {
       scrollNode.removeEventListener("wheel", handleWheel);
     };
-  }, [dashboardPageCount, dashboardPageSize, goToDashboardPage, pilotStatsDetailView]);
+  }, [dashboardPageCount, dashboardPageSize, pilotStatsDetailView, syncDashboardPagePosition]);
+
+  useEffect(
+    () => () => {
+      if (dashboardRestoreFrameRef.current) {
+        cancelAnimationFrame(dashboardRestoreFrameRef.current);
+        dashboardRestoreFrameRef.current = 0;
+      }
+    },
+    []
+  );
 
   function handleDashboardKeyDown(event) {
     const isNextKey =
@@ -343,7 +376,7 @@ export default function LogbookPilotStats({
       return;
     }
 
-    goToDashboardPage(nextPageIndex);
+    syncDashboardPagePosition(nextPageIndex);
   }
 
   return (
@@ -395,9 +428,9 @@ export default function LogbookPilotStats({
               <PilotStatsDashboardPageRail
                 pageCount={dashboardPageCount}
                 pageIndex={dashboardPageIndex}
-                onPrevPage={() => goToDashboardPage(dashboardPageIndex - 1)}
-                onNextPage={() => goToDashboardPage(dashboardPageIndex + 1)}
-                onGoToPage={(nextPageIndex) => goToDashboardPage(nextPageIndex)}
+                onPrevPage={() => syncDashboardPagePosition(dashboardPageIndex - 1)}
+                onNextPage={() => syncDashboardPagePosition(dashboardPageIndex + 1)}
+                onGoToPage={(nextPageIndex) => syncDashboardPagePosition(nextPageIndex)}
               />
             </div>
           )}
