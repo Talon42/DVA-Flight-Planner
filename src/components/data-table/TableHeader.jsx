@@ -16,6 +16,10 @@ function getContentAlignmentClass(column) {
 
 // Renders sortable headers as buttons and static headers as plain text while preserving layout.
 function HeaderButton({ column, sort, onSort }) {
+  if (column.filler) {
+    return <div className="h-full w-full" aria-hidden="true" />;
+  }
+
   const sortable = Boolean(column.sortable && onSort);
   const isActive = sortable && sort?.key === column.sortKey;
   const fullLabel = column.fullLabel || column.label;
@@ -91,11 +95,13 @@ export default function TableHeader({
   columnTemplate,
   sort,
   onSort,
-  scrollbarOffset = 0
+  scrollbarOffset = 0,
+  layoutMode = "fill"
 }) {
   return (
     <div
       className="relative z-20 grid w-full min-w-0 border-b border-[color:var(--line)] bg-[var(--surface-raised)]"
+      data-layout-mode={layoutMode}
       style={{
         gridTemplateColumns: columnTemplate,
         paddingRight: scrollbarOffset ? `${scrollbarOffset}px` : undefined

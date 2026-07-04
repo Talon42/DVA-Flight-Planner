@@ -41,7 +41,8 @@ export default function TableRow({
   onSelectRow,
   onActivateRow,
   getRowClassName,
-  renderRowOverlay
+  renderRowOverlay,
+  layoutMode = "fill"
 }) {
   const isSelectableSelected = Boolean(enableRowSelection && isSelected && selectedRowClassName);
 
@@ -82,6 +83,7 @@ export default function TableRow({
         getRowClassName?.(row),
         isSelectableSelected && selectedRowClassName
       )}
+      data-layout-mode={layoutMode}
       onClick={handleRowClick}
       onDoubleClick={handleRowDoubleClick}
       style={{
@@ -92,6 +94,10 @@ export default function TableRow({
     >
       {renderRowOverlay?.(row) || null}
       {columns.map((column) => {
+        if (column.filler) {
+          return <div key={column.key} className="min-w-0" aria-hidden="true" />;
+        }
+
         const content = column.renderCell ? column.renderCell(row, column) : row[column.key];
         const alignClassName = getCellAlignmentClass(column);
         const overflowClassName = column.allowOverflow ? "overflow-visible" : "overflow-hidden";

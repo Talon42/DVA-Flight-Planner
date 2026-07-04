@@ -232,3 +232,39 @@ export function buildColumnTemplate(columns) {
     })
     .join(" ");
 }
+
+function resolveContentTrackSize(column) {
+  if (column?.filler) {
+    return "minmax(0, 1fr)";
+  }
+
+  const presetKey = String(column?.presetKey || "").trim();
+  const preferredWidth =
+    presetKey === "compact"
+      ? column?.compactContentWidth ?? column?.contentWidth
+      : column?.contentWidth ?? column?.compactContentWidth;
+
+  if (typeof preferredWidth === "number" && Number.isFinite(preferredWidth) && preferredWidth > 0) {
+    return `${Math.round(preferredWidth)}px`;
+  }
+
+  if (typeof preferredWidth === "string" && preferredWidth.trim()) {
+    return preferredWidth.trim();
+  }
+
+  const minWidth = Math.max(1, Number(column?.minWidth) || 1);
+  const compactMaxWidth = Number(column?.compactMaxWidth);
+  const maxWidth = presetKey === "compact" ? compactMaxWidth : Number(column?.maxWidth);
+  const cappedMaxWidth = Number.isFinite(maxWidth) && maxWidth > 0 ? Math.max(minWidth, Math.round(maxWidth)) : minWidth;
+
+  return `minmax(${minWidth}px, ${cappedMaxWidth}px)`;
+}
+
+// Builds a content-fit grid where sparse stat tables keep compact columns and let the filler absorb the rest.
+export function buildContentColumnTemplate(columns) {
+  if (!columns.length) {
+    return "minmax(0, 1fr)";
+  }
+
+  return [...columns.map((column) => resolveContentTrackSize(column)), "minmax(0, 1fr)"].join(" ");
+}

@@ -101,6 +101,8 @@ function buildRankColumn(overrides = {}) {
     role: "shortCode",
     minWidth: 56,
     compactMinWidth: 44,
+    contentWidth: 64,
+    compactContentWidth: 64,
     fr: FIXED_FR,
     sortable: true,
     sortKey: "rank",
@@ -126,6 +128,8 @@ function buildCountColumn({
     role: "numeric",
     minWidth: 92,
     compactMinWidth: 64,
+    contentWidth: 104,
+    compactContentWidth: 72,
     fr: FIXED_FR,
     align: "right",
     sortable: true,
@@ -144,12 +148,34 @@ function buildPercentColumn(overrides = {}) {
     role: "numeric",
     minWidth: 104,
     compactMinWidth: 56,
+    contentWidth: 112,
+    compactContentWidth: 56,
     fr: FIXED_FR,
     align: "right",
     sortable: true,
     sortKey: "percentValue",
     getSortValue: (row) => resolveNumericSortValue(row?.percentValueRaw ?? row?.percentValue),
     renderCell: (row) => row.percentValue ?? LOGBOOK_EMPTY_VALUE,
+    ...overrides
+  };
+}
+
+function buildLandingRateColumn(overrides = {}) {
+  return {
+    key: "landingRate",
+    label: "Landing Rate",
+    compactLabel: "Landing",
+    wideLabel: "Landing Rate",
+    role: "time",
+    minWidth: 120,
+    compactMinWidth: 120,
+    contentWidth: 120,
+    compactContentWidth: 120,
+    fr: FIXED_FR,
+    truncate: true,
+    sortable: true,
+    sortKey: "landingRate",
+    getSortValue: (row) => resolveNumericSortValue(row?.rawLandingRate ?? row?.landingRate),
     ...overrides
   };
 }
@@ -282,17 +308,7 @@ function buildRecentLandingColumns() {
     },
     {
       key: "landingRate",
-      label: "Landing Rate",
-      compactLabel: "Landing",
-      wideLabel: "Landing Rate",
-      role: "time",
-      minWidth: 120,
-      compactMinWidth: 120,
-      fr: FIXED_FR,
-      truncate: true,
-      sortable: true,
-      sortKey: "landingRate",
-      getSortValue: (row) => resolveNumericSortValue(row?.rawLandingRate ?? row?.landingRate)
+      ...buildLandingRateColumn()
     },
     {
       key: "grade",
@@ -337,6 +353,8 @@ function buildRouteColumns() {
       role: "primaryText",
       minWidth: 220,
       compactMinWidth: 88,
+      contentWidth: "minmax(180px, 320px)",
+      compactContentWidth: "minmax(160px, 260px)",
       fr: 1,
       truncate: true,
       sortable: true,
@@ -358,6 +376,8 @@ function buildRouteColumns() {
       role: "primaryText",
       minWidth: 220,
       compactMinWidth: 88,
+      contentWidth: "minmax(180px, 320px)",
+      compactContentWidth: "minmax(160px, 260px)",
       fr: 1,
       truncate: true,
       sortable: true,
@@ -427,6 +447,8 @@ function buildTopAirportColumns() {
       role: "airportCode",
       minWidth: 220,
       compactMinWidth: 96,
+      contentWidth: "minmax(240px, 420px)",
+      compactContentWidth: "minmax(180px, 300px)",
       fr: 1,
       truncate: true,
       sortable: true,
@@ -462,6 +484,8 @@ function buildTopAirportColumns() {
       role: "numeric",
       minWidth: 84,
       compactMinWidth: 64,
+      contentWidth: 88,
+      compactContentWidth: 72,
       fr: FIXED_FR,
       align: "right",
       sortable: true,
@@ -477,6 +501,8 @@ function buildTopAirportColumns() {
       role: "numeric",
       minWidth: 84,
       compactMinWidth: 64,
+      contentWidth: 88,
+      compactContentWidth: 72,
       fr: FIXED_FR,
       align: "right",
       sortable: true,
@@ -512,6 +538,8 @@ function buildRecordColumns() {
       role: "primaryText",
       minWidth: 180,
       compactMinWidth: 152,
+      contentWidth: "minmax(180px, 260px)",
+      compactContentWidth: "minmax(160px, 220px)",
       fr: 0.8,
       truncate: true,
       sortable: true,
@@ -527,6 +555,8 @@ function buildRecordColumns() {
       role: "secondary",
       minWidth: 148,
       compactMinWidth: 124,
+      contentWidth: "minmax(148px, 220px)",
+      compactContentWidth: "minmax(124px, 180px)",
       fr: 0.6,
       truncate: true,
       sortable: true,
@@ -542,6 +572,8 @@ function buildRecordColumns() {
       role: "secondary",
       minWidth: 220,
       compactMinWidth: 168,
+      contentWidth: "minmax(220px, 360px)",
+      compactContentWidth: "minmax(168px, 280px)",
       fr: 1.2,
       truncate: true,
       sortable: true,
@@ -575,6 +607,8 @@ function buildAirlineColumns() {
       role: "primaryText",
       minWidth: 220,
       compactMinWidth: 160,
+      contentWidth: "minmax(260px, 460px)",
+      compactContentWidth: "minmax(200px, 360px)",
       fr: 1,
       truncate: true,
       sortable: true,
@@ -638,6 +672,8 @@ function buildSimpleAirportColumns(rowLabel = "Airport", valueLabel = "Total") {
       role: "airportCode",
       minWidth: 220,
       compactMinWidth: 96,
+      contentWidth: "minmax(240px, 420px)",
+      compactContentWidth: "minmax(180px, 300px)",
       fr: 1,
       truncate: true,
       sortable: true,
@@ -653,6 +689,8 @@ function buildSimpleAirportColumns(rowLabel = "Airport", valueLabel = "Total") {
       role: "numeric",
       minWidth: 96,
       compactMinWidth: 72,
+      contentWidth: 96,
+      compactContentWidth: 72,
       fr: FIXED_FR,
       align: "right",
       sortable: true,
@@ -668,6 +706,8 @@ function buildSimpleAirportColumns(rowLabel = "Airport", valueLabel = "Total") {
       role: "numeric",
       minWidth: 104,
       compactMinWidth: 56,
+      contentWidth: 112,
+      compactContentWidth: 56,
       fr: FIXED_FR,
       align: "right",
       sortable: true,
@@ -691,6 +731,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         })),
         columns: buildRecentLandingColumns(),
         rowHeight: 46,
+        tableLayoutMode: "fill",
         defaultSortKey: "date",
         defaultSortDirection: "desc"
       };
@@ -706,6 +747,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         })),
         columns: buildRouteColumns(),
         rowHeight: 54,
+        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
@@ -718,6 +760,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         })),
         columns: buildTopAirportColumns(),
         rowHeight: 54,
+        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
@@ -735,6 +778,8 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
             role: "primaryText",
             minWidth: 220,
             compactMinWidth: 180,
+            contentWidth: "minmax(260px, 420px)",
+            compactContentWidth: "minmax(220px, 360px)",
             fr: 1,
             truncate: true,
             sortable: true,
@@ -751,6 +796,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
           buildPercentColumn()
         ],
         rowHeight: 46,
+        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
@@ -760,6 +806,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         rows: detailRows.departureAirports || [],
         columns: buildSimpleAirportColumns("Airport", "Departures"),
         rowHeight: 46,
+        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
@@ -769,6 +816,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         rows: detailRows.arrivalAirports || [],
         columns: buildSimpleAirportColumns("Airport", "Arrivals"),
         rowHeight: 46,
+        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
@@ -778,6 +826,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         rows: detailRows.airlines || [],
         columns: buildAirlineColumns(),
         rowHeight: 46,
+        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };
@@ -788,6 +837,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         rows: detailRows.records || [],
         columns: buildRecordColumns(),
         rowHeight: 46,
+        tableLayoutMode: "content",
         defaultSortKey: "rank",
         defaultSortDirection: "asc"
       };

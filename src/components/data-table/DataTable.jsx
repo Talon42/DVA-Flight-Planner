@@ -4,6 +4,7 @@ import TableHeader from "./TableHeader";
 import TableRow from "./TableRow";
 import {
   applyOptionalColumnGroups,
+  buildContentColumnTemplate,
   buildColumnTemplate,
   getTablePresetKey,
   resolveColumnsForPreset,
@@ -16,6 +17,13 @@ import { tableCanvasClassName } from "../ui/patterns";
 const INITIAL_VISIBLE_ROWS = 50;
 const VISIBLE_ROW_PAGE = 50;
 const VISIBLE_ROW_THRESHOLD = 10;
+const CONTENT_FILLER_COLUMN = Object.freeze({
+  key: "__content_filler",
+  label: "",
+  filler: true,
+  sortable: false,
+  required: false
+});
 
 const TableListOuter = forwardRef(function TableListOuter(props, ref) {
   const { className, style, ...rest } = props;
@@ -59,6 +67,7 @@ function RowRenderer({ index, style, data }) {
       onActivateRow={data.onActivateRow}
       getRowClassName={data.getRowClassName}
       renderRowOverlay={data.renderRowOverlay}
+      layoutMode={data.layoutMode}
     />
   );
 }
@@ -79,6 +88,7 @@ export default function DataTable({
   getRowClassName,
   renderRowOverlay,
   frameClassName = "",
+  layoutMode = "fill",
   rowHeight = TABLE_ROW_HEIGHT,
   virtualized = true,
   initialVisibleRows = INITIAL_VISIBLE_ROWS,
@@ -109,9 +119,16 @@ export default function DataTable({
 
     return applyOptionalColumnGroups(compactPresetColumns, availableWidth, tableLayoutWidth);
   }, [availableWidth, tableLayoutWidth, fullPresetColumns, compactPresetColumns]);
+  const displayColumns = useMemo(
+    () => (layoutMode === "content" ? [...resolvedColumns, CONTENT_FILLER_COLUMN] : resolvedColumns),
+    [layoutMode, resolvedColumns]
+  );
   const columnTemplate = useMemo(
-    () => buildColumnTemplate(resolvedColumns),
-    [resolvedColumns]
+    () =>
+      layoutMode === "content"
+        ? buildContentColumnTemplate(resolvedColumns)
+        : buildColumnTemplate(resolvedColumns),
+    [layoutMode, resolvedColumns]
   );
   const bodyRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -217,8 +234,9 @@ export default function DataTable({
   const itemData = useMemo(
     () => ({
       rows: visibleRows,
-      columns: resolvedColumns,
+      columns: displayColumns,
       columnTemplate,
+      layoutMode,
       selectedRowId,
       onSelectRow,
       onActivateRow,
@@ -230,8 +248,9 @@ export default function DataTable({
     }),
     [
       visibleRows,
-      resolvedColumns,
+      displayColumns,
       columnTemplate,
+      layoutMode,
       selectedRowId,
       onSelectRow,
       onActivateRow,
@@ -254,11 +273,12 @@ export default function DataTable({
     >
       <div className="w-full min-w-0 flex-none overflow-hidden">
         <TableHeader
-          columns={resolvedColumns}
+          columns={displayColumns}
           columnTemplate={columnTemplate}
           sort={sort}
           onSort={onSort}
           scrollbarOffset={headerScrollbarOffset}
+          layoutMode={layoutMode}
         />
       </div>
 
@@ -293,21 +313,22 @@ export default function DataTable({
             return (
               <TableRow
                 key={rowId}
-                row={row}
-                rowId={rowId}
-                style={{ height: rowHeight }}
-                columns={resolvedColumns}
-                columnTemplate={columnTemplate}
-                enableRowSelection={enableRowSelection}
-                isSelected={enableRowSelection && selectedRowId != null && selectedRowId === rowId}
-                selectedRowClassName={selectedRowClassName}
-                onSelectRow={onSelectRow}
-                onActivateRow={onActivateRow}
-                getRowClassName={getRowClassName}
-                renderRowOverlay={renderRowOverlay}
-              />
-            );
-          })}
+              row={row}
+              rowId={rowId}
+              style={{ height: rowHeight }}
+              columns={displayColumns}
+              columnTemplate={columnTemplate}
+              enableRowSelection={enableRowSelection}
+              isSelected={enableRowSelection && selectedRowId != null && selectedRowId === rowId}
+              selectedRowClassName={selectedRowClassName}
+              onSelectRow={onSelectRow}
+              onActivateRow={onActivateRow}
+              getRowClassName={getRowClassName}
+              renderRowOverlay={renderRowOverlay}
+              layoutMode={layoutMode}
+            />
+          );
+        })}
         </div>
       )}
     </div>
