@@ -82,7 +82,7 @@ function renderLandingRateCell(row) {
 
   return (
     <span className="inline-flex min-w-0 items-center gap-2">
-      <span className="whitespace-nowrap tabular-nums">{landingRate}</span>
+      <span className="w-[5.25rem] shrink-0 whitespace-nowrap text-right tabular-nums">{landingRate}</span>
       <LandingGradeBadge grade={landingGrade} />
     </span>
   );
