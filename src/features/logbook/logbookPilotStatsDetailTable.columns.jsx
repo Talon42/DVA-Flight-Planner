@@ -258,9 +258,9 @@ function buildPercentColumn(overrides = {}) {
 // Keeps the All Equipment columns balanced so the table reads as one even block.
 function getEquipmentColumnWidthProfile(overrides = {}) {
   return {
-    minWidth: 132,
-    compactMinWidth: 132,
-    fr: 1,
+    minWidth: 100,
+    compactMinWidth: 100,
+    fr: 0.75,
     ...overrides
   };
 }
@@ -271,8 +271,22 @@ function buildRecentLandingRows(detailRows = {}) {
     date: formatCompactDashDate(row?.dateSortKey),
     flight: String(row?.compactFlightLabel || row?.flight || row?.label || "").trim() || LOGBOOK_EMPTY_VALUE,
     airline: String(row?.airlineDisplayName || row?.airline || "").trim() || LOGBOOK_EMPTY_VALUE,
-    dep: String(row?.dep || row?.departure || row?.departureCode || "").trim() || LOGBOOK_EMPTY_VALUE,
-    arr: String(row?.arr || row?.arrival || row?.arrivalCode || "").trim() || LOGBOOK_EMPTY_VALUE,
+    dep:
+      String(
+        row?.dep ||
+          row?.departureAirport ||
+          row?.departure ||
+          row?.departureCode ||
+          ""
+      ).trim() || LOGBOOK_EMPTY_VALUE,
+    arr:
+      String(
+        row?.arr ||
+          row?.arrivalAirport ||
+          row?.arrival ||
+          row?.arrivalCode ||
+          ""
+      ).trim() || LOGBOOK_EMPTY_VALUE,
     equipment: String(row?.equipment || "").trim() || LOGBOOK_EMPTY_VALUE,
     landingRate: Number.isFinite(row?.rawLandingRate) ? `${row.rawLandingRate} fpm` : LOGBOOK_EMPTY_VALUE,
     grade: row?.badge || LOGBOOK_EMPTY_VALUE
@@ -615,7 +629,10 @@ function buildEquipmentColumns() {
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE,
-      ...getEquipmentColumnWidthProfile()
+      ...getEquipmentColumnWidthProfile(),
+      minWidth: 66,
+      compactMinWidth: 66,
+      fr: 0.5
     }),
     buildNumericColumn({
       key: "averageLandingRate",
@@ -628,7 +645,12 @@ function buildEquipmentColumns() {
       renderCell: renderLandingRateCell,
       ...getEquipmentColumnWidthProfile()
     }),
-    buildPercentColumn(getEquipmentColumnWidthProfile())
+    buildPercentColumn({
+      ...getEquipmentColumnWidthProfile(),
+      minWidth: 76,
+      compactMinWidth: 56,
+      fr: 0.56
+    })
   ];
 }
 

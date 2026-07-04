@@ -686,6 +686,7 @@ function buildRecentLandingRows(rows, limit = 10) {
     .sort((left, right) => right.dateSortKey - left.dateSortKey || right.sourceIndex - left.sourceIndex)
     .slice(0, limit)
     .map((row) => {
+      const departureAirport = row.departure || LOGBOOK_EMPTY_VALUE;
       const arrivalAirport = row.arrival || LOGBOOK_EMPTY_VALUE;
       return {
         id: row.id,
@@ -696,8 +697,11 @@ function buildRecentLandingRows(rows, limit = 10) {
         dateSortKey: row.dateSortKey,
         flight: row.compactFlightLabel,
         airline: row.airlineDisplayName,
-        route: `${row.departure} -> ${row.arrival}`,
+        departureAirport,
         arrivalAirport,
+        dep: departureAirport,
+        arr: arrivalAirport,
+        route: `${departureAirport} -> ${arrivalAirport}`,
         equipment: row.equipment,
         meta: arrivalAirport,
         value: row.landingRateDisplay,
