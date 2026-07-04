@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
@@ -16,7 +16,6 @@ const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
 const TWO_COLUMN_TILE_VARIANTS = new Set(["records"]);
 const TILE_GRID_RENDER_VARIANTS = new Set(["records", "airline-grid", "equipment-grid"]);
-const FIXED_HEIGHT_TILE_GRID_VARIANTS = new Set(["airline-grid", "equipment-grid"]);
 // Keeps the airline and equipment metric bands visually aligned across both tile families.
 const TILE_METRIC_NUMBER_CLASS_NAME = "m-0 leading-none text-[1.1rem] font-semibold tabular-nums text-[var(--text-heading)]";
 const TILE_METRIC_LABEL_CLASS_NAME = "m-0 text-[0.32rem] tracking-[0.14em] text-[var(--text-muted)]";
@@ -33,6 +32,38 @@ const FIXED_TILE_ROW_GAP_PX = 8;
 function parsePercentValue(percentValue) {
   const numeric = Number(String(percentValue || "").replace("%", "").trim());
   return Number.isFinite(numeric) ? numeric : 0;
+}
+
+// Tracks when the viewport is short enough to switch the airline/equipment tiles into compact rows.
+function useShortViewportMode() {
+  const [isShortViewport, setIsShortViewport] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
+
+    const mediaQueryList = window.matchMedia("(max-height: 900px)");
+    const updateViewportMode = () => {
+      setIsShortViewport(Boolean(mediaQueryList.matches));
+    };
+
+    updateViewportMode();
+
+    if (typeof mediaQueryList.addEventListener === "function") {
+      mediaQueryList.addEventListener("change", updateViewportMode);
+      return () => mediaQueryList.removeEventListener("change", updateViewportMode);
+    }
+
+    if (typeof mediaQueryList.addListener === "function") {
+      mediaQueryList.addListener(updateViewportMode);
+      return () => mediaQueryList.removeListener(updateViewportMode);
+    }
+
+    return undefined;
+  }, []);
+
+  return isShortViewport;
 }
 
 // Renders the shared count, label, and percent band used by airline and equipment tiles.
@@ -55,6 +86,71 @@ function TileMetricBand({ value, percentValue, paddingClassName = "px-3", classN
       ) : (
         <span aria-hidden="true" />
       )}
+    </div>
+  );
+}
+
+// Renders a compact airline row when the viewport is short so the summary stays readable.
+function CompactAirlineRow({ item }) {
+  const airlineCode = String(item?.meta || item?.row?.airlineCode || "").trim();
+  const logoSrc = String(item?.row?.airlineLogoSrc || "").trim();
+  const logoClassName = String(item?.row?.airlineLogoClassName || "").trim();
+  const airlineName = String(item?.label || "").trim();
+  const airlineDisplayName = airlineCode ? `${airlineName || LOGBOOK_EMPTY_VALUE} (${airlineCode})` : airlineName || LOGBOOK_EMPTY_VALUE;
+  const fallbackMark = airlineCode ? airlineCode.slice(0, 3).toUpperCase() : airlineName ? airlineName.slice(0, 2).toUpperCase() : "?";
+
+  return (
+    <div className="grid min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border border-[color:var(--surface-border)] bg-white/45 px-2 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+        {logoSrc ? (
+          <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-8 w-8 object-contain", logoClassName)} loading="lazy" />
+        ) : (
+          <span className={cn("inline-flex h-8 w-8 items-center justify-center text-[0.75rem] font-semibold uppercase text-[var(--text-heading)] dark:text-white", bodyMdTextClassName)}>
+            {fallbackMark}
+          </span>
+        )}
+      </div>
+
+      <div className="min-w-0">
+        <p className={cn("m-0 truncate font-semibold text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
+          {airlineDisplayName}
+        </p>
+      </div>
+
+      <p className={cn("m-0 shrink-0 text-right font-semibold tabular-nums text-[var(--text-heading)]", bodyMdTextClassName)}>
+        {item?.value}
+      </p>
+    </div>
+  );
+}
+
+// Renders a compact equipment row when the viewport is short so the glyph stays legible.
+function CompactEquipmentRow({ item }) {
+  const label = String(item?.label || "").trim();
+  const glyphSources = getAircraftGlyphSources(label);
+  const fallbackMark = getEquipmentFallbackMark(label);
+
+  return (
+    <div className="grid min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border border-[color:var(--surface-border)] bg-white/45 px-2 py-1.5 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+        {glyphSources ? (
+          <LogbookEquipmentGlyph equipment={label} className="h-8 w-8" />
+        ) : (
+          <span className="inline-flex h-8 w-8 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[0.75rem] font-semibold uppercase text-[var(--text-heading)] dark:border-[color:var(--line-strong)] dark:bg-[var(--surface)] dark:text-white">
+            {fallbackMark}
+          </span>
+        )}
+      </div>
+
+      <div className="min-w-0">
+        <p className={cn("m-0 truncate font-semibold text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
+          {label || LOGBOOK_EMPTY_VALUE}
+        </p>
+      </div>
+
+      <p className={cn("m-0 shrink-0 text-right font-semibold tabular-nums text-[var(--text-heading)]", bodyMdTextClassName)}>
+        {item?.value}
+      </p>
     </div>
   );
 }
@@ -116,13 +212,13 @@ function AirlineTile({ item }) {
       ) : null}
 
       <div className="relative flex min-h-0 items-center gap-2 px-2 py-2">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center">
           {logoSrc ? (
-            <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-9 w-9 object-contain", logoClassName)} loading="lazy" />
+            <img src={logoSrc} alt="" aria-hidden="true" className={cn("h-14 w-14 object-contain", logoClassName)} loading="lazy" />
           ) : (
             <span
               className={cn(
-                "inline-flex h-10 w-10 items-center justify-center px-1 text-center text-[0.8rem] font-semibold uppercase text-[var(--text-heading)] dark:text-white",
+                "inline-flex h-14 w-14 items-center justify-center px-1 text-center text-[0.8rem] font-semibold uppercase text-[var(--text-heading)] dark:text-white",
                 bodyMdTextClassName
               )}
             >
@@ -148,7 +244,7 @@ function AirlineTile({ item }) {
         </div>
       </div>
 
-      <TileMetricBand value={item?.value} percentValue={item?.percentValue} paddingClassName="px-2" />
+      <TileMetricBand value={item?.value} percentValue={item?.percentValue} />
     </div>
   );
 }
@@ -260,6 +356,7 @@ function getMeasuredPilotStatsFitCount({
   rowHeights,
   rowGap,
   variant,
+  usesFixedTileFit,
   maxRows,
   itemCount
 }) {
@@ -275,7 +372,7 @@ function getMeasuredPilotStatsFitCount({
     return 0;
   }
 
-  if (FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant)) {
+  if (usesFixedTileFit) {
     const fittedVisualRows = Math.floor(
       (availableBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX)
     );
@@ -327,7 +424,7 @@ function getMeasuredPilotStatsFitCount({
   return Math.max(0, Math.min(safeItemCount, fittedRows));
 }
 
-function getFallbackPilotStatsFitCount({ bodyHeight, variant, maxRows, itemCount }) {
+function getFallbackPilotStatsFitCount({ bodyHeight, variant, usesFixedTileFit, maxRows, itemCount }) {
   const safeMaxRows = Math.max(1, Math.floor(Number(maxRows) || 1));
   const safeItemCount = Math.max(0, Math.floor(Number(itemCount) || 0));
   const availableBodyHeight = getAvailablePilotStatsBodyHeight(bodyHeight);
@@ -339,7 +436,7 @@ function getFallbackPilotStatsFitCount({ bodyHeight, variant, maxRows, itemCount
   const estimatedRowHeight = getEstimatedPilotStatsRowHeight(variant);
   const estimatedRows = Math.max(0, Math.floor(availableBodyHeight / estimatedRowHeight));
 
-  if (FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant)) {
+  if (usesFixedTileFit) {
     const fittedVisualRows = Math.floor(
       (availableBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX)
     );
@@ -373,6 +470,10 @@ export default function LogbookPilotStatsSummaryPanel({
   const measureRef = useRef(null);
   const [fitItems, setFitItems] = useState(maxRows);
   const rafIdRef = useRef(0);
+  const isShortViewport = useShortViewportMode();
+  const isCompactTileMode =
+    isShortViewport && (variant === "airline-grid" || variant === "equipment-grid");
+  const usesFixedTileFit = (variant === "airline-grid" || variant === "equipment-grid") && !isCompactTileMode;
   const rowItems = Array.isArray(items) ? items : [];
   const departureAirportItems = Array.isArray(departureItems) ? departureItems : [];
   const arrivalAirportItems = Array.isArray(arrivalItems) ? arrivalItems : [];
@@ -417,6 +518,20 @@ export default function LogbookPilotStatsSummaryPanel({
     }
 
     if (TILE_GRID_RENDER_VARIANTS.has(variant)) {
+      if (isCompactTileMode) {
+        return (
+          <div ref={containerRef} className="grid min-w-0 gap-2">
+            {safeRowItems.map((item, index) =>
+              variant === "airline-grid" ? (
+                <CompactAirlineRow key={`${item?.label || item?.value || "airline"}-${index}`} item={item} />
+              ) : (
+                <CompactEquipmentRow key={`${item?.label || item?.value || "equipment"}-${index}`} item={item} />
+              )
+            )}
+          </div>
+        );
+      }
+
       return (
         <div ref={containerRef} className="grid min-w-0 grid-cols-2 gap-2">
           {safeRowItems.map((item, index) =>
@@ -473,12 +588,13 @@ export default function LogbookPilotStatsSummaryPanel({
     const bodyNode = bodyRef.current;
     const measureNode = measureRef.current;
     const candidateCount = Math.min(maxRows, rowItems.length);
-    const needsMeasuredChildren = !FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant);
+    const needsMeasuredChildren = !usesFixedTileFit;
 
     if (!bodyNode || (needsMeasuredChildren && !measureNode) || typeof ResizeObserver === "undefined") {
       const fallbackFitItems = getFallbackPilotStatsFitCount({
         bodyHeight: bodyNode?.clientHeight || 0,
         variant,
+        usesFixedTileFit,
         maxRows,
         itemCount: candidateCount
       });
@@ -490,7 +606,7 @@ export default function LogbookPilotStatsSummaryPanel({
     const updateFitItems = () => {
       const bodyHeight = Math.max(0, Math.floor(bodyNode.clientHeight || 0));
 
-      if (FIXED_HEIGHT_TILE_GRID_VARIANTS.has(variant)) {
+      if (usesFixedTileFit) {
         const availableBodyHeight = getAvailablePilotStatsBodyHeight(bodyHeight);
         const fittedVisualRows = Math.floor(
           (availableBodyHeight + FIXED_TILE_ROW_GAP_PX) / (FIXED_TILE_ROW_HEIGHT_PX + FIXED_TILE_ROW_GAP_PX)
@@ -516,6 +632,7 @@ export default function LogbookPilotStatsSummaryPanel({
         rowHeights: childHeights,
         rowGap,
         variant,
+        usesFixedTileFit,
         maxRows,
         itemCount: candidateCount
       });
@@ -546,7 +663,7 @@ export default function LogbookPilotStatsSummaryPanel({
 
       observer.disconnect();
     };
-  }, [autoFitRows, maxRows, rowItems.length, variant]);
+  }, [autoFitRows, maxRows, rowItems.length, variant, usesFixedTileFit]);
 
   return (
     <Panel
@@ -558,7 +675,13 @@ export default function LogbookPilotStatsSummaryPanel({
       )}
     >
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-2">
-        <p className={cn("m-0 min-w-0 flex-1 truncate text-[var(--text-heading)] font-semibold uppercase tracking-[0.12em]", bodyMdTextClassName)}>{title}</p>
+        <div className="min-w-0 flex-1">
+          <p className={cn("m-0 min-w-0 truncate text-[var(--text-heading)] font-semibold tracking-[0.12em]", bodyMdTextClassName)}>
+            <span className="inline-block max-w-full border-b-2 border-[color:var(--delta-blue)] pb-0.5 dark:border-[#4d91d8]">
+              {title}
+            </span>
+          </p>
+        </div>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {onViewAll ? (
             <Button
