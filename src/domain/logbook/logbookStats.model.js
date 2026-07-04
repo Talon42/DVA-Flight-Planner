@@ -761,7 +761,8 @@ export function buildLogbookPilotStats(rows, options = {}) {
       }
     ],
     records,
-    recentLandings: buildRecentLandingRows(statsRows, 10),
+    // Feed the summary card the full landing set so the auto-fit card can use all available vertical space.
+    recentLandings: buildRecentLandingRows(statsRows, statsRows.length),
     rankings: {
       airlines: buildRankingItems(airlineCounts, { totalCount: statsRows.length, rowMap: airlineRowsByKey }),
       equipment: buildRankingItems(equipmentCounts, { totalCount: statsRows.length }),
@@ -802,7 +803,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
         labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
       }),
       status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),
-      recentLandings: buildRecentLandingRows(statsRows, 10)
+      recentLandings: buildRecentLandingRows(statsRows, statsRows.length)
     },
     raw: {
       allRows: statsRows

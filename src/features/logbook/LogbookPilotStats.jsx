@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName } from "../../components/ui/typography";
@@ -99,6 +99,82 @@ function clampPilotStatsPageIndex(pageIndex, pageCount) {
   return Math.max(0, Math.min(Math.max(0, pageCount - 1), pageIndex));
 }
 
+// Renders the compact right-side rail used to jump between dashboard pages.
+function PilotStatsDashboardPageRail({
+  pageCount,
+  pageIndex,
+  onPrevPage,
+  onNextPage,
+  onGoToPage
+}) {
+  const pageNumbers = useMemo(() => Array.from({ length: pageCount }, (_, index) => index), [pageCount]);
+
+  return (
+    <div className="flex h-full w-8 shrink-0 flex-col items-center justify-center gap-1">
+      <button
+        type="button"
+        aria-label="Previous dashboard page"
+        onClick={onPrevPage}
+        disabled={pageIndex <= 0}
+        className="inline-flex h-7 w-7 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[color:var(--line-strong)]"
+      >
+        <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
+          <path
+            d="M4 9.5 8 5.5l4 4"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.75"
+          />
+        </svg>
+      </button>
+
+      <div className="flex flex-col items-center justify-center gap-1 py-1">
+        {pageNumbers.map((pageNumber) => {
+          const isActive = pageNumber === pageIndex;
+
+          return (
+            <button
+              key={pageNumber}
+              type="button"
+              aria-label={`Go to dashboard page ${pageNumber + 1}`}
+              aria-current={isActive ? "true" : undefined}
+              onClick={() => onGoToPage(pageNumber)}
+              disabled={isActive}
+              className={cn(
+                "inline-flex h-4 w-4 items-center justify-center border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:cursor-default",
+                isActive
+                  ? "border-[color:var(--delta-blue)] bg-[var(--delta-blue)]"
+                  : "border-[color:var(--line)] bg-[var(--surface-raised)] hover:border-[color:var(--delta-blue)] hover:bg-[var(--surface-soft)] dark:border-[color:var(--line-strong)]"
+              )}
+            />
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        aria-label="Next dashboard page"
+        onClick={onNextPage}
+        disabled={pageIndex >= pageCount - 1}
+        className="inline-flex h-7 w-7 items-center justify-center border border-[color:var(--line)] bg-[var(--surface-raised)] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-heading)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-40 dark:border-[color:var(--line-strong)]"
+      >
+        <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5" focusable="false">
+          <path
+            d="M4 6.5 8 10.5l4-4"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.75"
+          />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 // Renders one active dashboard page stack so each page snaps as a single full-height row.
 function LogbookPilotStatsDashboardPages({ cards, pageSize, onPilotStatsDetailViewChange }) {
   const pages = useMemo(() => chunkPilotStatsCards(cards, pageSize), [cards, pageSize]);
@@ -156,26 +232,40 @@ export default function LogbookPilotStats({
   const dashboardPageCount = Math.max(1, Math.ceil(dashboardCards.length / dashboardPageSize));
   const dashboardScrollRef = useRef(null);
   const dashboardPageIndexRef = useRef(0);
-  const dashboardPageCountRef = useRef(dashboardPageCount);
   const dashboardWheelLockUntilRef = useRef(0);
   const previousDetailViewRef = useRef(Boolean(pilotStatsDetailView));
   const [dashboardPageIndex, setDashboardPageIndex] = useState(0);
 
-  useEffect(() => {
-    dashboardPageCountRef.current = dashboardPageCount;
-  }, [dashboardPageCount]);
+  const goToDashboardPage = useCallback(
+    (nextPageIndex) => {
+      const scrollNode = dashboardScrollRef.current;
+      const nextDashboardPageIndex = clampPilotStatsPageIndex(nextPageIndex, dashboardPageCount);
+
+      dashboardPageIndexRef.current = nextDashboardPageIndex;
+      setDashboardPageIndex(nextDashboardPageIndex);
+
+      if (!scrollNode) {
+        return;
+      }
+
+      const nextTop = scrollNode.clientHeight * nextDashboardPageIndex;
+
+      if (typeof scrollNode.scrollTo === "function") {
+        scrollNode.scrollTo({ top: nextTop, behavior: "auto" });
+      } else {
+        scrollNode.scrollTop = nextTop;
+      }
+    },
+    [dashboardPageCount]
+  );
 
   useEffect(() => {
-    dashboardPageIndexRef.current = dashboardPageIndex;
-  }, [dashboardPageIndex]);
+    goToDashboardPage(0);
+  }, [dashboardPageSize, goToDashboardPage]);
 
   useEffect(() => {
-    setDashboardPageIndex(0);
-  }, [dashboardPageSize]);
-
-  useEffect(() => {
-    setDashboardPageIndex(0);
-  }, [dashboardCards.length]);
+    goToDashboardPage(0);
+  }, [dashboardCards.length, goToDashboardPage]);
 
   useEffect(() => {
     const wasDetailView = previousDetailViewRef.current;
@@ -184,37 +274,9 @@ export default function LogbookPilotStats({
     previousDetailViewRef.current = isDetailView;
 
     if (wasDetailView && !isDetailView) {
-      setDashboardPageIndex(0);
+      goToDashboardPage(0);
     }
-  }, [pilotStatsDetailView]);
-
-  useEffect(() => {
-    setDashboardPageIndex((currentPageIndex) =>
-      clampPilotStatsPageIndex(currentPageIndex, dashboardPageCount)
-    );
-  }, [dashboardPageCount]);
-
-  useEffect(() => {
-    if (pilotStatsDetailView) {
-      return undefined;
-    }
-
-    const scrollNode = dashboardScrollRef.current;
-
-    if (!scrollNode) {
-      return undefined;
-    }
-
-    const nextTop = scrollNode.clientHeight * dashboardPageIndex;
-
-    if (typeof scrollNode.scrollTo === "function") {
-      scrollNode.scrollTo({ top: nextTop, behavior: "auto" });
-    } else {
-      scrollNode.scrollTop = nextTop;
-    }
-
-    return undefined;
-  }, [dashboardPageIndex, dashboardPageSize, dashboardCards.length, pilotStatsDetailView]);
+  }, [goToDashboardPage, pilotStatsDetailView]);
 
   useEffect(() => {
     if (pilotStatsDetailView) {
@@ -241,10 +303,7 @@ export default function LogbookPilotStats({
 
       const direction = event.deltaY > 0 ? 1 : -1;
       const currentPageIndex = dashboardPageIndexRef.current;
-      const nextPageIndex = clampPilotStatsPageIndex(
-        currentPageIndex + direction,
-        dashboardPageCountRef.current
-      );
+      const nextPageIndex = clampPilotStatsPageIndex(currentPageIndex + direction, dashboardPageCount);
 
       dashboardWheelLockUntilRef.current = now + 220;
 
@@ -252,22 +311,14 @@ export default function LogbookPilotStats({
         return;
       }
 
-      dashboardPageIndexRef.current = nextPageIndex;
-      setDashboardPageIndex(nextPageIndex);
-
-      const nextTop = scrollNode.clientHeight * nextPageIndex;
-      if (typeof scrollNode.scrollTo === "function") {
-        scrollNode.scrollTo({ top: nextTop, behavior: "auto" });
-      } else {
-        scrollNode.scrollTop = nextTop;
-      }
+      goToDashboardPage(nextPageIndex);
     };
 
     scrollNode.addEventListener("wheel", handleWheel, { passive: false });
     return () => {
       scrollNode.removeEventListener("wheel", handleWheel);
     };
-  }, [dashboardPageCount, dashboardPageSize, pilotStatsDetailView]);
+  }, [dashboardPageCount, dashboardPageSize, goToDashboardPage, pilotStatsDetailView]);
 
   function handleDashboardKeyDown(event) {
     const isNextKey =
@@ -283,27 +334,14 @@ export default function LogbookPilotStats({
     const currentPageIndex = dashboardPageIndexRef.current;
     const nextPageIndex = clampPilotStatsPageIndex(
       currentPageIndex + (isNextKey ? 1 : -1),
-      dashboardPageCountRef.current
+      dashboardPageCount
     );
 
     if (nextPageIndex === currentPageIndex) {
       return;
     }
 
-    dashboardPageIndexRef.current = nextPageIndex;
-    setDashboardPageIndex(nextPageIndex);
-
-    const scrollNode = dashboardScrollRef.current;
-    if (!scrollNode) {
-      return;
-    }
-
-    const nextTop = scrollNode.clientHeight * nextPageIndex;
-    if (typeof scrollNode.scrollTo === "function") {
-      scrollNode.scrollTo({ top: nextTop, behavior: "auto" });
-    } else {
-      scrollNode.scrollTop = nextTop;
-    }
+    goToDashboardPage(nextPageIndex);
   }
 
   return (
@@ -333,24 +371,32 @@ export default function LogbookPilotStats({
               />
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 overflow-hidden">
-              <div
-                ref={dashboardScrollRef}
-                tabIndex={0}
-                role="region"
-                aria-label="Pilot stats dashboard pages"
-                onKeyDown={handleDashboardKeyDown}
-                className={cn(
-                  "logbook-pilot-stats__paged-dashboard app-scrollbar h-full min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] snap-y snap-mandatory [&::-webkit-scrollbar]:hidden",
-                )}
-                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-              >
-                <LogbookPilotStatsDashboardPages
-                  cards={dashboardCards}
-                  pageSize={dashboardPageSize}
-                  onPilotStatsDetailViewChange={onPilotStatsDetailViewChange}
-                />
+            <div className="flex min-h-0 flex-1 gap-2 overflow-hidden">
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div
+                  ref={dashboardScrollRef}
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Pilot stats dashboard pages"
+                  onKeyDown={handleDashboardKeyDown}
+                  className="logbook-pilot-stats__paged-dashboard app-scrollbar h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] snap-y snap-mandatory [&::-webkit-scrollbar]:hidden"
+                  style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                >
+                  <LogbookPilotStatsDashboardPages
+                    cards={dashboardCards}
+                    pageSize={dashboardPageSize}
+                    onPilotStatsDetailViewChange={onPilotStatsDetailViewChange}
+                  />
+                </div>
               </div>
+
+              <PilotStatsDashboardPageRail
+                pageCount={dashboardPageCount}
+                pageIndex={dashboardPageIndex}
+                onPrevPage={() => goToDashboardPage(dashboardPageIndex - 1)}
+                onNextPage={() => goToDashboardPage(dashboardPageIndex + 1)}
+                onGoToPage={(nextPageIndex) => goToDashboardPage(nextPageIndex)}
+              />
             </div>
           )}
         </div>
