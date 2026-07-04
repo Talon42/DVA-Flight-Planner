@@ -12,6 +12,9 @@ import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
 import { buildLogbookPirepId, useVisibleLogbookPirepDetails } from "./useLogbookPirepDetails.hooks.js";
 
+const STAT_CARD_BODY_CLASS_NAME = cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName);
+const STAT_CARD_VALUE_CLASS_NAME = cn("m-0 truncate font-semibold tabular-nums text-[var(--text-heading)]", bodyMdTextClassName);
+const STAT_CARD_META_CLASS_NAME = cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName);
 const TRANSPARENT_HEADER_ACTION_CLASS_NAME =
   "!bg-transparent !px-0 !text-[var(--delta-blue)] hover:!bg-transparent hover:!text-[var(--text-heading)] dark:!bg-transparent dark:!text-[#7db7ef] dark:hover:!text-white";
 const TWO_COLUMN_TILE_VARIANTS = new Set(["records"]);
@@ -19,7 +22,7 @@ const TILE_GRID_RENDER_VARIANTS = new Set(["records", "airline-grid", "equipment
 // Keeps the airline and equipment metric bands visually aligned across both tile families.
 const TILE_METRIC_NUMBER_CLASS_NAME = "m-0 leading-none text-[1.1rem] font-semibold tabular-nums text-[var(--text-heading)]";
 const TILE_METRIC_LABEL_CLASS_NAME = "m-0 text-[0.32rem] tracking-[0.14em] text-[var(--text-muted)]";
-const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 min-w-0 truncate text-right text-[0.82rem] tabular-nums text-[var(--text-muted)]";
+const TILE_METRIC_PERCENT_CLASS_NAME = "m-0 min-w-0 text-right tabular-nums text-[var(--text-muted)]";
 // Gives the airline and equipment tiles a shared frame treatment in light mode while preserving the dark look.
 const TILE_STAT_FRAME_CLASS_NAME =
   "relative isolate grid h-[8.25rem] min-w-0 grid-rows-[minmax(0,1fr)_2.75rem] overflow-hidden border-2 border-[color:var(--surface-border)] bg-white/55 dark:border dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]";
@@ -77,7 +80,7 @@ function TileMetricBand({ value, percentValue, paddingClassName = "px-3", classN
       )}
     >
       <div className="min-w-0">
-        <p className={TILE_METRIC_NUMBER_CLASS_NAME}>{value}</p>
+        <p className={cn(TILE_METRIC_NUMBER_CLASS_NAME, bodyMdTextClassName)}>{value}</p>
         <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>Flights</p>
       </div>
       <div aria-hidden="true" />
@@ -96,7 +99,6 @@ function CompactAirlineRow({ item }) {
   const logoSrc = String(item?.row?.airlineLogoSrc || "").trim();
   const logoClassName = String(item?.row?.airlineLogoClassName || "").trim();
   const airlineName = String(item?.label || "").trim();
-  const airlineDisplayName = airlineCode ? `${airlineName || LOGBOOK_EMPTY_VALUE} (${airlineCode})` : airlineName || LOGBOOK_EMPTY_VALUE;
   const fallbackMark = airlineCode ? airlineCode.slice(0, 3).toUpperCase() : airlineName ? airlineName.slice(0, 2).toUpperCase() : "?";
 
   return (
@@ -112,14 +114,13 @@ function CompactAirlineRow({ item }) {
       </div>
 
       <div className="min-w-0">
-        <p className={cn("m-0 truncate font-semibold text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
-          {airlineDisplayName}
+        <p className={STAT_CARD_BODY_CLASS_NAME}>
+          {airlineName || LOGBOOK_EMPTY_VALUE}
+          {airlineCode ? <span className={STAT_CARD_META_CLASS_NAME}>{` (${airlineCode})`}</span> : null}
         </p>
       </div>
 
-      <p className={cn("m-0 shrink-0 text-right font-semibold tabular-nums text-[var(--text-heading)]", bodyMdTextClassName)}>
-        {item?.value}
-      </p>
+      <p className={STAT_CARD_VALUE_CLASS_NAME}>{item?.value}</p>
     </div>
   );
 }
@@ -143,14 +144,10 @@ function CompactEquipmentRow({ item }) {
       </div>
 
       <div className="min-w-0">
-        <p className={cn("m-0 truncate font-semibold text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
-          {label || LOGBOOK_EMPTY_VALUE}
-        </p>
+        <p className={STAT_CARD_BODY_CLASS_NAME}>{label || LOGBOOK_EMPTY_VALUE}</p>
       </div>
 
-      <p className={cn("m-0 shrink-0 text-right font-semibold tabular-nums text-[var(--text-heading)]", bodyMdTextClassName)}>
-        {item?.value}
-      </p>
+      <p className={STAT_CARD_VALUE_CLASS_NAME}>{item?.value}</p>
     </div>
   );
 }
@@ -163,14 +160,14 @@ function RankingRow({ item, showProgressBar = true, showPercentValue = true }) {
       <div className="flex min-w-0 items-baseline justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="min-w-0 flex-1">
-            <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
-            {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
+            <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.label}</p>
+            {item?.meta ? <p className={STAT_CARD_META_CLASS_NAME}>{item.meta}</p> : null}
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <p className={cn("m-0 text-[var(--text-heading)]", bodyMdTextClassName)}>{item?.value}</p>
+          <p className={STAT_CARD_VALUE_CLASS_NAME}>{item?.value}</p>
           {showPercentValue && item?.percentValue ? (
-            <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>{item.percentValue}</p>
+            <p className={STAT_CARD_META_CLASS_NAME}>{item.percentValue}</p>
           ) : null}
         </div>
       </div>
@@ -228,17 +225,10 @@ function AirlineTile({ item }) {
         </div>
 
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p
-            className={cn(
-              "m-0 block w-full min-w-0 truncate whitespace-nowrap text-left font-semibold text-[var(--text-primary)] dark:text-white",
-              bodyMdTextClassName
-            )}
-          >
-            {airlineName || LOGBOOK_EMPTY_VALUE}
-          </p>
+          <p className={STAT_CARD_BODY_CLASS_NAME}>{airlineName || LOGBOOK_EMPTY_VALUE}</p>
           {airlineCode ? (
             <div className="mt-0.5 flex min-w-0 flex-col items-start">
-              <p className={cn("m-0 truncate text-left text-[var(--text-muted)]", bodyMdTextClassName)}>{airlineCode}</p>
+              <p className={STAT_CARD_META_CLASS_NAME}>{airlineCode}</p>
             </div>
           ) : null}
         </div>
@@ -256,12 +246,12 @@ function RouteRow({ item }) {
     <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex min-w-0 items-baseline justify-between gap-3 text-left">
         <div className="min-w-0 flex-1 text-left">
-          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
-          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
+          <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.label}</p>
+          {item?.meta ? <p className={STAT_CARD_META_CLASS_NAME}>{item.meta}</p> : null}
         </div>
-        <p className={cn("m-0 shrink-0 text-right text-[var(--text-heading)]", bodyMdTextClassName)}>{item?.value}</p>
+        <p className={STAT_CARD_VALUE_CLASS_NAME}>{item?.value}</p>
       </div>
-      {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>{item.percentValue}</p> : null}
+      {item?.percentValue ? <p className={STAT_CARD_META_CLASS_NAME}>{item.percentValue}</p> : null}
       <div className="h-1 w-full overflow-hidden bg-[color:var(--line)]">
         <div className="h-full bg-[var(--delta-blue)] dark:bg-[#4d91d8]" style={{ width: `${barWidth}%` }} />
       </div>
@@ -287,20 +277,12 @@ function LandingRow({ item, pirepDetails }) {
   return (
     <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
       <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_auto] items-center gap-3">
-        <p className={cn("m-0 shrink-0 truncate text-[var(--text-primary)] tabular-nums", bodyMdTextClassName)}>
-          {item?.date || LOGBOOK_EMPTY_VALUE}
-        </p>
+        <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.date || LOGBOOK_EMPTY_VALUE}</p>
         <div className="min-w-0">
-          <p className={cn("m-0 truncate text-[var(--text-primary)]", bodyMdTextClassName)}>
-            {buildLandingLocationLabel(item, pirepDetails)}
-          </p>
-          <p className={cn("m-0 truncate text-[var(--text-primary)]", bodyMdTextClassName)}>
-            {item?.equipment || LOGBOOK_EMPTY_VALUE}
-          </p>
+          <p className={STAT_CARD_BODY_CLASS_NAME}>{buildLandingLocationLabel(item, pirepDetails)}</p>
+          <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.equipment || LOGBOOK_EMPTY_VALUE}</p>
         </div>
-        <p className={cn("m-0 shrink-0 truncate text-center font-semibold tabular-nums text-[var(--text-primary)]", bodyMdTextClassName)}>
-          {landingRateValue}
-        </p>
+        <p className={STAT_CARD_VALUE_CLASS_NAME}>{landingRateValue}</p>
         <div className="flex shrink-0 items-center justify-end">
           <LandingGradeBadge grade={item?.badge} />
         </div>
@@ -314,15 +296,15 @@ function AirportRow({ item }) {
     <div className="grid gap-1.5 border-b border-[color:var(--line)] pb-2 last:border-b-0 last:pb-0">
       <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className={cn("m-0 truncate text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>{item?.label}</p>
-          {item?.meta ? <p className={cn("m-0 truncate text-[var(--text-muted)]", bodyMdTextClassName)}>{item.meta}</p> : null}
+          <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.label}</p>
+          {item?.meta ? <p className={STAT_CARD_META_CLASS_NAME}>{item.meta}</p> : null}
         </div>
         <div className="shrink-0 text-right">
-          <p className={cn("m-0 text-[var(--text-heading)]", bodyMdTextClassName)}>{item?.value}</p>
-          {item?.percentValue ? <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>{item.percentValue}</p> : null}
+          <p className={STAT_CARD_VALUE_CLASS_NAME}>{item?.value}</p>
+          {item?.percentValue ? <p className={STAT_CARD_META_CLASS_NAME}>{item.percentValue}</p> : null}
         </div>
       </div>
-      <div className={cn("flex gap-2 uppercase tracking-[0.12em] text-[var(--text-muted)]", bodyMdTextClassName)}>
+      <div className={cn("flex gap-2 text-[var(--text-muted)]", bodyMdTextClassName)}>
         <span>{`DEP ${item?.dep ?? "0"}`}</span>
         <span>{`ARR ${item?.arr ?? "0"}`}</span>
       </div>
@@ -340,9 +322,9 @@ function RecordTile({ item }) {
 
   return (
     <div className={cn("grid min-h-0 gap-1 border p-2", toneClassName)}>
-      <p className={cn("m-0 truncate text-[0.88rem] font-semibold uppercase tracking-[0.12em]")}>{item?.label}</p>
-      <p className={cn("m-0 truncate", bodyMdTextClassName)}>{item?.value}</p>
-      {item?.meta ? <p className={cn("m-0 truncate opacity-80", bodyMdTextClassName)}>{item.meta}</p> : null}
+      <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.label}</p>
+      <p className={STAT_CARD_VALUE_CLASS_NAME}>{item?.value}</p>
+      {item?.meta ? <p className={STAT_CARD_META_CLASS_NAME}>{item.meta}</p> : null}
     </div>
   );
 }
@@ -759,7 +741,7 @@ function EquipmentTile({ item }) {
             </span>
           )}
         </div>
-        <p className={cn("m-0 w-full truncate text-center text-[var(--text-primary)] dark:text-white", bodyMdTextClassName)}>
+        <p className={STAT_CARD_BODY_CLASS_NAME}>
           {label || LOGBOOK_EMPTY_VALUE}
         </p>
       </div>
