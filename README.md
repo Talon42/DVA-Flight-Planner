@@ -103,6 +103,8 @@ Accomplishments use synced DVA logbook data to track required airport progress. 
 
 The Logbook view shows synced DVA logbook rows, filters, detail panels, and Pilot Stats for completed legs, distance, block time, airlines, equipment, routes, airports, landings, and records.
 
+Flight numbers in the logbook and Pilot Stats detail views can be clicked to open the matching PIREP on the DVA website.
+
 ### Map View
 
 The map displays planned route context for selected or active Flight Board entries. It supports route plotting, waypoint context, weather radar, satellite imagery, standard/world map modes, and VATSIM airport or regional coverage overlays.
