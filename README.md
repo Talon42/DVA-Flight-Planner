@@ -138,14 +138,3 @@ Use `Settings` > `Advanced` > `Delete User Data` to clear saved local data, DVA 
 Windows may show a `Microsoft Defender SmartScreen` warning when opening the `.exe`. This can happen for small or newly released apps that are not code-signed or do not yet have Microsoft download reputation.
 
 To continue, click `More info`, then `Run anyway`.
-
-## Development
-
-Current app version: `0.8.1-beta`
-
-```bash
-npm install
-npm run dev
-npm run lint
-npm run build
-```
