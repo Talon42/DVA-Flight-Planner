@@ -39,20 +39,20 @@ export function buildDutyScheduleMessage(dutyFilters, status, requestedCount, ge
   const resolvedAirlineLabel = getActiveDutyAirline(dutyFilters);
 
   if (status === "success") {
-    return `Built a ${generatedCount}-flight duty schedule${
+    return `Built a ${generatedCount}-leg duty schedule${
       resolvedAirlineLabel ? ` for ${resolvedAirlineLabel}` : ""
     }.`;
   }
 
   if (status === "partial") {
-    return `Built ${generatedCount} of ${requestedCount} flights because the current constraints prevented a full chain${
+    return `Built ${generatedCount} of ${requestedCount} legs because the current constraints prevented a full chain${
       resolvedAirlineLabel ? ` for ${resolvedAirlineLabel}` : ""
     }.`;
   }
 
   if (reasonCodes?.includes("no-candidates")) {
-    return "No flights match the current duty schedule filters.";
+    return "No legs match the current duty schedule filters.";
   }
 
-  return `Unable to build a full ${requestedCount}-flight duty schedule with the current filters. Lower the requested flight count or adjust the filters and try again.`;
+  return `Unable to build a full ${requestedCount}-leg duty schedule with the current filters. Lower the requested leg count or adjust the filters and try again.`;
 }

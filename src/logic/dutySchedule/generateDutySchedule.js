@@ -106,7 +106,7 @@ function buildLocationAirlineSelection({
         status: "failure",
         generatedCount: airlineFlights.length,
         reasonCodes: ["insufficient-candidate-count"],
-        message: "Insufficient candidate flights for the requested duty length."
+        message: "Insufficient candidate legs for the requested duty length."
       };
     } else {
       const feasibilityRng = createSeededRng(

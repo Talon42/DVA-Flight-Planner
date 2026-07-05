@@ -62,7 +62,7 @@ function TileMetricBand({ value, percentValue, paddingClassName = "px-3", classN
     >
       <div className="min-w-0">
         <p className={cn(TILE_METRIC_NUMBER_CLASS_NAME, bodyMdTextClassName)}>{value}</p>
-        <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>Flights</p>
+        <p className={cn(TILE_METRIC_LABEL_CLASS_NAME, bodyMdTextClassName)}>Legs</p>
       </div>
       <div aria-hidden="true" />
       {percentValue ? (
@@ -286,7 +286,7 @@ function FavoriteRouteBoardCard({
           </p>
         </div>
         <div className="min-w-0 text-center">
-          <p className="m-0 text-[0.54rem] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Flights</p>
+          <p className="m-0 text-[0.54rem] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Legs</p>
           <p className="m-0 truncate text-[0.8rem] font-semibold tabular-nums text-[var(--text-heading)] dark:text-white">
             {resolvedFlightCountDisplay}
           </p>

@@ -12,7 +12,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
   airlines: Object.freeze({
     key: "airlines",
     dashboardOrder: 10,
-    title: "Flights by Airline",
+    title: "Legs by Airline",
     detailView: "airlines",
     variant: "airline-grid",
     dataKey: "airlines",
@@ -23,7 +23,7 @@ export const PILOT_STATS_CARD_REGISTRY = Object.freeze({
   equipment: Object.freeze({
     key: "equipment",
     dashboardOrder: 20,
-    title: "Flights by Equipment",
+    title: "Legs by Equipment",
     detailView: "equipment",
     variant: "equipment-grid",
     dataKey: "equipment",

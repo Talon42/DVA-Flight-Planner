@@ -39,7 +39,7 @@ function formatCompactDashDate(dateSortKey) {
   return `${month}-${day}-${year}`;
 }
 
-function getRecentLandingPirepUrl(row) {
+function getDvaPirepUrl(row) {
   const pirepId = buildDvaPirepId(row?.dvaPirepId || row?.rawLogbookId || row?.id);
   return pirepId ? `https://www.deltava.org/pirep.do?id=${pirepId}` : "";
 }
@@ -70,6 +70,11 @@ function renderEquipmentCell(row) {
       <span className="min-w-0 truncate">{equipment}</span>
     </span>
   );
+}
+
+function renderDashCell(value) {
+  const normalized = String(value ?? "").trim();
+  return normalized ? normalized : LOGBOOK_EMPTY_VALUE;
 }
 
 // Recent landings stores the compact flight label in `label`, so this cell reads the actual equipment field directly.
@@ -204,7 +209,7 @@ function buildRankColumn() {
 
 function buildNumericColumn({
   key = "value",
-  label = "Flights",
+  label = "Legs",
   compactLabel = "Flt",
   wideLabel = label,
   ariaLabel = label,
@@ -368,7 +373,7 @@ function buildRecentLandingColumns() {
       getSortValue: (row) => resolveTextSortValue(row?.flight),
       renderCell: (row) => row.flight,
       onCellClick: async (row) => {
-        const pirepUrl = getRecentLandingPirepUrl(row);
+        const pirepUrl = getDvaPirepUrl(row);
 
         if (!pirepUrl) {
           return;
@@ -476,10 +481,10 @@ function buildRouteColumns() {
       getSortValue: (row) => resolveTextSortValue(row?.arr)
     }),
     buildNumericColumn({
-      label: "Flights",
-      compactLabel: "Flights",
-      wideLabel: "Flights",
-      ariaLabel: "Flights",
+      label: "Legs",
+      compactLabel: "Legs",
+      wideLabel: "Legs",
+      ariaLabel: "Legs",
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
@@ -611,10 +616,10 @@ function buildAirlineColumns() {
     }),
     buildNumericColumn({
       key: "value",
-      label: "Flights",
-      compactLabel: "Flights",
-      wideLabel: "Flights",
-      ariaLabel: "Flights",
+      label: "Legs",
+      compactLabel: "Legs",
+      wideLabel: "Legs",
+      ariaLabel: "Legs",
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
       minWidth: 84,
@@ -646,10 +651,10 @@ function buildEquipmentColumns() {
     }),
     buildNumericColumn({
       key: "value",
-      label: "Flights",
-      compactLabel: "Flt",
-      wideLabel: "Flights",
-      ariaLabel: "Flights",
+      label: "Legs",
+      compactLabel: "Legs",
+      wideLabel: "Legs",
+      ariaLabel: "Legs",
       sortKey: "value",
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.count ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE,
@@ -691,6 +696,70 @@ function buildRecordColumns() {
       renderCell: (row) => row.label ?? LOGBOOK_EMPTY_VALUE
     }),
     buildSharedDetailColumn({
+      key: "flightNumber",
+      label: "Flight Number",
+      compactLabel: "Flight No.",
+      wideLabel: "Flight Number",
+      role: "primaryText",
+      sortKey: "flightNumber",
+      getSortValue: (row) => resolveTextSortValue(row?.flightNumber),
+      renderCell: (row) => renderDashCell(row?.flightNumber),
+      onCellClick: async (row) => {
+        const pirepUrl = getDvaPirepUrl(row);
+
+        if (!pirepUrl) {
+          return;
+        }
+
+        try {
+          await openDesktopUrl(pirepUrl);
+        } catch (error) {
+          console.error("Unable to open DVA PIREP page.", error);
+        }
+      },
+      cellAriaLabel: (row) => {
+        const pirepId = String(row?.dvaPirepId || row?.rawLogbookId || row?.id || "").trim();
+        return pirepId ? `Open DVA PIREP ${pirepId}` : "Open DVA PIREP";
+      },
+      cellTitle: (row) => {
+        const pirepId = String(row?.dvaPirepId || row?.rawLogbookId || row?.id || "").trim();
+        return pirepId ? `Open DVA PIREP ${pirepId}` : "Open DVA PIREP";
+      },
+      stopRowSelectOnClick: true
+    }),
+    buildSharedDetailColumn({
+      key: "dep",
+      label: "Departure",
+      compactLabel: "DEP",
+      wideLabel: "Departure",
+      ariaLabel: "Departure",
+      role: "airportCode",
+      sortKey: "dep",
+      getSortValue: (row) => resolveTextSortValue(row?.dep),
+      renderCell: (row) => renderDashCell(row?.dep)
+    }),
+    buildSharedDetailColumn({
+      key: "arr",
+      label: "Arrival",
+      compactLabel: "ARR",
+      wideLabel: "Arrival",
+      ariaLabel: "Arrival",
+      role: "airportCode",
+      sortKey: "arr",
+      getSortValue: (row) => resolveTextSortValue(row?.arr),
+      renderCell: (row) => renderDashCell(row?.arr)
+    }),
+    buildSharedDetailColumn({
+      key: "date",
+      label: "Date",
+      compactLabel: "Date",
+      wideLabel: "Date",
+      role: "time",
+      sortKey: "date",
+      getSortValue: (row) => resolveNumericSortValue(row?.dateSortKey ?? row?.date),
+      renderCell: (row) => renderDashCell(row?.date)
+    }),
+    buildSharedDetailColumn({
       key: "value",
       label: "Value",
       compactLabel: "Value",
@@ -700,16 +769,6 @@ function buildRecordColumns() {
       getSortValue: (row) => resolveNumericSortValue(row?.valueRaw ?? row?.value),
       renderCell: (row) => row.value ?? LOGBOOK_EMPTY_VALUE
     }),
-    buildSharedDetailColumn({
-      key: "meta",
-      label: "Detail",
-      compactLabel: "Detail",
-      wideLabel: "Detail",
-      role: "secondary",
-      sortKey: "meta",
-      getSortValue: (row) => resolveTextSortValue(row?.meta),
-      renderCell: (row) => row.meta ?? LOGBOOK_EMPTY_VALUE
-    })
   ];
 }
 
@@ -798,7 +857,7 @@ export function buildPilotStatsDetailTableConfig(detailView, detailRows) {
         rows: detailRows.records || [],
         columns: buildRecordColumns(),
         rowHeight: 46,
-        defaultSortKey: "rank",
+        defaultSortKey: "label",
         defaultSortDirection: "asc"
       };
   }

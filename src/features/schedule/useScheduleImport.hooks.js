@@ -292,8 +292,8 @@ export function useScheduleImport({
         setStatusMessage?.(
           persistedSuccessfully
             ? staleBoardEntries
-              ? `Imported ${formatNumber(imported.flights.length)} flights from ${scheduleFile.fileName}. ${formatNumber(staleBoardEntries)} board flights need repair.`
-              : `Imported ${formatNumber(imported.flights.length)} flights from ${scheduleFile.fileName}.`
+              ? `Imported ${formatNumber(imported.flights.length)} legs from ${scheduleFile.fileName}. ${formatNumber(staleBoardEntries)} board flights need repair.`
+              : `Imported ${formatNumber(imported.flights.length)} legs from ${scheduleFile.fileName}.`
             : "Imported schedule, but it could not be saved for next launch. Check the app log."
         );
         await logAppEvent("import-success", {

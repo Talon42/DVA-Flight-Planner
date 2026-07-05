@@ -281,6 +281,16 @@ function buildYearKey(row) {
   return String(date.getUTCFullYear());
 }
 
+// Uses the full flight date so the records snapshot can show the busiest single day.
+function buildDayKey(row) {
+  const normalized = Number(row?.dateSortKey);
+  if (!Number.isFinite(normalized) || normalized <= 0) {
+    return LOGBOOK_EMPTY_VALUE;
+  }
+
+  return String(Math.trunc(normalized));
+}
+
 function buildMonthLabel(monthKey) {
   if (monthKey === LOGBOOK_EMPTY_VALUE) {
     return LOGBOOK_EMPTY_VALUE;
@@ -296,6 +306,58 @@ function buildMonthLabel(monthKey) {
     year: "numeric",
     timeZone: "UTC"
   });
+}
+
+// Formats a YYYYMMDD key into the same readable date style used elsewhere in the logbook UI.
+function buildDayLabel(dayKey) {
+  if (dayKey === LOGBOOK_EMPTY_VALUE) {
+    return LOGBOOK_EMPTY_VALUE;
+  }
+
+  const normalized = String(dayKey).trim();
+  if (!/^\d{8}$/.test(normalized)) {
+    return LOGBOOK_EMPTY_VALUE;
+  }
+
+  const year = Number(normalized.slice(0, 4));
+  const month = Number(normalized.slice(4, 6));
+  const day = Number(normalized.slice(6, 8));
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return LOGBOOK_EMPTY_VALUE;
+  }
+
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC"
+  });
+}
+
+// Normalizes record snapshot fields so aggregate rows can fall back to the shared dash placeholder.
+function buildRecordField(value) {
+  return String(value ?? "").trim() || LOGBOOK_EMPTY_VALUE;
+}
+
+// Preserves the source flight row while adding the fields used by the records detail table.
+function buildRecordSummaryRow(row, { label, value, meta, date, recordType, tone = "neutral" } = {}) {
+  return {
+    id: row?.id || recordType,
+    recordType,
+    label,
+    value,
+    meta,
+    date: buildRecordField(date ?? row?.dateDisplay),
+    tone,
+    rawLogbookId: row?.rawLogbookId || null,
+    dvaPirepId: row?.dvaPirepId || null,
+    dateSortKey: Number.isFinite(row?.dateSortKey) ? row.dateSortKey : null,
+    flightNumber: buildRecordField(row?.compactFlightLabel),
+    dep: buildRecordField(row?.departure),
+    arr: buildRecordField(row?.arrival),
+    flightLinkLabel: buildRecordField(row?.compactFlightLabel)
+  };
 }
 
 function buildRankingItems(counterMap, { totalCount = 0, rowMap = null, labelBuilder = null } = {}) {
@@ -761,12 +823,23 @@ function buildRecordSummary(rows) {
     blockTimeRows.length > 0
       ? [...blockTimeRows].sort((left, right) => left.blockTimeMinutes - right.blockTimeMinutes || right.dateSortKey - left.dateSortKey)[0]
       : null;
+  const dailyCounts = new Map();
   const monthlyCounts = new Map();
   const yearlyCounts = new Map();
 
   for (const row of activeRows) {
+    incrementCount(dailyCounts, buildDayKey(row));
     incrementCount(monthlyCounts, buildMonthKey(row));
     incrementCount(yearlyCounts, buildYearKey(row));
+  }
+
+  let busiestDayKey = "";
+  let busiestDayCount = 0;
+  for (const [dayKey, count] of dailyCounts.entries()) {
+    if (!busiestDayKey || count > busiestDayCount) {
+      busiestDayKey = dayKey;
+      busiestDayCount = count;
+    }
   }
 
   let busiestMonthKey = "";
@@ -836,12 +909,20 @@ function buildRecordSummary(rows) {
           meta: shortestFlightTime.dateDisplay
         }
       : null,
+    busiestDay: busiestDayKey
+      ? {
+          id: "busiest-day",
+          label: buildDayLabel(busiestDayKey),
+          value: formatNumber(busiestDayCount),
+          meta: "Legs"
+        }
+      : null,
     busiestMonth: busiestMonthKey
       ? {
           id: "busiest-month",
           label: buildMonthLabel(busiestMonthKey),
           value: formatNumber(busiestMonthCount),
-          meta: "Flights"
+          meta: "Legs"
         }
       : null,
     busiestYear: busiestYearKey
@@ -849,68 +930,79 @@ function buildRecordSummary(rows) {
           id: "busiest-year",
           label: busiestYearKey,
           value: formatNumber(busiestYearCount),
-          meta: "Flights"
+          meta: "Legs"
         }
       : null,
     summaryRows: [
       bestLandingRate
-        ? {
-            id: "best-landing",
+        ? buildRecordSummaryRow(bestLandingRate, {
             recordType: "best-landing",
             label: "Best Landing",
             value: bestLandingRate.landingRateDisplay,
             meta: `${bestLandingRate.compactFlightLabel} - ${bestLandingRate.dateDisplay}`,
             tone: "positive"
-          }
+          })
         : null,
       worstLandingRate
-        ? {
-            id: "worst-landing",
+        ? buildRecordSummaryRow(worstLandingRate, {
             recordType: "worst-landing",
             label: "Worst Landing",
             value: worstLandingRate.landingRateDisplay,
             meta: `${worstLandingRate.compactFlightLabel} - ${worstLandingRate.dateDisplay}`,
             tone: "negative"
-          }
+          })
         : null,
       longestFlight
-        ? {
-            id: "longest-flight",
+        ? buildRecordSummaryRow(longestFlight, {
             recordType: "longest-flight",
             label: "Longest Flight (NM)",
             value: longestFlight.distanceDisplay,
             meta: `${longestFlight.compactFlightLabel} - ${longestFlight.dateDisplay}`,
             tone: "neutral"
-          }
+          })
         : null,
       shortestFlight
-        ? {
-            id: "shortest-flight",
+        ? buildRecordSummaryRow(shortestFlight, {
             recordType: "shortest-flight",
             label: "Shortest Flight (NM)",
             value: shortestFlight.distanceDisplay,
             meta: `${shortestFlight.compactFlightLabel} - ${shortestFlight.dateDisplay}`,
             tone: "neutral"
-          }
+          })
         : null,
       longestFlightTime
-        ? {
-            id: "longest-flight-time",
+        ? buildRecordSummaryRow(longestFlightTime, {
             recordType: "longest-flight-time",
             label: "Longest Flight (Time)",
             value: longestFlightTime.blockTimeDisplay || formatMinutes(longestFlightTime.blockTimeMinutes),
             meta: `${longestFlightTime.compactFlightLabel} - ${longestFlightTime.dateDisplay}`,
             tone: "neutral"
-          }
+          })
         : null,
       shortestFlightTime
-        ? {
-            id: "shortest-flight-time",
+        ? buildRecordSummaryRow(shortestFlightTime, {
             recordType: "shortest-flight-time",
             label: "Shortest Flight (Time)",
             value: shortestFlightTime.blockTimeDisplay || formatMinutes(shortestFlightTime.blockTimeMinutes),
             meta: `${shortestFlightTime.compactFlightLabel} - ${shortestFlightTime.dateDisplay}`,
             tone: "neutral"
+          })
+        : null,
+      busiestDayKey
+        ? {
+            id: "busiest-day",
+            recordType: "busiest-day",
+            label: "Busiest Day",
+            value: `${formatNumber(busiestDayCount)} Legs`,
+            meta: buildDayLabel(busiestDayKey),
+            date: buildDayLabel(busiestDayKey),
+            tone: "neutral",
+            rawLogbookId: null,
+            dvaPirepId: null,
+            flightNumber: LOGBOOK_EMPTY_VALUE,
+            dep: LOGBOOK_EMPTY_VALUE,
+            arr: LOGBOOK_EMPTY_VALUE,
+            flightLinkLabel: LOGBOOK_EMPTY_VALUE
           }
         : null,
       busiestMonthKey
@@ -918,9 +1010,16 @@ function buildRecordSummary(rows) {
             id: "busiest-month",
             recordType: "busiest-month",
             label: "Busiest Month",
-            value: `${formatNumber(busiestMonthCount)} Flights`,
+            value: `${formatNumber(busiestMonthCount)} Legs`,
             meta: buildMonthLabel(busiestMonthKey),
-            tone: "neutral"
+            date: buildMonthLabel(busiestMonthKey),
+            tone: "neutral",
+            rawLogbookId: null,
+            dvaPirepId: null,
+            flightNumber: LOGBOOK_EMPTY_VALUE,
+            dep: LOGBOOK_EMPTY_VALUE,
+            arr: LOGBOOK_EMPTY_VALUE,
+            flightLinkLabel: LOGBOOK_EMPTY_VALUE
           }
         : null,
       busiestYearKey
@@ -928,9 +1027,16 @@ function buildRecordSummary(rows) {
             id: "busiest-year",
             recordType: "busiest-year",
             label: "Busiest Year",
-            value: `${formatNumber(busiestYearCount)} Flights`,
+            value: `${formatNumber(busiestYearCount)} Legs`,
             meta: busiestYearKey,
-            tone: "neutral"
+            date: busiestYearKey,
+            tone: "neutral",
+            rawLogbookId: null,
+            dvaPirepId: null,
+            flightNumber: LOGBOOK_EMPTY_VALUE,
+            dep: LOGBOOK_EMPTY_VALUE,
+            arr: LOGBOOK_EMPTY_VALUE,
+            flightLinkLabel: LOGBOOK_EMPTY_VALUE
           }
         : null
     ].filter(Boolean)
@@ -1051,7 +1157,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
       anchorDateIso: comparison.anchorDateIso
     },
     cards: [
-      { label: "Total Flights", value: formatNumber(statsRows.length) },
+      { label: "Total Legs", value: formatNumber(statsRows.length) },
       { label: "Total Distance", value: formatUnit(totalDistance, "nm") },
       { label: "Total Block Time", value: formatMinutes(totalBlockTime) },
       { label: "Total Flight Time", value: formatMinutes(totalFlightTime) },
@@ -1060,7 +1166,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
       {
         label: "Top Airline",
         value: topAirline ? topAirline.label : LOGBOOK_EMPTY_VALUE,
-        meta: topAirline ? `${formatNumber(topAirline.count)} flights` : ""
+        meta: topAirline ? `${formatNumber(topAirline.count)} legs` : ""
       }
     ],
     landingRates: [

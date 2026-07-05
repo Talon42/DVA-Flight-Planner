@@ -85,8 +85,8 @@ export default function DutyScheduleFilters({
         const length = index + 2;
         return {
           value: String(length),
-          label: `${length} flights`,
-          keywords: `${length} flights`
+          label: `${length} legs`,
+          keywords: `${length} legs`
         };
       }),
     []

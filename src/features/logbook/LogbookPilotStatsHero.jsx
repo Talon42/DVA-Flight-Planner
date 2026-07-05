@@ -246,7 +246,7 @@ export default function LogbookPilotStatsHero({
   const kpiCards = [
     {
       id: "total-flights",
-      label: "Total Flights",
+      label: "Total Legs",
       value: summary?.totalFlights || LOGBOOK_EMPTY_VALUE,
       delta: useComparison ? formatDeltaValue(deltas.totalFlights?.rawValue) : "",
       deltaStatus: deltas.totalFlights?.status

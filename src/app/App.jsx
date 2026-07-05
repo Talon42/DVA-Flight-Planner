@@ -539,7 +539,7 @@ export default function App() {
         },
         {
           kind: "stat",
-          label: "Imported Flights",
+          label: "Imported Legs",
           value: formatNumber(schedule.importSummary.importedRows ?? 0)
         },
         { kind: "stat", label: "Logbook Sync", value: logbookLastSyncLabel },
