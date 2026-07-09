@@ -188,7 +188,6 @@ export default function LogbookDetailsCard({
   const departureRunwayLength = String(pirepDetails?.departureRunwayLength || "").trim();
   const arrivalRunway = String(pirepDetails?.arrivalRunway || "").trim();
   const arrivalRunwayLength = String(pirepDetails?.arrivalRunwayLength || "").trim();
-  const payloadPassengersValue = String(pirepDetails?.payloadPassengers || "").trim();
   const payloadCargoValue = String(pirepDetails?.payloadCargo || "").trim();
   const arrivalThresholdDistanceValue = String(pirepDetails?.arrivalRunwayThresholdDistance || "").trim();
   const arrivalThresholdDistanceDisplay = buildScrapedDetailValue(arrivalThresholdDistanceValue, {
@@ -200,7 +199,7 @@ export default function LogbookDetailsCard({
     { label: "Flight Time", value: formatLogbookDuration(entry.airborneTime) },
     { label: "Total Time", value: formatLogbookDuration(entry.blockTime) },
     { label: "Distance", value: selectedLogbookFlight.distanceDisplay, title: selectedLogbookFlight.distanceDisplay },
-    { label: "Passengers", value: formatWebOnlyDetailValue(payloadPassengersValue) },
+    { label: "Passengers", value: formatLogbookAviationNumber(selectedLogbookFlight.passengerCount, "") },
     { label: "Cargo", value: formatWebOnlyDetailValue(payloadCargoValue) },
     { label: "Route", value: routeSummary, title: pirepDetails?.routeSummary || routeSummary }
   ];

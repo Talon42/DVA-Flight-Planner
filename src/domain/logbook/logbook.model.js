@@ -497,6 +497,8 @@ export function normalizeLogbookRows(entries) {
       airborneDisplay: formatMinutes(airborneMinutes),
       distanceNm,
       distanceDisplay: formatAviationNumber(distanceNm, "nm"),
+      // The export's pax field is the authoritative passenger count for logbook records.
+      passengerCount: toNumber(entry.pax),
       statusRaw: normalizeText(entry.status) || LOGBOOK_EMPTY_VALUE,
       statusDisplay: normalizeStatus(entry.status),
       simulator: readSimulator(entry),
