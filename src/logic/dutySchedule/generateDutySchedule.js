@@ -2,7 +2,7 @@
 import { buildDutyFlightPool, buildDutyFlightPoolDiagnostics } from "./dutyCandidates";
 import { flightTouchesDutyLocation } from "./dutyLocation";
 import { buildDutySchedule, createSeededRng } from "./buildDutySchedule";
-import { getDutyBuildWarnings } from "./dutyScheduleSummary";
+import { buildDutyScheduleMessage, getDutyBuildWarnings } from "./dutyScheduleSummary";
 import { normalizeDutyFilters } from "./dutyFilters";
 function normalizeIcao(value) {
   return String(value || "").trim().toUpperCase();
@@ -13,6 +13,7 @@ function buildFeasibilitySeed(airline, dutyFilters, selectedOriginAirport) {
     airline,
     String(dutyFilters?.buildMode || ""),
     String(dutyFilters?.dutyTargetMode || ""),
+    String(dutyFilters?.dutyLength ?? ""),
     String(dutyFilters?.locationKind || ""),
     String(dutyFilters?.selectedCountry || "").trim(),
     String(dutyFilters?.selectedRegion || "").trim().toUpperCase(),
@@ -23,6 +24,9 @@ function buildFeasibilitySeed(airline, dutyFilters, selectedOriginAirport) {
     String(dutyFilters?.distanceMax ?? ""),
     String(dutyFilters?.addonFilterEnabled || false),
     String(dutyFilters?.addonMatchMode || ""),
+    String(dutyFilters?.uniqueDestinationsEnabled || false),
+    String(dutyFilters?.timeOrderEnabled || false),
+    String(dutyFilters?.minTurnMinutes ?? ""),
     normalizeIcao(selectedOriginAirport)
   ].join("|");
 }
@@ -39,7 +43,18 @@ function buildFeasibilityReason(buildResult, strictFeasible) {
   return String(buildResult?.message || "not-feasible").trim() || "not-feasible";
 }
 
-// Scores location-mode airlines so the resolver can bias toward broader coverage without being fixed.
+function shuffleValues(values, rng = Math.random) {
+  const shuffled = [...values];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+// Attempts location-mode airlines at Generate time so one unavailable airline cannot block the build.
 function buildLocationAirlineSelection({
   scheduleFlights = [],
   dutyFilters = {},
@@ -51,11 +66,11 @@ function buildLocationAirlineSelection({
   const selectedOriginAirport = String(dutyFilters?.selectedOriginAirport || "").trim().toUpperCase();
   const selectionFilters = {
     ...dutyFilters,
-    selectedAirline: "",
-    resolvedAirline: ""
+    selectedAirline: ""
   };
   const candidateFlights = buildDutyFlightPool(scheduleFlights, selectionFilters, addonAirports, {
     filterBounds,
+    respectOriginAirport: false,
     flightTouchesDutyLocation,
     supportsFlightByAircraftLimits
   });
@@ -89,95 +104,112 @@ function buildLocationAirlineSelection({
   const requestedCount = Math.max(0, Number(dutyFilters?.dutyLength || 0));
   const strictFeasibilityRequired = dutyFilters?.dutyTargetMode === "strict";
   const scoredCandidates = [...airlineStats.values()].map((entry) => {
-    const airlineFlights = candidateFlights.filter(
-      (flight) => String(flight?.airlineName || "").trim() === entry.airline
-    );
     const uniqueLocationAirportCount = entry.uniqueLocationAirportSet.size;
     const score = Math.sqrt(entry.candidateCount) * (1 + uniqueLocationAirportCount * 0.12);
-    const feasibilityFilters = {
-      ...dutyFilters,
-      selectedAirline: entry.airline,
-      resolvedAirline: entry.airline
-    };
-    let buildResult = null;
-
-    if (strictFeasibilityRequired && airlineFlights.length < requestedCount) {
-      buildResult = {
-        status: "failure",
-        generatedCount: airlineFlights.length,
-        reasonCodes: ["insufficient-candidate-count"],
-        message: "Insufficient candidate legs for the requested duty length."
-      };
-    } else {
-      const feasibilityRng = createSeededRng(
-        buildFeasibilitySeed(entry.airline, dutyFilters, selectedOriginAirport)
-      );
-
-      buildResult = buildDutySchedule({
-        flights: airlineFlights,
-        dutyFilters: feasibilityFilters,
-        addonAirports,
-        selectedOriginAirport,
-        rng: feasibilityRng
-      });
-    }
-
-    const strictFeasible =
-      strictFeasibilityRequired &&
-      Boolean(buildResult) &&
-      buildResult.status === "success" &&
-      buildResult.generatedCount >= requestedCount;
 
     return {
       airline: entry.airline,
       candidateCount: entry.candidateCount,
       uniqueLocationAirportCount,
       score,
-      strictFeasible: strictFeasibilityRequired ? strictFeasible : true,
-      maxBuildableFlights: buildResult?.generatedCount ?? airlineFlights.length,
-      feasibilityReason: strictFeasibilityRequired
-        ? buildFeasibilityReason(buildResult, strictFeasible)
-        : "",
-      buildStatus: buildResult?.status || "not-tested",
-      buildReasonCodes: buildResult?.reasonCodes || []
+      strictFeasible: false,
+      maxBuildableFlights: 0,
+      feasibilityReason: "",
+      buildStatus: "not-tested",
+      buildReasonCodes: []
     };
   });
 
-  const eligibleCandidates = strictFeasibilityRequired
-    ? scoredCandidates.filter((candidate) => candidate.strictFeasible)
-    : scoredCandidates;
-
-  const totalScore = eligibleCandidates.reduce((sum, candidate) => sum + candidate.score, 0);
-  let selectedAirline = "";
+  const orderedCandidates = shuffleValues(
+    [...scoredCandidates].sort((left, right) => right.score - left.score),
+    rng
+  );
   let selectedCandidate = null;
-  const draw = totalScore > 0 ? rng() * totalScore : 0;
-  let runningScore = 0;
+  let selectedBuildResult = null;
+  let bestPartialCandidate = null;
+  let bestPartialBuildResult = null;
+  let lastBuildResult = null;
+  let attemptedCandidateCount = 0;
 
-  for (const candidate of eligibleCandidates) {
-    const probability = totalScore > 0 ? candidate.score / totalScore : 0;
-    candidate.probability = probability;
-    runningScore += candidate.score;
+  for (const candidate of orderedCandidates) {
+    const airlineFlights = candidateFlights.filter(
+      (flight) => String(flight?.airlineName || "").trim() === candidate.airline
+    );
 
-    if (!selectedAirline && draw < runningScore) {
-      selectedAirline = candidate.airline;
+    if (strictFeasibilityRequired && airlineFlights.length < requestedCount) {
+      candidate.buildStatus = "failure";
+      candidate.buildReasonCodes = ["insufficient-candidate-count"];
+      candidate.feasibilityReason = "insufficient-candidate-count";
+      continue;
+    }
+
+    attemptedCandidateCount += 1;
+    const buildResult = buildDutySchedule({
+      flights: airlineFlights,
+      dutyFilters,
+      addonAirports,
+      selectedOriginAirport,
+      rng: createSeededRng(buildFeasibilitySeed(candidate.airline, dutyFilters, selectedOriginAirport))
+    });
+    lastBuildResult = buildResult;
+    const generatedCount = Number(buildResult?.generatedCount || 0);
+    const fullBuild =
+      buildResult?.status === "success" && generatedCount >= requestedCount;
+
+    candidate.strictFeasible = fullBuild;
+    candidate.maxBuildableFlights = generatedCount;
+    candidate.feasibilityReason = buildFeasibilityReason(buildResult, fullBuild);
+    candidate.buildStatus = buildResult?.status || "failure";
+    candidate.buildReasonCodes = buildResult?.reasonCodes || [];
+
+    if (fullBuild) {
       selectedCandidate = candidate;
+      selectedBuildResult = buildResult;
+      break;
+    }
+
+    if (
+      buildResult?.status === "partial" &&
+      (!bestPartialBuildResult || generatedCount > bestPartialBuildResult.generatedCount)
+    ) {
+      bestPartialCandidate = candidate;
+      bestPartialBuildResult = buildResult;
     }
   }
 
-  if (!selectedAirline && eligibleCandidates.length) {
-    selectedCandidate = eligibleCandidates[eligibleCandidates.length - 1];
-    selectedAirline = selectedCandidate.airline;
+  if (!selectedCandidate && !strictFeasibilityRequired && bestPartialCandidate) {
+    selectedCandidate = bestPartialCandidate;
+    selectedBuildResult = bestPartialBuildResult;
   }
+
+  const fallbackBuildResult = selectedBuildResult || lastBuildResult || {
+    flights: [],
+    status: "failure",
+    message: buildDutyScheduleMessage(
+      dutyFilters,
+      "failure",
+      requestedCount,
+      0,
+      candidateFlights.length ? ["insufficient-candidate-count"] : ["no-candidates"]
+    ),
+    requestedCount,
+    generatedCount: 0,
+    reasonCodes: candidateFlights.length ? ["insufficient-candidate-count"] : ["no-candidates"]
+  };
 
   return {
     candidatePoolSize: candidateFlights.length,
     strictFeasible: strictFeasibilityRequired,
-    strictFeasibleAirlines: eligibleCandidates.length,
+    strictFeasibleAirlines: scoredCandidates.filter((candidate) => candidate.strictFeasible).length,
+    attemptedCandidateCount,
     maxBuildableFlights: selectedCandidate?.maxBuildableFlights || 0,
-    feasibilityReason: selectedCandidate?.feasibilityReason || (strictFeasibilityRequired ? "no-strict-feasible-airlines" : ""),
-    selectedAirline,
+    feasibilityReason:
+      selectedCandidate?.feasibilityReason ||
+      (strictFeasibilityRequired ? "no-strict-feasible-airlines" : ""),
+    selectedAirline: selectedCandidate?.airline || "",
     selectedCandidate,
-    scoredCandidates
+    scoredCandidates,
+    buildResult: fallbackBuildResult
   };
 }
 
@@ -186,14 +218,13 @@ export function prepareDutyScheduleBuild({
   scheduleFlights = [],
   dutyFilters = {},
   addonAirports = new Set(),
-  qualifyingDutyAirlines = [],
   hasSchedule = false,
   supportsFlightByAircraftLimits,
   rng = Math.random,
   filterBounds = { maxBlockMinutes: 0, maxDistanceNm: 0 }
 } = {}) {
   const activeDutyFilters = normalizeDutyFilters(dutyFilters, filterBounds);
-  const buildWarnings = getDutyBuildWarnings(activeDutyFilters, qualifyingDutyAirlines, hasSchedule);
+  const buildWarnings = getDutyBuildWarnings(activeDutyFilters, hasSchedule);
   const locationAirlineSelection =
     activeDutyFilters.buildMode === "location"
       ? buildLocationAirlineSelection({
@@ -216,7 +247,6 @@ export function prepareDutyScheduleBuild({
       buildWarnings,
       activeDutyFilters,
       selectedOriginAirport: String(activeDutyFilters.selectedOriginAirport || "").trim().toUpperCase(),
-      resolvedDutyAirline: String(activeDutyFilters.resolvedAirline || "").trim(),
       effectiveDutyFilters: activeDutyFilters,
       candidateFlights: [],
       locationAirlineSelection,
@@ -231,70 +261,56 @@ export function prepareDutyScheduleBuild({
         }
       ),
       buildResult: null,
-      shouldPersistResolvedAirline: false
+      selectedAirline: ""
     };
   }
 
   const selectedOriginAirport = String(activeDutyFilters.selectedOriginAirport || "").trim().toUpperCase();
-
-  const resolvedDutyAirline =
+  const selectedAirline =
     activeDutyFilters.buildMode === "airline"
       ? activeDutyFilters.selectedAirline
       : locationAirlineSelection.selectedAirline;
 
-  const shouldForceNoCandidates =
-    activeDutyFilters.buildMode === "location" &&
-    activeDutyFilters.dutyTargetMode === "strict" &&
-    !resolvedDutyAirline;
-
-  const effectiveDutyFilters =
-    resolvedDutyAirline === activeDutyFilters.resolvedAirline
-      ? activeDutyFilters
-      : {
-          ...activeDutyFilters,
-          resolvedAirline: resolvedDutyAirline
-        };
-
+  const shouldForceNoCandidates = activeDutyFilters.buildMode === "location" && !selectedAirline;
+  const candidatePoolOptions = {
+    filterBounds,
+    respectOriginAirport: false,
+    flightTouchesDutyLocation,
+    supportsFlightByAircraftLimits,
+    ...(activeDutyFilters.buildMode === "location" && selectedAirline
+      ? { airlineOverride: selectedAirline }
+      : {})
+  };
   const candidateFlights = shouldForceNoCandidates
     ? []
-    : buildDutyFlightPool(scheduleFlights, effectiveDutyFilters, addonAirports, {
-        filterBounds,
-        respectOriginAirport: false,
-        flightTouchesDutyLocation,
-        supportsFlightByAircraftLimits
-      });
+    : buildDutyFlightPool(scheduleFlights, activeDutyFilters, addonAirports, candidatePoolOptions);
   const dutyFlightPoolDiagnostics = buildDutyFlightPoolDiagnostics(
     scheduleFlights,
-    effectiveDutyFilters,
+    activeDutyFilters,
     addonAirports,
-    {
-      filterBounds,
-      flightTouchesDutyLocation,
-      supportsFlightByAircraftLimits
-    }
+    candidatePoolOptions
   );
 
-  const buildResult = buildDutySchedule({
-    flights: candidateFlights,
-    dutyFilters: effectiveDutyFilters,
-    addonAirports,
-    selectedOriginAirport,
-    rng
-  });
+  const buildResult =
+    activeDutyFilters.buildMode === "location"
+      ? locationAirlineSelection.buildResult
+      : buildDutySchedule({
+          flights: candidateFlights,
+          dutyFilters: activeDutyFilters,
+          addonAirports,
+          selectedOriginAirport,
+          rng
+        });
 
   return {
     buildWarnings: [],
     activeDutyFilters,
     selectedOriginAirport,
-    resolvedDutyAirline,
-    effectiveDutyFilters,
+    selectedAirline,
+    effectiveDutyFilters: activeDutyFilters,
     candidateFlights,
     locationAirlineSelection,
     dutyFlightPoolDiagnostics,
-    buildResult,
-    shouldPersistResolvedAirline:
-      Boolean(resolvedDutyAirline) &&
-      resolvedDutyAirline !== activeDutyFilters.resolvedAirline &&
-      Boolean(selectedOriginAirport)
+    buildResult
   };
 }

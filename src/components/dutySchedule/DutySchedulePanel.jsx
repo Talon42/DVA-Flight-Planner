@@ -2,7 +2,6 @@ import Panel from "../ui/Panel";
 import { cn } from "../ui/cn";
 import DutyScheduleControls from "./DutyScheduleControls";
 import DutyScheduleFilters from "./DutyScheduleFilters";
-import DutyScheduleSummary from "./DutyScheduleSummary";
 import DutyScheduleStatus from "./DutyScheduleStatus";
 
 // Renders the dedicated Duty Schedule workspace without moving build logic back into App.jsx.
@@ -35,8 +34,6 @@ export default function DutySchedulePanel({
           onReset={onReset}
         />
       </div>
-
-      <DutyScheduleSummary dutyFilters={dutyFilters} />
 
       <div className="app-scrollbar grid min-h-0 content-start auto-rows-max gap-4 overflow-y-auto px-2.5 pb-2 pt-2 bp-1024:gap-3 bp-1024:px-3 bp-1024:pb-2 bp-1024:pt-2">
         <DutyScheduleFilters

@@ -75,7 +75,7 @@ export function flightTouchesDutyLocation(flight, dutyFilters) {
 
   const fromLocation = readDutyLocationField(flight, "from");
   const toLocation = readDutyLocationField(flight, "to");
-  return fromLocation.country === target || toLocation.country === target;
+  return fromLocation.country === target && toLocation.country === target;
 }
 
 // Builds the origin airport options that remain valid for the current duty selection.

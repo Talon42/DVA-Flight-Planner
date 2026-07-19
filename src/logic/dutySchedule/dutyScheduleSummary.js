@@ -2,7 +2,7 @@
 import { getActiveDutyAirline, hasActiveDutyLocationSelection, normalizeDutyFilters } from "./dutyFilters";
 
 // Builds the preflight warning list so the UI can block invalid Duty Schedule builds.
-function buildDutyBuildWarnings(dutyFilters, qualifyingDutyAirlines = [], hasSchedule = false) {
+function buildDutyBuildWarnings(dutyFilters, hasSchedule = false) {
   const warnings = [];
 
   if (!hasSchedule) {
@@ -21,32 +21,28 @@ function buildDutyBuildWarnings(dutyFilters, qualifyingDutyAirlines = [], hasSch
     warnings.push("Select an origin airport, airline, or location.");
   }
 
-  if (hasLocationSelection && !qualifyingDutyAirlines.length) {
-    warnings.push("No qualifying airlines were found for the selected location.");
-  }
-
   return warnings;
 }
 
 // Builds the warning list shown before a duty schedule build starts.
-export function getDutyBuildWarnings(dutyFilters, qualifyingDutyAirlines = [], hasSchedule = false) {
+export function getDutyBuildWarnings(dutyFilters, hasSchedule = false) {
   const normalizedFilters = normalizeDutyFilters(dutyFilters);
-  return buildDutyBuildWarnings(normalizedFilters, qualifyingDutyAirlines, hasSchedule);
+  return buildDutyBuildWarnings(normalizedFilters, hasSchedule);
 }
 
 // Builds the human-readable status text for a duty schedule build result.
 export function buildDutyScheduleMessage(dutyFilters, status, requestedCount, generatedCount, reasonCodes) {
-  const resolvedAirlineLabel = getActiveDutyAirline(dutyFilters);
+  const activeAirlineLabel = getActiveDutyAirline(dutyFilters);
 
   if (status === "success") {
     return `Built a ${generatedCount}-leg duty schedule${
-      resolvedAirlineLabel ? ` for ${resolvedAirlineLabel}` : ""
+      activeAirlineLabel ? ` for ${activeAirlineLabel}` : ""
     }.`;
   }
 
   if (status === "partial") {
     return `Built ${generatedCount} of ${requestedCount} legs because the current constraints prevented a full chain${
-      resolvedAirlineLabel ? ` for ${resolvedAirlineLabel}` : ""
+      activeAirlineLabel ? ` for ${activeAirlineLabel}` : ""
     }.`;
   }
 

@@ -17,6 +17,5 @@ export const DEFAULT_DUTY_FILTERS = {
   timeOrderEnabled: false,
   minTurnMinutes: 60,
   dutyTargetMode: "strict",
-  dutyLength: 2,
-  resolvedAirline: ""
+  dutyLength: 2
 };
