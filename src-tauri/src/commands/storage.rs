@@ -57,8 +57,10 @@ pub(crate) fn read_deltava_accomplishment_eligibility(
 }
 
 #[tauri::command]
-pub(crate) fn clear_user_data(app: AppHandle) -> Result<(), String> {
-    crate::services::storage::file_store::clear_user_data(&app)
+pub(crate) fn clear_user_data(
+    app: AppHandle,
+) -> crate::services::storage::user_data::UserDataClearResult {
+    crate::services::storage::user_data::clear_user_data(&app)
 }
 
 #[tauri::command]

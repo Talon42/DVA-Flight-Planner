@@ -50,3 +50,11 @@ export async function ensureAppLogFile(header) {
     event: "app-log-ensure-failed"
   });
 }
+
+// Runs the Rust-owned allowlisted profile cleanup and returns its structured outcome.
+export async function clearUserData() {
+  return invokeAppCommand("clear_user_data", {}, {
+    subsystem: "App Storage",
+    event: "user-data-clear-failed"
+  });
+}

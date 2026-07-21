@@ -17,8 +17,6 @@ import {
   readSavedTheme
 } from "./appRuntime.js";
 import {
-  getDefaultBasicFilterSectionState,
-  getDefaultPlannerControlsCollapsed,
   useAppLayout
 } from "./useAppLayout.hooks.js";
 import { useAppBootstrap } from "./useAppBootstrap.hooks.js";
@@ -36,6 +34,7 @@ import { useScheduleImport } from "../features/schedule/useScheduleImport.hooks.
 import { useAppDevTools } from "./useAppDevTools.hooks.js";
 import { useAppSettings } from "./useAppSettings.hooks.js";
 import { useAppSettingsPersistence } from "./useAppSettingsPersistence.hooks.js";
+import { useUserDataLifecycle } from "./useUserDataLifecycle.hooks.js";
 import AppSettingsContent from "./AppSettingsContent.jsx";
 import AppRightColumn from "./AppRightColumn.jsx";
 import { useFlightBoards } from "../features/flightBoard/useFlightBoards.hooks.js";
@@ -65,9 +64,6 @@ import {
   selectScheduleAirlines,
   selectScheduleEquipmentOptions
 } from "../features/schedule/scheduleOptions.selectors";
-import {
-  createEmptyAddonAirportScan
-} from "../services/tauri/addonAirportScan.client.js";
 import { formatNumber } from "../domain/formatting/formatters.js";
 import {
   logAppError,
@@ -76,12 +72,8 @@ import {
   setDebugLoggingEnabled,
   openAppLogFile
 } from "../services/logging/appLog.client.js";
+import { writeGettingStartedState } from "../services/storage/storage.js";
 import {
-  deleteStoredUserData,
-  writeGettingStartedState
-} from "../services/storage/storage.js";
-import {
-  DEFAULT_FLIGHT_BOARD_NAME,
   createFlightBoard,
   normalizeBoardEntry,
   normalizeDraftNetwork,
@@ -161,7 +153,6 @@ export default function App() {
   const [gettingStartedState, setGettingStartedState] = useState(DEFAULT_GETTING_STARTED_STATE);
   const [hasLoadedGettingStartedState, setHasLoadedGettingStartedState] = useState(false);
   const [shouldRunDeferredStartupDvaSync, setShouldRunDeferredStartupDvaSync] = useState(false);
-  const [isDeletingUserData, setIsDeletingUserData] = useState(false);
   const [, setStatusMessage] = useState("Ready");
   const [logbookAirportProgress, setLogbookAirportProgress] = useState({
     dateIso: null,
@@ -201,9 +192,7 @@ export default function App() {
   } = useAppConfirmations();
   const {
     isDevToolsEnabled,
-    setIsDevToolsEnabled,
     devWindowWidth,
-    setDevWindowWidth,
     isDevWindowMenuOpen,
     setIsDevWindowMenuOpen,
     isDevContextMenuOpen,
@@ -961,6 +950,16 @@ export default function App() {
     isRefreshingLogbook,
     onRefreshLogbook: handleRefreshDeltaVirtualLogbook
   });
+  const {
+    isDeletingUserData,
+    clearFailure: userDataClearFailure,
+    handleDeleteUserData,
+    retryUserDataClear,
+    reloadAfterUserDataClearFailure
+  } = useUserDataLifecycle({
+    confirmDelete: confirmDeleteUserDataInApp,
+    prepareForUserDataClear: logbookWorkspace.prepareForUserDataClear
+  });
   logbookSyncCompleteRef.current = logbookWorkspace.handleSyncComplete;
   const uiStateSnapshot = useMemo(() => ({
       plannerMode,
@@ -1490,83 +1489,6 @@ export default function App() {
   const handleDispatchWorkflow = handleStartSimBriefDispatch;
   const handleRegenerateDispatchWorkflow = handleRegenerateSimBriefDispatch;
 
-  async function handleDeleteUserData() {
-    const confirmed = await confirmDeleteUserDataInApp();
-    if (!confirmed) {
-      return;
-    }
-
-    setIsDeletingUserData(true);
-
-    try {
-      await deleteStoredUserData();
-      setGettingStartedState(DEFAULT_GETTING_STARTED_STATE);
-      setShouldRunDeferredStartupDvaSync(false);
-      setSchedule(null);
-      const defaultBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
-      setFlightBoards([defaultBoard]);
-      setActiveFlightBoardId(defaultBoard.id);
-      setSelectedFlightId(null);
-      setSelectedAirportInfo(null);
-      setExpandedBoardFlightId(null);
-      setPlannerMode("basic");
-      setFilters(DEFAULT_FILTERS);
-      setDutyFilters(DEFAULT_DUTY_FILTERS);
-      setFilterUiVersion((current) => current + 1);
-      setSort(DEFAULT_SORT);
-      setTheme("light");
-      setIsDevToolsEnabled(false);
-      setDevWindowWidth(null);
-      setIsDevWindowMenuOpen(false);
-      setPlannerControlsCollapsed(getDefaultPlannerControlsCollapsed());
-      setBasicAdvancedFiltersOpen(
-        getDefaultBasicFilterSectionState(viewportSize).basicAdvancedFiltersOpen
-      );
-      setBasicAddonFiltersOpen(
-        getDefaultBasicFilterSectionState(viewportSize).basicAddonFiltersOpen
-      );
-      setAddonScan(createEmptyAddonAirportScan());
-      setDvaFirstName("");
-      setDvaFirstNameDraft("");
-      setDvaLastName("");
-      setDvaLastNameDraft("");
-      setDvaHasPassword(false);
-      setSimBriefUsername("");
-      setSimBriefUsernameDraft("");
-      setSimBriefPilotId("");
-      setSimBriefPilotIdDraft("");
-      setSimBriefUseCurrentUtcForDispatchTime(false);
-      setSimBriefDispatchUnits("LBS");
-      setSavedSimBriefDispatchUnits("LBS");
-      setSimBriefDepartureOffsetMinutes(0);
-      setSavedSimBriefDepartureOffsetMinutes(0);
-      setSimBriefCustomAirframes([]);
-      setSimBriefCustomAirframesDraft([]);
-      setSimBriefCustomAirframeIdDraft("");
-      setSimBriefCustomAirframeMatchTypeDraft("");
-      setLogbookAirportProgress({
-        dateIso: null,
-        lastSyncAt: null,
-        visitedAirports: [],
-        arrivalAirports: []
-      });
-      setDeltaVirtualAccomplishmentEligibility({ lastSyncAt: null, sourceUrl: null, rows: [] });
-      handleSetMapOptions(DEFAULT_MAP_OPTIONS);
-      setSimBriefDispatchState({
-        flightId: "",
-        isDispatching: false,
-        message: ""
-      });
-      setStatusMessage("Deleted saved user info from this device.");
-      setIsSettingsOpen(false);
-    } catch (error) {
-      setStatusMessage(error.message || "Unable to delete saved user info.");
-      await logAppError("delete-user-data-failed", error);
-    } finally {
-      setIsDeletingUserData(false);
-    }
-  }
-
   function handleToggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
@@ -1896,6 +1818,9 @@ export default function App() {
     onSkipAddonSetup: handleSkipAddonSetup,
     isDeleteUserDataConfirmOpen,
     onResolveDeleteUserDataConfirmation: resolveDeleteUserDataConfirmation,
+    userDataClearFailure,
+    onRetryUserDataClear: retryUserDataClear,
+    onReloadAfterUserDataClearFailure: reloadAfterUserDataClearFailure,
     isDutyBoardOverwriteConfirmOpen,
     onResolveDutyBoardOverwriteConfirmation: resolveDutyBoardOverwriteConfirmation,
     isSimBriefDispatchBlockedOpen,

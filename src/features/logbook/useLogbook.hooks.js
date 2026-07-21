@@ -226,6 +226,21 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     setSelectedRowId((current) => (current === rowId ? current : rowId));
   }, []);
 
+  // Invalidates active loads and releases all in-memory user data before profile deletion.
+  const prepareForUserDataClear = useCallback(() => {
+    requestGenerationRef.current += 1;
+    setCacheResult({
+      dateIso: null,
+      lastSyncAt: null,
+      profileMetadata: null,
+      entries: [],
+      entryCount: 0
+    });
+    setSelectedRowId(null);
+    setIsLoading(false);
+    setLoadError("");
+  }, []);
+
   return {
     cacheResult,
     isLoading,
@@ -251,6 +266,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     handleResetFilters,
     handleSort,
     handleSelectRow,
+    prepareForUserDataClear,
     setPilotStatsComparisonPeriod,
     setPilotStatsDashboardSlots,
     setPilotStatsDetailView

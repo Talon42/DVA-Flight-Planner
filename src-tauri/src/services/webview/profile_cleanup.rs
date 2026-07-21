@@ -40,11 +40,6 @@ pub(crate) fn remove_path_if_exists(path: &Path) {
     }
 }
 
-pub(crate) fn remove_dir_contents_if_exists(path: &Path) {
-    let Ok(entries) = fs::read_dir(path) else { return; };
-    for entry in entries.flatten() { remove_path_if_exists(&entry.path()); }
-}
-
 fn prune_legacy_downloads(directory: &Path) {
     if let Ok(entries) = fs::read_dir(directory) {
         for entry in entries.flatten() {

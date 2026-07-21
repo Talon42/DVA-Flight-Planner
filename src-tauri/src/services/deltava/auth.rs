@@ -125,13 +125,22 @@ pub fn save_auth_settings_internal(
 
 pub fn clear_auth_settings_internal(app: &AppHandle) -> Result<(), String> {
     let path = auth_settings_path(app)?;
-    if path.exists() {
+    let file_result = if path.exists() {
         fs::remove_file(&path)
-            .map_err(|error| format!("Unable to remove Delta Virtual auth settings: {error}"))?;
-    }
+            .map_err(|error| format!("Unable to remove Delta Virtual auth settings: {error}"))
+    } else {
+        Ok(())
+    };
+    let credential_result = clear_password_from_credential_manager();
 
-    let _ = clear_password_from_credential_manager();
-    Ok(())
+    match (file_result, credential_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(file_error), Ok(())) => Err(file_error),
+        (Ok(()), Err(credential_error)) => Err(credential_error),
+        (Err(file_error), Err(credential_error)) => Err(format!(
+            "{file_error}; {credential_error}"
+        )),
+    }
 }
 
 pub fn read_deltava_auth_settings(app: AppHandle) -> Result<DeltaVirtualAuthSettings, String> {

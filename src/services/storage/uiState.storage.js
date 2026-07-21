@@ -8,6 +8,7 @@ let latestAuthoritativeRevision = 0;
 let activeWrite = null;
 let pendingWrite = null;
 let flushWaiters = [];
+let suspended = false;
 
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -70,6 +71,9 @@ async function drainWriteQueue() {
 }
 
 function queueUiStateWrite(uiState) {
+  if (suspended) {
+    return Promise.resolve({ skipped: true, reason: "suspended", authoritative: false });
+  }
   const serialized = JSON.stringify(uiState || {});
   const revision = ++nextRevision;
   latestQueuedRevision = revision;
@@ -111,4 +115,13 @@ export function flushUiStateWrites() {
   return new Promise((resolve) => {
     flushWaiters.push(resolve);
   });
+}
+
+// Stops new UI-state writes while already accepted snapshots can still be flushed.
+export function suspendUiStateWrites() {
+  suspended = true;
+}
+
+export function resumeUiStateWrites() {
+  suspended = false;
 }

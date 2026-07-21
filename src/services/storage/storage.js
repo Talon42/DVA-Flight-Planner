@@ -6,6 +6,7 @@ import {
   SAVED_SCHEDULE_FILE,
   SIMBRIEF_SETTINGS_FILE,
   UI_STATE_FILE,
+  USER_DATA_BROWSER_STORAGE_KEYS,
   WHATS_NEW_STATE_FILE
 } from "./storage.constants.js";
 import {
@@ -22,6 +23,7 @@ import {
 } from "../../domain/aircraft/aircraftIdentity.js";
 import {
   ensureAppLogFile,
+  clearUserData,
   quarantineAppStorageFile,
   readAppStorageFile,
   writeAppStorageFile
@@ -32,7 +34,6 @@ const PERSISTED_SCHEDULE_VERSION = 4;
 const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
 const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
 const BROWSER_LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
-const LEGACY_DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
 const DELTAVA_TOURS_CACHE_STORAGE_KEY = "flight-planner.deltava-tours-cache";
 const DELTAVA_TOUR_PROGRESS_STORAGE_KEY = "flight-planner.deltava-tour-progress";
 const GETTING_STARTED_STORAGE_KEY = "flight-planner.getting-started";
@@ -100,6 +101,22 @@ export function normalizeSimBriefDepartureOffsetMinutes(value) {
   return normalizedValue === 30 || normalizedValue === 45 || normalizedValue === 60 || normalizedValue === 90
     ? normalizedValue
     : 0;
+}
+
+// Produces the complete canonical snapshot accepted by the ordered SimBrief writer.
+export function normalizeSimBriefSettingsSnapshot(settings) {
+  return {
+    username: String(settings?.username || "").trim(),
+    pilotId: String(settings?.pilotId || "").trim(),
+    useCurrentUtcForDispatchTime: Boolean(settings?.useCurrentUtcForDispatchTime),
+    dispatchUnits: String(settings?.dispatchUnits || "LBS").trim().toUpperCase() === "KGS"
+      ? "KGS"
+      : "LBS",
+    departureOffsetMinutes: normalizeSimBriefDepartureOffsetMinutes(settings?.departureOffsetMinutes),
+    customAirframes: Array.isArray(settings?.customAirframes)
+      ? settings.customAirframes.map(normalizeAircraftCustomAirframe).filter(Boolean)
+      : []
+  };
 }
 
 function buildCompactLabel(values, visibleCount) {
@@ -754,26 +771,6 @@ export async function writeSavedDevToolsEnabled(enabled) {
 }
 
 export async function readSimBriefSettings() {
-  function normalizeCustomAirframe(entry) {
-    return normalizeAircraftCustomAirframe(entry);
-  }
-
-  function normalizeSettings(parsed) {
-    const dispatchUnits = String(parsed?.dispatchUnits || "").trim().toUpperCase();
-    return {
-      username: String(parsed?.username || "").trim(),
-      pilotId: String(parsed?.pilotId || "").trim(),
-      useCurrentUtcForDispatchTime: Boolean(parsed?.useCurrentUtcForDispatchTime),
-      dispatchUnits: dispatchUnits === "KGS" ? "KGS" : "LBS",
-      departureOffsetMinutes: normalizeSimBriefDepartureOffsetMinutes(
-        parsed?.departureOffsetMinutes
-      ),
-      customAirframes: Array.isArray(parsed?.customAirframes)
-        ? parsed.customAirframes.map(normalizeCustomAirframe).filter(Boolean)
-        : []
-    };
-  }
-
   const defaultSettings = getDefaultSimBriefSettings();
 
   if (isTauriRuntime()) {
@@ -783,7 +780,7 @@ export async function readSimBriefSettings() {
     }
 
     try {
-      return normalizeSettings(JSON.parse(text));
+      return normalizeSimBriefSettingsSnapshot(JSON.parse(text));
     } catch (error) {
       await quarantineCorruptStorageFile(SIMBRIEF_SETTINGS_FILE, "simbrief settings");
       logCorruptStorageFileOnce("simbrief settings", SIMBRIEF_SETTINGS_FILE, error);
@@ -797,7 +794,7 @@ export async function readSimBriefSettings() {
   }
 
   try {
-    return normalizeSettings(JSON.parse(text));
+    return normalizeSimBriefSettingsSnapshot(JSON.parse(text));
   } catch (error) {
     logCorruptStorageFileOnce("simbrief settings", "flight-planner.simbrief-settings", error);
     return defaultSettings;
@@ -805,22 +802,7 @@ export async function readSimBriefSettings() {
 }
 
 export async function writeSimBriefSettings(settings) {
-  const serialized = JSON.stringify({
-    username: String(settings?.username || "").trim(),
-    pilotId: String(settings?.pilotId || "").trim(),
-    useCurrentUtcForDispatchTime: Boolean(settings?.useCurrentUtcForDispatchTime),
-    dispatchUnits: String(settings?.dispatchUnits || "LBS").trim().toUpperCase() === "KGS"
-      ? "KGS"
-      : "LBS",
-    departureOffsetMinutes: normalizeSimBriefDepartureOffsetMinutes(
-      settings?.departureOffsetMinutes
-    ),
-    customAirframes: Array.isArray(settings?.customAirframes)
-      ? settings.customAirframes
-          .map(normalizeAircraftCustomAirframe)
-          .filter(Boolean)
-      : []
-  });
+  const serialized = JSON.stringify(normalizeSimBriefSettingsSnapshot(settings));
 
   if (isTauriRuntime()) {
     await writeAppStorageFile("simbriefSettings", serialized);
@@ -1077,27 +1059,21 @@ export async function confirmDeleteUserData() {
 }
 
 export async function deleteStoredUserData() {
+  let result = {
+    ok: true,
+    clearedTargets: [],
+    missingTargets: [],
+    failures: []
+  };
   if (isTauriRuntime()) {
-    await invoke("clear_user_data");
+    result = await clearUserData();
   }
 
   // Legacy browser cleanup only; canonical DVA logbook storage is Rust-backed.
-  for (const key of [
-    "flight-planner.saved-schedule",
-    "flight-planner.ui-state",
-    "flight-planner.simbrief-settings",
-    "flight-planner.deltava-auth",
-    GETTING_STARTED_STORAGE_KEY,
-    "flight-planner.import-log",
-    LEGACY_DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
-    DELTAVA_TOUR_PROGRESS_STORAGE_KEY,
-    WHATS_NEW_LAST_SEEN_RELEASE_STORAGE_KEY,
-    "flight-planner.theme",
-    "flight-planner.dev-tools-enabled",
-    "flight-planner.dev-window-width"
-  ]) {
+  for (const key of USER_DATA_BROWSER_STORAGE_KEYS) {
     window.localStorage.removeItem(key);
   }
+  return result;
 }
 
 async function pickTextFile({ accept, filterName, extensions }) {

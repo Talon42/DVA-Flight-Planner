@@ -93,16 +93,31 @@ describe("logbook PIREP request manager", () => {
     expect(fetchDetails).toHaveBeenCalledTimes(2);
   });
 
-  it("prevents old requests from repopulating a cleared generation", async () => {
+  it("immediately rejects active requests and ignores their late completion after clear", async () => {
     const pending = deferred();
     const manager = createLogbookPirepDetailsRequestManager({ fetchDetails: () => pending.promise });
     const request = manager.request("DVA1");
     await Promise.resolve();
     manager.clear();
+    await expect(request).rejects.toMatchObject({ kind: "invalidated" });
     pending.resolve({ id: "DVA1" });
-    await request;
+    await Promise.resolve();
 
     expect(manager.get("DVA1")).toBeNull();
     expect(manager.diagnostics().generation).toBe(1);
+  });
+
+  it("immediately rejects an active request invalidated by id", async () => {
+    const pending = deferred();
+    const manager = createLogbookPirepDetailsRequestManager({ fetchDetails: () => pending.promise });
+    const request = manager.request("DVA1");
+    await Promise.resolve();
+
+    manager.invalidate("DVA1");
+
+    await expect(request).rejects.toMatchObject({ kind: "invalidated" });
+    pending.resolve({ id: "DVA1" });
+    await Promise.resolve();
+    expect(manager.get("DVA1")).toBeNull();
   });
 });

@@ -18,6 +18,7 @@ export function useLogbookWorkspace({
     persistedUiState,
     reloadVersion
   });
+  const prepareLogbookForUserDataClear = logbook.prepareForUserDataClear;
 
   const selectedLogbookFlight = useMemo(
     () => logbook.allRows.find((row) => row.id === logbook.selectedRowId) || null,
@@ -32,6 +33,11 @@ export function useLogbookWorkspace({
     clearLogbookPirepDetailsRequests();
     setReloadVersion((current) => current + 1);
   }, []);
+
+  const prepareForUserDataClear = useCallback(() => {
+    prepareLogbookForUserDataClear();
+    clearLogbookPirepDetailsRequests();
+  }, [prepareLogbookForUserDataClear]);
 
   const persistedState = useMemo(
     () => ({
@@ -132,6 +138,7 @@ export function useLogbookWorkspace({
     mainProps,
     rightPanelProps,
     persistedUiState: persistedState,
-    handleSyncComplete
+    handleSyncComplete,
+    prepareForUserDataClear
   };
 }

@@ -110,4 +110,13 @@ describe("UI-state write coordinator", () => {
     });
     expect(writeUiStateJson).not.toHaveBeenCalled();
   });
+
+  it("skips newly requested writes while suspended", async () => {
+    const { saveUiState, suspendUiStateWrites, resumeUiStateWrites } = await loadCoordinator();
+    suspendUiStateWrites();
+
+    await expect(saveUiState({ blocked: true })).resolves.toMatchObject({ skipped: true });
+    expect(writeUiStateJson).not.toHaveBeenCalled();
+    resumeUiStateWrites();
+  });
 });

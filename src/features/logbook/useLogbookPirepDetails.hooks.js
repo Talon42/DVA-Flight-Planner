@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
 import { logbookPirepDetailsRequests } from "./logbookPirepDetailsRequests.js";
 
@@ -73,6 +73,10 @@ export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true }
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const requestIdRef = useRef(0);
+  const invalidationVersion = useSyncExternalStore(
+    logbookPirepDetailsRequests.subscribeInvalidation,
+    logbookPirepDetailsRequests.getInvalidationVersion
+  );
 
   useEffect(() => {
     const pirepId = buildLogbookPirepId(selectedLogbookFlight);
@@ -125,7 +129,7 @@ export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true }
       });
 
     return undefined;
-  }, [enabled, selectedLogbookFlight]);
+  }, [enabled, invalidationVersion, selectedLogbookFlight]);
 
   return {
     details,
@@ -138,6 +142,10 @@ export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true }
 export function useVisibleLogbookPirepDetails(logbookFlights, { enabled = true, limit = 0 } = {}) {
   const [detailsByPirepId, setDetailsByPirepId] = useState({});
   const requestIdRef = useRef(0);
+  const invalidationVersion = useSyncExternalStore(
+    logbookPirepDetailsRequests.subscribeInvalidation,
+    logbookPirepDetailsRequests.getInvalidationVersion
+  );
   const visiblePirepIds = useMemo(() => {
     const candidateRows = Array.isArray(logbookFlights) ? logbookFlights : [];
     const visibleRows = limit > 0 ? candidateRows.slice(0, limit) : candidateRows;
@@ -192,7 +200,7 @@ export function useVisibleLogbookPirepDetails(logbookFlights, { enabled = true, 
         requestIdRef.current += 1;
       }
     };
-  }, [enabled, visiblePirepIdSignature]);
+  }, [enabled, invalidationVersion, visiblePirepIdSignature]);
 
   return detailsByPirepId;
 }

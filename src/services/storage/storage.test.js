@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const appStorage = vi.hoisted(() => ({
+  clearUserData: vi.fn(),
   ensureAppLogFile: vi.fn(),
   quarantineAppStorageFile: vi.fn(),
   readAppStorageFile: vi.fn(),
@@ -58,5 +59,21 @@ describe("storage runtime boundaries", () => {
       "simbriefSettings",
       expect.stringContaining('"username":"pilot"')
     );
+  });
+
+  it("returns the structured desktop deletion result and clears browser compatibility keys", async () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
+    window.localStorage.setItem("flight-planner.saved-schedule", "saved");
+    const clearResult = {
+      ok: false,
+      clearedTargets: ["savedSchedule"],
+      missingTargets: [],
+      failures: [{ target: "deltavaCredentials", reasonCode: "credential_error" }]
+    };
+    appStorage.clearUserData.mockResolvedValue(clearResult);
+    const storage = await loadStorage();
+
+    await expect(storage.deleteStoredUserData()).resolves.toEqual(clearResult);
+    expect(window.localStorage.getItem("flight-planner.saved-schedule")).toBeNull();
   });
 });

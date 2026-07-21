@@ -140,6 +140,9 @@ export default function AppOverlayHost({
   onSkipAddonSetup,
   isDeleteUserDataConfirmOpen,
   onResolveDeleteUserDataConfirmation,
+  userDataClearFailure,
+  onRetryUserDataClear,
+  onReloadAfterUserDataClearFailure,
   isDutyBoardOverwriteConfirmOpen,
   onResolveDutyBoardOverwriteConfirmation,
   isSimBriefDispatchBlockedOpen,
@@ -573,6 +576,38 @@ export default function AppOverlayHost({
                   {dvaSyncWarning.primaryLabel || "Open Delta Virtual Settings"}
                 </Button>
               ) : null}
+            </div>
+          </Panel>
+        </ModalBackdrop>
+      ) : null}
+
+      {userDataClearFailure ? (
+        <ModalBackdrop onClick={() => {}}>
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="User data deletion incomplete"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader eyebrow="User Data" title="Deletion could not be completed" />
+            <div className={mutedTextStackClassName}>
+              <p className="m-0">
+                Some app data could not be removed. Persistence remains paused so deleted data is not recreated.
+              </p>
+              <p className="m-0">
+                Close other app windows and retry, or reload the app before continuing.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={onReloadAfterUserDataClearFailure}>
+                Reload App
+              </Button>
+              <Button variant="danger" onClick={onRetryUserDataClear}>
+                Retry Delete
+              </Button>
             </div>
           </Panel>
         </ModalBackdrop>

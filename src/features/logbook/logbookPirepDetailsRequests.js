@@ -30,6 +30,31 @@ export function createLogbookPirepDetailsRequestManager({
   const lowPriorityQueue = [];
   let activeCount = 0;
   let generation = 0;
+  let invalidationVersion = 0;
+  const invalidationListeners = new Set();
+
+  function createInvalidatedError() {
+    const error = new Error("PIREP request was invalidated.");
+    error.kind = "invalidated";
+    return error;
+  }
+
+  function notifyInvalidation() {
+    invalidationVersion += 1;
+    for (const listener of invalidationListeners) listener();
+  }
+
+  function resolveTask(task, value) {
+    if (task.settled) return;
+    task.settled = true;
+    task.resolve(value);
+  }
+
+  function rejectTask(task, error) {
+    if (task.settled) return;
+    task.settled = true;
+    task.reject(error);
+  }
 
   function get(pirepId) {
     const id = normalizeId(pirepId);
@@ -65,15 +90,17 @@ export function createLogbookPirepDetailsRequestManager({
       Promise.resolve()
         .then(() => fetchDetails(task.id))
         .then((value) => {
+          if (task.cancelled) return;
           failures.delete(task.id);
           store(task.id, value, task.generation, task.idGeneration);
-          task.resolve(copyValue(value));
+          resolveTask(task, copyValue(value));
         })
         .catch((error) => {
+          if (task.cancelled) return;
           if (task.generation === generation && task.idGeneration === (idGenerations.get(task.id) || 0)) {
             failures.set(task.id, now() + failureCooldownMs);
           }
-          task.reject(error);
+          rejectTask(task, error);
         })
         .finally(() => {
           activeCount -= 1;
@@ -124,7 +151,8 @@ export function createLogbookPirepDetailsRequestManager({
       resolve: resolveTask,
       reject: rejectTask,
       started: false,
-      cancelled: false
+      cancelled: false,
+      settled: false
     };
     requests.set(id, task);
     (priority === "high" ? highPriorityQueue : lowPriorityQueue).push(task);
@@ -138,18 +166,18 @@ export function createLogbookPirepDetailsRequestManager({
     cache.delete(id);
     failures.delete(id);
     idGenerations.set(id, (idGenerations.get(id) || 0) + 1);
+    notifyInvalidation();
     const task = requests.get(id);
     if (!task) return;
     requests.delete(id);
+    task.cancelled = true;
     if (!task.started) {
-      task.cancelled = true;
       const queue = task.priority === "high" ? highPriorityQueue : lowPriorityQueue;
       const queueIndex = queue.indexOf(task);
       if (queueIndex >= 0) queue.splice(queueIndex, 1);
-      const error = new Error("PIREP request was invalidated.");
-      error.kind = "invalidated";
-      task.reject(error);
     }
+    // Active network work cannot always be aborted, but callers are rejected immediately.
+    rejectTask(task, createInvalidatedError());
   }
 
   function clear() {
@@ -157,12 +185,10 @@ export function createLogbookPirepDetailsRequestManager({
     cache.clear();
     failures.clear();
     idGenerations.clear();
-    const error = new Error("PIREP request was invalidated.");
-    error.kind = "invalidated";
-    for (const task of [...highPriorityQueue, ...lowPriorityQueue]) {
+    notifyInvalidation();
+    for (const task of requests.values()) {
       task.cancelled = true;
-      requests.delete(task.id);
-      task.reject(error);
+      rejectTask(task, createInvalidatedError());
     }
     highPriorityQueue.length = 0;
     lowPriorityQueue.length = 0;
@@ -175,6 +201,11 @@ export function createLogbookPirepDetailsRequestManager({
     prefetch: (pirepId) => enqueue(pirepId, "low"),
     invalidate,
     clear,
+    subscribeInvalidation: (listener) => {
+      invalidationListeners.add(listener);
+      return () => invalidationListeners.delete(listener);
+    },
+    getInvalidationVersion: () => invalidationVersion,
     diagnostics: () => ({
       cacheSize: cache.size,
       activeCount,

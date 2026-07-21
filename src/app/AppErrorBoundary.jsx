@@ -14,23 +14,41 @@ function buildRenderErrorMetadata(error, info) {
   };
 }
 
+function buildErrorSignature(error, info) {
+  const metadata = buildRenderErrorMetadata(error, info);
+  return `${metadata.errorName}\u001f${metadata.errorMessage}\u001f${metadata.componentStack || ""}`;
+}
+
 // Catches root render crashes so the app can show a recoverable fallback instead of a blank screen.
 export default class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = {
+      error: null,
+      recoveryKey: 0,
+      currentSignature: "",
+      retriedSignature: ""
+    };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { error };
   }
 
   componentDidCatch(error, info) {
+    const signature = buildErrorSignature(error, info);
+    if (signature !== this.state.currentSignature) this.setState({ currentSignature: signature });
     logAppError("app-render-failed", error, buildRenderErrorMetadata(error, info)).catch(() => {});
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false });
+    const { currentSignature, retriedSignature } = this.state;
+    if (!currentSignature || currentSignature === retriedSignature) return;
+    this.setState((current) => ({
+      error: null,
+      recoveryKey: current.recoveryKey + 1,
+      retriedSignature: currentSignature
+    }));
   };
 
   handleReload = () => {
@@ -38,8 +56,8 @@ export default class AppErrorBoundary extends React.Component {
   };
 
   render() {
-    if (!this.state.hasError) {
-      return this.props.children;
+    if (!this.state.error) {
+      return <React.Fragment key={this.state.recoveryKey}>{this.props.children}</React.Fragment>;
     }
 
     return (
@@ -50,7 +68,9 @@ export default class AppErrorBoundary extends React.Component {
             The app hit a render error. Try again first. If the problem comes back, reload the app.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={this.handleRetry}>Try Again</Button>
+            {this.state.currentSignature !== this.state.retriedSignature ? (
+              <Button onClick={this.handleRetry}>Try Again</Button>
+            ) : null}
             <Button variant="ghost" onClick={this.handleReload}>
               Reload App
             </Button>
