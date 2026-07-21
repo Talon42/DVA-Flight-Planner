@@ -12,7 +12,7 @@ command = '''
 Remove-Item -Recurse -Force .\dist -ErrorAction SilentlyContinue
 npm ci
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-npm run lint
+npm run validate
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 npm run tauri -- build
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
