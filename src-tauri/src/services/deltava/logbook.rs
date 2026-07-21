@@ -376,6 +376,7 @@ fn empty_logbook_cache(
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_test_dir() -> PathBuf {
@@ -390,6 +391,27 @@ mod tests {
         tokio::runtime::Runtime::new()
             .expect("runtime")
             .block_on(future)
+    }
+
+    fn representative_logbook_document() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../../test-fixtures/deltava/representative-logbook.json"
+        ))
+        .expect("representative logbook fixture")
+    }
+
+    fn representative_logbook_expected() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../../test-fixtures/deltava/representative-logbook.expected.json"
+        ))
+        .expect("representative logbook expectations")
+    }
+
+    fn serialized_entry_by_id(entries: &[Value], id: i64) -> &Value {
+        entries
+            .iter()
+            .find(|entry| entry.get("id").and_then(Value::as_i64) == Some(id))
+            .unwrap_or_else(|| panic!("representative logbook row {id}"))
     }
 
     #[derive(serde::Deserialize)]
@@ -413,6 +435,149 @@ mod tests {
                 extract_dva_logbook_date(&entry).map(|date| date.format("%Y-%m-%d").to_string());
             assert_eq!(actual, test_case.expected_iso, "{}", test_case.name);
         }
+    }
+
+    #[test]
+    fn projects_representative_legacy_and_modern_logbook_rows_into_frontend_dtos() {
+        let document = representative_logbook_document();
+        let expected = representative_logbook_expected();
+
+        assert!(has_supported_logbook_root(&document));
+        assert_eq!(
+            normalize_logbook_entries(&document).len(),
+            expected["inputCount"].as_u64().expect("input count") as usize
+        );
+
+        let (entries, rejected) = validate_logbook_entries(&document);
+        assert_eq!(
+            entries.len(),
+            expected["acceptedCount"].as_u64().expect("accepted count") as usize
+        );
+        assert_eq!(
+            rejected,
+            expected["rejectedCount"].as_u64().expect("rejected count") as usize
+        );
+        assert_eq!(
+            extract_latest_logbook_date_iso(&document).as_deref(),
+            expected["latestDateIso"].as_str()
+        );
+
+        let serialized = serde_json::to_value(entries).expect("serialized representative DTOs");
+        let serialized_entries = serialized.as_array().expect("serialized entry array");
+        let modern_draft = serialized_entry_by_id(serialized_entries, 900001);
+        let approved_without_telemetry = serialized_entry_by_id(serialized_entries, 900002);
+        let legacy_acars = serialized_entry_by_id(serialized_entries, 900003);
+
+        assert_eq!(modern_draft["status"], "DRAFT");
+        assert!(modern_draft.get("landing").is_none());
+        assert_eq!(approved_without_telemetry["status"], "OK");
+        assert!(approved_without_telemetry.get("landing").is_none());
+        for required_key in [
+            "id", "date", "status", "airline", "flight", "airportD", "airportA", "eqType",
+            "duration",
+        ] {
+            assert!(
+                legacy_acars.get(required_key).is_some(),
+                "frontend DTO field {required_key}"
+            );
+        }
+
+        for entry in serialized_entries {
+            for private_key in [
+                "comments",
+                "remarks",
+                "updates",
+                "capabilities",
+                "clientBuild",
+                "network",
+            ] {
+                assert!(
+                    entry.get(private_key).is_none(),
+                    "private field {private_key} was promoted into the frontend DTO"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn preserves_representative_status_airline_equipment_and_month_contracts() {
+        let document = representative_logbook_document();
+        let expected = representative_logbook_expected();
+        let (entries, rejected) = validate_logbook_entries(&document);
+        assert_eq!(rejected, 0);
+        let serialized = serde_json::to_value(entries).expect("serialized representative DTOs");
+        let serialized_entries = serialized.as_array().expect("serialized entry array");
+
+        let mut status_counts = BTreeMap::<String, u64>::new();
+        let mut airlines = BTreeSet::<String>::new();
+        let mut equipment = BTreeSet::<String>::new();
+        for entry in serialized_entries {
+            if let Some(status) = entry.get("status").and_then(Value::as_str) {
+                *status_counts.entry(status.to_string()).or_default() += 1;
+            }
+            if let Some(airline) = entry.get("airline").and_then(Value::as_str) {
+                airlines.insert(airline.to_string());
+            }
+            if let Some(eq_type) = entry.get("eqType").and_then(Value::as_str) {
+                equipment.insert(eq_type.to_string());
+            }
+        }
+
+        for status in ["DRAFT", "OK", "REJECTED"] {
+            assert_eq!(
+                status_counts.get(status).copied(),
+                expected["statusCounts"][status].as_u64(),
+                "representative status {status}"
+            );
+        }
+        assert!(airlines.contains("DL") && airlines.contains("AM") && airlines.contains("VA"));
+        assert!(
+            equipment.contains("B757-200")
+                && equipment.contains("B767-300ER")
+                && equipment.contains("EMB-120")
+        );
+
+        let december = normalize_logbook_entries(&document)
+            .into_iter()
+            .find(|entry| entry.get("id").and_then(Value::as_i64) == Some(900009))
+            .expect("December representative row");
+        assert_eq!(
+            extract_dva_logbook_date(&december)
+                .map(|date| date.format("%Y-%m-%d").to_string())
+                .as_deref(),
+            expected["knownRows"]["900009"]["dateIso"].as_str()
+        );
+    }
+
+    #[test]
+    fn stores_the_representative_logbook_without_rewriting_its_source_shape() {
+        let directory = unique_test_dir();
+        let fixture_text =
+            include_str!("../../../../test-fixtures/deltava/representative-logbook.json");
+
+        let artifact = run_async(store_logbook_json_in_dir(
+            &directory,
+            fixture_text,
+            None,
+            false,
+        ))
+        .expect("store representative logbook");
+        let stored_path = directory.join(DELTAVA_LOGBOOK_FILE);
+
+        assert_eq!(artifact.file_name, DELTAVA_LOGBOOK_FILE);
+        let stored_text =
+            std::fs::read_to_string(&stored_path).expect("stored representative fixture");
+        assert_eq!(stored_text, fixture_text.trim());
+        assert_eq!(
+            serde_json::from_str::<Value>(&stored_text).expect("stored representative JSON"),
+            representative_logbook_document()
+        );
+        assert!(matches!(
+            read_logbook_artifact_from_path(stored_path),
+            LogbookArtifactRead::Valid { .. }
+        ));
+
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     #[test]
@@ -615,7 +780,7 @@ mod tests {
     }
 
     #[test]
-    fn store_logbook_json_restores_existing_file_when_replace_fails() {
+    fn preserves_the_previous_logbook_when_representative_fixture_replacement_fails() {
         let logbook_dir = unique_test_dir();
         std::fs::create_dir_all(&logbook_dir).expect("test dir");
         let final_path = logbook_dir.join(DELTAVA_LOGBOOK_FILE);
@@ -627,15 +792,11 @@ mod tests {
         .to_string();
         std::fs::write(&final_path, &original_text).expect("original file");
 
-        let replacement_text = json!({
-            "entries": [
-                { "date": { "y": 2026, "m": 0, "d": 2 }, "status": "OK" }
-            ]
-        })
-        .to_string();
+        let replacement_text =
+            include_str!("../../../../test-fixtures/deltava/representative-logbook.json");
         let error = run_async(store_logbook_json_in_dir(
             &logbook_dir,
-            &replacement_text,
+            replacement_text,
             None,
             true,
         ))

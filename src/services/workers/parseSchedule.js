@@ -185,16 +185,17 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
       }
 
       const effectiveSpeedKts = calculateScheduleGroundSpeedKts(distanceNm, fromAirport, toAirport);
-      const estimatedBlockMinutes = estimateBlockMinutes(distanceNm, effectiveSpeedKts);
-      const staLocal = Number.isFinite(estimatedBlockMinutes)
-        ? stdLocal.plus({ minutes: estimatedBlockMinutes })
-        : normalizeArrivalDate(stdLocal, rawStaLocal, distanceNm);
+      // Preserve a valid source STA; normalization is only a recovery path for invalid chronology.
+      const staLocal = rawStaLocal.toUTC() >= stdLocal.toUTC()
+        ? rawStaLocal
+        : normalizeArrivalDate(stdLocal, rawStaLocal, distanceNm, effectiveSpeedKts);
 
       const airlineName =
         airlineMap.get(rawFlight.airline) || `${rawFlight.airline} (not in airline map)`;
-      const blockMinutes = Number.isFinite(estimatedBlockMinutes)
-        ? estimatedBlockMinutes
-        : Math.max(0, Math.round(staLocal.toUTC().diff(stdLocal.toUTC(), "minutes").minutes));
+      const blockMinutes = Math.max(
+        0,
+        Math.round(staLocal.toUTC().diff(stdLocal.toUTC(), "minutes").minutes)
+      );
       const compatibility = resolveRouteCompatibility(rawFlight, distanceNm);
       const airlineIcao = airlineIcaoMap.get(rawFlight.airline) || "";
       const flightNumber = String(rawFlight.flightNumber || "").trim();
@@ -227,6 +228,7 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         mtow: rawFlight.mtow,
         mlw: rawFlight.mlw,
         maxPax: rawFlight.maxPax,
+        payload: rawFlight.payload,
         blockMinutes,
         distanceNm,
         compatibleEquipment: compatibility.compatibleEquipment,
@@ -289,6 +291,7 @@ function readFlightElement(flightBlock) {
     mtow: parseNumeric(readText(flightBlock, "MTOW")),
     mlw: parseNumeric(readText(flightBlock, "MLW")),
     maxPax: parseNumeric(readText(flightBlock, "MaxPax")),
+    payload: parseNumeric(readText(flightBlock, "Payload")),
     notes: readText(flightBlock, "Notes")
   };
 }
@@ -481,9 +484,9 @@ function calculateGreatCircleNm(fromLatitude, fromLongitude, toLatitude, toLongi
   return Math.round(earthRadiusNm * c);
 }
 
-function normalizeArrivalDate(stdLocal, staLocal, distanceNm) {
+function normalizeArrivalDate(stdLocal, staLocal, distanceNm, effectiveSpeedKts) {
   const candidates = [];
-  const estimatedMinutes = estimateBlockMinutes(distanceNm);
+  const estimatedMinutes = estimateBlockMinutes(distanceNm, effectiveSpeedKts);
 
   for (let dayOffset = -2; dayOffset <= 2; dayOffset += 1) {
     const candidate = staLocal.plus({ days: dayOffset });

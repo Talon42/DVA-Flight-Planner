@@ -1,0 +1,917 @@
+{
+  "flights": [
+    {
+      "date": {
+        "d": 14,
+        "y": 2026,
+        "m": 5
+      },
+      "flight": 1456,
+      "capabilities": [],
+      "distance": 1948,
+      "pax": 157,
+      "aircraft": {
+        "name": "A320",
+        "icao": "A320"
+      },
+      "updates": [
+        {
+          "date": 1781464300350,
+          "msg": "Sanitized system update 1.",
+          "type": "SYSTEM"
+        },
+        {
+          "date": 1781464360599,
+          "msg": "Sanitized system update 2.",
+          "type": "SYSTEM"
+        }
+      ],
+      "leg": 1,
+      "attrs": 16777216,
+      "duration": 0,
+      "airportA": {
+        "country": "AU",
+        "hasUSPFI": false,
+        "utcOffset": 36000,
+        "iata": "MEL",
+        "lng": 144.841944,
+        "name": "Melbourne Australia",
+        "alt": 434,
+        "icao": "YMML",
+        "isSchengen": false,
+        "lat": -37.672778
+      },
+      "sim": "UNKNOWN",
+      "id": 900001,
+      "airline": "VA",
+      "airportD": {
+        "country": "AU",
+        "hasUSPFI": false,
+        "utcOffset": 34200,
+        "iata": "DRW",
+        "lng": 130.876938,
+        "name": "Darwin Australia",
+        "alt": 103,
+        "icao": "YPDN",
+        "isSchengen": false,
+        "lat": -12.413889
+      },
+      "remarks": "Sanitized fixture remark.",
+      "status": "DRAFT",
+      "eqType": "A320",
+      "promotionEQ": []
+    },
+    {
+      "date": {
+        "d": 23,
+        "y": 2013,
+        "m": 2
+      },
+      "flight": 2342,
+      "comments": "Sanitized fixture comment.",
+      "capabilities": [],
+      "distance": 270,
+      "pax": 182,
+      "aircraft": {
+        "name": "B757-200",
+        "icao": "B752"
+      },
+      "submittedOn": 1364072650000,
+      "updates": [],
+      "leg": 1,
+      "network": "VATSIM",
+      "attrs": 2,
+      "duration": 5400000,
+      "airportA": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -14400,
+        "iata": "JAX",
+        "lng": -81.6875,
+        "name": "Jacksonville FL",
+        "alt": 30,
+        "icao": "KJAX",
+        "isSchengen": false,
+        "lat": 30.49361
+      },
+      "disposedOn": 1364073466000,
+      "sim": "FSX",
+      "id": 900002,
+      "airline": "DL",
+      "airportD": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -14400,
+        "iata": "ATL",
+        "lng": -84.426389,
+        "name": "Atlanta GA",
+        "alt": 1026,
+        "icao": "KATL",
+        "isSchengen": false,
+        "lat": 33.640278
+      },
+      "status": "OK",
+      "eqType": "B757-200",
+      "promotionEQ": []
+    },
+    {
+      "date": {
+        "d": 24,
+        "y": 2013,
+        "m": 2
+      },
+      "flight": 3936,
+      "distance": 424,
+      "airborneTime": 3842000,
+      "totalFuel": 11370,
+      "updates": [],
+      "avgFrameRate": 45.2,
+      "leg": 1,
+      "network": "VATSIM",
+      "duration": 6790000,
+      "boardTime": 0,
+      "onTime": "UNKNOWN",
+      "sim": "FSX",
+      "startTime": 1364162611000,
+      "end": {
+        "fuel": 5203,
+        "weight": 188444,
+        "time": 1364169322000
+      },
+      "id": 900003,
+      "paxWeight": 0,
+      "airline": "DL",
+      "restoreCount": 0,
+      "promotionEQ": [
+        "B757-200"
+      ],
+      "deboardTime": 0,
+      "capabilities": [],
+      "takeoff": {
+        "distance": 0,
+        "fuel": 15442,
+        "weight": 198684,
+        "location": {
+          "lng": -83.3658,
+          "lat": 42.2098
+        },
+        "hdg": 36,
+        "time": 1364165389000,
+        "speed": 158
+      },
+      "pax": 200,
+      "aircraft": {
+        "name": "B757-200",
+        "icao": "B752"
+      },
+      "submittedOn": 1364169393000,
+      "clientBuild": 100,
+      "attrs": 18,
+      "airportA": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -14400,
+        "iata": "ABE",
+        "lng": -75.440002,
+        "name": "Allentown PA",
+        "alt": 394,
+        "icao": "KABE",
+        "isSchengen": false,
+        "lat": 40.651699
+      },
+      "taxiTime": 1364165368000,
+      "landing": {
+        "vSpeed": -269,
+        "distance": 0,
+        "fuel": 5351,
+        "g": 2.837,
+        "weight": 188593,
+        "location": {
+          "lng": -75.4479,
+          "lat": 40.6486
+        },
+        "hdg": 62,
+        "time": 1364169231000,
+        "speed": 129
+      },
+      "disposedOn": 1364169993000,
+      "fdr": "ACARS",
+      "cargoWeight": 0,
+      "acCode": "PT1H4M2S",
+      "blockTime": 6790000,
+      "airportD": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -14400,
+        "iata": "DTW",
+        "lng": -83.348056,
+        "name": "Detroit-Wayne County MI",
+        "alt": 645,
+        "icao": "KDTW",
+        "isSchengen": false,
+        "lat": 42.211667
+      },
+      "status": "OK",
+      "eqType": "B757-200"
+    },
+    {
+      "date": {
+        "d": 8,
+        "y": 2013,
+        "m": 5
+      },
+      "flight": 3999,
+      "distance": 339,
+      "airborneTime": 3415000,
+      "totalFuel": 10418,
+      "updates": [],
+      "avgFrameRate": 28.4,
+      "leg": 1,
+      "network": "VATSIM",
+      "duration": 5231000,
+      "boardTime": 0,
+      "onTime": "UNKNOWN",
+      "sim": "FSX",
+      "startTime": 1370706217000,
+      "end": {
+        "fuel": 4884,
+        "weight": 188125,
+        "time": 1370711488000
+      },
+      "id": 900004,
+      "paxWeight": 0,
+      "airline": "DL",
+      "restoreCount": 0,
+      "promotionEQ": [
+        "B757-200"
+      ],
+      "deboardTime": 0,
+      "capabilities": [],
+      "takeoff": {
+        "distance": 0,
+        "fuel": 13905,
+        "weight": 197147,
+        "location": {
+          "lng": -73.7726,
+          "lat": 40.6387
+        },
+        "hdg": 224,
+        "time": 1370707788000,
+        "speed": 171
+      },
+      "pax": 154,
+      "aircraft": {
+        "name": "B757-200",
+        "icao": "B752"
+      },
+      "submittedOn": 1370711513000,
+      "clientBuild": 101,
+      "attrs": 18,
+      "airportA": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -14400,
+        "iata": "PIT",
+        "lng": -80.232803,
+        "name": "Pittsburgh PA",
+        "alt": 1203,
+        "icao": "KPIT",
+        "isSchengen": false,
+        "lat": 40.491402
+      },
+      "taxiTime": 1370707727000,
+      "landing": {
+        "vSpeed": -16,
+        "distance": 0,
+        "fuel": 5405,
+        "g": 0.941,
+        "weight": 188646,
+        "location": {
+          "lng": -80.2358,
+          "lat": 40.5014
+        },
+        "hdg": 281,
+        "time": 1370711203000,
+        "speed": 115
+      },
+      "disposedOn": 1370715417000,
+      "fdr": "ACARS",
+      "cargoWeight": 0,
+      "acCode": "PT56M55S",
+      "blockTime": 5231000,
+      "airportD": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -14400,
+        "iata": "JFK",
+        "lng": -73.778889,
+        "name": "New York-Kennedy NY",
+        "alt": 13,
+        "icao": "KJFK",
+        "isSchengen": false,
+        "lat": 40.639167
+      },
+      "status": "OK",
+      "eqType": "B757-200"
+    },
+    {
+      "date": {
+        "d": 31,
+        "y": 2013,
+        "m": 2
+      },
+      "flight": 4523,
+      "distance": 234,
+      "airborneTime": 3191000,
+      "totalFuel": 9369,
+      "updates": [],
+      "avgFrameRate": 38.9,
+      "leg": 1,
+      "network": "VATSIM",
+      "duration": 4340000,
+      "boardTime": 0,
+      "onTime": "UNKNOWN",
+      "sim": "FSX",
+      "startTime": 1364782278000,
+      "end": {
+        "fuel": 5624,
+        "weight": 178635,
+        "time": 1364786579000
+      },
+      "id": 900005,
+      "paxWeight": 0,
+      "airline": "DL",
+      "restoreCount": 0,
+      "promotionEQ": [
+        "B757-200"
+      ],
+      "deboardTime": 0,
+      "comments": "Sanitized fixture comment.",
+      "capabilities": [],
+      "takeoff": {
+        "distance": 0,
+        "fuel": 13792,
+        "weight": 186804,
+        "location": {
+          "lng": -83.3556,
+          "lat": 42.2239
+        },
+        "hdg": 215,
+        "time": 1364783282000,
+        "speed": 157
+      },
+      "pax": 187,
+      "aircraft": {
+        "name": "B757-200",
+        "icao": "B752"
+      },
+      "submittedOn": 1364786628000,
+      "clientBuild": 100,
+      "attrs": 18,
+      "airportA": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -18000,
+        "iata": "ORD",
+        "lng": -87.904167,
+        "name": "Chicago-O'Hare IL",
+        "alt": 680,
+        "icao": "KORD",
+        "isSchengen": false,
+        "lat": 41.979167
+      },
+      "taxiTime": 1364782811000,
+      "landing": {
+        "vSpeed": -545,
+        "distance": 0,
+        "fuel": 5799,
+        "g": 3.685,
+        "weight": 178810,
+        "location": {
+          "lng": -87.8972,
+          "lat": 41.984
+        },
+        "hdg": 273,
+        "time": 1364786473000,
+        "speed": 126
+      },
+      "disposedOn": 1364794198000,
+      "fdr": "ACARS",
+      "cargoWeight": 0,
+      "acCode": "PT53M11S",
+      "blockTime": 4340000,
+      "airportD": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -14400,
+        "iata": "DTW",
+        "lng": -83.348056,
+        "name": "Detroit-Wayne County MI",
+        "alt": 645,
+        "icao": "KDTW",
+        "isSchengen": false,
+        "lat": 42.211667
+      },
+      "remarks": "Sanitized fixture remark.",
+      "status": "OK",
+      "eqType": "B757-200"
+    },
+    {
+      "date": {
+        "d": 4,
+        "y": 2013,
+        "m": 3
+      },
+      "flight": 9950,
+      "distance": 228,
+      "airborneTime": 4088000,
+      "totalFuel": 922,
+      "updates": [],
+      "avgFrameRate": 29.9,
+      "leg": 7,
+      "network": "VATSIM",
+      "duration": 5159000,
+      "boardTime": 0,
+      "onTime": "UNKNOWN",
+      "sim": "FSX",
+      "startTime": 1365120260000,
+      "end": {
+        "fuel": 1477,
+        "weight": 21607,
+        "time": 1365125308000
+      },
+      "id": 900006,
+      "paxWeight": 0,
+      "airline": "DL",
+      "restoreCount": 0,
+      "promotionEQ": [],
+      "deboardTime": 0,
+      "comments": "Sanitized fixture comment.",
+      "capabilities": [],
+      "takeoff": {
+        "distance": 0,
+        "fuel": 2341,
+        "weight": 22473,
+        "location": {
+          "lng": -81.3221,
+          "lat": 28.4324
+        },
+        "hdg": 185,
+        "time": 1365121042000,
+        "speed": 138
+      },
+      "pax": 28,
+      "aircraft": {
+        "name": "EMB-120",
+        "icao": "E120"
+      },
+      "submittedOn": 1365125416000,
+      "clientBuild": 100,
+      "attrs": 1202,
+      "airportA": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -14400,
+        "iata": "TLH",
+        "lng": -84.350304,
+        "name": "Tallahassee FL",
+        "alt": 83,
+        "icao": "KTLH",
+        "isSchengen": false,
+        "lat": 30.3964
+      },
+      "taxiTime": 1365120627000,
+      "landing": {
+        "vSpeed": -36,
+        "distance": 0,
+        "fuel": 1491,
+        "g": 1.277,
+        "weight": 21621,
+        "location": {
+          "lng": -84.3378,
+          "lat": 30.3915
+        },
+        "hdg": 273,
+        "time": 1365125130000,
+        "speed": 124
+      },
+      "disposedOn": 1365253357000,
+      "fdr": "ACARS",
+      "cargoWeight": 0,
+      "acCode": "PT1H8M8S",
+      "blockTime": 5159000,
+      "airportD": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -14400,
+        "iata": "MCO",
+        "lng": -81.315552,
+        "name": "Orlando FL",
+        "alt": 96,
+        "icao": "KMCO",
+        "isSchengen": false,
+        "lat": 28.428888
+      },
+      "remarks": "Sanitized fixture remark.",
+      "status": "OK",
+      "eqType": "EMB-120"
+    },
+    {
+      "date": {
+        "d": 27,
+        "y": 2015,
+        "m": 1
+      },
+      "flight": 1384,
+      "distance": 338,
+      "airborneTime": 3491000,
+      "totalFuel": 11466,
+      "updates": [],
+      "avgFrameRate": 29.7,
+      "leg": 1,
+      "duration": 3985000,
+      "boardTime": 0,
+      "onTime": "UNKNOWN",
+      "sim": "FSX",
+      "startTime": 1425049936000,
+      "end": {
+        "fuel": 9782,
+        "weight": 254209,
+        "time": 1425053796000
+      },
+      "id": 900007,
+      "paxWeight": 0,
+      "airline": "DL",
+      "restoreCount": 0,
+      "promotionEQ": [],
+      "deboardTime": 0,
+      "comments": "Sanitized fixture comment.",
+      "capabilities": [],
+      "takeoff": {
+        "distance": 0,
+        "fuel": 20693,
+        "weight": 265120,
+        "location": {
+          "lng": -122.3766,
+          "lat": 37.6174
+        },
+        "hdg": 13,
+        "time": 1425050171000,
+        "speed": 139
+      },
+      "pax": 249,
+      "aircraft": {
+        "name": "B767-300ER",
+        "icao": "B763"
+      },
+      "submittedOn": 1425053922000,
+      "clientBuild": 104,
+      "attrs": 144,
+      "airportA": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -25200,
+        "iata": "LAX",
+        "lng": -118.406944,
+        "name": "Los Angeles CA",
+        "alt": 128,
+        "icao": "KLAX",
+        "isSchengen": false,
+        "lat": 33.9425
+      },
+      "taxiTime": 1425050060000,
+      "landing": {
+        "vSpeed": -543,
+        "distance": 0,
+        "fuel": 10005,
+        "g": 1.174,
+        "weight": 254431,
+        "location": {
+          "lng": -118.3895,
+          "lat": 33.937
+        },
+        "hdg": 250,
+        "time": 1425053662000,
+        "speed": 118
+      },
+      "disposedOn": 1425058975000,
+      "fdr": "ACARS",
+      "cargoWeight": 0,
+      "acCode": "PT58M11S",
+      "blockTime": 3985000,
+      "airportD": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -25200,
+        "iata": "SFO",
+        "lng": -122.375,
+        "name": "San Francisco CA",
+        "alt": 13,
+        "icao": "KSFO",
+        "isSchengen": false,
+        "lat": 37.618057
+      },
+      "remarks": "Sanitized fixture remark.",
+      "status": "REJECTED",
+      "eqType": "B767-300ER"
+    },
+    {
+      "date": {
+        "d": 27,
+        "y": 2015,
+        "m": 1
+      },
+      "flight": 1384,
+      "distance": 338,
+      "airborneTime": 3288000,
+      "totalFuel": 9413,
+      "updates": [],
+      "avgFrameRate": 30,
+      "leg": 1,
+      "duration": 3773000,
+      "boardTime": 0,
+      "onTime": "UNKNOWN",
+      "sim": "FSX",
+      "startTime": 1425080260000,
+      "end": {
+        "fuel": 11833,
+        "weight": 250350,
+        "time": 1425083939000
+      },
+      "id": 900008,
+      "paxWeight": 0,
+      "airline": "DL",
+      "restoreCount": 0,
+      "promotionEQ": [],
+      "deboardTime": 0,
+      "comments": "Sanitized fixture comment.",
+      "capabilities": [],
+      "takeoff": {
+        "distance": 0,
+        "fuel": 20691,
+        "weight": 259210,
+        "location": {
+          "lng": -122.3758,
+          "lat": 37.6187
+        },
+        "hdg": 13,
+        "time": 1425080484000,
+        "speed": 148
+      },
+      "pax": 218,
+      "aircraft": {
+        "name": "B767-300ER",
+        "icao": "B763"
+      },
+      "submittedOn": 1425084032000,
+      "clientBuild": 104,
+      "attrs": 144,
+      "airportA": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -25200,
+        "iata": "LAX",
+        "lng": -118.406944,
+        "name": "Los Angeles CA",
+        "alt": 128,
+        "icao": "KLAX",
+        "isSchengen": false,
+        "lat": 33.9425
+      },
+      "taxiTime": 1425080375000,
+      "landing": {
+        "vSpeed": -256,
+        "distance": 0,
+        "fuel": 12117,
+        "g": 1.101,
+        "weight": 250634,
+        "location": {
+          "lng": -118.3847,
+          "lat": 33.9375
+        },
+        "hdg": 250,
+        "time": 1425083772000,
+        "speed": 124
+      },
+      "disposedOn": 1425103228000,
+      "fdr": "ACARS",
+      "cargoWeight": 0,
+      "acCode": "PT54M48S",
+      "blockTime": 3773000,
+      "airportD": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -25200,
+        "iata": "SFO",
+        "lng": -122.375,
+        "name": "San Francisco CA",
+        "alt": 13,
+        "icao": "KSFO",
+        "isSchengen": false,
+        "lat": 37.618057
+      },
+      "remarks": "Sanitized fixture remark.",
+      "status": "OK",
+      "eqType": "B767-300ER"
+    },
+    {
+      "date": {
+        "d": 5,
+        "y": 2015,
+        "m": 11
+      },
+      "flight": 4751,
+      "distance": 284,
+      "airborneTime": 3001000,
+      "totalFuel": 41138,
+      "updates": [],
+      "avgFrameRate": 27.6,
+      "leg": 1,
+      "duration": 4371000,
+      "boardTime": 0,
+      "onTime": "UNKNOWN",
+      "sim": "P3D",
+      "startTime": 1449341033000,
+      "end": {
+        "fuel": 4782,
+        "weight": 112507,
+        "time": 1449345361000
+      },
+      "id": 900009,
+      "paxWeight": 0,
+      "airline": "DL",
+      "restoreCount": 0,
+      "promotionEQ": [],
+      "deboardTime": 0,
+      "capabilities": [],
+      "takeoff": {
+        "distance": 0,
+        "fuel": 9696,
+        "weight": 117422,
+        "location": {
+          "lng": -93.2083,
+          "lat": 44.8875
+        },
+        "hdg": 121,
+        "time": 1449342164000,
+        "speed": 139
+      },
+      "pax": 95,
+      "aircraft": {
+        "name": "B737-700",
+        "icao": "B737"
+      },
+      "submittedOn": 1449345289000,
+      "clientBuild": 111,
+      "attrs": 16,
+      "airportA": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -18000,
+        "iata": "GFK",
+        "lng": -97.175556,
+        "name": "Grand Forks ND",
+        "alt": 845,
+        "icao": "KGFK",
+        "isSchengen": false,
+        "lat": 47.949167
+      },
+      "taxiTime": 1449341956000,
+      "landing": {
+        "vSpeed": -232,
+        "distance": 0,
+        "fuel": 4957,
+        "g": 1.49,
+        "weight": 112683,
+        "location": {
+          "lng": -97.1812,
+          "lat": 47.943
+        },
+        "hdg": 354,
+        "time": 1449345165000,
+        "speed": 123
+      },
+      "disposedOn": 1449345673000,
+      "fdr": "ACARS",
+      "cargoWeight": 0,
+      "acCode": "PT50M1S",
+      "blockTime": 4371000,
+      "airportD": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -18000,
+        "iata": "MSP",
+        "lng": -93.216667,
+        "name": "Minneapolis/St Paul MN",
+        "alt": 842,
+        "icao": "KMSP",
+        "isSchengen": false,
+        "lat": 44.880278
+      },
+      "status": "OK",
+      "eqType": "B737-700"
+    },
+    {
+      "date": {
+        "d": 6,
+        "y": 2013,
+        "m": 7
+      },
+      "flight": 464,
+      "distance": 305,
+      "airborneTime": 2884000,
+      "totalFuel": 8682,
+      "updates": [],
+      "avgFrameRate": 28.2,
+      "leg": 2,
+      "network": "VATSIM",
+      "duration": 3903000,
+      "boardTime": 0,
+      "onTime": "UNKNOWN",
+      "sim": "FSX",
+      "startTime": 1375835746000,
+      "end": {
+        "fuel": 7313,
+        "weight": 181824,
+        "time": 1375839618000
+      },
+      "id": 900010,
+      "paxWeight": 0,
+      "airline": "AM",
+      "restoreCount": 0,
+      "promotionEQ": [
+        "B757-200"
+      ],
+      "deboardTime": 0,
+      "comments": "Sanitized fixture comment.",
+      "capabilities": [],
+      "takeoff": {
+        "distance": 0,
+        "fuel": 15301,
+        "weight": 189814,
+        "location": {
+          "lng": -111.0513,
+          "lat": 29.0939
+        },
+        "hdg": 228,
+        "time": 1375836605000,
+        "speed": 159
+      },
+      "pax": 194,
+      "aircraft": {
+        "name": "B757-200",
+        "icao": "B752"
+      },
+      "submittedOn": 1375839651000,
+      "clientBuild": 101,
+      "attrs": 18,
+      "airportA": {
+        "country": "US",
+        "hasUSPFI": false,
+        "utcOffset": -25200,
+        "iata": "PHX",
+        "lng": -112.006667,
+        "name": "Phoenix AZ",
+        "alt": 1135,
+        "icao": "KPHX",
+        "isSchengen": false,
+        "lat": 33.433611
+      },
+      "taxiTime": 1375836386000,
+      "landing": {
+        "vSpeed": -364,
+        "distance": 0,
+        "fuel": 7520,
+        "g": 2.616,
+        "weight": 182031,
+        "location": {
+          "lng": -111.9953,
+          "lat": 33.4409
+        },
+        "hdg": 259,
+        "time": 1375839489000,
+        "speed": 115
+      },
+      "disposedOn": 1375840347000,
+      "fdr": "ACARS",
+      "cargoWeight": 0,
+      "acCode": "PT48M4S",
+      "blockTime": 3903000,
+      "airportD": {
+        "country": "MX",
+        "hasUSPFI": false,
+        "utcOffset": -25200,
+        "iata": "HMO",
+        "lng": -111.047778,
+        "name": "Hermosillo Mexico",
+        "alt": 627,
+        "icao": "MMHO",
+        "isSchengen": false,
+        "lat": 29.095556
+      },
+      "remarks": "",
+      "status": "OK",
+      "eqType": "B757-200"
+    }
+  ]
+}

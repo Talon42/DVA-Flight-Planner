@@ -1,0 +1,149 @@
+{
+  "fixturePurpose": "Representative real-shaped PFPX schedule fixture for parser, filter, and Duty Schedule integration tests.",
+  "inputFlightCount": 30,
+  "airlineCounts": {
+    "AF": 6,
+    "AFH": 1,
+    "AM": 1,
+    "CI": 1,
+    "DL": 21
+  },
+  "distinctAirlines": [
+    "AF",
+    "AFH",
+    "AM",
+    "CI",
+    "DL"
+  ],
+  "distinctOrigins": [
+    "EGLL",
+    "KATL",
+    "KBOS",
+    "KCLT",
+    "KDFW",
+    "KDTW",
+    "KJFK",
+    "KLAS",
+    "KLAX",
+    "KORD",
+    "KPDX",
+    "KSEA",
+    "KSFO",
+    "LFPG",
+    "RJAA"
+  ],
+  "distinctDestinations": [
+    "EDDL",
+    "EGLL",
+    "KATL",
+    "KBOS",
+    "KCLT",
+    "KDFW",
+    "KDTW",
+    "KJFK",
+    "KLAS",
+    "KLAX",
+    "KORD",
+    "KPDX",
+    "KSEA",
+    "KSFO",
+    "LFPG",
+    "MMMX"
+  ],
+  "knownConnectedChain": {
+    "origin": "EGLL",
+    "flightKeys": [
+      "DL2:EGLL-KJFK:03/30/2026 10:10->03/30/2026 13:25",
+      "DL679:KJFK-KSFO:03/30/2026 13:55->03/30/2026 17:24",
+      "DL1167:KSFO-KLAX:03/30/2026 17:58->03/30/2026 19:29"
+    ],
+    "expectedRoutes": [
+      "EGLL-KJFK",
+      "KJFK-KSFO",
+      "KSFO-KLAX"
+    ],
+    "turnMinutes": [
+      30,
+      34
+    ],
+    "strictLength": 3,
+    "shouldSucceedAtMinTurnMinutes": 30,
+    "shouldFailAtMinTurnMinutes": 35
+  },
+  "uniqueDestinationCase": {
+    "routes": [
+      "KATL-KJFK",
+      "KJFK-KATL"
+    ],
+    "description": "The return leg revisits the original airport and should be rejected when unique destinations are required."
+  },
+  "localClockCase": {
+    "flightKey": "AFH1:LFPG-KJFK:03/30/2026 11:00->03/30/2026 08:45",
+    "description": "Arrival clock is earlier than departure clock on the same displayed date; do not infer invalid duration from raw local clock subtraction."
+  },
+  "overnightCases": [
+    "AF1:KJFK-LFPG:03/30/2026 15:30->03/31/2026 04:55",
+    "DL264:KJFK-LFPG:03/30/2026 21:30->03/31/2026 11:10",
+    "DL30:KATL-EGLL:03/30/2026 16:35->03/31/2026 05:45",
+    "AF31:KATL-LFPG:03/30/2026 15:30->03/31/2026 06:00",
+    "DL319:KSFO-KJFK:03/30/2026 21:55->03/31/2026 06:28",
+    "DL676:KLAX-KJFK:03/30/2026 21:50->03/31/2026 06:14"
+  ],
+  "duplicateCase": {
+    "flightKey": "AF1306:LFPG-EDDL:03/30/2026 06:10->03/30/2026 07:20",
+    "expectedOccurrences": 2
+  },
+  "filterExamples": {
+    "DLFromEGLL": [
+      "DL2:EGLL-KJFK:03/30/2026 10:10->03/30/2026 13:25"
+    ],
+    "FlightsFromKATL": [
+      "DL1034:KATL-KJFK:03/30/2026 07:55->03/30/2026 10:17",
+      "DL30:KATL-EGLL:03/30/2026 16:35->03/31/2026 05:45",
+      "AF31:KATL-LFPG:03/30/2026 15:30->03/31/2026 06:00",
+      "CI5345:KATL-KSFO:03/30/2026 21:10->03/30/2026 22:46",
+      "DL31:KATL-KDFW:03/30/2026 19:10->03/30/2026 20:30",
+      "DL1097:KATL-KCLT:03/30/2026 12:45->03/30/2026 13:53"
+    ],
+    "FlightsToKJFK": [
+      "DL2:EGLL-KJFK:03/30/2026 10:10->03/30/2026 13:25",
+      "DL1034:KATL-KJFK:03/30/2026 07:55->03/30/2026 10:17",
+      "AFH1:LFPG-KJFK:03/30/2026 11:00->03/30/2026 08:45",
+      "DL2611:KBOS-KJFK:03/30/2026 05:05->03/30/2026 06:29",
+      "DL319:KSFO-KJFK:03/30/2026 21:55->03/31/2026 06:28",
+      "DL676:KLAX-KJFK:03/30/2026 21:50->03/31/2026 06:14"
+    ]
+  },
+  "allFlightKeys": [
+    "DL2:EGLL-KJFK:03/30/2026 10:10->03/30/2026 13:25",
+    "DL679:KJFK-KSFO:03/30/2026 13:55->03/30/2026 17:24",
+    "DL1167:KSFO-KLAX:03/30/2026 17:58->03/30/2026 19:29",
+    "DL1034:KATL-KJFK:03/30/2026 07:55->03/30/2026 10:17",
+    "DL1029:KJFK-KATL:03/30/2026 12:30->03/30/2026 15:07",
+    "AF1:KJFK-LFPG:03/30/2026 15:30->03/31/2026 04:55",
+    "DL264:KJFK-LFPG:03/30/2026 21:30->03/31/2026 11:10",
+    "AFH1:LFPG-KJFK:03/30/2026 11:00->03/30/2026 08:45",
+    "DL30:KATL-EGLL:03/30/2026 16:35->03/31/2026 05:45",
+    "AF31:KATL-LFPG:03/30/2026 15:30->03/31/2026 06:00",
+    "AF1306:LFPG-EDDL:03/30/2026 06:10->03/30/2026 07:20",
+    "AF1306:LFPG-EDDL:03/30/2026 06:10->03/30/2026 07:20",
+    "AM57:RJAA-MMMX:03/30/2026 11:50->03/30/2026 09:10",
+    "CI5345:KATL-KSFO:03/30/2026 21:10->03/30/2026 22:46",
+    "DL31:KATL-KDFW:03/30/2026 19:10->03/30/2026 20:30",
+    "DL32:KDFW-KATL:03/30/2026 15:16->03/30/2026 18:30",
+    "DL2639:KJFK-KBOS:03/30/2026 20:00->03/30/2026 21:30",
+    "DL2611:KBOS-KJFK:03/30/2026 05:05->03/30/2026 06:29",
+    "DL1219:KLAX-KLAS:03/30/2026 10:15->03/30/2026 11:29",
+    "DL1273:KLAS-KLAX:03/30/2026 16:37->03/30/2026 17:57",
+    "DL1097:KATL-KCLT:03/30/2026 12:45->03/30/2026 13:53",
+    "DL676:KCLT-KATL:03/30/2026 17:33->03/30/2026 19:03",
+    "DL1084:KDTW-KORD:03/30/2026 16:40->03/30/2026 17:04",
+    "DL1084:KORD-KDTW:03/30/2026 17:50->03/30/2026 20:23",
+    "DL2384:KSEA-KPDX:03/30/2026 21:55->03/30/2026 22:52",
+    "DL2275:KPDX-KSEA:03/30/2026 06:15->03/30/2026 07:21",
+    "DL319:KSFO-KJFK:03/30/2026 21:55->03/31/2026 06:28",
+    "DL676:KLAX-KJFK:03/30/2026 21:50->03/31/2026 06:14",
+    "AF1180:LFPG-EGLL:03/30/2026 17:15->03/30/2026 17:35",
+    "AF1181:EGLL-LFPG:03/30/2026 18:45->03/30/2026 21:00"
+  ]
+}
