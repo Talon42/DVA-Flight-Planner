@@ -70,19 +70,11 @@ import {
 } from "../services/logging/appLog.client.js";
 import { writeGettingStartedState } from "../services/storage/storage.js";
 import {
-  createFlightBoard,
-  normalizeBoardEntry,
-  normalizeDraftNetwork,
+  createFlightBoard
 } from "../features/flightBoard/flightBoard.model";
 import {
   DEFAULT_MAP_OPTIONS,
 } from "../components/map/mapOptions.model.js";
-import {
-  getAircraftDisplayName,
-  findCustomAirframeByInternalId,
-  getSelectedAircraftForFlight,
-  resolveSimBriefDispatchAircraft
-} from "../domain/aircraft/aircraftIdentity.js";
 import { DEFAULT_DERIVED_TOUR_PROGRESS } from "../features/tours/tours.constants";
 import {
   buildFooterDateLabel,
@@ -489,6 +481,8 @@ export default function App() {
     flightBoards,
     isDevToolsEnabled,
     isScheduleCurrent: !isScheduleOutOfDate,
+    onCloseSimBriefDispatchBlocked: handleCloseSimBriefDispatchBlocked,
+    onOpenSimBriefDispatchBlocked: handleOpenSimBriefDispatchBlocked,
     schedule,
     scheduleView,
     onOpenStaleScheduleBlocked: handleOpenStaleScheduleBlocked,
@@ -498,6 +492,7 @@ export default function App() {
     setPlannerControlsCollapsed,
     setStatusMessage,
     setTourProgress,
+    simBriefCustomAirframes,
     simBriefDispatchStateRef,
     tourFlightsByKey
   });
@@ -507,6 +502,7 @@ export default function App() {
     shortlist,
     selectedShortlistFlight,
     updateActiveFlightBoardEntries,
+    applySimBriefPlanToBoardEntry,
     replaceFlightBoard,
     handleToggleBoardFlight,
     handleAddToFlightBoard,
@@ -517,7 +513,9 @@ export default function App() {
     handleSelectFlightBoard,
     handleCreateFlightBoard,
     handleRenameFlightBoard,
-    handleDeleteFlightBoard
+    handleDeleteFlightBoard,
+    handleSimBriefTypeChange,
+    handleDraftNetworkChange
   } = boardState;
   const handleToggleAccomplishmentSelectorCollapsed = useCallback((nextCollapsed) => {
     setIsAccomplishmentSelectorCollapsed(nextCollapsed);
@@ -1128,211 +1126,6 @@ export default function App() {
     await writeGettingStartedState(normalizedState);
     setGettingStartedState(normalizedState);
     return normalizedState;
-  }
-
-  function handleSimBriefTypeChange(boardEntryId, nextType) {
-    const rawSelection = String(nextType || "").trim();
-    const selectedCustomAirframe = findCustomAirframeByInternalId(
-      rawSelection,
-      simBriefCustomAirframes
-    );
-    const selectedAircraft = selectedCustomAirframe?.internalId
-      ? rawSelection
-      : getAircraftDisplayName(rawSelection);
-    const nextFlightBoard = flightBoard.map((entry) =>
-      entry.boardEntryId === boardEntryId
-        ? {
-            ...entry,
-            selectedAircraft,
-            simbriefSelectedType: ""
-          }
-        : entry
-    );
-    updateActiveFlightBoardEntries(nextFlightBoard);
-
-    const updatedEntry =
-      nextFlightBoard.find((entry) => entry.boardEntryId === boardEntryId) || null;
-    if (!updatedEntry || !selectedAircraft) {
-      handleCloseSimBriefDispatchBlocked();
-      return;
-    }
-
-    const dispatchResolution = resolveSimBriefDispatchAircraft(
-      {
-        ...updatedEntry,
-        selectedAircraft
-      },
-      simBriefCustomAirframes
-    );
-
-    if (dispatchResolution.ok) {
-      handleCloseSimBriefDispatchBlocked();
-      return;
-    }
-
-    handleOpenSimBriefDispatchBlocked(dispatchResolution.reason);
-  }
-
-  // Updates the board entry's draft network without disturbing the aircraft selection.
-  function handleDraftNetworkChange(boardEntryId, nextNetwork) {
-    const normalizedDraftNetwork = normalizeDraftNetwork(nextNetwork);
-
-    updateActiveFlightBoardEntries((currentEntries) =>
-      currentEntries.map((entry) =>
-        entry.boardEntryId === boardEntryId
-          ? {
-              ...entry,
-              draftNetwork: normalizedDraftNetwork
-            }
-          : entry
-      )
-    );
-  }
-
-  function normalizeSimBriefPlanForBoardEntry(plan, fallbackStaticId = "") {
-    if (!plan || typeof plan !== "object") {
-      return null;
-    }
-
-    const routePointsSource = Array.isArray(plan.routePoints)
-      ? plan.routePoints
-      : Array.isArray(plan.route_points)
-        ? plan.route_points
-        : [];
-    const routePoints = routePointsSource
-      .map((point) => {
-        if (!point || typeof point !== "object") {
-          return null;
-        }
-
-        const latitude = Number(point.latitude);
-        const longitude = Number(point.longitude);
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-          return null;
-        }
-
-        return {
-          ident: String(point.ident || "").trim(),
-          latitude,
-          longitude
-        };
-      })
-      .filter(Boolean);
-    const aircraftType = String(
-      plan.aircraftType ||
-        plan.aircraft_type ||
-        plan.aircraft?.icao ||
-        plan.aircraft?.type ||
-        plan.aircraft?.code ||
-        plan.aircraft?.name ||
-        plan.aircraft ||
-        ""
-    )
-      .trim()
-      .toUpperCase();
-    const staticId = String(plan.staticId || plan.static_id || fallbackStaticId || "").trim();
-    const ofpXmlId = String(plan.ofpXmlId || plan.ofp_xml_id || plan.dvaSimBriefId || "").trim().toUpperCase();
-    const aircraft =
-      plan.aircraft && typeof plan.aircraft === "object"
-        ? { ...plan.aircraft }
-        : aircraftType
-          ? {
-              code: aircraftType,
-              icao: aircraftType,
-              type: aircraftType,
-              name: aircraftType
-            }
-          : null;
-
-    return {
-      status: String(plan.status || "").trim(),
-      generatedAtUtc: String(plan.generatedAtUtc || plan.generated_at_utc || "").trim(),
-      generated_at_utc: String(plan.generatedAtUtc || plan.generated_at_utc || "").trim(),
-      staticId,
-      static_id: staticId,
-      ofpXmlId,
-      ofp_xml_id: ofpXmlId,
-      aircraftType,
-      aircraft_type: aircraftType,
-      aircraft,
-      callsign: String(plan.callsign || "").trim(),
-      route: String(plan.route || "").trim(),
-      cruiseAltitude: String(plan.cruiseAltitude || plan.cruise_altitude || "").trim(),
-      alternate: String(plan.alternate || "").trim(),
-      ete: String(plan.ete || "").trim(),
-      blockFuel: String(plan.blockFuel || plan.block_fuel || "").trim(),
-      pax: Number.isInteger(plan.pax) ? plan.pax : Number.isInteger(Number(plan.pax)) ? Number(plan.pax) : null,
-      ofpUrl: String(plan.ofpUrl || plan.ofp_url || "").trim(),
-      pdfUrl: String(plan.pdfUrl || plan.pdf_url || "").trim(),
-      routePoints,
-      route_points: routePoints
-    };
-  }
-
-  // Builds the board-entry shape used by both the live board state and the draft submit payload.
-  function buildBoardEntryWithSimBriefPlan(boardEntry, simBriefPlan) {
-    const normalizedBoardEntry = normalizeBoardEntry(boardEntry);
-    if (!normalizedBoardEntry) {
-      return null;
-    }
-
-    const normalizedPlan = normalizeSimBriefPlanForBoardEntry(
-      simBriefPlan,
-      normalizedBoardEntry.simbriefPlan?.staticId || normalizedBoardEntry.simbriefPlan?.static_id || ""
-    );
-    const existingSelectedAircraft =
-      getSelectedAircraftForFlight(normalizedBoardEntry, simBriefCustomAirframes) || "";
-    const refreshedSelectedAircraft =
-      getAircraftDisplayName(normalizedPlan?.aircraftType) ||
-      String(normalizedPlan?.aircraftType || "").trim();
-    // Always sync the stored selection to the aircraft that SimBrief returned for the plan.
-    const resolvedSelectedAircraft = refreshedSelectedAircraft || existingSelectedAircraft;
-    const resolvedPlan = normalizedPlan
-      ? {
-          ...normalizedPlan,
-          aircraftType: resolvedSelectedAircraft,
-          aircraft_type: resolvedSelectedAircraft,
-          aircraft: resolvedSelectedAircraft
-            ? normalizedPlan.aircraft ||
-              {
-                code: resolvedSelectedAircraft,
-                icao: resolvedSelectedAircraft,
-                type: resolvedSelectedAircraft,
-                name: resolvedSelectedAircraft
-              }
-            : null
-        }
-      : null;
-
-    return {
-      ...normalizedBoardEntry,
-      simbriefPlan: resolvedPlan,
-      selectedAircraft: resolvedSelectedAircraft,
-      simbriefSelectedType: ""
-    };
-  }
-
-  // Keeps the stored aircraft selection aligned with the latest imported SimBrief plan.
-  function applySimBriefPlanToBoardEntry(boardEntryId, simBriefPlan) {
-    const currentBoardEntry =
-      flightBoard.find((entry) => entry.boardEntryId === boardEntryId) ||
-      selectedShortlistFlight ||
-      null;
-    const nextBoardEntry = buildBoardEntryWithSimBriefPlan(currentBoardEntry, simBriefPlan);
-
-    if (!nextBoardEntry) {
-      return null;
-    }
-
-    updateActiveFlightBoardEntries((currentEntries) =>
-      currentEntries.map((entry) =>
-        entry.boardEntryId === boardEntryId
-          ? nextBoardEntry
-          : entry
-      )
-    );
-
-    return nextBoardEntry;
   }
 
   const {
