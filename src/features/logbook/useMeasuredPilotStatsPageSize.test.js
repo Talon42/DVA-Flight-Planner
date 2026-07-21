@@ -14,6 +14,7 @@ describe("pilot stats measured page size", () => {
     expect(getPilotStatsPageSizeForWidth(widthFor(3))).toBe(3);
     expect(getPilotStatsPageSizeForWidth(widthFor(4))).toBe(4);
     expect(getPilotStatsPageSizeForWidth(widthFor(8))).toBe(4);
+    expect(getPilotStatsPageSizeForWidth(widthFor(4), 3)).toBe(3);
   });
 
   it("preserves a valid page and clamps only when page count shrinks", () => {
