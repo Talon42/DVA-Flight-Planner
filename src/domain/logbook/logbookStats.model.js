@@ -2,16 +2,32 @@ import { getAirportByIcao } from "../airports/airportCatalog.js";
 import { LOGBOOK_EMPTY_VALUE, formatLandingGrade } from "./logbook.model.js";
 
 const BEST_LANDING_TARGET_FPM = -250;
+const numberFormatterCache = new Map();
+
+function getNumberFormatter({ minimumFractionDigits = 0, maximumFractionDigits = 0, signDisplay = "auto" } = {}) {
+  const cacheKey = `${minimumFractionDigits}|${maximumFractionDigits}|${signDisplay}`;
+  let formatter = numberFormatterCache.get(cacheKey);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits,
+      maximumFractionDigits,
+      signDisplay
+    });
+    numberFormatterCache.set(cacheKey, formatter);
+  }
+
+  return formatter;
+}
 
 function formatNumber(value, options = {}) {
-  return new Intl.NumberFormat("en-US", {
+  return getNumberFormatter({
     minimumFractionDigits: options.minimumFractionDigits ?? 0,
     maximumFractionDigits: options.maximumFractionDigits ?? 0
   }).format(value);
 }
 
 function formatSignedNumber(value, options = {}) {
-  return new Intl.NumberFormat("en-US", {
+  return getNumberFormatter({
     minimumFractionDigits: options.minimumFractionDigits ?? 0,
     maximumFractionDigits: options.maximumFractionDigits ?? 0,
     signDisplay: "always"
@@ -69,6 +85,14 @@ function compareBestLandingRate(left, right) {
   const rightDistance = Math.abs(right.landingRate - BEST_LANDING_TARGET_FPM);
 
   return leftDistance - rightDistance || right.dateSortKey - left.dateSortKey;
+}
+
+function selectBestCandidate(current, candidate, compare) {
+  if (!current || compare(candidate, current) < 0) {
+    return candidate;
+  }
+
+  return current;
 }
 
 function parseDateSortKey(dateSortKey) {
@@ -810,45 +834,81 @@ function buildRecentLandingRows(rows, limit = 10) {
     });
 }
 
-function buildRecordSummary(rows) {
-  const activeRows = Array.isArray(rows) ? rows : [];
-  const landingRows = activeRows.filter((row) => Number.isFinite(row.landingRate));
-  const bestLandingRate =
-      landingRows.length > 0
-      ? [...landingRows].sort(compareBestLandingRate)[0]
-      : null;
-  const worstLandingRate =
-      landingRows.length > 0
-      ? [...landingRows].sort(
-          (left, right) => left.landingRate - right.landingRate || right.dateSortKey - left.dateSortKey
-        )[0]
-      : null;
-  const longestFlight =
-    activeRows.length > 0
-      ? [...activeRows].sort((left, right) => (right.distanceNm || 0) - (left.distanceNm || 0) || right.dateSortKey - left.dateSortKey)[0]
-      : null;
-  const shortestFlight =
-    activeRows.length > 0
-      ? [...activeRows].sort((left, right) => (left.distanceNm || Number.POSITIVE_INFINITY) - (right.distanceNm || Number.POSITIVE_INFINITY) || right.dateSortKey - left.dateSortKey)[0]
-      : null;
-  const blockTimeRows = activeRows.filter((row) => Number.isFinite(row.blockTimeMinutes));
-  const longestFlightTime =
-    blockTimeRows.length > 0
-      ? [...blockTimeRows].sort((left, right) => right.blockTimeMinutes - left.blockTimeMinutes || right.dateSortKey - left.dateSortKey)[0]
-      : null;
-  const shortestFlightTime =
-    blockTimeRows.length > 0
-      ? [...blockTimeRows].sort((left, right) => left.blockTimeMinutes - right.blockTimeMinutes || right.dateSortKey - left.dateSortKey)[0]
-      : null;
-  const dailyCounts = new Map();
-  const monthlyCounts = new Map();
-  const yearlyCounts = new Map();
+function createRecordAggregation() {
+  return {
+    landingRows: [],
+    landingTotal: 0,
+    bestLandingRate: null,
+    worstLandingRate: null,
+    longestFlight: null,
+    shortestFlight: null,
+    longestFlightTime: null,
+    shortestFlightTime: null,
+    dailyCounts: new Map(),
+    monthlyCounts: new Map(),
+    yearlyCounts: new Map()
+  };
+}
 
-  for (const row of activeRows) {
-    incrementCount(dailyCounts, buildDayKey(row));
-    incrementCount(monthlyCounts, buildMonthKey(row));
-    incrementCount(yearlyCounts, buildYearKey(row));
+// Updates records and busiest-period counters during the main stats aggregation pass.
+function updateRecordAggregation(aggregation, row) {
+  const newestFirst = (left, right) => right.dateSortKey - left.dateSortKey;
+
+  if (Number.isFinite(row.landingRate)) {
+    aggregation.landingRows.push(row);
+    aggregation.landingTotal += row.landingRate;
+    aggregation.bestLandingRate = selectBestCandidate(aggregation.bestLandingRate, row, compareBestLandingRate);
+    aggregation.worstLandingRate = selectBestCandidate(
+      aggregation.worstLandingRate,
+      row,
+      (left, right) => left.landingRate - right.landingRate || newestFirst(left, right)
+    );
   }
+
+  aggregation.longestFlight = selectBestCandidate(
+    aggregation.longestFlight,
+    row,
+    (left, right) => (right.distanceNm || 0) - (left.distanceNm || 0) || newestFirst(left, right)
+  );
+  aggregation.shortestFlight = selectBestCandidate(
+    aggregation.shortestFlight,
+    row,
+    (left, right) =>
+      (left.distanceNm || Number.POSITIVE_INFINITY) -
+        (right.distanceNm || Number.POSITIVE_INFINITY) ||
+      newestFirst(left, right)
+  );
+
+  if (Number.isFinite(row.blockTimeMinutes)) {
+    aggregation.longestFlightTime = selectBestCandidate(
+      aggregation.longestFlightTime,
+      row,
+      (left, right) => right.blockTimeMinutes - left.blockTimeMinutes || newestFirst(left, right)
+    );
+    aggregation.shortestFlightTime = selectBestCandidate(
+      aggregation.shortestFlightTime,
+      row,
+      (left, right) => left.blockTimeMinutes - right.blockTimeMinutes || newestFirst(left, right)
+    );
+  }
+
+  incrementCount(aggregation.dailyCounts, buildDayKey(row));
+  incrementCount(aggregation.monthlyCounts, buildMonthKey(row));
+  incrementCount(aggregation.yearlyCounts, buildYearKey(row));
+}
+
+function buildRecordSummary(aggregation) {
+  const {
+    bestLandingRate,
+    worstLandingRate,
+    longestFlight,
+    shortestFlight,
+    longestFlightTime,
+    shortestFlightTime,
+    dailyCounts,
+    monthlyCounts,
+    yearlyCounts
+  } = aggregation;
 
   let busiestDayKey = "";
   let busiestDayCount = 0;
@@ -1078,7 +1138,7 @@ export function buildLogbookPilotStats(rows, options = {}) {
   const routeRowsByKey = new Map();
   const routeFirstSeenOrder = new Map();
   const routeAggregateByKey = new Map();
-  const landingRows = [];
+  const recordAggregation = createRecordAggregation();
   let totalDistance = 0;
   let totalBlockTime = 0;
   let totalFlightTime = 0;
@@ -1118,32 +1178,32 @@ export function buildLogbookPilotStats(rows, options = {}) {
       routeAggregateByKey.set(routeKey, routeAggregate);
     }
 
-    if (Number.isFinite(row.landingRate)) {
-      landingRows.push(row);
-    }
+    updateRecordAggregation(recordAggregation, row);
   }
 
   const averageLandingRate =
-    landingRows.length > 0
-      ? landingRows.reduce((sum, row) => sum + row.landingRate, 0) / landingRows.length
-      : null;
-  const bestLandingRate =
-    landingRows.length > 0
-      ? [...landingRows].sort(compareBestLandingRate)[0]
-      : null;
-  const worstLandingRate =
-    landingRows.length > 0
-      ? [...landingRows].sort(
-          (left, right) => left.landingRate - right.landingRate || right.dateSortKey - left.dateSortKey
-        )[0]
+    recordAggregation.landingRows.length > 0
+      ? recordAggregation.landingTotal / recordAggregation.landingRows.length
       : null;
   const topAirline = selectTopCountEntry(airlineCounts, airlineFirstSeenOrder, airlineRowsByKey);
-  const records = buildRecordSummary(statsRows);
+  const records = buildRecordSummary(recordAggregation);
   const airlineRankingItems = buildAirlineRankingItems(airlineCounts, statsRows, {
     totalCount: statsRows.length,
     rowMap: airlineRowsByKey
   });
   const equipmentRankingItems = buildEquipmentRankingItems(equipmentCounts, statsRows, { totalCount: statsRows.length });
+  const recentLandingRows = buildRecentLandingRows(recordAggregation.landingRows, 20);
+  const topAirportRows = buildCombinedAirportRows(departureCounts, arrivalCounts);
+  const departureAirportRows = buildRankingItems(departureCounts, { totalCount: statsRows.length });
+  const arrivalAirportRows = buildRankingItems(arrivalCounts, { totalCount: statsRows.length });
+  const routeRankingItems = buildRouteRankingItems(routeCounts, {
+    totalCount: statsRows.length,
+    rowMap: routeRowsByKey,
+    routeAggregateMap: routeAggregateByKey,
+    labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
+  });
+  const statusRankingItems = buildRankingItems(statusCounts, { totalCount: statsRows.length });
+  const simulatorRankingItems = buildRankingItems(simulatorCounts, { totalCount: statsRows.length });
 
   return {
     totalFlights: statsRows.length,
@@ -1171,85 +1231,28 @@ export function buildLogbookPilotStats(rows, options = {}) {
       periodLabel: comparison.periodLabel,
       anchorDateIso: comparison.anchorDateIso
     },
-    cards: [
-      { label: "Total Legs", value: formatNumber(statsRows.length) },
-      { label: "Total Distance", value: formatUnit(totalDistance, "nm") },
-      { label: "Total Block Time", value: formatMinutes(totalBlockTime) },
-      { label: "Total Flight Time", value: formatMinutes(totalFlightTime) },
-      { label: "Total Fuel", value: formatUnit(totalFuel, "lb") },
-      { label: "Average Landing Rate", value: formatUnit(averageLandingRate, "fpm", { maximumFractionDigits: 0 }) },
-      {
-        label: "Top Airline",
-        value: topAirline ? topAirline.label : LOGBOOK_EMPTY_VALUE,
-        meta: topAirline ? `${formatNumber(topAirline.count)} legs` : ""
-      }
-    ],
-    landingRates: [
-      {
-        label: "Best",
-        value: bestLandingRate ? formatUnit(bestLandingRate.landingRate, "fpm") : LOGBOOK_EMPTY_VALUE,
-        meta: bestLandingRate ? `${bestLandingRate.compactFlightLabel} - ${bestLandingRate.dateDisplay}` : ""
-      },
-      {
-        label: "Worst",
-        value: worstLandingRate ? formatUnit(worstLandingRate.landingRate, "fpm") : LOGBOOK_EMPTY_VALUE,
-        meta: worstLandingRate ? `${worstLandingRate.compactFlightLabel} - ${worstLandingRate.dateDisplay}` : ""
-      },
-      {
-        label: "Average",
-        value: formatUnit(averageLandingRate, "fpm", { maximumFractionDigits: 0 }),
-        meta: landingRows.length ? `${formatNumber(landingRows.length)} recorded landings` : ""
-      }
-    ],
     records,
-    recentLandings: buildRecentLandingRows(statsRows, 20),
+    recentLandings: recentLandingRows,
     rankings: {
       airlines: airlineRankingItems,
       equipment: equipmentRankingItems,
-      topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
-      departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
-      arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
-      routes: buildRouteRankingItems(routeCounts, {
-        totalCount: statsRows.length,
-        rowMap: routeRowsByKey,
-        routeAggregateMap: routeAggregateByKey,
-        labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
-      }),
-      status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),
-      simulatorUsage: buildRankingItems(simulatorCounts, { totalCount: statsRows.length })
+      topAirports: topAirportRows,
+      departureAirports: departureAirportRows,
+      arrivalAirports: arrivalAirportRows,
+      routes: routeRankingItems,
+      status: statusRankingItems,
+      simulatorUsage: simulatorRankingItems
     },
     detailRows: {
       airlines: airlineRankingItems,
       equipment: equipmentRankingItems,
-      recentLandings: buildRecentLandingRows(statsRows, 20),
-      topAirports: buildCombinedAirportRows(departureCounts, arrivalCounts),
-      departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
-      arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
-      routes: buildRouteRankingItems(routeCounts, {
-        totalCount: statsRows.length,
-        rowMap: routeRowsByKey,
-        routeAggregateMap: routeAggregateByKey,
-        labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
-      }),
-      status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),
+      recentLandings: recentLandingRows,
+      topAirports: topAirportRows,
+      departureAirports: departureAirportRows,
+      arrivalAirports: arrivalAirportRows,
+      routes: routeRankingItems,
+      status: statusRankingItems,
       records: records.summaryRows
-    },
-    layoutSafeLists: {
-      airlines: airlineRankingItems,
-      equipment: equipmentRankingItems,
-      departureAirports: buildRankingItems(departureCounts, { totalCount: statsRows.length }),
-      arrivalAirports: buildRankingItems(arrivalCounts, { totalCount: statsRows.length }),
-      routes: buildRouteRankingItems(routeCounts, {
-        totalCount: statsRows.length,
-        rowMap: routeRowsByKey,
-        routeAggregateMap: routeAggregateByKey,
-        labelBuilder: (_, row) => (row ? buildRouteLabel(row) : LOGBOOK_EMPTY_VALUE)
-      }),
-      status: buildRankingItems(statusCounts, { totalCount: statsRows.length }),
-      recentLandings: buildRecentLandingRows(statsRows, 20)
-    },
-    raw: {
-      allRows: statsRows
     }
   };
 }
