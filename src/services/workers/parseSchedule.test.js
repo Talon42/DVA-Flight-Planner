@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { describe, expect, it } from "vitest";
 import { DateTime } from "luxon";
 import { parseScheduleImport } from "./parseSchedule.js";
 
@@ -20,7 +19,7 @@ function buildScheduleXml({ airline = "PAH", flightNumber = "103", from = "AGGH"
 
 function parseSingleFlight(xmlText, fileName = "schedule.xml") {
   const result = parseScheduleImport(fileName, xmlText);
-  assert.equal(result.flights.length, 1);
+  expect(result.flights).toHaveLength(1);
   return result;
 }
 
@@ -28,7 +27,8 @@ function getInvalidTimeDefaultedIssue(result) {
   return result.importIssues.find((issue) => issue.kind === "invalid-time-defaulted") || null;
 }
 
-test("invalid departure time imports the flight and defaults departure to midnight", () => {
+describe("parseScheduleImport", () => {
+  it("imports an invalid departure time and defaults departure to midnight", () => {
   const result = parseSingleFlight(
     buildScheduleXml({
       std: "06/02/2026 BAD",
@@ -39,17 +39,17 @@ test("invalid departure time imports the flight and defaults departure to midnig
   const flight = result.flights[0];
   const issue = getInvalidTimeDefaultedIssue(result);
 
-  assert.ok(issue);
-  assert.equal(issue.severity, "warning");
-  assert.equal(issue.sourceFileName, "schedule.xml");
-  assert.equal(flight.localDepartureClock, "00:00");
-  assert.equal(DateTime.fromISO(flight.stdLocal).isValid, true);
-  assert.match(result.importLog, /WARNING \| invalid-time-defaulted \|/);
-  assert.doesNotMatch(result.importLog, /ERROR \| invalid-time \|/);
-  assert.doesNotMatch(result.importLog, /omitted because one or more schedule timestamps were invalid/);
-});
+  expect(issue).toBeTruthy();
+  expect(issue.severity).toBe("warning");
+  expect(issue.sourceFileName).toBe("schedule.xml");
+  expect(flight.localDepartureClock).toBe("00:00");
+  expect(DateTime.fromISO(flight.stdLocal).isValid).toBe(true);
+  expect(result.importLog).toMatch(/WARNING \| invalid-time-defaulted \|/);
+  expect(result.importLog).not.toMatch(/ERROR \| invalid-time \|/);
+  expect(result.importLog).not.toMatch(/omitted because one or more schedule timestamps were invalid/);
+  });
 
-test("invalid arrival time imports the flight and emits a warning", () => {
+  it("imports an invalid arrival time and emits a warning", () => {
   const result = parseSingleFlight(
     buildScheduleXml({
       std: "06/02/2026 07:15",
@@ -61,14 +61,14 @@ test("invalid arrival time imports the flight and emits a warning", () => {
   const flight = result.flights[0];
   const issue = getInvalidTimeDefaultedIssue(result);
 
-  assert.ok(issue);
-  assert.equal(issue.severity, "warning");
-  assert.equal(flight.localDepartureClock, "07:15");
-  assert.equal(DateTime.fromISO(flight.staLocal).isValid, true);
-  assert.match(result.importLog, /WARNING \| invalid-time-defaulted \|/);
-});
+  expect(issue).toBeTruthy();
+  expect(issue.severity).toBe("warning");
+  expect(flight.localDepartureClock).toBe("07:15");
+  expect(DateTime.fromISO(flight.staLocal).isValid).toBe(true);
+  expect(result.importLog).toMatch(/WARNING \| invalid-time-defaulted \|/);
+  });
 
-test("missing departure time imports the flight using the paired date", () => {
+  it("imports a missing departure time using the paired date", () => {
   const result = parseSingleFlight(
     buildScheduleXml({
       std: "",
@@ -80,14 +80,14 @@ test("missing departure time imports the flight using the paired date", () => {
   const flight = result.flights[0];
   const issue = getInvalidTimeDefaultedIssue(result);
 
-  assert.ok(issue);
-  assert.equal(issue.severity, "warning");
-  assert.equal(flight.localDepartureClock, "00:00");
-  assert.equal(DateTime.fromISO(flight.stdLocal).isValid, true);
-  assert.equal(DateTime.fromISO(flight.staLocal).isValid, true);
-});
+  expect(issue).toBeTruthy();
+  expect(issue.severity).toBe("warning");
+  expect(flight.localDepartureClock).toBe("00:00");
+  expect(DateTime.fromISO(flight.stdLocal).isValid).toBe(true);
+  expect(DateTime.fromISO(flight.staLocal).isValid).toBe(true);
+  });
 
-test("missing both times still imports the flight", () => {
+  it("still imports a flight when both times are missing", () => {
   const result = parseSingleFlight(
     buildScheduleXml({
       std: "",
@@ -99,18 +99,15 @@ test("missing both times still imports the flight", () => {
   const flight = result.flights[0];
   const issue = getInvalidTimeDefaultedIssue(result);
 
-  assert.ok(issue);
-  assert.equal(issue.severity, "warning");
-  assert.equal(DateTime.fromISO(flight.stdLocal).isValid, true);
-  assert.equal(DateTime.fromISO(flight.staLocal).isValid, true);
-  assert.equal(flight.localDepartureClock, "00:00");
-  assert.equal(
-    result.importIssues.some((entry) => entry.kind === "invalid-time"),
-    false
-  );
-});
+  expect(issue).toBeTruthy();
+  expect(issue.severity).toBe("warning");
+  expect(DateTime.fromISO(flight.stdLocal).isValid).toBe(true);
+  expect(DateTime.fromISO(flight.staLocal).isValid).toBe(true);
+  expect(flight.localDepartureClock).toBe("00:00");
+  expect(result.importIssues.some((entry) => entry.kind === "invalid-time")).toBe(false);
+  });
 
-test("valid times stay unchanged and do not emit the defaulted warning", () => {
+  it("keeps valid times unchanged without a defaulted warning", () => {
   const result = parseSingleFlight(
     buildScheduleXml({
       std: "06/02/2026 07:15",
@@ -121,8 +118,9 @@ test("valid times stay unchanged and do not emit the defaulted warning", () => {
 
   const flight = result.flights[0];
 
-  assert.equal(getInvalidTimeDefaultedIssue(result), null);
-  assert.equal(flight.localDepartureClock, "07:15");
-  assert.equal(DateTime.fromISO(flight.stdLocal).isValid, true);
-  assert.equal(DateTime.fromISO(flight.staLocal).isValid, true);
+  expect(getInvalidTimeDefaultedIssue(result)).toBeNull();
+  expect(flight.localDepartureClock).toBe("07:15");
+  expect(DateTime.fromISO(flight.stdLocal).isValid).toBe(true);
+  expect(DateTime.fromISO(flight.staLocal).isValid).toBe(true);
+  });
 });

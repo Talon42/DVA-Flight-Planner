@@ -17,7 +17,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "validate": "npm run test:run && npm run lint && npm run build && npm run test:rust && cargo check --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
