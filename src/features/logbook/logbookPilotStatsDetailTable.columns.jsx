@@ -2,6 +2,7 @@ import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName } from "../../components/ui/typography";
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import { buildDvaPirepId, LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
+import { parseLogbookDateSortKey } from "../../domain/time/logbookDate.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 import LogbookEquipmentGlyph from "./LogbookEquipmentGlyph.jsx";
 import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
@@ -28,15 +29,8 @@ function resolveTextSortValue(value) {
 }
 
 function formatCompactDashDate(dateSortKey) {
-  const normalized = String(dateSortKey ?? "").trim();
-  if (!normalized || !/^\d{8}$/.test(normalized)) {
-    return LOGBOOK_EMPTY_VALUE;
-  }
-
-  const month = normalized.slice(4, 6);
-  const day = normalized.slice(6, 8);
-  const year = normalized.slice(2, 4);
-  return `${month}-${day}-${year}`;
+  const date = parseLogbookDateSortKey(dateSortKey);
+  return date ? `${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}-${String(date.year).slice(-2)}` : LOGBOOK_EMPTY_VALUE;
 }
 
 function getDvaPirepUrl(row) {

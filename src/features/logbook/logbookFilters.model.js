@@ -1,3 +1,5 @@
+import { parseLogbookIsoDate } from "../../domain/time/logbookDate.js";
+
 const DEFAULT_DISTANCE_BOUNDS = {
   minDateSortKey: 0,
   maxDateSortKey: 0,
@@ -54,26 +56,11 @@ function roundUpToStep(value, step) {
 }
 
 function normalizeDateString(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized) {
-    return "";
-  }
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-    return "";
-  }
-
-  return normalized;
+  return parseLogbookIsoDate(value)?.iso || "";
 }
 
 function dateStringToSortKey(value) {
-  const normalized = normalizeDateString(value);
-  if (!normalized) {
-    return null;
-  }
-
-  const numeric = Number(normalized.replaceAll("-", ""));
-  return Number.isFinite(numeric) ? numeric : null;
+  return parseLogbookIsoDate(value)?.sortKey ?? null;
 }
 
 function sortKeyToDateString(value) {

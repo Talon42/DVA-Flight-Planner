@@ -154,6 +154,18 @@ describe("pilot stats aggregation", () => {
     expect(stats.comparisons.prior.totalFlights).toBe(1);
   });
 
+  it("does not use an invalid date as a comparison-period anchor", () => {
+    const stats = buildLogbookPilotStats(
+      [
+        statsRow({ id: "invalid", dateSortKey: 20260231 }),
+        statsRow({ id: "valid", dateSortKey: 20260115, sourceIndex: 0 })
+      ],
+      { comparisonPeriod: "year-to-date" }
+    );
+
+    expect(stats.comparisons.anchorDateIso).toBe("2026-01-15T00:00:00.000Z");
+  });
+
   it("keeps empty values safe and scales across a large synthetic dataset", () => {
     const rows = Array.from({ length: 5000 }, (_, index) =>
       statsRow({

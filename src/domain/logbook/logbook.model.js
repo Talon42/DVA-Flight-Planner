@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import { getAirlineLogo, getAirlineLogoClassName, getAirlineNameByCode } from "../airlines/airlineBranding.js";
+import { parseDvaLogbookDate } from "../time/logbookDate.js";
 
 export const LOGBOOK_EMPTY_VALUE = "\u2014";
 
@@ -46,37 +47,9 @@ function formatTimestamp(value) {
   return DateTime.fromMillis(epochMilliseconds).toFormat("MM/dd/yyyy HH:mm");
 }
 
-function normalizeLogbookMonth(rawMonth) {
-  const numericMonth = toNumber(rawMonth);
-  if (!Number.isFinite(numericMonth)) {
-    return null;
-  }
-
-  if (numericMonth >= 0 && numericMonth <= 11) {
-    return numericMonth + 1;
-  }
-
-  if (numericMonth === 12) {
-    return 12;
-  }
-
-  return null;
-}
-
 function extractDateParts(entry) {
-  const date = entry?.date;
-  if (!date || typeof date !== "object") {
-    return null;
-  }
-
-  const year = toNumber(date.y);
-  const month = normalizeLogbookMonth(date.m);
-  const day = toNumber(date.d);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return null;
-  }
-
-  return { year, month, day };
+  const parsed = parseDvaLogbookDate(entry?.date);
+  return parsed ? { year: parsed.year, month: parsed.month, day: parsed.day } : null;
 }
 
 function formatDvaDate(entry) {
@@ -106,12 +79,7 @@ function formatDvaDateCompact(entry) {
 }
 
 function buildDateSortKey(entry) {
-  const parts = extractDateParts(entry);
-  if (!parts) {
-    return 0;
-  }
-
-  return parts.year * 10_000 + parts.month * 100 + parts.day;
+  return parseDvaLogbookDate(entry?.date)?.sortKey || 0;
 }
 
 function parseClockDurationMinutes(value) {

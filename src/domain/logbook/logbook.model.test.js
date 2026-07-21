@@ -57,4 +57,13 @@ describe("DVA logbook duration normalization", () => {
     expect(row.rawEntry).toBe(entry);
     expect(entry.duration).toBe("bad");
   });
+
+  it("turns impossible DVA dates into an empty display and zero sort key", () => {
+    const [row] = normalizeLogbookRows([
+      { id: "invalid-date", status: "APPROVED", date: { y: 2026, m: 1, d: 31 } }
+    ]);
+
+    expect(row.dateSortKey).toBe(0);
+    expect(row.dateDisplay).toBe("—");
+  });
 });

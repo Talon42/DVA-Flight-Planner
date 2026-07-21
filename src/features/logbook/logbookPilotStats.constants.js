@@ -1,3 +1,5 @@
+import { parseLogbookDateSortKey } from "../../domain/time/logbookDate.js";
+
 export const DEFAULT_PILOT_STATS_COMPARISON_PERIOD = "off";
 export const PILOT_STATS_SUMMARY_CARD_CLASS_NAME = "h-full min-h-0";
 
@@ -94,12 +96,8 @@ export function buildPilotStatsComparisonOptions(rows = []) {
   const yearValues = new Set();
 
   for (const row of Array.isArray(rows) ? rows : []) {
-    const dateSortKey = Number(row?.dateSortKey);
-    if (!Number.isFinite(dateSortKey) || dateSortKey <= 0) {
-      continue;
-    }
-
-    yearValues.add(Math.floor(dateSortKey / 10000));
+    const date = parseLogbookDateSortKey(row?.dateSortKey);
+    if (date) yearValues.add(date.year);
   }
 
   const yearOptions = [...yearValues]

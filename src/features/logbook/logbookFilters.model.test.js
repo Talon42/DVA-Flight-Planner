@@ -40,6 +40,8 @@ describe("compiled logbook filters", () => {
     expect(predicate({ distanceMin: 600 })(row())).toBe(false);
     expect(predicate({})(row({ dateSortKey: null, durationMinutes: null, distanceNm: null }))).toBe(true);
     expect(predicate({ dateStart: "2024-06-01" })(row({ dateSortKey: null }))).toBe(false);
+    expect(predicate({ dateStart: "2024-02-31" })(row())).toBe(true);
+    expect(predicate({ dateStart: "2024-02-29" })(row({ dateSortKey: 20240101 }))).toBe(false);
     expect(predicate({ durationMin: 60 })(row({ durationMinutes: null }))).toBe(false);
     expect(predicate({ distanceMin: 1 })(row({ distanceNm: null }))).toBe(false);
   });

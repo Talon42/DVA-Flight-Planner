@@ -1,5 +1,10 @@
 import { getAirportByIcao } from "../airports/airportCatalog.js";
 import { LOGBOOK_EMPTY_VALUE, formatLandingGrade } from "./logbook.model.js";
+import {
+  logbookDateFromParts,
+  parseLogbookDateSortKey,
+  parseLogbookIsoDate
+} from "../time/logbookDate.js";
 
 const BEST_LANDING_TARGET_FPM = -250;
 const numberFormatterCache = new Map();
@@ -96,20 +101,7 @@ function selectBestCandidate(current, candidate, compare) {
 }
 
 function parseDateSortKey(dateSortKey) {
-  const normalized = Number(dateSortKey);
-  if (!Number.isFinite(normalized) || normalized <= 0) {
-    return null;
-  }
-
-  const year = Math.floor(normalized / 10000);
-  const month = Math.floor((normalized % 10000) / 100);
-  const day = normalized % 100;
-
-  if (!year || !month || !day) {
-    return null;
-  }
-
-  return new Date(Date.UTC(year, month - 1, day));
+  return parseLogbookDateSortKey(dateSortKey)?.date || null;
 }
 
 function toDateSortKey(date) {
@@ -307,12 +299,7 @@ function buildYearKey(row) {
 
 // Uses the full flight date so the records snapshot can show the busiest single day.
 function buildDayKey(row) {
-  const normalized = Number(row?.dateSortKey);
-  if (!Number.isFinite(normalized) || normalized <= 0) {
-    return LOGBOOK_EMPTY_VALUE;
-  }
-
-  return String(Math.trunc(normalized));
+  return parseLogbookDateSortKey(row?.dateSortKey)?.iso.replaceAll("-", "") || LOGBOOK_EMPTY_VALUE;
 }
 
 function buildMonthLabel(monthKey) {
@@ -320,12 +307,10 @@ function buildMonthLabel(monthKey) {
     return LOGBOOK_EMPTY_VALUE;
   }
 
-  const [year, month] = String(monthKey).split("-").map((value) => Number(value));
-  if (!Number.isFinite(year) || !Number.isFinite(month)) {
-    return LOGBOOK_EMPTY_VALUE;
-  }
+  const date = parseLogbookIsoDate(`${String(monthKey).trim()}-01`);
+  if (!date) return LOGBOOK_EMPTY_VALUE;
 
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-US", {
+  return date.date.toLocaleDateString("en-US", {
     month: "short",
     year: "numeric",
     timeZone: "UTC"
@@ -338,20 +323,10 @@ function buildDayLabel(dayKey) {
     return LOGBOOK_EMPTY_VALUE;
   }
 
-  const normalized = String(dayKey).trim();
-  if (!/^\d{8}$/.test(normalized)) {
-    return LOGBOOK_EMPTY_VALUE;
-  }
+  const date = parseLogbookDateSortKey(dayKey);
+  if (!date) return LOGBOOK_EMPTY_VALUE;
 
-  const year = Number(normalized.slice(0, 4));
-  const month = Number(normalized.slice(4, 6));
-  const day = Number(normalized.slice(6, 8));
-
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return LOGBOOK_EMPTY_VALUE;
-  }
-
-  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-US", {
+  return date.date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -631,12 +606,20 @@ function createPeriodConfig(periodKey, anchorDate) {
         return null;
       }
 
+      const currentStart = logbookDateFromParts(year, 1, 1)?.date;
+      const currentEndExclusive = logbookDateFromParts(year + 1, 1, 1)?.date;
+      const priorStart = logbookDateFromParts(year - 1, 1, 1)?.date;
+      const priorEndExclusive = currentStart;
+      if (!currentStart || !currentEndExclusive || !priorStart || !priorEndExclusive) {
+        return null;
+      }
+
       return {
         label: String(year),
-        currentStart: new Date(Date.UTC(year, 0, 1)),
-        currentEndExclusive: new Date(Date.UTC(year + 1, 0, 1)),
-        priorStart: new Date(Date.UTC(year - 1, 0, 1)),
-        priorEndExclusive: new Date(Date.UTC(year, 0, 1))
+        currentStart,
+        currentEndExclusive,
+        priorStart,
+        priorEndExclusive
       };
     }
   }
@@ -650,7 +633,10 @@ function filterRowsByDateRange(rows, startDate, endDateExclusive) {
   const startKey = toDateSortKey(startDate);
   const endKey = toDateSortKey(endDateExclusive);
 
-  return rows.filter((row) => Number.isFinite(row.dateSortKey) && row.dateSortKey >= startKey && row.dateSortKey < endKey);
+  return rows.filter((row) => {
+    const rowDate = parseLogbookDateSortKey(row.dateSortKey);
+    return rowDate && rowDate.sortKey >= startKey && rowDate.sortKey < endKey;
+  });
 }
 
 function sumRows(rows) {
@@ -769,7 +755,9 @@ function buildPeriodMetrics(rows) {
 
 function buildComparisonBundle(rows, periodKey) {
   const activeRows = Array.isArray(rows) ? rows : [];
-  const anchorRow = [...activeRows].sort((left, right) => right.dateSortKey - left.dateSortKey || right.sourceIndex - left.sourceIndex)[0];
+  const anchorRow = activeRows
+    .filter((row) => parseLogbookDateSortKey(row?.dateSortKey))
+    .sort((left, right) => right.dateSortKey - left.dateSortKey || right.sourceIndex - left.sourceIndex)[0];
   const anchorDate = parseDateSortKey(anchorRow?.dateSortKey);
   const periodConfig = createPeriodConfig(periodKey, anchorDate);
   const currentPeriodRows =

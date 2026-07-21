@@ -32,6 +32,12 @@ Flight Planner helps you sync your DVA schedule, review logbook progress, build 
 - View planned routes on an interactive map with weather, satellite, and VATSIM-aware overlays.
 - Store settings locally, including DVA sync credentials, SimBrief settings, addon folders, and custom SimBrief airframes.
 
+## Windows SmartScreen
+
+Windows may show a `Microsoft Defender SmartScreen` warning when opening the `.exe`. This can happen for small or newly released apps that are not code-signed or do not yet have Microsoft download reputation.
+
+To continue, click `More info`, then `Run anyway`.
+
 ## Quick Start
 
 1. Open the app.
@@ -134,22 +140,3 @@ Settings covers the app's main integrations and maintenance tools:
 The app stores local schedule, logbook, tour, settings, and Flight Board data on your device. DVA password storage uses the desktop credential flow rather than plain app settings.
 
 Use `Settings` > `Advanced` > `Delete User Data` to clear saved local data, DVA credentials, temporary sync data, and browser data where possible.
-
-## Windows SmartScreen
-
-Windows may show a `Microsoft Defender SmartScreen` warning when opening the `.exe`. This can happen for small or newly released apps that are not code-signed or do not yet have Microsoft download reputation.
-
-To continue, click `More info`, then `Run anyway`.
-
-## Automated Validation
-
-Install Node.js 22 and the stable Rust toolchain, then run the complete local validation workflow from the repository root:
-
-```bash
-npm ci
-npm run validate
-```
-
-The validation command runs all offline Vitest suites, ESLint, aircraft and airport data audits, the production Vite build, Rust formatting checks, Rust unit tests, and a Rust compile check. Tests use sanitized local fixtures and mocks; they do not require live Delta Virtual or SimBrief services.
-
-Codex runs the appropriate local validation automatically after every task that changes repository files. GitHub Actions does not run tests on branch pushes. Release builds and the Codex Clean Build action must also pass validation when they are initiated.
