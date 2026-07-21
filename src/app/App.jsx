@@ -78,7 +78,6 @@ import {
 import { DEFAULT_DERIVED_TOUR_PROGRESS } from "../features/tours/tours.constants";
 import {
   buildFooterDateLabel,
-  buildFooterDateTimeLabel,
   buildScheduleDateInfo
 } from "../domain/schedule/scheduleDate";
 
@@ -397,7 +396,6 @@ export default function App() {
   const isScheduleOutOfDate = Boolean(schedule?.flights?.length) && scheduleDateInfo.isCurrent === false;
   const scheduleDateLabel = scheduleDateInfo.label;
   const logbookLastReportLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
-  const logbookLastSyncLabel = buildFooterDateTimeLabel(logbookAirportProgress.lastSyncAt);
   // Tracks which rows are already assigned to any board so the schedule tables only show available work.
   const boardedFlightIds = useMemo(
     () =>
@@ -434,7 +432,6 @@ export default function App() {
           label: "Imported Legs",
           value: formatNumber(schedule.importSummary.importedRows ?? 0)
         },
-        { kind: "stat", label: "Logbook Sync", value: logbookLastSyncLabel },
         { kind: "stat", label: "Last Flight Report", value: logbookLastReportLabel }
       ]
     : [];
