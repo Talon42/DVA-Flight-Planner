@@ -204,7 +204,7 @@ fn attach_windows_xml_message_handler(
                                                         kind,
                                                         reason,
                                                         password,
-                                                        .. 
+                                                        ..
                                                     } = message;
 
                                                     match kind {

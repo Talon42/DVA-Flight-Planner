@@ -66,6 +66,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   });
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [backendStatus, setBackendStatus] = useState("missing");
   const [selectedTab, setSelectedTab] = useState("flights");
   const [filters, setFilters] = useState(DEFAULT_LOGBOOK_FILTERS);
   const [sort, setSort] = useState(DEFAULT_LOGBOOK_SORT);
@@ -143,6 +144,8 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
       const nextError = String(nextResult?.error || "").trim();
       const isInvalid = nextStatus === "invalid" || Boolean(nextError);
 
+      setBackendStatus(isInvalid ? "invalid" : nextStatus === "missing" ? "missing" : "ready");
+
       setCacheResult((current) => {
         // Invalid reads must never replace usable rows or profile metadata with an empty payload.
         if (isInvalid) {
@@ -163,6 +166,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
       setLoadError(nextError);
     } catch {
       if (isMountedRef.current && requestGenerationRef.current === requestGeneration) {
+        setBackendStatus("invalid");
         setLoadError(normalizeLogbookLoadError());
       }
     } finally {
@@ -247,6 +251,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
       entries: [],
       entryCount: 0
     });
+    setBackendStatus("missing");
     setSelectedRowId(null);
     setIsLoading(false);
     setLoadError("");
@@ -256,6 +261,7 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     cacheResult,
     isLoading,
     loadError,
+    backendStatus,
     allRows,
     filteredRows,
     sortedFilteredRows,

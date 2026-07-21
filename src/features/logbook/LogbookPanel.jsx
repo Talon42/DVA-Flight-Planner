@@ -97,6 +97,9 @@ export default function LogbookPanel({
   selectedRowId,
   pilotStats,
   profileMetadata,
+  isLoading = false,
+  loadError = "",
+  logbookStatus = "missing",
   pilotStatsComparisonPeriod,
   pilotStatsComparisonOptions,
   pilotStatsDashboardSlots,
@@ -118,6 +121,11 @@ export default function LogbookPanel({
     pilotStatsComparisonOptions
   );
 
+  const hasLoadError = Boolean(String(loadError || "").trim());
+  const showLoadingState = Boolean(isLoading && !allRows.length);
+  const showInvalidState = Boolean(!isLoading && !allRows.length && (logbookStatus === "invalid" || hasLoadError));
+  const showValidEmptyState = Boolean(!isLoading && !showInvalidState && logbookStatus === "ready");
+
   if (!allRows.length) {
     return (
       <div className="logbook-panel flex h-full min-h-0 w-full min-w-0 flex-1 flex-col gap-3">
@@ -135,11 +143,28 @@ export default function LogbookPanel({
           />
         </div>
 
-        <div className={cn("grid gap-3 border border-dashed border-[color:var(--line)] p-5", cardFrameClassName)}>
-          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
-            Logbook data has not been synced yet. Use Refresh Logbook or Sync from Delta Virtual to
-            download your logbook and schedule.
-          </p>
+        <div className={cn("grid gap-3 border border-dashed border-[color:var(--line)] p-5", cardFrameClassName)} role="status" aria-live="polite">
+          {showLoadingState ? (
+            <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>Loading logbook...</p>
+          ) : showInvalidState ? (
+            <>
+              <p className={cn("m-0 text-[var(--text-primary)]", bodySmTextClassName)}>
+                Unable to load the saved Delta Virtual logbook.
+              </p>
+              <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
+                Try Refresh Logbook again. Your saved logbook data will be kept safe.
+              </p>
+            </>
+          ) : showValidEmptyState ? (
+            <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
+              Your Delta Virtual logbook is up to date, but it contains no flights yet.
+            </p>
+          ) : (
+            <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
+              Logbook data has not been synced yet. Use Refresh Logbook or Sync from Delta Virtual to
+              download your logbook and schedule.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -160,6 +185,14 @@ export default function LogbookPanel({
           onPilotStatsComparisonPeriodChange={onPilotStatsComparisonPeriodChange}
         />
       </div>
+
+      {hasLoadError ? (
+        <div className={cn("border border-dashed border-[color:var(--line)] px-4 py-2", cardFrameClassName)} role="status" aria-live="polite">
+          <p className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
+            Logbook refresh failed. Showing your last saved logbook data.
+          </p>
+        </div>
+      ) : null}
 
       <div className="min-h-0 w-full min-w-0 flex-1">
         {selectedTab === "pilot-stats" ? (

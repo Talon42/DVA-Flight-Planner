@@ -133,6 +133,23 @@ describe("useLogbook loading", () => {
     expect(result.current.allRows).toEqual([]);
   });
 
+  it("keeps loading state explicit while the initial read is pending", async () => {
+    const pendingRead = deferred();
+    readDeltaVirtualLogbook.mockReturnValueOnce(pendingRead.promise);
+    const { result } = renderHook(() => useLogbook());
+
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.backendStatus).toBe("missing");
+    expect(result.current.loadError).toBe("");
+
+    await act(async () => {
+      pendingRead.resolve({ ...logbookResult(null), status: "ready" });
+      await pendingRead.promise;
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.backendStatus).toBe("ready");
+  });
+
   it("does not let an older read overwrite a newer result", async () => {
     const olderRead = deferred();
     const newerRead = deferred();
