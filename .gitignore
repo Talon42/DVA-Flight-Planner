@@ -19,6 +19,5 @@
 /.npm-cache
 /.eslintcache
 /coverage/
-/docs/instructions/*
-!/docs/instructions/VALIDATION.md
+/docs/instructions/
 /tmp/
