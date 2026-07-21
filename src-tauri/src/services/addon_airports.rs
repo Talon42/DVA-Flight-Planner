@@ -204,7 +204,9 @@ fn extract_leading_icao_token(text: &str) -> Option<String> {
     const FALSE_POSITIVE_TOKENS: &[&str] = &["BUSH", "CITY", "FORT", "HARE", "HERN", "INTL"];
 
     if token.len() == 4
-        && token.chars().all(|character| character.is_ascii_uppercase())
+        && token
+            .chars()
+            .all(|character| character.is_ascii_uppercase())
         && !FALSE_POSITIVE_TOKENS.contains(&token)
     {
         Some(token.to_string())
@@ -296,7 +298,10 @@ fn find_common_content_history_files(
         push_existing_content_history_file(&mut files, candidate);
     }
 
-    for content_info_folder in [package_root.join("ContentInfo"), package_root.join("contentinfo")] {
+    for content_info_folder in [
+        package_root.join("ContentInfo"),
+        package_root.join("contentinfo"),
+    ] {
         if !content_info_folder.is_dir() {
             continue;
         }
@@ -367,7 +372,10 @@ fn find_content_history_files(
     find_content_history_files_recursive(package_root, summary)
 }
 
-fn find_direct_manifest_file(package_root: &Path, summary: &mut AddonAirportScanSummary) -> Option<PathBuf> {
+fn find_direct_manifest_file(
+    package_root: &Path,
+    summary: &mut AddonAirportScanSummary,
+) -> Option<PathBuf> {
     let entries = match read_directory_entries_sorted(package_root) {
         Ok(entries) => entries,
         Err(error) => {
@@ -692,11 +700,15 @@ mod tests {
     #[test]
     fn extract_icao_from_package_folder_name_prefers_the_folder_name() {
         assert_eq!(
-            extract_icao_from_package_folder_name(Path::new("CYEG_fsimstudios-airport-cyeg-edmonton")),
+            extract_icao_from_package_folder_name(Path::new(
+                "CYEG_fsimstudios-airport-cyeg-edmonton"
+            )),
             Some("CYEG".to_string())
         );
         assert_eq!(
-            extract_icao_from_package_folder_name(Path::new("KMCI_tropicalsim-airport-kmci-kansas-city-jetways")),
+            extract_icao_from_package_folder_name(Path::new(
+                "KMCI_tropicalsim-airport-kmci-kansas-city-jetways"
+            )),
             Some("KMCI".to_string())
         );
         assert_eq!(
@@ -944,11 +956,13 @@ mod tests {
         assert_eq!(cache.manifest_files_scanned, 0);
         assert_eq!(cache.manifest_fallbacks_used, 0);
         assert_eq!(cache.status, "ready");
-        assert!(cache
-            .scan_details
-            .iter()
-            .any(|detail| detail.status == "cached"
-                && detail.airports == vec!["KSEA".to_string()]));
+        assert!(
+            cache
+                .scan_details
+                .iter()
+                .any(|detail| detail.status == "cached"
+                    && detail.airports == vec!["KSEA".to_string()])
+        );
         assert!(!cache
             .scan_details
             .iter()

@@ -49,11 +49,7 @@ fn reason_code(error: &io::Error) -> &'static str {
     }
 }
 
-fn remove_allowlisted_path(
-    target: &str,
-    path: &Path,
-    result: &mut UserDataClearResult,
-) {
+fn remove_allowlisted_path(target: &str, path: &Path, result: &mut UserDataClearResult) {
     let metadata = match fs::symlink_metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
@@ -110,7 +106,9 @@ where
     }
 
     match clear_credentials() {
-        Ok(()) => result.cleared_targets.push("deltavaCredentials".to_string()),
+        Ok(()) => result
+            .cleared_targets
+            .push("deltavaCredentials".to_string()),
         Err(_) => result.failures.push(UserDataClearFailure {
             target: "deltavaCredentials".to_string(),
             reason_code: "credential_error".to_string(),
@@ -154,7 +152,9 @@ pub(crate) fn clear_user_data(app: &AppHandle) -> UserDataClearResult {
         }),
     }
     match clear_auth_settings_internal(app) {
-        Ok(()) => result.cleared_targets.push("deltavaCredentials".to_string()),
+        Ok(()) => result
+            .cleared_targets
+            .push("deltavaCredentials".to_string()),
         Err(_) => result.failures.push(UserDataClearFailure {
             target: "deltavaCredentials".to_string(),
             reason_code: "credential_error".to_string(),
@@ -171,7 +171,10 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_root(label: &str) -> PathBuf {
-        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         std::env::temp_dir().join(format!("flight-planner-user-data-{label}-{unique}"))
     }
 

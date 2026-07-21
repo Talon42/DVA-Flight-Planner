@@ -1,6 +1,6 @@
 use chrono::Utc;
-use reqwest::redirect::Policy;
 use regex::Regex;
+use reqwest::redirect::Policy;
 use scraper::{Html, Selector};
 
 use crate::{append_sync_log, models::DeltaLogbookPilotProfileMetadata};
@@ -75,8 +75,8 @@ pub(crate) fn derive_display_name_from_profile_header(header: &str) -> Option<St
         return None;
     }
 
-    let header_pattern = regex::Regex::new(r"^(?P<lead>.+?)\s*\([^()]+\)\s*$")
-        .expect("valid profile header regex");
+    let header_pattern =
+        regex::Regex::new(r"^(?P<lead>.+?)\s*\([^()]+\)\s*$").expect("valid profile header regex");
 
     let lead = header_pattern
         .captures(&normalized_header)
@@ -93,16 +93,18 @@ pub(crate) fn derive_display_name_from_profile_header(header: &str) -> Option<St
 
 fn build_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(PROFILE_FETCH_TIMEOUT_SECONDS))
+        .timeout(std::time::Duration::from_secs(
+            PROFILE_FETCH_TIMEOUT_SECONDS,
+        ))
         .redirect(Policy::limited(10))
         .user_agent("DVA Flight Planner")
         .build()
-        .map_err(|error| format!("fetch_failed: Unable to initialize Delta Virtual profile client: {error}"))
+        .map_err(|error| {
+            format!("fetch_failed: Unable to initialize Delta Virtual profile client: {error}")
+        })
 }
 
-fn parse_profile_header_text(
-    document: &Html,
-) -> (Option<String>, Option<String>, Option<String>) {
+fn parse_profile_header_text(document: &Html) -> (Option<String>, Option<String>, Option<String>) {
     let selectors = ["h1", "h2", "h3", "header", "strong", "td", "th", "title"];
     let mut candidates = Vec::new();
 
@@ -132,14 +134,23 @@ fn parse_profile_header_text(
             continue;
         };
 
-        let pilot_code = normalize_text(captures.name("pilot_code").map(|value| value.as_str()).unwrap_or(""));
+        let pilot_code = normalize_text(
+            captures
+                .name("pilot_code")
+                .map(|value| value.as_str())
+                .unwrap_or(""),
+        );
         if pilot_code.is_empty() {
             continue;
         }
 
         let display_name = derive_display_name_from_profile_header(&candidate);
 
-        return (Some(candidate), display_name, Some(pilot_code.to_uppercase()));
+        return (
+            Some(candidate),
+            display_name,
+            Some(pilot_code.to_uppercase()),
+        );
     }
 
     (None, None, None)
@@ -189,7 +200,8 @@ fn extract_total_block_time_minutes(document: &Html) -> Option<i64> {
             .unwrap_or_default()
             .to_ascii_lowercase();
 
-        if label_text != "total flights" && !row_text.to_ascii_lowercase().contains("total flights") {
+        if label_text != "total flights" && !row_text.to_ascii_lowercase().contains("total flights")
+        {
             continue;
         }
 
@@ -256,7 +268,9 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     }
 
     let profile_url = format!("{DELTAVA_PROFILE_URL_PREFIX}{normalized_export_id}");
-    append_sync_log(&format!("pilot-profile:fetch-start exportId={normalized_export_id}"));
+    append_sync_log(&format!(
+        "pilot-profile:fetch-start exportId={normalized_export_id}"
+    ));
 
     let client = build_client()?;
     let response = match client.get(&profile_url).send().await {
@@ -265,7 +279,9 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
             append_sync_log(&format!(
                 "pilot-profile:fetch-status exportId={normalized_export_id} ok=false status=request_failed finalUrl={profile_url}"
             ));
-            return Err(format!("fetch_failed: Delta Virtual profile request failed: {error}"));
+            return Err(format!(
+                "fetch_failed: Delta Virtual profile request failed: {error}"
+            ));
         }
     };
 
@@ -277,16 +293,17 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
             .map(|code| code.is_success())
             .unwrap_or(false)
     ));
-    let html_text = response
-        .text()
-        .await
-        .map_err(|error| format!("fetch_failed: Unable to read Delta Virtual profile response: {error}"))?;
+    let html_text = response.text().await.map_err(|error| {
+        format!("fetch_failed: Unable to read Delta Virtual profile response: {error}")
+    })?;
 
     if !reqwest::StatusCode::from_u16(status)
         .map(|code| code.is_success())
         .unwrap_or(false)
     {
-        return Err(format!("http_status: Delta Virtual profile request returned HTTP {status}."));
+        return Err(format!(
+            "http_status: Delta Virtual profile request returned HTTP {status}."
+        ));
     }
 
     let document = Html::parse_document(&html_text);
@@ -330,25 +347,6 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
     Ok(metadata)
 }
 
-pub(crate) fn build_unavailable_pilot_profile_metadata(
-    export_id: Option<&str>,
-    profile_url: Option<&str>,
-) -> DeltaLogbookPilotProfileMetadata {
-    DeltaLogbookPilotProfileMetadata {
-        export_id: export_id.map(|value| normalize_text(value)).filter(|value| !value.is_empty()),
-        profile_url: profile_url.map(|value| normalize_text(value)).filter(|value| !value.is_empty()),
-        raw_profile_header: None,
-        display_name: None,
-        rank: None,
-        name: None,
-        pilot_code: None,
-        equipment_type: None,
-        flying_since_year: None,
-        total_block_time_minutes: None,
-        fetched_at_utc: Some(Utc::now().to_rfc3339()),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,7 +368,10 @@ mod tests {
 
         let (raw_profile_header, display_name, pilot_code) = parse_profile_header_text(&document);
 
-        assert_eq!(raw_profile_header.as_deref(), Some("CAPTAIN JACOB BENJAMIN (DVA11384)"));
+        assert_eq!(
+            raw_profile_header.as_deref(),
+            Some("CAPTAIN JACOB BENJAMIN (DVA11384)")
+        );
         assert_eq!(display_name.as_deref(), Some("Captain Jacob Benjamin"));
         assert_eq!(pilot_code.as_deref(), Some("DVA11384"));
     }

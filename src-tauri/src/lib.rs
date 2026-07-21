@@ -4,12 +4,10 @@ mod domain;
 mod models;
 mod services;
 
-pub(crate) use app::paths::{
-    DELTAVA_LOGBOOK_FILE, DELTAVA_SYNC_DOWNLOAD_FILE,
-};
+pub(crate) use app::paths::{DELTAVA_LOGBOOK_FILE, DELTAVA_SYNC_DOWNLOAD_FILE};
 pub(crate) use app::{
-    append_sync_log, append_sync_log_debug, build_webview_data_directory,
-    initialize_sync_log_path, iso_now_utc, DeltaSyncManager,
+    append_sync_log, append_sync_log_debug, build_webview_data_directory, initialize_sync_log_path,
+    iso_now_utc, DeltaSyncManager,
 };
 pub(crate) use models::{AddonAirportCache, AddonAirportScanDetail};
 pub(crate) use models::{

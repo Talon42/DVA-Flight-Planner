@@ -12,8 +12,13 @@ pub(crate) async fn start_deltava_sync(
     sync_run_id: String,
     debug_enabled: bool,
 ) -> Result<crate::DeltaSyncPayload, String> {
-    crate::services::deltava::sync::start_deltava_sync(app, sync_manager, sync_run_id, debug_enabled)
-        .await
+    crate::services::deltava::sync::start_deltava_sync(
+        app,
+        sync_manager,
+        sync_run_id,
+        debug_enabled,
+    )
+    .await
 }
 
 #[tauri::command]

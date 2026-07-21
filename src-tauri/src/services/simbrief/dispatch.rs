@@ -582,7 +582,11 @@ fn spawn_simbrief_background_fetch(
         )
         .await;
         let fetch_succeeded = result.is_ok();
-        append_simbrief_debug_log(&app, debug_enabled, &format!("fetch-finished ok={fetch_succeeded}"));
+        append_simbrief_debug_log(
+            &app,
+            debug_enabled,
+            &format!("fetch-finished ok={fetch_succeeded}"),
+        );
         let dispatch_error = result.as_ref().err().cloned();
 
         if fetch_succeeded {

@@ -9,12 +9,14 @@ use tokio::sync::oneshot;
 use uuid::Uuid;
 
 use crate::{
-    append_sync_log, build_webview_data_directory, initialize_sync_log_path,
     app::state::DeltaSyncFinishOutcome,
+    append_sync_log, build_webview_data_directory, initialize_sync_log_path,
     services::{
         deltava::auth::{read_auth_context_internal, DeltaVirtualAuthContext},
         webview::{
-            injected_scripts::{build_deltava_auto_sync_script, build_deltava_logbook_refresh_script},
+            injected_scripts::{
+                build_deltava_auto_sync_script, build_deltava_logbook_refresh_script,
+            },
             window_factory,
         },
     },
@@ -125,9 +127,11 @@ pub(crate) async fn start_deltava_sync(
         Ok(window) => window,
         Err(error) => {
             // Once the manager is active, any startup failure must clear it before returning.
-            let outcome = app
-                .state::<crate::DeltaSyncManager>()
-                .finish(window_factory::DELTAVA_SYNC_LABEL, &sync_nonce, Err(error.clone()));
+            let outcome = app.state::<crate::DeltaSyncManager>().finish(
+                window_factory::DELTAVA_SYNC_LABEL,
+                &sync_nonce,
+                Err(error.clone()),
+            );
             if outcome != DeltaSyncFinishOutcome::Completed {
                 log_ignored_finish("startup-error", outcome);
             }
@@ -203,10 +207,13 @@ pub(crate) async fn refresh_deltava_logbook(
     let started_at = Instant::now();
 
     let webview_data_directory = build_webview_data_directory(&app)?;
-    let refresh_download_path = crate::app::paths::deltava_sync_dir(&app)?.join("logbook-refresh").join("refresh.tmp");
+    let refresh_download_path = crate::app::paths::deltava_sync_dir(&app)?
+        .join("logbook-refresh")
+        .join("refresh.tmp");
     if let Some(parent) = refresh_download_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("download_failed: Unable to create logbook refresh directory: {error}"))?;
+        fs::create_dir_all(parent).map_err(|error| {
+            format!("download_failed: Unable to create logbook refresh directory: {error}")
+        })?;
     }
     let focus_lost_at = Arc::new(Mutex::new(None::<Instant>));
     let (auth_context, auth_loaded_from_storage) = match read_auth_context_internal(&app) {
@@ -232,12 +239,13 @@ pub(crate) async fn refresh_deltava_logbook(
         ));
     }
 
-    let login_automation_script = crate::services::deltava::login::build_deltava_login_automation_script(
-        &auth_context,
-        DELTAVA_LOGIN_URL,
-        DELTAVA_LOGBOOK_URL,
-        &sync_nonce,
-    );
+    let login_automation_script =
+        crate::services::deltava::login::build_deltava_login_automation_script(
+            &auth_context,
+            DELTAVA_LOGIN_URL,
+            DELTAVA_LOGBOOK_URL,
+            &sync_nonce,
+        );
     let refresh_script = build_deltava_logbook_refresh_script(&sync_nonce);
 
     let (sender, receiver) = oneshot::channel();
@@ -267,9 +275,11 @@ pub(crate) async fn refresh_deltava_logbook(
     ) {
         Ok(window) => window,
         Err(error) => {
-            let outcome = app
-                .state::<crate::DeltaSyncManager>()
-                .finish(window_factory::DELTAVA_SYNC_LABEL, &sync_nonce, Err(error.clone()));
+            let outcome = app.state::<crate::DeltaSyncManager>().finish(
+                window_factory::DELTAVA_SYNC_LABEL,
+                &sync_nonce,
+                Err(error.clone()),
+            );
             if outcome != DeltaSyncFinishOutcome::Completed {
                 log_ignored_finish("logbook-refresh-startup-error", outcome);
             }
@@ -308,7 +318,10 @@ pub(crate) async fn refresh_deltava_logbook(
             let outcome = app.state::<crate::DeltaSyncManager>().finish(
                 window_factory::DELTAVA_SYNC_LABEL,
                 &sync_nonce,
-                Err("auth_failed: Timed out waiting for Delta Virtual login or logbook refresh.".into()),
+                Err(
+                    "auth_failed: Timed out waiting for Delta Virtual login or logbook refresh."
+                        .into(),
+                ),
             );
             if outcome != DeltaSyncFinishOutcome::Completed {
                 log_ignored_finish("logbook-refresh-timeout", outcome);

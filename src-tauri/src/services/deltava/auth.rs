@@ -137,9 +137,9 @@ pub fn clear_auth_settings_internal(app: &AppHandle) -> Result<(), String> {
         (Ok(()), Ok(())) => Ok(()),
         (Err(file_error), Ok(())) => Err(file_error),
         (Ok(()), Err(credential_error)) => Err(credential_error),
-        (Err(file_error), Err(credential_error)) => Err(format!(
-            "{file_error}; {credential_error}"
-        )),
+        (Err(file_error), Err(credential_error)) => {
+            Err(format!("{file_error}; {credential_error}"))
+        }
     }
 }
 

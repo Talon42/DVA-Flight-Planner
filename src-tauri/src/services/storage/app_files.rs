@@ -70,7 +70,10 @@ fn path(app: &AppHandle, file: AppFile) -> Result<PathBuf, String> {
 
 fn validate_size(file: AppFile, byte_count: u64) -> Result<(), String> {
     if byte_count > file.max_bytes() {
-        return Err(format!("App storage value exceeded the {} byte limit.", file.max_bytes()));
+        return Err(format!(
+            "App storage value exceeded the {} byte limit.",
+            file.max_bytes()
+        ));
     }
     Ok(())
 }
@@ -82,7 +85,8 @@ pub(crate) fn read(app: &AppHandle, key: &str) -> Result<Option<String>, String>
     if !path.is_file() {
         return Ok(None);
     }
-    let metadata = fs::metadata(&path).map_err(|_| "Unable to read app storage metadata.".to_string())?;
+    let metadata =
+        fs::metadata(&path).map_err(|_| "Unable to read app storage metadata.".to_string())?;
     validate_size(file, metadata.len())?;
     fs::read_to_string(path)
         .map(Some)
@@ -102,9 +106,15 @@ pub(crate) fn write(app: &AppHandle, key: &str, contents: &str) -> Result<(), St
 }
 
 fn write_text_atomic(path: &std::path::Path, contents: &str) -> Result<(), String> {
-    let parent = path.parent().ok_or_else(|| "Unable to resolve app storage directory.".to_string())?;
-    fs::create_dir_all(parent).map_err(|_| "Unable to create app storage directory.".to_string())?;
-    let file_name = path.file_name().and_then(|value| value.to_str()).ok_or_else(|| "Unable to resolve app storage file.".to_string())?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| "Unable to resolve app storage directory.".to_string())?;
+    fs::create_dir_all(parent)
+        .map_err(|_| "Unable to create app storage directory.".to_string())?;
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "Unable to resolve app storage file.".to_string())?;
     let temp_path = path.with_file_name(format!("{file_name}.tmp"));
     let backup_path = path.with_file_name(format!("{file_name}.bak"));
     let _ = fs::remove_file(&temp_path);
@@ -112,7 +122,8 @@ fn write_text_atomic(path: &std::path::Path, contents: &str) -> Result<(), Strin
     fs::write(&temp_path, contents).map_err(|_| "Unable to stage app storage file.".to_string())?;
     let had_previous = path.exists();
     if had_previous {
-        fs::rename(path, &backup_path).map_err(|_| "Unable to stage previous app storage file.".to_string())?;
+        fs::rename(path, &backup_path)
+            .map_err(|_| "Unable to stage previous app storage file.".to_string())?;
     }
     if fs::rename(&temp_path, path).is_err() {
         if had_previous {
@@ -122,7 +133,8 @@ fn write_text_atomic(path: &std::path::Path, contents: &str) -> Result<(), Strin
         return Err("Unable to finalize app storage file.".to_string());
     }
     if had_previous {
-        fs::remove_file(backup_path).map_err(|_| "Unable to clean up app storage backup.".to_string())?;
+        fs::remove_file(backup_path)
+            .map_err(|_| "Unable to clean up app storage backup.".to_string())?;
     }
     Ok(())
 }
@@ -145,8 +157,11 @@ pub(crate) fn quarantine(app: &AppHandle, key: &str) -> Result<(), String> {
         chrono::Utc::now().timestamp_millis(),
         &file_name[dot..]
     );
-    fs::rename(path, crate::app::paths::app_storage_dir(app)?.join(quarantine_name))
-        .map_err(|_| "Unable to quarantine malformed app storage file.".to_string())
+    fs::rename(
+        path,
+        crate::app::paths::app_storage_dir(app)?.join(quarantine_name),
+    )
+    .map_err(|_| "Unable to quarantine malformed app storage file.".to_string())
 }
 
 // Creates the allowlisted app log when the user asks to open it.
@@ -173,7 +188,10 @@ mod tests {
     #[test]
     fn fixed_keys_preserve_existing_file_names() {
         assert_eq!(AppFile::SavedSchedule.file_name(), "saved-schedule.json");
-        assert_eq!(AppFile::DeltavaTourProgress.file_name(), "dva-tour-progress.json");
+        assert_eq!(
+            AppFile::DeltavaTourProgress.file_name(),
+            "dva-tour-progress.json"
+        );
         assert!(AppFile::SimbriefSettings.requires_json());
         assert!(!AppFile::WhatsNewState.requires_json());
     }

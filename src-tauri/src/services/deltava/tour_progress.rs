@@ -1208,7 +1208,10 @@ fn write_tour_progress_cache(
     fs::write(&path, serialized).map_err(|error| {
         format!("download_failed: Unable to write Delta Virtual tour progress cache: {error}")
     })?;
-    crate::append_sync_log_debug(debug_enabled, &format!("tour-progress:write {}", path.display()));
+    crate::append_sync_log_debug(
+        debug_enabled,
+        &format!("tour-progress:write {}", path.display()),
+    );
     Ok(())
 }
 

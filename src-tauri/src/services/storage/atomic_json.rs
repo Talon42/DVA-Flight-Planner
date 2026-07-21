@@ -28,8 +28,8 @@ fn restore_backup(final_path: &Path, backup_path: &Path) -> Result<(), String> {
 }
 
 fn verify_json_file(path: &Path, expected: &Value) -> Result<(), String> {
-    let mut file = File::open(path)
-        .map_err(|error| format!("Unable to open replaced JSON file: {error}"))?;
+    let mut file =
+        File::open(path).map_err(|error| format!("Unable to open replaced JSON file: {error}"))?;
     let mut text = String::new();
     file.read_to_string(&mut text)
         .map_err(|error| format!("Unable to read replaced JSON file: {error}"))?;
@@ -181,7 +181,8 @@ mod tests {
         fs::create_dir_all(&directory).unwrap();
         fs::write(&path, r#"{"revision":1}"#).unwrap();
 
-        write_atomic_json(&path, r#"{"revision":2}"#).expect("existing JSON file should be replaced");
+        write_atomic_json(&path, r#"{"revision":2}"#)
+            .expect("existing JSON file should be replaced");
 
         assert_eq!(fs::read_to_string(&path).unwrap(), r#"{"revision":2}"#);
         assert!(!sibling_path(&path, ".tmp").unwrap().exists());

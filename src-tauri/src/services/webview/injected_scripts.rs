@@ -1,7 +1,10 @@
 use serde::Serialize;
 
 use crate::services::deltava::{
-    constants::{DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX, DELTAVA_SYNC_RESULT_MESSAGE_PREFIX},
+    constants::{
+        DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX,
+        DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
+    },
     sync_types::{
         MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES, MAX_DELTAVA_LOGBOOK_JSON_BYTES,
         MAX_DELTAVA_LOGBOOK_PAGE_HTML_BYTES, MAX_DELTAVA_SCHEDULE_XML_BYTES,
@@ -242,51 +245,67 @@ fn limits() -> ScriptLimits {
 fn build_script(config: SyncScriptConfig<'_>, nonce: &str) -> String {
     let config = serde_json::to_string(&config).unwrap_or_else(|_| "{}".to_string());
     let nonce = serde_json::to_string(nonce).unwrap_or_else(|_| "\"\"".to_string());
-    DELTAVA_SYNC_SCRIPT.replace("__CONFIG__", &config).replace("__NONCE__", &nonce)
+    DELTAVA_SYNC_SCRIPT
+        .replace("__CONFIG__", &config)
+        .replace("__NONCE__", &nonce)
 }
 
 pub(crate) fn build_deltava_auto_sync_script(nonce: &str) -> String {
-    build_script(SyncScriptConfig {
-        mode: "full",
-        target_url: "https://www.deltava.org/pfpxsched.ws",
-        schedule_url: Some("https://www.deltava.org/pfpxsched.ws"),
-        logbook_page_url: "https://www.deltava.org/logbook.do",
-        logbook_export_url: "https://www.deltava.org/mylogbook.ws",
-        accomplishment_url: Some("https://www.deltava.org/acceligibility.do"),
-        sync_flag_key: "flightPlannerDeltaSyncRequested",
-        requested_key: "__flightPlannerDeltaSyncRequested",
-        listeners_bound_key: "__flightPlannerDeltaSyncListenersBound",
-        pending_key: "__flightPlannerDeltaSyncPending",
-        downloads_posted_key: "__flightPlannerDeltaDownloadsPosted",
-        result_prefix: DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
-        debug_prefix: DELTAVA_DEBUG_MESSAGE_PREFIX,
-        overlay_text: "Downloading and processing schedule...",
-        overlay_icon: "⌛",
-        enabled_artifacts: EnabledArtifacts { schedule: true, logbook: true, accomplishments: true },
-        limits: limits(),
-    }, nonce)
+    build_script(
+        SyncScriptConfig {
+            mode: "full",
+            target_url: "https://www.deltava.org/pfpxsched.ws",
+            schedule_url: Some("https://www.deltava.org/pfpxsched.ws"),
+            logbook_page_url: "https://www.deltava.org/logbook.do",
+            logbook_export_url: "https://www.deltava.org/mylogbook.ws",
+            accomplishment_url: Some("https://www.deltava.org/acceligibility.do"),
+            sync_flag_key: "flightPlannerDeltaSyncRequested",
+            requested_key: "__flightPlannerDeltaSyncRequested",
+            listeners_bound_key: "__flightPlannerDeltaSyncListenersBound",
+            pending_key: "__flightPlannerDeltaSyncPending",
+            downloads_posted_key: "__flightPlannerDeltaDownloadsPosted",
+            result_prefix: DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
+            debug_prefix: DELTAVA_DEBUG_MESSAGE_PREFIX,
+            overlay_text: "Downloading and processing schedule...",
+            overlay_icon: "⌛",
+            enabled_artifacts: EnabledArtifacts {
+                schedule: true,
+                logbook: true,
+                accomplishments: true,
+            },
+            limits: limits(),
+        },
+        nonce,
+    )
 }
 
 pub(crate) fn build_deltava_logbook_refresh_script(nonce: &str) -> String {
-    build_script(SyncScriptConfig {
-        mode: "logbookRefresh",
-        target_url: "https://www.deltava.org/logbook.do",
-        schedule_url: None,
-        logbook_page_url: "https://www.deltava.org/logbook.do",
-        logbook_export_url: "https://www.deltava.org/mylogbook.ws",
-        accomplishment_url: None,
-        sync_flag_key: "flightPlannerDeltaLogbookRefreshRequested",
-        requested_key: "__flightPlannerDeltaLogbookRefreshRequested",
-        listeners_bound_key: "__flightPlannerDeltaLogbookRefreshListenersBound",
-        pending_key: "__flightPlannerDeltaLogbookRefreshPending",
-        downloads_posted_key: "__flightPlannerDeltaLogbookRefreshPosted",
-        result_prefix: DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX,
-        debug_prefix: DELTAVA_DEBUG_MESSAGE_PREFIX,
-        overlay_text: "Refreshing your logbook data...",
-        overlay_icon: "⟳",
-        enabled_artifacts: EnabledArtifacts { schedule: false, logbook: true, accomplishments: false },
-        limits: limits(),
-    }, nonce)
+    build_script(
+        SyncScriptConfig {
+            mode: "logbookRefresh",
+            target_url: "https://www.deltava.org/logbook.do",
+            schedule_url: None,
+            logbook_page_url: "https://www.deltava.org/logbook.do",
+            logbook_export_url: "https://www.deltava.org/mylogbook.ws",
+            accomplishment_url: None,
+            sync_flag_key: "flightPlannerDeltaLogbookRefreshRequested",
+            requested_key: "__flightPlannerDeltaLogbookRefreshRequested",
+            listeners_bound_key: "__flightPlannerDeltaLogbookRefreshListenersBound",
+            pending_key: "__flightPlannerDeltaLogbookRefreshPending",
+            downloads_posted_key: "__flightPlannerDeltaLogbookRefreshPosted",
+            result_prefix: DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX,
+            debug_prefix: DELTAVA_DEBUG_MESSAGE_PREFIX,
+            overlay_text: "Refreshing your logbook data...",
+            overlay_icon: "⟳",
+            enabled_artifacts: EnabledArtifacts {
+                schedule: false,
+                logbook: true,
+                accomplishments: false,
+            },
+            limits: limits(),
+        },
+        nonce,
+    )
 }
 
 #[cfg(test)]
@@ -297,7 +316,12 @@ mod tests {
         assert!(!script.contains("__CONFIG__"));
         assert!(!script.contains("__NONCE__"));
         assert_eq!(script.matches("const readBoundedText = async").count(), 1);
-        assert_eq!(script.matches("const fetchLogbookJsonExport = async").count(), 1);
+        assert_eq!(
+            script
+                .matches("const fetchLogbookJsonExport = async")
+                .count(),
+            1
+        );
         assert!(script.contains("nonce-test"));
     }
 

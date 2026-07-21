@@ -88,7 +88,8 @@ fn extract_missing_airports(eligibility_text: &str) -> (Vec<String>, Vec<String>
 
     if let Some(regex) = airport_regex {
         for capture in regex.captures_iter(eligibility_text) {
-            let label = normalize_whitespace(capture.get(1).map(|value| value.as_str()).unwrap_or(""));
+            let label =
+                normalize_whitespace(capture.get(1).map(|value| value.as_str()).unwrap_or(""));
             if label.is_empty() {
                 continue;
             }
@@ -122,7 +123,8 @@ fn is_eligibility_text(value: &str) -> bool {
 }
 
 fn pick_name(cells: &[String], unit_index: usize, eligibility_index: usize) -> Option<String> {
-    cells.iter()
+    cells
+        .iter()
         .enumerate()
         .find_map(|(index, value)| {
             if index == unit_index || index == eligibility_index {
@@ -139,7 +141,8 @@ fn pick_name(cells: &[String], unit_index: usize, eligibility_index: usize) -> O
 }
 
 fn pick_requirement_text(cells: &[String], unit_index: usize, eligibility_index: usize) -> String {
-    cells.iter()
+    cells
+        .iter()
         .enumerate()
         .find_map(|(index, value)| {
             if index == unit_index || index == eligibility_index {

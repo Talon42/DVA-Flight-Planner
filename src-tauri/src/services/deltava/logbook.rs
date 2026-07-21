@@ -129,44 +129,13 @@ fn read_logbook_artifact_from_path(path: PathBuf) -> LogbookArtifactRead {
     LogbookArtifactRead::Valid { path, document }
 }
 
-fn collect_json_paths(logbook_dir: &Path) -> Vec<PathBuf> {
-    let mut json_paths = fs::read_dir(logbook_dir)
-        .ok()
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            let is_json = path
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .map(|extension| extension.eq_ignore_ascii_case("json"))
-                .unwrap_or(false);
-
-            if path.is_file() && is_json {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-
-    json_paths.sort();
-    json_paths
-}
-
 pub(crate) fn remove_stale_logbook_json_files(logbook_dir: &Path) {
-    for path in collect_json_paths(logbook_dir) {
-        let file_name = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name.to_ascii_lowercase())
-            .unwrap_or_default();
-
-        if file_name == DELTAVA_LOGBOOK_FILE.to_ascii_lowercase() {
+    // Only remove the exact legacy artifact; profile and future cache files are independent data.
+    for file_name in [crate::app::paths::DELTAVA_LOGBOOK_FALLBACK_FILE] {
+        let path = logbook_dir.join(file_name);
+        if !path.is_file() {
             continue;
         }
-
         if let Err(error) = fs::remove_file(&path) {
             append_sync_log(&format!(
                 "logbook:cleanup-skip {} ({error})",
@@ -294,7 +263,9 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
     let artifact = read_logbook_artifact(app);
     let (path, json) = match artifact {
         LogbookArtifactRead::Valid { path, document } => (path, document),
-        LogbookArtifactRead::Missing => return empty_logbook_cache(app, crate::LOGBOOK_STATUS_MISSING, None, None),
+        LogbookArtifactRead::Missing => {
+            return empty_logbook_cache(app, crate::LOGBOOK_STATUS_MISSING, None, None)
+        }
         LogbookArtifactRead::Invalid { path, reason } => {
             append_sync_log(&format!(
                 "logbook:read-invalid {} ({reason})",
@@ -479,6 +450,34 @@ mod tests {
         assert_eq!(artifact.file_name, DELTAVA_LOGBOOK_FILE);
         assert_eq!(artifact.bytes, json_text.len());
 
+        let profile_path = logbook_dir.join(crate::app::paths::DELTAVA_LOGBOOK_PROFILE_FILE);
+        std::fs::write(&profile_path, r#"{"displayName":"Captain Cached"}"#).expect("profile");
+        remove_stale_logbook_json_files(&logbook_dir);
+        assert!(profile_path.exists());
+
+        let _ = std::fs::remove_dir_all(&logbook_dir);
+    }
+
+    #[test]
+    fn store_logbook_json_preserves_profile_cache() {
+        let logbook_dir = unique_test_dir();
+        std::fs::create_dir_all(&logbook_dir).expect("test dir");
+        let profile_path = logbook_dir.join(crate::app::paths::DELTAVA_LOGBOOK_PROFILE_FILE);
+        let profile_json = r#"{"displayName":"Captain Cached"}"#;
+        std::fs::write(&profile_path, profile_json).expect("profile");
+
+        run_async(store_logbook_json_in_dir(
+            &logbook_dir,
+            r#"{"entries":[]}"#,
+            None,
+            false,
+        ))
+        .expect("store logbook");
+
+        assert_eq!(
+            std::fs::read_to_string(profile_path).expect("profile after store"),
+            profile_json
+        );
         let _ = std::fs::remove_dir_all(&logbook_dir);
     }
 

@@ -20,6 +20,7 @@ pub(crate) struct DeltaSyncPayload {
     pub status: String,
     pub xml_status: String,
     pub logbook_status: String,
+    pub profile_status: String,
     pub accomplishment_eligibility: Option<DeltaAccomplishmentEligibilitySummary>,
     pub logbook_json: Option<DeltaLogbookArtifact>,
     pub warnings: Vec<String>,

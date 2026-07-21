@@ -1,7 +1,7 @@
 pub(crate) mod addon_airports;
 pub(crate) mod deltava_auth;
-pub(crate) mod deltava_logbook;
 pub(crate) mod deltava_draft;
+pub(crate) mod deltava_logbook;
 pub(crate) mod deltava_pirep_details;
 pub(crate) mod deltava_sync;
 pub(crate) mod deltava_tours;

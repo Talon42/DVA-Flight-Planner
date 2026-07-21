@@ -105,7 +105,9 @@ fn normalize_label_text(value: &str) -> String {
 
 fn normalize_hex_id(value: &serde_json::Value) -> Option<String> {
     match value {
-        serde_json::Value::Number(number) => number.as_u64().map(|numeric| format!("0x{:x}", numeric)),
+        serde_json::Value::Number(number) => {
+            number.as_u64().map(|numeric| format!("0x{:x}", numeric))
+        }
         serde_json::Value::String(text) => normalize_hex_id_text(text),
         _ => None,
     }
@@ -124,7 +126,10 @@ fn normalize_hex_id_text(value: &str) -> Option<String> {
     }
 
     if normalized.chars().all(|ch| ch.is_ascii_digit()) {
-        return normalized.parse::<u64>().ok().map(|numeric| format!("0x{:x}", numeric));
+        return normalized
+            .parse::<u64>()
+            .ok()
+            .map(|numeric| format!("0x{:x}", numeric));
     }
 
     None
@@ -135,8 +140,9 @@ fn resolve_pirep_url(request: &DeltaVirtualPirepDetailsRequest) -> Result<(Strin
         return Err("invalid_id: Delta Virtual PIREP id was missing or invalid.".into());
     };
 
-    let numeric_id = u64::from_str_radix(hex_id.trim_start_matches("0x"), 16)
-        .map_err(|error| format!("invalid_id: Delta Virtual PIREP id could not be parsed: {error}"))?;
+    let numeric_id = u64::from_str_radix(hex_id.trim_start_matches("0x"), 16).map_err(|error| {
+        format!("invalid_id: Delta Virtual PIREP id could not be parsed: {error}")
+    })?;
 
     Ok((format!("{DELTAVA_PIREP_URL_PREFIX}{hex_id}"), numeric_id))
 }
@@ -227,7 +233,12 @@ fn parse_payload_weight_details(raw: &str) -> String {
 }
 
 // Pulls a normalized field value from either the first two cells or the full row text.
-fn extract_row_value(label: &str, value: &str, row_text: &str, expected_label: &str) -> Option<String> {
+fn extract_row_value(
+    label: &str,
+    value: &str,
+    row_text: &str,
+    expected_label: &str,
+) -> Option<String> {
     let normalized_label = normalize_label_text(label);
     let normalized_value = normalize_text(value);
     if normalized_label == expected_label && !normalized_value.is_empty() {
@@ -279,7 +290,8 @@ fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
             .unwrap_or_default();
         let normalized_label = normalize_label_text(&label);
         // Only match the current DVA labels here; the legacy bare "Payload" row should stay ignored.
-        let passengers_carried_source = extract_row_value(&label, &value, &row_text, "passengers carried");
+        let passengers_carried_source =
+            extract_row_value(&label, &value, &row_text, "passengers carried");
         let payload_weight_source = extract_row_value(&label, &value, &row_text, "payload weight");
 
         match normalized_label.as_str() {
@@ -303,7 +315,8 @@ fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
             }
             "takeoff runway" => {
                 parsed.departure_runway_raw = value;
-                parsed.departure_runway_details = parse_runway_details(&parsed.departure_runway_raw);
+                parsed.departure_runway_details =
+                    parse_runway_details(&parsed.departure_runway_raw);
                 parsed.found_takeoff_runway = true;
             }
             "landing runway" => {
@@ -318,7 +331,8 @@ fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
             if let Some(passengers_carried_source) = passengers_carried_source {
                 parsed.found_passengers_carried = true;
                 parsed.passengers_carried_raw = passengers_carried_source;
-                parsed.payload_passengers = parse_passengers_carried_details(&parsed.passengers_carried_raw);
+                parsed.payload_passengers =
+                    parse_passengers_carried_details(&parsed.passengers_carried_raw);
             }
         }
 
@@ -389,7 +403,9 @@ fn build_client() -> Result<reqwest::Client, String> {
         .redirect(Policy::limited(10))
         .user_agent("DVA Flight Planner")
         .build()
-        .map_err(|error| format!("fetch_failed: Unable to initialize Delta Virtual HTTP client: {error}"))
+        .map_err(|error| {
+            format!("fetch_failed: Unable to initialize Delta Virtual HTTP client: {error}")
+        })
 }
 
 fn log_parse_summary(parsed: &ParsedPirepDetails) {
@@ -412,20 +428,21 @@ pub async fn fetch_delta_virtual_pirep_details(
     request: DeltaVirtualPirepDetailsRequest,
 ) -> Result<DeltaVirtualPirepDetailsResult, String> {
     let (source_url, numeric_id) = resolve_pirep_url(&request)?;
-    crate::append_sync_log(&format!("pirep-details:fetch-start id={}", source_url.rsplit('=').next().unwrap_or("")));
+    crate::append_sync_log(&format!(
+        "pirep-details:fetch-start id={}",
+        source_url.rsplit('=').next().unwrap_or("")
+    ));
 
-    let response = client
-        .get(&source_url)
-        .send()
-        .await
-        .map_err(|error| format!("fetch_failed: Delta Virtual PIREP request failed: {error}"))?;
+    let response =
+        client.get(&source_url).send().await.map_err(|error| {
+            format!("fetch_failed: Delta Virtual PIREP request failed: {error}")
+        })?;
 
     let status = response.status().as_u16();
     let final_url = response.url().to_string();
-    let html_text = response
-        .text()
-        .await
-        .map_err(|error| format!("fetch_failed: Unable to read Delta Virtual PIREP response: {error}"))?;
+    let html_text = response.text().await.map_err(|error| {
+        format!("fetch_failed: Unable to read Delta Virtual PIREP response: {error}")
+    })?;
     crate::append_sync_log(&format!(
         "pirep-details:fetch-status status={status} bytes={} finalUrl={final_url}",
         html_text.len()
@@ -469,15 +486,27 @@ mod tests {
     fn parses_route_and_runway_fields_from_sample_table() {
         let parsed = parse_pirep_detail_html(SAMPLE_HTML);
 
-        assert_eq!(parsed.passengers_carried_raw, "121 passengers (78.57% full)");
-        assert_eq!(parsed.payload_raw, "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)");
+        assert_eq!(
+            parsed.passengers_carried_raw,
+            "121 passengers (78.57% full)"
+        );
+        assert_eq!(
+            parsed.payload_raw,
+            "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)"
+        );
         assert_eq!(parsed.payload_passengers, "121");
         assert_eq!(parsed.payload_cargo, "17,645 lbs");
         assert_eq!(parsed.departure_route, "GLADZ4.LULLS");
         assert_eq!(parsed.flight_route, "LULLS Y196 CANOA UB879 NOSAT");
         assert_eq!(parsed.arrival_route, "NOSA1B.NOSAT");
-        assert_eq!(parsed.departure_runway_raw, "08R (Asphalt - 10,495 feet, takeoff run 6,153 feet)");
-        assert_eq!(parsed.arrival_runway_raw, "12L (was 12) (Asphalt - 9,171 feet, 1,731 feet from threshold)");
+        assert_eq!(
+            parsed.departure_runway_raw,
+            "08R (Asphalt - 10,495 feet, takeoff run 6,153 feet)"
+        );
+        assert_eq!(
+            parsed.arrival_runway_raw,
+            "12L (was 12) (Asphalt - 9,171 feet, 1,731 feet from threshold)"
+        );
     }
 
     #[test]
@@ -502,7 +531,9 @@ mod tests {
 
     #[test]
     fn missing_labels_remain_empty() {
-        let parsed = parse_pirep_detail_html("<html><body><table><tr><td>Other</td><td>Value</td></tr></table></body></html>");
+        let parsed = parse_pirep_detail_html(
+            "<html><body><table><tr><td>Other</td><td>Value</td></tr></table></body></html>",
+        );
         assert_eq!(parsed.payload_raw, "");
         assert_eq!(parsed.payload_passengers, "");
         assert_eq!(parsed.payload_cargo, "");
@@ -523,8 +554,14 @@ mod tests {
             "<html><body><table><tr><td>  pAsSeNgErS\u{00a0}cArRiEd : </td><td>121 passengers (78.57% full)</td></tr><tr><td>  pAyLoAd\u{00a0}WeIgHt : </td><td>163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
         );
 
-        assert_eq!(parsed.passengers_carried_raw, "121 passengers (78.57% full)");
-        assert_eq!(parsed.payload_raw, "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)");
+        assert_eq!(
+            parsed.passengers_carried_raw,
+            "121 passengers (78.57% full)"
+        );
+        assert_eq!(
+            parsed.payload_raw,
+            "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)"
+        );
         assert_eq!(parsed.payload_passengers, "121");
         assert_eq!(parsed.payload_cargo, "17,645 lbs");
         assert_eq!(parsed.departure_route, "ABC");
@@ -536,8 +573,14 @@ mod tests {
             "<html><body><table><tr><td colspan=\"2\">Passengers Carried 121 passengers (78.57% full)</td></tr><tr><td colspan=\"2\">Payload Weight 163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
         );
 
-        assert_eq!(parsed.passengers_carried_raw, "121 passengers (78.57% full)");
-        assert_eq!(parsed.payload_raw, "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)");
+        assert_eq!(
+            parsed.passengers_carried_raw,
+            "121 passengers (78.57% full)"
+        );
+        assert_eq!(
+            parsed.payload_raw,
+            "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)"
+        );
         assert_eq!(parsed.payload_passengers, "121");
         assert_eq!(parsed.payload_cargo, "17,645 lbs");
         assert_eq!(parsed.departure_route, "ABC");
@@ -549,7 +592,10 @@ mod tests {
             "<html><body><table><tr><td>Passengers Carried</td><td>121 passengers (78.57% full)</td></tr><tr><td>Payload</td><td>163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)</td></tr><tr><td>Departure Route</td><td>ABC</td></tr></table></body></html>",
         );
 
-        assert_eq!(parsed.passengers_carried_raw, "121 passengers (78.57% full)");
+        assert_eq!(
+            parsed.passengers_carried_raw,
+            "121 passengers (78.57% full)"
+        );
         assert_eq!(parsed.payload_raw, "");
         assert_eq!(parsed.payload_passengers, "121");
         assert_eq!(parsed.payload_cargo, "");
@@ -590,8 +636,14 @@ mod tests {
         assert_eq!(result.numeric_id, 1911377);
         assert_eq!(result.payload_passengers, "121");
         assert_eq!(result.payload_cargo, "17,645 lbs");
-        assert_eq!(result.payload_raw, "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)");
-        assert_eq!(result.route_summary, "GLADZ4.LULLS LULLS Y196 CANOA UB879 NOSAT NOSA1B.NOSAT");
+        assert_eq!(
+            result.payload_raw,
+            "163 lb passengers, 17,645 lb baggage/cargo (Passenger Load: ASSIGNED)"
+        );
+        assert_eq!(
+            result.route_summary,
+            "GLADZ4.LULLS LULLS Y196 CANOA UB879 NOSAT NOSA1B.NOSAT"
+        );
     }
 
     #[test]

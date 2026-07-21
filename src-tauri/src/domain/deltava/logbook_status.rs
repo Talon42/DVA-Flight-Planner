@@ -45,7 +45,10 @@ impl LogbookStatus {
     }
 
     pub(crate) fn show_in_table(self) -> bool {
-        matches!(self, Self::Approved | Self::Submitted | Self::Held | Self::Rejected)
+        matches!(
+            self,
+            Self::Approved | Self::Submitted | Self::Held | Self::Rejected
+        )
     }
 
     pub(crate) fn include_in_stats(self) -> bool {
@@ -93,10 +96,30 @@ mod tests {
 
         for case in cases {
             let status = LogbookStatus::from_raw(case.raw.as_deref());
-            assert_eq!(status.canonical_key(), case.canonical, "{} canonical", case.name);
-            assert_eq!(status.display_label(), case.display_label, "{} label", case.name);
-            assert_eq!(status.show_in_table(), case.show_in_table, "{} table", case.name);
-            assert_eq!(status.include_in_stats(), case.include_in_stats, "{} stats", case.name);
+            assert_eq!(
+                status.canonical_key(),
+                case.canonical,
+                "{} canonical",
+                case.name
+            );
+            assert_eq!(
+                status.display_label(),
+                case.display_label,
+                "{} label",
+                case.name
+            );
+            assert_eq!(
+                status.show_in_table(),
+                case.show_in_table,
+                "{} table",
+                case.name
+            );
+            assert_eq!(
+                status.include_in_stats(),
+                case.include_in_stats,
+                "{} stats",
+                case.name
+            );
             assert_eq!(
                 status.include_in_airport_progress(),
                 case.include_in_airport_progress,

@@ -1226,7 +1226,10 @@ pub async fn sync_delta_virtual_tours(
     .await
     {
         Ok(Ok(result)) => {
-            let synced_tours = result.as_ref().map(|payload| payload.synced_tours).unwrap_or(0);
+            let synced_tours = result
+                .as_ref()
+                .map(|payload| payload.synced_tours)
+                .unwrap_or(0);
             append_sync_log(&format!(
                 "tour-sync-succeeded syncRunId={sync_run_id} syncedTours={} durationMs={}",
                 synced_tours,

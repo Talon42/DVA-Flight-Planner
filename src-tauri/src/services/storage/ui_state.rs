@@ -4,7 +4,9 @@ const MAX_UI_STATE_BYTES: usize = 5 * 1024 * 1024;
 
 fn validate_ui_state_size(json: &str) -> Result<(), String> {
     if json.len() > MAX_UI_STATE_BYTES {
-        return Err(format!("UI state exceeded the {MAX_UI_STATE_BYTES} byte limit."));
+        return Err(format!(
+            "UI state exceeded the {MAX_UI_STATE_BYTES} byte limit."
+        ));
     }
     Ok(())
 }

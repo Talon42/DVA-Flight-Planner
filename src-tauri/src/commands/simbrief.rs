@@ -29,6 +29,11 @@ pub(crate) async fn start_simbrief_dispatch(
     payload: crate::services::simbrief::dispatch::SimBriefDispatchPayload,
     debug_enabled: bool,
 ) -> Result<crate::services::simbrief::dispatch::SimBriefPlanSummary, String> {
-    crate::services::simbrief::dispatch::start_simbrief_dispatch(app, manager, payload, debug_enabled)
-        .await
+    crate::services::simbrief::dispatch::start_simbrief_dispatch(
+        app,
+        manager,
+        payload,
+        debug_enabled,
+    )
+    .await
 }

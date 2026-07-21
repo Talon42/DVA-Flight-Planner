@@ -104,7 +104,9 @@ impl DraftSubmitManager {
         })?;
 
         if active.is_some() {
-            return Err("submit_failed: A Delta Virtual draft operation is already in progress.".into());
+            return Err(
+                "submit_failed: A Delta Virtual draft operation is already in progress.".into(),
+            );
         }
 
         *active = Some(ActiveDraftSubmit { label, sender });
@@ -198,25 +200,25 @@ fn truncate_log_text(value: &str, limit: usize) -> String {
 }
 
 fn redact_app_log_key(key: &str) -> bool {
-  let normalized = key
-    .trim()
-    .to_ascii_lowercase()
-    .chars()
+    let normalized = key
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
         .filter(|character| character.is_ascii_alphanumeric())
-    .collect::<String>();
+        .collect::<String>();
 
-  matches!(
-    normalized.as_str(),
-    value if value.contains("password")
-        || value.contains("cookie")
-        || value.contains("token")
-        || value.contains("auth")
-        || value.contains("apikey")
-        || value.contains("authorization")
-        || value.contains("setcookie")
-        || value.contains("credential")
-        || value.contains("secret")
-  )
+    matches!(
+      normalized.as_str(),
+      value if value.contains("password")
+          || value.contains("cookie")
+          || value.contains("token")
+          || value.contains("auth")
+          || value.contains("apikey")
+          || value.contains("authorization")
+          || value.contains("setcookie")
+          || value.contains("credential")
+          || value.contains("secret")
+    )
 }
 
 fn sanitize_app_log_value(value: &Value) -> Value {
@@ -242,8 +244,8 @@ fn sanitize_app_log_value(value: &Value) -> Value {
 }
 
 fn format_app_log_value(value: &Value) -> String {
-  match value {
-    Value::Null => "null".to_string(),
+    match value {
+        Value::Null => "null".to_string(),
         Value::Bool(boolean) => boolean.to_string(),
         Value::Number(number) => number.to_string(),
         Value::String(text) => {
@@ -290,8 +292,8 @@ fn format_app_log_data(data: Option<&Value>) -> String {
 }
 
 fn append_draft_app_log_event(app: &AppHandle, event: &str, data: Option<&Value>) {
-  let message = format!("{event}{}", format_app_log_data(data));
-  crate::app::logging::append_app_log(app, "DVA Draft", &message);
+    let message = format!("{event}{}", format_app_log_data(data));
+    crate::app::logging::append_app_log(app, "DVA Draft", &message);
 }
 
 fn append_draft_debug_log_event(
@@ -568,8 +570,7 @@ fn build_deltava_draft_delete_script(
     let draft_report_id_value = draft_report_id.to_string();
     let draft_id_hex = format!("{:x}", draft_report_id);
     let draft_report_id = draft_report_id_value;
-    let draft_id_hex = serde_json::to_string(&draft_id_hex)
-        .unwrap_or_else(|_| "\"0\"".to_string());
+    let draft_id_hex = serde_json::to_string(&draft_id_hex).unwrap_or_else(|_| "\"0\"".to_string());
     let app_log_prefix = serde_json::to_string(app_log_prefix)
         .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_DVA_DRAFT_APP_LOG__\"".to_string());
     let result_prefix = serde_json::to_string(DVA_DRAFT_RESULT_MESSAGE_PREFIX)

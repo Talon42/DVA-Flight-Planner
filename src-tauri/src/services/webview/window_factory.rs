@@ -1,24 +1,24 @@
 use std::{
-    path::PathBuf,
     collections::HashSet,
+    path::PathBuf,
     sync::{Arc, Mutex, OnceLock},
     time::{Duration, Instant},
 };
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 
+use crate::services::deltava::constants::DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX;
 use crate::services::deltava::sync_types::{
-    DeltaWebDebugMessage, DeltaWebLogbookRefreshResult, DeltaWebSyncResult, DeltaWebXmlCaptureMessage,
-    MAX_DELTAVA_DEBUG_MESSAGE_BYTES, MAX_DELTAVA_LOGBOOK_REFRESH_WEB_MESSAGE_BYTES,
-    MAX_DELTAVA_SYNC_WEB_MESSAGE_BYTES, MAX_DELTAVA_XML_CAPTURE_WEB_MESSAGE_BYTES,
+    DeltaWebDebugMessage, DeltaWebLogbookRefreshResult, DeltaWebSyncResult,
+    DeltaWebXmlCaptureMessage, MAX_DELTAVA_DEBUG_MESSAGE_BYTES,
+    MAX_DELTAVA_LOGBOOK_REFRESH_WEB_MESSAGE_BYTES, MAX_DELTAVA_SYNC_WEB_MESSAGE_BYTES,
+    MAX_DELTAVA_XML_CAPTURE_WEB_MESSAGE_BYTES,
 };
 use crate::{
-    app::state::DeltaSyncFinishOutcome,
-    append_sync_log, append_sync_log_debug, DeltaSyncManager,
+    app::state::DeltaSyncFinishOutcome, append_sync_log, append_sync_log_debug, DeltaSyncManager,
     DeltaSyncPayload, DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_DOWNLOAD_FILE,
     DELTAVA_SYNC_RESULT_MESSAGE_PREFIX, DELTAVA_XML_MESSAGE_PREFIX,
 };
-use crate::services::deltava::constants::DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX;
 
 pub(crate) const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
 const DELTAVA_LOGIN_URL: &str = "https://www.deltava.org/login.do";
@@ -394,6 +394,7 @@ fn attach_windows_xml_message_handler(
                                                 status: "partial".into(),
                                                 xml_status: "success".into(),
                                                 logbook_status: "failed".into(),
+                                                profile_status: "skipped".into(),
                                                 accomplishment_eligibility: None,
                                                 logbook_json: None,
                                                 warnings: vec![
@@ -545,6 +546,7 @@ pub(crate) fn build_deltava_sync_window(
                                         status: "partial".into(),
                                         xml_status: "success".into(),
                                         logbook_status: "failed".into(),
+                                        profile_status: "skipped".into(),
                                         accomplishment_eligibility: None,
                                         logbook_json: None,
                                         warnings: vec![
