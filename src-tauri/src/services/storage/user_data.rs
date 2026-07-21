@@ -41,6 +41,12 @@ pub(crate) struct UserDataClearResult {
     failures: Vec<UserDataClearFailure>,
 }
 
+impl UserDataClearResult {
+    pub(crate) fn is_ok(&self) -> bool {
+        self.ok
+    }
+}
+
 fn reason_code(error: &io::Error) -> &'static str {
     match error.kind() {
         io::ErrorKind::PermissionDenied => "access_denied",

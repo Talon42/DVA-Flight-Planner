@@ -66,6 +66,7 @@ export default function AppSettingsContent({
   isDevToolsEnabled,
   onDeleteUserData,
   isDeletingUserData,
+  isUserDataDeletionBlocked = false,
   appBuildGitTag,
   hasWhatsNewCards = false,
   onOpenWhatsNew
@@ -166,7 +167,7 @@ export default function AppSettingsContent({
               <Button
                 variant="danger"
                 onClick={onDeleteUserData}
-                disabled={isDeletingUserData || isImporting || isSyncing || isSimBriefSaving}
+                disabled={isUserDataDeletionBlocked}
               >
                 {isDeletingUserData ? "Deleting..." : "Delete"}
               </Button>

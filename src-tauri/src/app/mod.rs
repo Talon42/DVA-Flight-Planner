@@ -7,7 +7,7 @@ pub(crate) use logging::{
     append_sync_log, append_sync_log_debug, initialize_sync_log_path, iso_now_utc,
 };
 pub(crate) use paths::build_webview_data_directory;
-pub(crate) use state::DeltaSyncManager;
+pub(crate) use state::{DeltaSyncManager, UserDataPersistenceGate};
 pub(crate) use window_state::{persist_main_window_state, restore_main_window_state};
 
 use crate::{
@@ -24,6 +24,7 @@ use tauri::{Manager, WindowEvent};
 pub fn run() {
     tauri::Builder::default()
         .manage(DeltaSyncManager::default())
+        .manage(UserDataPersistenceGate::default())
         .manage(DeltaToursSyncManager::default())
         .manage(DraftSubmitManager::default())
         .manage(SimBriefDispatchManager::default())

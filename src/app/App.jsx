@@ -950,6 +950,13 @@ export default function App() {
     isRefreshingLogbook,
     onRefreshLogbook: handleRefreshDeltaVirtualLogbook
   });
+  const isUserDataWriterBusy =
+    isImporting ||
+    isSyncing ||
+    isRefreshingLogbook ||
+    isSimBriefSaving ||
+    isDvaCredentialsSaving ||
+    isAddonScanBusy;
   const {
     isDeletingUserData,
     clearFailure: userDataClearFailure,
@@ -958,8 +965,10 @@ export default function App() {
     reloadAfterUserDataClearFailure
   } = useUserDataLifecycle({
     confirmDelete: confirmDeleteUserDataInApp,
+    isDeleteBlocked: isUserDataWriterBusy,
     prepareForUserDataClear: logbookWorkspace.prepareForUserDataClear
   });
+  const isUserDataDeletionBlocked = isDeletingUserData || isUserDataWriterBusy;
   logbookSyncCompleteRef.current = logbookWorkspace.handleSyncComplete;
   const uiStateSnapshot = useMemo(() => ({
       plannerMode,
@@ -1602,6 +1611,7 @@ export default function App() {
       isDevToolsEnabled={isDevToolsEnabled}
       onDeleteUserData={handleDeleteUserData}
       isDeletingUserData={isDeletingUserData}
+      isUserDataDeletionBlocked={isUserDataDeletionBlocked}
       appBuildGitTag={APP_BUILD_GIT_TAG}
       hasWhatsNewCards={hasWhatsNewCards}
       onOpenWhatsNew={handleOpenWhatsNewFromSettings}
@@ -1817,6 +1827,7 @@ export default function App() {
     onRemoveAddonRoot: handleRemoveAddonRoot,
     onSkipAddonSetup: handleSkipAddonSetup,
     isDeleteUserDataConfirmOpen,
+    isUserDataDeletionBlocked,
     onResolveDeleteUserDataConfirmation: resolveDeleteUserDataConfirmation,
     userDataClearFailure,
     onRetryUserDataClear: retryUserDataClear,

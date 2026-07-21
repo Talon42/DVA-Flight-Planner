@@ -139,6 +139,7 @@ export default function AppOverlayHost({
   onRemoveAddonRoot,
   onSkipAddonSetup,
   isDeleteUserDataConfirmOpen,
+  isUserDataDeletionBlocked,
   onResolveDeleteUserDataConfirmation,
   userDataClearFailure,
   onRetryUserDataClear,
@@ -353,7 +354,11 @@ export default function AppOverlayHost({
               <Button variant="ghost" onClick={() => onResolveDeleteUserDataConfirmation(false)}>
                 Cancel
               </Button>
-              <Button variant="danger" onClick={() => onResolveDeleteUserDataConfirmation(true)}>
+              <Button
+                variant="danger"
+                disabled={isUserDataDeletionBlocked}
+                onClick={() => onResolveDeleteUserDataConfirmation(true)}
+              >
                 Delete
               </Button>
             </div>

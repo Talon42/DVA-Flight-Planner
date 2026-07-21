@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow};
 
 use super::paths::main_window_state_path;
+use super::state::UserDataPersistenceGate;
 
 const MAIN_WINDOW_MIN_WIDTH: u32 = 1024;
 const MAIN_WINDOW_MIN_HEIGHT: u32 = 768;
@@ -63,6 +64,14 @@ pub(crate) fn persist_main_window_state(
     window: &WebviewWindow,
     preserve_bounds_if_maximized: bool,
 ) {
+    if window
+        .app_handle()
+        .state::<UserDataPersistenceGate>()
+        .should_suppress_window_state()
+    {
+        return;
+    }
+
     let Some(state) = capture_main_window_state(window, preserve_bounds_if_maximized) else {
         return;
     };

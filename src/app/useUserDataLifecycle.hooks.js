@@ -13,6 +13,7 @@ import { logAppError } from "../services/logging/appLog.client.js";
 // Owns the suspend-flush-delete-reload lifecycle so deleted state cannot be rewritten.
 export function useUserDataLifecycle({
   confirmDelete,
+  isDeleteBlocked = false,
   prepareForUserDataClear,
   deleteUserData = deleteStoredUserData,
   reloadPage = () => window.location.reload()
@@ -20,17 +21,17 @@ export function useUserDataLifecycle({
   const [isDeletingUserData, setIsDeletingUserData] = useState(false);
   const [clearFailure, setClearFailure] = useState(null);
   const isDeletingRef = useRef(false);
+  const isDeleteBlockedRef = useRef(Boolean(isDeleteBlocked));
+  isDeleteBlockedRef.current = Boolean(isDeleteBlocked);
 
-  const runClear = useCallback(async () => {
-    if (isDeletingRef.current) return false;
-    isDeletingRef.current = true;
+  const executeClear = useCallback(async () => {
     setIsDeletingUserData(true);
     setClearFailure(null);
-    suspendUiStateWrites();
-    suspendSimBriefSettingsWrites();
-    prepareForUserDataClear?.();
 
     try {
+      suspendUiStateWrites();
+      suspendSimBriefSettingsWrites();
+      prepareForUserDataClear?.();
       await Promise.all([flushUiStateWrites(), flushSimBriefSettingsWrites()]);
       const result = await deleteUserData();
       if (result?.ok) {
@@ -46,15 +47,30 @@ export function useUserDataLifecycle({
       await logAppError("delete-user-data-failed", error);
       return false;
     } finally {
-      isDeletingRef.current = false;
       setIsDeletingUserData(false);
     }
   }, [deleteUserData, prepareForUserDataClear, reloadPage]);
 
+  const runClear = useCallback(async () => {
+    if (isDeletingRef.current || isDeleteBlockedRef.current) return false;
+    isDeletingRef.current = true;
+    try {
+      return await executeClear();
+    } finally {
+      isDeletingRef.current = false;
+    }
+  }, [executeClear]);
+
   const handleDeleteUserData = useCallback(async () => {
-    if (isDeletingRef.current || !(await confirmDelete?.())) return false;
-    return runClear();
-  }, [confirmDelete, runClear]);
+    if (isDeletingRef.current || isDeleteBlockedRef.current) return false;
+    isDeletingRef.current = true;
+    try {
+      if (!(await confirmDelete?.()) || isDeleteBlockedRef.current) return false;
+      return await executeClear();
+    } finally {
+      isDeletingRef.current = false;
+    }
+  }, [confirmDelete, executeClear]);
 
   return {
     isDeletingUserData,
