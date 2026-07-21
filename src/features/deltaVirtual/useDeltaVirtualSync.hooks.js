@@ -19,6 +19,7 @@ import {
   syncScheduleFromDeltaVirtual
 } from "../../services/tauri/deltaVirtual.client.js";
 import { buildScheduleDateInfo } from "../../domain/schedule/scheduleDate.js";
+import { clearLogbookPirepDetailsRequests } from "../logbook/logbookPirepDetailsRequests.js";
 
 const DELTA_VIRTUAL_SYNC_FAILURE_GUIDANCE =
   "Delta Virtual Sync failed. Please check your Delta Virtual credentials, try again later, or post the app log on the DVA forums.";
@@ -466,6 +467,7 @@ export function useDeltaVirtualSync({
       setStatusMessage?.("Resetting Delta Virtual sync session...");
       await closeDeltaVirtualSyncWindow();
       await resetDeltaVirtualSyncSession();
+      clearLogbookPirepDetailsRequests();
       setStatusMessage?.("Delta Virtual sync session reset. Try syncing again.");
       await logSystemEvent("DVA Sync Reset", "succeeded");
     } catch (error) {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
-import { fetchDeltaVirtualPirepDetails } from "../../services/tauri/deltaVirtual.client.js";
+import { logbookPirepDetailsRequests } from "./logbookPirepDetailsRequests.js";
 
 const EMPTY_PIREP_DETAILS = {
   id: "",
@@ -19,9 +19,6 @@ const EMPTY_PIREP_DETAILS = {
   arrivalRunwayRaw: "",
   fetchedAt: ""
 };
-
-const pirepDetailsCache = new Map();
-const inFlightPirepDetailsRequests = new Map();
 
 // Normalizes a logbook row or selected-flight object into the DVA PIREP id used by the detail fetch.
 export function buildLogbookPirepId(selectedLogbookFlight) {
@@ -42,37 +39,6 @@ function buildCachedDetails(details) {
     sourceUrl: String(details?.sourceUrl || "").trim(),
     fetchedAt: String(details?.fetchedAt || "").trim()
   };
-}
-
-function getCachedPirepDetails(pirepId) {
-  const cachedDetails = pirepDetailsCache.get(pirepId);
-  return cachedDetails ? buildCachedDetails(cachedDetails) : null;
-}
-
-function getOrFetchPirepDetails(pirepId) {
-  const cachedDetails = getCachedPirepDetails(pirepId);
-  if (cachedDetails) {
-    return Promise.resolve(cachedDetails);
-  }
-
-  const inFlightRequest = inFlightPirepDetailsRequests.get(pirepId);
-  if (inFlightRequest) {
-    return inFlightRequest;
-  }
-
-  const requestPromise = (async () => {
-    try {
-      const fetchedDetails = await fetchDeltaVirtualPirepDetails(pirepId);
-      const normalizedDetails = buildCachedDetails(fetchedDetails);
-      pirepDetailsCache.set(pirepId, normalizedDetails);
-      return normalizedDetails;
-    } finally {
-      inFlightPirepDetailsRequests.delete(pirepId);
-    }
-  })();
-
-  inFlightPirepDetailsRequests.set(pirepId, requestPromise);
-  return requestPromise;
 }
 
 function areShallowObjectsEqual(left, right) {
@@ -120,7 +86,8 @@ export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true }
       return undefined;
     }
 
-    const cachedDetails = getCachedPirepDetails(pirepId);
+    const cachedValue = logbookPirepDetailsRequests.get(pirepId);
+    const cachedDetails = cachedValue ? buildCachedDetails(cachedValue) : null;
     if (cachedDetails) {
       setDetails(cachedDetails);
       setIsLoading(false);
@@ -132,7 +99,7 @@ export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true }
     setIsLoading(true);
     setError("");
 
-    const requestPromise = getOrFetchPirepDetails(pirepId);
+    const requestPromise = logbookPirepDetailsRequests.request(pirepId);
 
     void requestPromise
       .then((fetchedDetails) => {
@@ -140,7 +107,7 @@ export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true }
           return;
         }
 
-        setDetails(fetchedDetails);
+        setDetails(buildCachedDetails(fetchedDetails));
         setError("");
       })
       .catch(() => {
@@ -192,7 +159,8 @@ export function useVisibleLogbookPirepDetails(logbookFlights, { enabled = true, 
     const missingPirepIds = [];
 
     for (const pirepId of pirepIds) {
-      const cachedDetails = getCachedPirepDetails(pirepId);
+      const cachedValue = logbookPirepDetailsRequests.get(pirepId);
+      const cachedDetails = cachedValue ? buildCachedDetails(cachedValue) : null;
       if (cachedDetails) {
         nextCachedDetails[pirepId] = cachedDetails;
       } else {
@@ -208,29 +176,16 @@ export function useVisibleLogbookPirepDetails(logbookFlights, { enabled = true, 
       return undefined;
     }
 
-    void Promise.all(
-      missingPirepIds.map((pirepId) =>
-        getOrFetchPirepDetails(pirepId)
-          .then((details) => [pirepId, details])
-          .catch(() => [pirepId, null])
-      )
-    ).then((results) => {
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
-
-      setDetailsByPirepId((current) => {
-        const nextValue = { ...current };
-
-        for (const [pirepId, details] of results) {
-          if (details) {
-            nextValue[pirepId] = details;
-          }
-        }
-
-        return arePirepDetailMapsEqual(current, nextValue) ? current : nextValue;
-      });
-    });
+    for (const pirepId of missingPirepIds) {
+      void logbookPirepDetailsRequests.prefetch(pirepId).then((details) => {
+        if (requestIdRef.current !== requestId) return;
+        const normalizedDetails = buildCachedDetails(details);
+        setDetailsByPirepId((current) => {
+          const nextValue = { ...current, [pirepId]: normalizedDetails };
+          return arePirepDetailMapsEqual(current, nextValue) ? current : nextValue;
+        });
+      }).catch(() => {});
+    }
 
     return () => {
       if (requestIdRef.current === requestId) {

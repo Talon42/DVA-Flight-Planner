@@ -16,3 +16,37 @@ export async function writeUiStateJson(json) {
     }
   );
 }
+
+// Reads one Rust-allowlisted app-owned storage file.
+export async function readAppStorageFile(key) {
+  return invokeAppCommand("read_app_storage_file", { key }, {
+    subsystem: "App Storage",
+    event: "app-storage-read-failed",
+    metadata: { key }
+  });
+}
+
+// Writes one Rust-allowlisted app-owned storage file with backend validation.
+export async function writeAppStorageFile(key, contents) {
+  const serialized = String(contents ?? "");
+  return invokeAppCommand("write_app_storage_file", { key, contents: serialized }, {
+    subsystem: "App Storage",
+    event: "app-storage-write-failed",
+    metadata: { key, byteCount: new TextEncoder().encode(serialized).length }
+  });
+}
+
+export async function quarantineAppStorageFile(key) {
+  return invokeAppCommand("quarantine_app_storage_file", { key }, {
+    subsystem: "App Storage",
+    event: "app-storage-quarantine-failed",
+    metadata: { key }
+  });
+}
+
+export async function ensureAppLogFile(header) {
+  return invokeAppCommand("ensure_app_log_file", { header: String(header || "") }, {
+    subsystem: "App Storage",
+    event: "app-log-ensure-failed"
+  });
+}

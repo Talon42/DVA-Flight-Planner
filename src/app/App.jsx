@@ -22,12 +22,14 @@ import {
   useAppLayout
 } from "./useAppLayout.hooks.js";
 import { useAppBootstrap } from "./useAppBootstrap.hooks.js";
-import { useDebouncedEffect } from "./useDebouncedEffect.hooks.js";
+import { useAppUiStatePersistence } from "./useAppUiStatePersistence.hooks.js";
+import { useExternalFlightActions } from "./useExternalFlightActions.hooks.js";
 import { useAddonAirports } from "../features/addons/useAddonAirports.hooks.js";
 import { useAppModals } from "./useAppModals.hooks.js";
+import { useAppConfirmations } from "./useAppConfirmations.hooks.js";
 import { useAppUpdates } from "./useAppUpdates.hooks.js";
 import { useDeltaVirtualDraftReport } from "../features/deltaVirtual/useDeltaVirtualDraftReport.hooks.js";
-import { useDeltaVirtualSync } from "../features/deltaVirtual/useDeltaVirtualSync.hooks.js";
+import { useSyncOrchestration } from "./useSyncOrchestration.hooks.js";
 import { useWhatsNew } from "../features/whatsNew/useWhatsNew.hooks.js";
 import { useSimBriefDispatch } from "../features/simbrief/useSimBriefDispatch.hooks.js";
 import { useScheduleImport } from "../features/schedule/useScheduleImport.hooks.js";
@@ -70,8 +72,6 @@ import { formatNumber } from "../domain/formatting/formatters.js";
 import {
   logAppError,
   logAppEvent,
-  logSystemError,
-  logSystemEvent,
   getAppSessionId,
   setDebugLoggingEnabled,
   openAppLogFile
@@ -81,11 +81,6 @@ import {
   writeGettingStartedState
 } from "../services/storage/storage.js";
 import {
-  saveUiState,
-  saveUiStateImmediate
-} from "../services/storage/uiState.storage.js";
-import { openDesktopUrl } from "../services/tauri/desktopShell.client.js";
-import {
   DEFAULT_FLIGHT_BOARD_NAME,
   createFlightBoard,
   normalizeBoardEntry,
@@ -93,7 +88,6 @@ import {
 } from "../features/flightBoard/flightBoard.model";
 import {
   DEFAULT_MAP_OPTIONS,
-  normalizeMapOptions,
 } from "../components/map/mapOptions.model.js";
 import {
   getAircraftDisplayName,
@@ -148,93 +142,10 @@ export default function App() {
     });
   const [mapOptions, setMapOptions] = useState(DEFAULT_MAP_OPTIONS);
   const [theme, setTheme] = useState(readSavedTheme);
-  const uiStateSnapshotRef = useRef({
-    plannerMode: "basic",
-    filters: DEFAULT_FILTERS,
-    dutyFilters: DEFAULT_DUTY_FILTERS,
-    flightBoards: [createFlightBoard()],
-    activeFlightBoardId: "",
-    flightBoard: null,
-    plannerControlsCollapsed: false,
-    basicAdvancedFiltersOpen: false,
-    basicAddonFiltersOpen: false,
-    sort: DEFAULT_SORT,
-    selectedFlightId: null,
-    scheduleView: "flights",
-    selectedTourPath: "",
-    selectedAccomplishmentName: "",
-    mapOptions: DEFAULT_MAP_OPTIONS,
-    logbookSubTab: "flights",
-    logbookFilters: {},
-    logbookSort: null,
-    pilotStatsComparisonPeriod: "off",
-    pilotStatsDetailView: null,
-    tourProgress: {}
-  });
-  const flightBoardCacheSignatureRef = useRef("");
-  // Builds the current UI-state payload so the debounced save and immediate map writes stay in sync.
-  const buildCurrentUiStatePayload = useCallback(
-    (overrides = {}) => {
-      const currentState = uiStateSnapshotRef.current;
-      const nextMapOptions =
-        overrides.mapOptions !== undefined
-          ? normalizeMapOptions(overrides.mapOptions)
-          : currentState.mapOptions;
-
-      return {
-        ...currentState,
-        ...overrides,
-        mapOptions: nextMapOptions
-      };
-    },
-    []
-  );
-  // Builds a compact signature for the board cache fields we want to write through immediately.
-  const buildFlightBoardCacheSignature = useCallback((boards = []) => {
-    return JSON.stringify(
-      (Array.isArray(boards) ? boards : []).map((board) => ({
-        id: String(board?.id || "").trim(),
-        entries: (Array.isArray(board?.entries) ? board.entries : []).map((entry) => ({
-          boardEntryId: String(entry?.boardEntryId || "").trim(),
-          flightCode: String(entry?.flightCode || "").trim(),
-          staticId: String(entry?.simbriefPlan?.staticId || entry?.simbriefPlan?.static_id || "").trim(),
-          ofpXmlId: String(entry?.simbriefPlan?.ofpXmlId || entry?.simbriefPlan?.ofp_xml_id || "").trim(),
-          draftReportId: String(entry?.draftReportId || "").trim(),
-          dvaDraftReportId: String(entry?.dvaDraftReportId || "").trim(),
-          draftDeleteRequiresRegenerate: Boolean(entry?.draftDeleteRequiresRegenerate)
-        }))
-      }))
-    );
+  const setMapOptionsThroughPersistenceRef = useRef(null);
+  const handleSetMapOptions = useCallback((updater) => {
+    setMapOptionsThroughPersistenceRef.current?.(updater);
   }, []);
-  // Writes the current UI state immediately so preference toggles cannot be lost on exit.
-  const handleSetMapOptions = useCallback(
-    (updater) => {
-      const previousMapOptions = normalizeMapOptions(uiStateSnapshotRef.current.mapOptions);
-      const nextMapOptions = normalizeMapOptions(
-        typeof updater === "function" ? updater(previousMapOptions) : updater
-      );
-      uiStateSnapshotRef.current = {
-        ...uiStateSnapshotRef.current,
-        mapOptions: nextMapOptions
-      };
-      setMapOptions(nextMapOptions);
-
-      void logAppEvent("map-options-changed", {
-        previousMapOptions,
-        nextMapOptions
-      }).catch(() => {});
-      void logAppEvent("persist-ui-state-map-options", {
-        mapOptions: nextMapOptions
-      }).catch(() => {});
-
-      saveUiStateImmediate(buildCurrentUiStatePayload({ mapOptions: nextMapOptions })).catch(
-        (error) => {
-          setStatusMessage(error instanceof Error ? error.message : "Unable to persist the current planner state.");
-        }
-      );
-    },
-    [buildCurrentUiStatePayload]
-  );
   const {
     viewportSize,
     plannerControlsCollapsed,
@@ -266,6 +177,9 @@ export default function App() {
   const clearSimBriefDispatchStateRef = useRef(null);
   const logbookSyncCompleteRef = useRef(() => {});
   const isDesktopAddonScanAvailable = isTauriRuntime();
+  const { handleOpenSimBriefFlight } = useExternalFlightActions({
+    isDesktop: isDesktopAddonScanAvailable
+  });
   const appDevTools = useAppDevTools({
     isDesktopAddonScanAvailable,
     setStatusMessage
@@ -277,6 +191,14 @@ export default function App() {
     setStatusMessage
   });
   const appModals = useAppModals();
+  const {
+    isDeleteUserDataConfirmOpen,
+    confirmDeleteUserDataInApp,
+    resolveDeleteUserDataConfirmation,
+    isDutyBoardOverwriteConfirmOpen,
+    confirmDutyBoardOverwriteInApp,
+    resolveDutyBoardOverwriteConfirmation
+  } = useAppConfirmations();
   const {
     isDevToolsEnabled,
     setIsDevToolsEnabled,
@@ -311,21 +233,13 @@ export default function App() {
     isReadmeOpen,
     handleToggleReadme,
     handleCloseReadme,
-    isDeleteUserDataConfirmOpen,
-    handleOpenDeleteUserDataConfirm,
-    handleCloseDeleteUserDataConfirm,
-    isDutyBoardOverwriteConfirmOpen,
-    handleOpenDutyBoardOverwriteConfirm,
-    handleCloseDutyBoardOverwriteConfirm,
     isSimBriefDispatchBlockedOpen,
     simBriefDispatchBlockedMessage,
     handleOpenSimBriefDispatchBlocked,
     handleCloseSimBriefDispatchBlocked,
     isStaleScheduleBlockedOpen,
     handleOpenStaleScheduleBlocked,
-    handleCloseStaleScheduleBlocked,
-    deleteUserDataConfirmResolverRef,
-    dutyBoardOverwriteConfirmResolverRef
+    handleCloseStaleScheduleBlocked
   } = appModals;
   const appSettings = useAppSettings({ setIsDevWindowMenuOpen });
   const {
@@ -749,7 +663,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isSettingsOpen]);
+  }, [isSettingsOpen, setIsSettingsOpen]);
 
   useEffect(() => {
     if (!isDvaSyncWarningOpen) {
@@ -767,23 +681,6 @@ export default function App() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isDvaSyncWarningOpen, setDvaSyncWarning]);
-
-  useEffect(() => {
-    if (!isDeleteUserDataConfirmOpen) {
-      return undefined;
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        resolveDeleteUserDataConfirmation(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isDeleteUserDataConfirmOpen]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -1009,151 +906,6 @@ export default function App() {
   const handleVatsimScheduleSyncComplete = useCallback(() => {
     setVatsimRefreshVersion((current) => current + 1);
   }, []);
-  const {
-    handleCloseDvaSyncWarning,
-    handleDeltaVirtualSync,
-    handleRefreshDeltaVirtualLogbook,
-    handleResetDeltaVirtualSyncSession,
-    isSyncing,
-    isRefreshingLogbook
-  } = useDeltaVirtualSync({
-    dvaFirstName,
-    dvaHasPassword,
-    dvaLastName,
-    isDevToolsEnabled,
-    onLogbookSyncComplete: () => logbookSyncCompleteRef.current?.(),
-    processImportedSchedule,
-    onScheduleSyncComplete: handleVatsimScheduleSyncComplete,
-    setDerivedTourProgress,
-    setDeltaVirtualAccomplishmentEligibility,
-    setDeltaVirtualToursCache,
-    setDvaHasPassword,
-    setDvaSyncWarning,
-    setLogbookAirportProgress,
-    setStatusMessage
-  });
-  const logbookWorkspace = useLogbookWorkspace({
-    persistedUiState: restoredUiState,
-    scheduleView,
-    viewportWidth: viewportSize.width,
-    isSyncing,
-    isRefreshingLogbook,
-    onRefreshLogbook: handleRefreshDeltaVirtualLogbook
-  });
-  logbookSyncCompleteRef.current = logbookWorkspace.handleSyncComplete;
-  uiStateSnapshotRef.current = {
-    plannerMode,
-    filters,
-    dutyFilters,
-    flightBoards,
-    activeFlightBoardId,
-    flightBoard,
-    plannerControlsCollapsed,
-    basicAdvancedFiltersOpen,
-    basicAddonFiltersOpen,
-    sort,
-    selectedFlightId,
-    scheduleView,
-    selectedTourPath,
-    selectedAccomplishmentName,
-    mapOptions,
-    pilotStatsComparisonPeriod: logbookWorkspace.persistedUiState.pilotStatsComparisonPeriod,
-    pilotStatsDetailView: logbookWorkspace.persistedUiState.pilotStatsDetailView,
-    ...logbookWorkspace.persistedUiState,
-    tourProgress
-  };
-  const currentFlightBoardCacheSignature = buildFlightBoardCacheSignature(flightBoards);
-  useEffect(() => {
-    if (isHydrating) {
-      flightBoardCacheSignatureRef.current = currentFlightBoardCacheSignature;
-      return;
-    }
-
-    if (flightBoardCacheSignatureRef.current === currentFlightBoardCacheSignature) {
-      return;
-    }
-
-    flightBoardCacheSignatureRef.current = currentFlightBoardCacheSignature;
-
-    const boardCount = Array.isArray(flightBoards) ? flightBoards.length : 0;
-    const entries = (Array.isArray(flightBoards) ? flightBoards : []).flatMap((board) =>
-      Array.isArray(board?.entries) ? board.entries : []
-    );
-    const cachedEntries = entries.filter(
-      (entry) =>
-        Boolean(entry?.simbriefPlan) ||
-        Boolean(entry?.draftReportId) ||
-        Boolean(entry?.dvaDraftReportId)
-    );
-    const sampleCachedFlightCodes = cachedEntries
-      .map((entry) => String(entry?.flightCode || "").trim())
-      .filter(Boolean)
-      .slice(0, 5);
-
-    void logAppEvent("persist-flight-board-cache-started", {
-      reason: "flight-board-cache",
-      boardCount,
-      entryCount: entries.length,
-      cachedEntryCount: cachedEntries.length
-    });
-
-    void saveUiStateImmediate(buildCurrentUiStatePayload({ flightBoards }))
-      .then(() => {
-        void logAppEvent("persist-flight-board-cache-succeeded", {
-          reason: "flight-board-cache",
-          boardCount,
-          entryCount: entries.length,
-          simbriefPlanCount: entries.filter((entry) => Boolean(entry?.simbriefPlan)).length,
-          draftReportCount: entries.filter(
-            (entry) => Boolean(entry?.draftReportId) || Boolean(entry?.dvaDraftReportId)
-          ).length,
-          sampleCachedFlightCodes
-        });
-      })
-      .catch((error) => {
-        setStatusMessage(error instanceof Error ? error.message : "Unable to persist the current planner state.");
-      });
-  }, [buildCurrentUiStatePayload, buildFlightBoardCacheSignature, currentFlightBoardCacheSignature, flightBoards, isHydrating]);
-  useDebouncedEffect(
-    () => {
-      if (isHydrating) {
-        return;
-      }
-
-      saveUiState(buildCurrentUiStatePayload()).catch((error) => {
-        setStatusMessage(error instanceof Error ? error.message : "Unable to persist the current planner state.");
-      });
-    },
-    [
-      plannerMode,
-      filters,
-      dutyFilters,
-      flightBoards,
-      activeFlightBoardId,
-      flightBoard,
-      plannerControlsCollapsed,
-      basicAdvancedFiltersOpen,
-      basicAddonFiltersOpen,
-      sort,
-      selectedFlightId,
-      scheduleView,
-      selectedTourPath,
-      selectedAccomplishmentName,
-      mapOptions,
-      logbookWorkspace.persistedUiState,
-      tourProgress,
-      buildCurrentUiStatePayload,
-      isHydrating
-    ],
-    350
-  );
-  const appDeltaVirtualDraftReport = useDeltaVirtualDraftReport({
-    flightBoard,
-    isDevToolsEnabled,
-    simBriefCustomAirframes,
-    setStatusMessage,
-    updateActiveFlightBoardEntries
-  });
   const shouldShowGettingStarted =
     hasLoadedGettingStartedState &&
     !isHydrating &&
@@ -1173,6 +925,98 @@ export default function App() {
     isGettingStartedOpen: shouldShowGettingStarted
   });
   const isStartupGateComplete = !shouldShowGettingStarted && !shouldShowWhatsNew;
+  const {
+    handleCloseDvaSyncWarning,
+    handleDeltaVirtualSync,
+    handleRefreshDeltaVirtualLogbook,
+    handleResetDeltaVirtualSyncSession,
+    isSyncing,
+    isRefreshingLogbook
+  } = useSyncOrchestration({
+    deltaVirtualOptions: {
+      dvaFirstName,
+      dvaHasPassword,
+      dvaLastName,
+      isDevToolsEnabled,
+      onLogbookSyncComplete: () => logbookSyncCompleteRef.current?.(),
+      processImportedSchedule,
+      onScheduleSyncComplete: handleVatsimScheduleSyncComplete,
+      setDerivedTourProgress,
+      setDeltaVirtualAccomplishmentEligibility,
+      setDeltaVirtualToursCache,
+      setDvaHasPassword,
+      setDvaSyncWarning,
+      setLogbookAirportProgress,
+      setStatusMessage
+    },
+    shouldRunDeferredStartupSync: shouldRunDeferredStartupDvaSync,
+    setShouldRunDeferredStartupSync: setShouldRunDeferredStartupDvaSync,
+    isStartupGateComplete
+  });
+  const logbookWorkspace = useLogbookWorkspace({
+    persistedUiState: restoredUiState,
+    scheduleView,
+    viewportWidth: viewportSize.width,
+    isSyncing,
+    isRefreshingLogbook,
+    onRefreshLogbook: handleRefreshDeltaVirtualLogbook
+  });
+  logbookSyncCompleteRef.current = logbookWorkspace.handleSyncComplete;
+  const uiStateSnapshot = useMemo(() => ({
+      plannerMode,
+      filters,
+      dutyFilters,
+      flightBoards,
+      activeFlightBoardId,
+      flightBoard,
+      plannerControlsCollapsed,
+      basicAdvancedFiltersOpen,
+      basicAddonFiltersOpen,
+      sort,
+      selectedFlightId,
+      scheduleView,
+      selectedTourPath,
+      selectedAccomplishmentName,
+      mapOptions,
+      ...logbookWorkspace.persistedUiState,
+      tourProgress
+    }), [
+      activeFlightBoardId,
+      basicAddonFiltersOpen,
+      basicAdvancedFiltersOpen,
+      dutyFilters,
+      filters,
+      flightBoard,
+      flightBoards,
+      logbookWorkspace.persistedUiState,
+      mapOptions,
+      plannerControlsCollapsed,
+      plannerMode,
+      scheduleView,
+      selectedAccomplishmentName,
+      selectedFlightId,
+      selectedTourPath,
+      sort,
+      tourProgress
+    ]);
+  const handleUiStatePersistenceError = useCallback((error) => {
+    setStatusMessage(error instanceof Error ? error.message : "Unable to persist the current planner state.");
+  }, []);
+  const appUiStatePersistence = useAppUiStatePersistence({
+    snapshot: uiStateSnapshot,
+    isHydrating,
+    flightBoards,
+    setMapOptions,
+    onError: handleUiStatePersistenceError
+  });
+  setMapOptionsThroughPersistenceRef.current = appUiStatePersistence.handleSetMapOptions;
+  const appDeltaVirtualDraftReport = useDeltaVirtualDraftReport({
+    flightBoard,
+    isDevToolsEnabled,
+    simBriefCustomAirframes,
+    setStatusMessage,
+    updateActiveFlightBoardEntries
+  });
   const appUpdates = useAppUpdates({
     isDesktopAddonScanAvailable,
     isDevToolsEnabled,
@@ -1188,49 +1032,6 @@ export default function App() {
     handleCloseUpdatePrompt,
     handleDownloadUpdate
   } = appUpdates;
-
-  useEffect(() => {
-    if (!shouldRunDeferredStartupDvaSync || !isStartupGateComplete) {
-      return;
-    }
-
-    setShouldRunDeferredStartupDvaSync(false);
-    void handleDeltaVirtualSync().catch(async (error) => {
-      setStatusMessage(error.message || "Unable to sync from Delta Virtual.");
-      await logAppError("getting-started-sync-failed", error);
-    });
-  }, [handleDeltaVirtualSync, isStartupGateComplete, shouldRunDeferredStartupDvaSync]);
-
-  function resolveDeleteUserDataConfirmation(confirmed) {
-    handleCloseDeleteUserDataConfirm();
-    if (deleteUserDataConfirmResolverRef.current) {
-      deleteUserDataConfirmResolverRef.current(confirmed);
-      deleteUserDataConfirmResolverRef.current = null;
-    }
-  }
-
-  async function confirmDeleteUserDataInApp() {
-    return new Promise((resolve) => {
-      deleteUserDataConfirmResolverRef.current = resolve;
-      handleOpenDeleteUserDataConfirm();
-    });
-  }
-
-  // Duty Schedule overwrite uses the shared modal so Generate can ask before replacing a full set of boards.
-  function resolveDutyBoardOverwriteConfirmation(confirmed) {
-    handleCloseDutyBoardOverwriteConfirm();
-    if (dutyBoardOverwriteConfirmResolverRef.current) {
-      dutyBoardOverwriteConfirmResolverRef.current(confirmed);
-      dutyBoardOverwriteConfirmResolverRef.current = null;
-    }
-  }
-
-  async function confirmDutyBoardOverwriteInApp() {
-    return new Promise((resolve) => {
-      dutyBoardOverwriteConfirmResolverRef.current = resolve;
-      handleOpenDutyBoardOverwriteConfirm();
-    });
-  }
 
   function handleFilterChange(key, value) {
     if (
@@ -1812,33 +1613,6 @@ export default function App() {
     } catch (error) {
       setStatusMessage(error.message || "Unable to save What's New progress.");
       await logAppError("whats-new-finish-failed", error);
-    }
-  }
-
-  async function handleOpenSimBriefFlight(staticId) {
-    const normalizedStaticId = String(staticId || "").trim();
-    if (!normalizedStaticId) {
-      return;
-    }
-
-    const simBriefUrl = `https://dispatch.simbrief.com/briefing/latest?static_id=${encodeURIComponent(normalizedStaticId)}`;
-
-    try {
-      if (isDesktopAddonScanAvailable) {
-        await openDesktopUrl(simBriefUrl);
-      } else {
-        window.open(simBriefUrl, "_blank", "noopener,noreferrer");
-      }
-
-      await logSystemEvent("SimBrief", "flight-opened", {
-        staticId: normalizedStaticId,
-        url: simBriefUrl
-      });
-    } catch (error) {
-      await logSystemError("SimBrief", "flight-open-failed", error, {
-        staticId: normalizedStaticId,
-        url: simBriefUrl
-      });
     }
   }
 

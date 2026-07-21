@@ -7,6 +7,10 @@ import LogbookPilotStatsDetailView from "./LogbookPilotStatsDetailView.jsx";
 import LogbookPilotStatsHero from "./LogbookPilotStatsHero.jsx";
 import LogbookPilotStatsSummaryPanel from "./LogbookPilotStatsSummaryPanel.jsx";
 import { EMPTY_DETAIL_ROWS, getPilotStatsDashboardCards } from "./logbookPilotStats.constants.js";
+import {
+  clampPilotStatsPageIndex,
+  useMeasuredPilotStatsPageSize
+} from "./useMeasuredPilotStatsPageSize.hooks.js";
 
 // Renders the Pilot Stats overview and drill-in detail view.
 function chunkPilotStatsCards(cards, pageSize) {
@@ -21,68 +25,6 @@ function chunkPilotStatsCards(cards, pageSize) {
   return pages;
 }
 
-function getPilotStatsDashboardPageSize() {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return 2;
-  }
-
-  if (window.matchMedia("(min-width: 120rem)").matches) {
-    return 4;
-  }
-
-  if (window.matchMedia("(min-width: 87.5rem)").matches) {
-    return 3;
-  }
-
-  return 2;
-}
-
-function addMediaQueryListener(mediaQueryList, listener) {
-  if (!mediaQueryList) {
-    return () => {};
-  }
-
-  if (typeof mediaQueryList.addEventListener === "function") {
-    mediaQueryList.addEventListener("change", listener);
-    return () => mediaQueryList.removeEventListener("change", listener);
-  }
-
-  if (typeof mediaQueryList.addListener === "function") {
-    mediaQueryList.addListener(listener);
-    return () => mediaQueryList.removeListener(listener);
-  }
-
-  return () => {};
-}
-
-function usePilotStatsDashboardPageSize() {
-  const [pageSize, setPageSize] = useState(getPilotStatsDashboardPageSize);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return undefined;
-    }
-
-    const bp1920Query = window.matchMedia("(min-width: 120rem)");
-    const bp1400Query = window.matchMedia("(min-width: 87.5rem)");
-    const updatePageSize = () => {
-      setPageSize(getPilotStatsDashboardPageSize());
-    };
-
-    updatePageSize();
-
-    const remove1920Listener = addMediaQueryListener(bp1920Query, updatePageSize);
-    const remove1400Listener = addMediaQueryListener(bp1400Query, updatePageSize);
-
-    return () => {
-      remove1920Listener();
-      remove1400Listener();
-    };
-  }, []);
-
-  return pageSize;
-}
-
 function getPilotStatsDashboardGridClassName(pageSize) {
   if (pageSize >= 4) {
     return "grid-cols-4";
@@ -93,10 +35,6 @@ function getPilotStatsDashboardGridClassName(pageSize) {
   }
 
   return "grid-cols-2";
-}
-
-function clampPilotStatsPageIndex(pageIndex, pageCount) {
-  return Math.max(0, Math.min(Math.max(0, pageCount - 1), pageIndex));
 }
 
 // Renders the compact right-side rail used to jump between dashboard pages.
@@ -229,7 +167,8 @@ export default function LogbookPilotStats({
   const comparisons = displayStats.comparisons || null;
   const detailRows = useMemo(() => displayStats.detailRows || EMPTY_DETAIL_ROWS, [displayStats.detailRows]);
   const dashboardCards = useMemo(() => getPilotStatsDashboardCards(displayStats), [displayStats]);
-  const dashboardPageSize = usePilotStatsDashboardPageSize();
+  const { containerRef: dashboardContainerRef, pageSize: dashboardPageSize } =
+    useMeasuredPilotStatsPageSize();
   const dashboardPageCount = Math.max(1, Math.ceil(dashboardCards.length / dashboardPageSize));
   const dashboardScrollRef = useRef(null);
   const dashboardPageIndexRef = useRef(0);
@@ -406,7 +345,7 @@ export default function LogbookPilotStats({
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 gap-2 overflow-hidden">
-              <div className="min-w-0 flex-1 overflow-hidden">
+              <div ref={dashboardContainerRef} className="min-w-0 flex-1 overflow-hidden">
                 <div
                   ref={dashboardScrollRef}
                   tabIndex={0}

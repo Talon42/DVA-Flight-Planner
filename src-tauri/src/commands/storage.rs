@@ -11,6 +11,26 @@ pub(crate) fn write_ui_state(app: AppHandle, json: String) -> Result<(), String>
 }
 
 #[tauri::command]
+pub(crate) fn read_app_storage_file(app: AppHandle, key: String) -> Result<Option<String>, String> {
+    crate::services::storage::app_files::read(&app, &key)
+}
+
+#[tauri::command]
+pub(crate) fn write_app_storage_file(app: AppHandle, key: String, contents: String) -> Result<(), String> {
+    crate::services::storage::app_files::write(&app, &key, &contents)
+}
+
+#[tauri::command]
+pub(crate) fn quarantine_app_storage_file(app: AppHandle, key: String) -> Result<(), String> {
+    crate::services::storage::app_files::quarantine(&app, &key)
+}
+
+#[tauri::command]
+pub(crate) fn ensure_app_log_file(app: AppHandle, header: String) -> Result<String, String> {
+    crate::services::storage::app_files::ensure_app_log(&app, &header)
+}
+
+#[tauri::command]
 pub(crate) fn prune_deltava_storage(app: AppHandle, remove_downloaded_schedule: bool) {
     crate::services::webview::profile_cleanup::prune_deltava_storage(
         &app,

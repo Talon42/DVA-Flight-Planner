@@ -14,6 +14,7 @@ import {
   writeSimBriefSettings
 } from "../services/storage/storage.js";
 import { normalizeSimBriefCustomAirframe } from "../services/tauri/simbrief.client.js";
+import { clearLogbookPirepDetailsRequests } from "../features/logbook/logbookPirepDetailsRequests.js";
 
 // Owns settings persistence workflows so App can keep the modal state and tab selection only.
 export function useAppSettingsPersistence({
@@ -158,6 +159,7 @@ export function useAppSettingsPersistence({
 
     try {
       await clearDeltaVirtualCredentials();
+      clearLogbookPirepDetailsRequests();
       const clearedCredentials = getDefaultDeltaVirtualCredentials();
       setDvaFirstName(clearedCredentials.firstName);
       setDvaFirstNameDraft(clearedCredentials.firstName);

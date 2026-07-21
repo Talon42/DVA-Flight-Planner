@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useLogbook } from "./useLogbook.hooks.js";
 import { useLogbookPirepDetails } from "./useLogbookPirepDetails.hooks.js";
+import { clearLogbookPirepDetailsRequests } from "./logbookPirepDetailsRequests.js";
 
 // Adapts the logbook feature into compact prop bundles for the app shell and right column.
 export function useLogbookWorkspace({
@@ -28,6 +29,7 @@ export function useLogbookWorkspace({
   });
 
   const handleSyncComplete = useCallback(() => {
+    clearLogbookPirepDetailsRequests();
     setReloadVersion((current) => current + 1);
   }, []);
 

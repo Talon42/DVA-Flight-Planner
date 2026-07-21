@@ -20,6 +20,12 @@ import {
   getSelectedAircraftForFlight,
   normalizeAircraftCustomAirframe
 } from "../../domain/aircraft/aircraftIdentity.js";
+import {
+  ensureAppLogFile,
+  quarantineAppStorageFile,
+  readAppStorageFile,
+  writeAppStorageFile
+} from "../tauri/storage.client.js";
 
 const LEGACY_PERSISTED_SCHEDULE_VERSION = 2;
 const PERSISTED_SCHEDULE_VERSION = 4;
@@ -45,24 +51,16 @@ async function loadFsModule() {
   return import("@tauri-apps/plugin-fs");
 }
 
-async function ensureAppDataRoot() {
-  const { appDataDir } = await import("@tauri-apps/api/path");
-  const { mkdir } = await loadFsModule();
-  await mkdir(await appDataDir(), {
-    recursive: true
-  });
-}
-
-function buildCorruptStorageFileName(fileName) {
-  const normalizedFileName = String(fileName || "").trim();
-  const lastDotIndex = normalizedFileName.lastIndexOf(".");
-
-  if (lastDotIndex <= 0) {
-    return `${normalizedFileName}.corrupt.${Date.now()}`;
-  }
-
-  return `${normalizedFileName.slice(0, lastDotIndex)}.corrupt.${Date.now()}${normalizedFileName.slice(lastDotIndex)}`;
-}
+const APP_STORAGE_KEYS_BY_FILE = {
+  [SAVED_SCHEDULE_FILE]: "savedSchedule",
+  [UI_STATE_FILE]: "uiState",
+  [DEV_TOOLS_STATE_FILE]: "devToolsState",
+  [SIMBRIEF_SETTINGS_FILE]: "simbriefSettings",
+  [GETTING_STARTED_STATE_FILE]: "gettingStarted",
+  [DELTAVA_TOURS_CACHE_FILE]: "deltavaToursCache",
+  [DELTAVA_TOUR_PROGRESS_FILE]: "deltavaTourProgress",
+  [WHATS_NEW_STATE_FILE]: "whatsNewState"
+};
 
 function logCorruptStorageFileOnce(storageLabel, fileName, error) {
   const warningKey = `${storageLabel}:${fileName}`;
@@ -79,13 +77,7 @@ function logCorruptStorageFileOnce(storageLabel, fileName, error) {
 
 async function quarantineCorruptStorageFile(fileName, storageLabel) {
   try {
-    const { rename, BaseDirectory } = await loadFsModule();
-    const corruptFileName = buildCorruptStorageFileName(fileName);
-
-    await rename(fileName, corruptFileName, {
-      oldPathBaseDir: BaseDirectory.AppData,
-      newPathBaseDir: BaseDirectory.AppData
-    });
+    await quarantineAppStorageFile(APP_STORAGE_KEYS_BY_FILE[fileName]);
   } catch (error) {
     logCorruptStorageFileOnce(storageLabel, fileName, error);
   }
@@ -655,18 +647,8 @@ async function serializeSavedSchedule(savedSchedule) {
 
 export async function readSavedSchedule() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(SAVED_SCHEDULE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return null;
-    }
-
-    const text = await readTextFile(SAVED_SCHEDULE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
+    const text = await readAppStorageFile("savedSchedule");
+    if (!text) return null;
 
     try {
       return await parseSavedScheduleText(text);
@@ -694,13 +676,7 @@ export async function writeSavedSchedule(savedSchedule) {
   const serializedSchedule = await serializeSavedSchedule(savedSchedule);
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(
-      SAVED_SCHEDULE_FILE,
-      serializedSchedule,
-      { baseDir: BaseDirectory.AppData }
-    );
+    await writeAppStorageFile("savedSchedule", serializedSchedule);
     return;
   }
 
@@ -709,18 +685,7 @@ export async function writeSavedSchedule(savedSchedule) {
 
 export async function readSavedUiState() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(UI_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return null;
-    }
-
-    const text = await readTextFile(UI_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
+    const text = await readAppStorageFile("uiState");
     if (!text) {
       return null;
     }
@@ -751,18 +716,7 @@ export { saveUiState as writeSavedUiState } from "./uiState.storage.js";
 
 export async function readSavedDevToolsEnabled() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(DEV_TOOLS_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return null;
-    }
-
-    const text = await readTextFile(DEV_TOOLS_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
+    const text = await readAppStorageFile("devToolsState");
     if (!text) {
       return null;
     }
@@ -792,11 +746,7 @@ export async function writeSavedDevToolsEnabled(enabled) {
   const serialized = JSON.stringify({ enabled: Boolean(enabled) });
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(DEV_TOOLS_STATE_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("devToolsState", serialized);
     return;
   }
 
@@ -827,18 +777,7 @@ export async function readSimBriefSettings() {
   const defaultSettings = getDefaultSimBriefSettings();
 
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(SIMBRIEF_SETTINGS_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return defaultSettings;
-    }
-
-    const text = await readTextFile(SIMBRIEF_SETTINGS_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
+    const text = await readAppStorageFile("simbriefSettings");
     if (!text) {
       return defaultSettings;
     }
@@ -884,11 +823,7 @@ export async function writeSimBriefSettings(settings) {
   });
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(SIMBRIEF_SETTINGS_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("simbriefSettings", serialized);
     return;
   }
 
@@ -897,19 +832,8 @@ export async function writeSimBriefSettings(settings) {
 
 export async function readGettingStartedState() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(GETTING_STARTED_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return getDefaultGettingStartedState();
-    }
-
     try {
-      const text = await readTextFile(GETTING_STARTED_STATE_FILE, {
-        baseDir: BaseDirectory.AppData
-      });
+      const text = await readAppStorageFile("gettingStarted");
       return normalizeGettingStartedState(text ? JSON.parse(text) : null);
     } catch {
       return getDefaultGettingStartedState();
@@ -932,19 +856,8 @@ export async function readDeltaVirtualToursCache() {
   const defaultCache = getDefaultDeltaVirtualToursCache();
 
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(DELTAVA_TOURS_CACHE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return defaultCache;
-    }
-
     try {
-      const text = await readTextFile(DELTAVA_TOURS_CACHE_FILE, {
-        baseDir: BaseDirectory.AppData
-      });
+      const text = await readAppStorageFile("deltavaToursCache");
       return normalizeDeltaVirtualToursCache(text ? JSON.parse(text) : null);
     } catch {
       return defaultCache;
@@ -967,11 +880,7 @@ export async function writeDeltaVirtualToursCache(cache) {
   const serialized = JSON.stringify(normalizeDeltaVirtualToursCache(cache));
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(DELTAVA_TOURS_CACHE_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("deltavaToursCache", serialized);
     return;
   }
 
@@ -982,19 +891,8 @@ export async function readDeltaVirtualTourProgress() {
   const defaultProgress = getDefaultDeltaVirtualTourProgress();
 
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(DELTAVA_TOUR_PROGRESS_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return defaultProgress;
-    }
-
     try {
-      const text = await readTextFile(DELTAVA_TOUR_PROGRESS_FILE, {
-        baseDir: BaseDirectory.AppData
-      });
+      const text = await readAppStorageFile("deltavaTourProgress");
       return normalizeDeltaVirtualTourProgress(text ? JSON.parse(text) : null);
     } catch {
       return defaultProgress;
@@ -1017,11 +915,7 @@ export async function writeDeltaVirtualTourProgress(progress) {
   const serialized = JSON.stringify(normalizeDeltaVirtualTourProgress(progress));
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(DELTAVA_TOUR_PROGRESS_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("deltavaTourProgress", serialized);
     return;
   }
 
@@ -1032,11 +926,7 @@ export async function writeGettingStartedState(state) {
   const serialized = JSON.stringify(normalizeGettingStartedState(state));
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(GETTING_STARTED_STATE_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("gettingStarted", serialized);
     return;
   }
 
@@ -1045,19 +935,8 @@ export async function writeGettingStartedState(state) {
 
 export async function readLastSeenWhatsNewReleaseId() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(WHATS_NEW_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return "";
-    }
-
     try {
-      const text = await readTextFile(WHATS_NEW_STATE_FILE, {
-        baseDir: BaseDirectory.AppData
-      });
+      const text = await readAppStorageFile("whatsNewState");
       return normalizeWhatsNewReleaseId(text);
     } catch {
       return "";
@@ -1073,11 +952,7 @@ export async function saveLastSeenWhatsNewReleaseId(version) {
   const normalizedVersion = normalizeWhatsNewReleaseId(version);
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(WHATS_NEW_STATE_FILE, normalizedVersion, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("whatsNewState", normalizedVersion);
     return;
   }
 
@@ -1124,19 +999,8 @@ async function ensureLogFile(relativePath, storageKey) {
   const header = `[${new Date().toISOString()}] [App] log-file-created`;
 
   if (isTauriRuntime()) {
-    const { exists, writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    const hasFile = await exists(relativePath, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      await writeTextFile(relativePath, `${header}\n`, {
-        baseDir: BaseDirectory.AppData
-      });
-    }
-
-    return resolveAppDataPath(relativePath);
+    if (relativePath !== IMPORT_LOG_FILE) return null;
+    return ensureAppLogFile(`${header}\n`);
   }
 
   const existing = window.localStorage.getItem(storageKey);
