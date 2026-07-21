@@ -282,7 +282,7 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
     ]
       .filter(Boolean)
       .join(':');
-    return `dva:dva:${tourId}${composite ? `:${composite}` : ''}`;
+    return `dva:${tourId}${composite ? `:${composite}` : ''}`;
   };
   const normalizeTourFlight = (tour, flight, index) => {
     const tourId = normalizeId(tour?.id || tour?.sourceId);
@@ -820,6 +820,63 @@ struct DeltaWebDebugMessage {
     message: String,
 }
 
+// Collapses the former double prefix while leaving source IDs and canonical IDs unchanged.
+fn normalize_dva_identifier(value: &str) -> String {
+    let mut normalized = value.trim().to_string();
+    while normalized.starts_with("dva:dva:") {
+        normalized = normalized.replacen("dva:dva:", "dva:", 1);
+    }
+    normalized
+}
+
+fn normalize_tour_payload_identifiers(payload: &mut DeltaToursSyncPayload) {
+    for tour in &mut payload.tours {
+        tour.id = normalize_dva_identifier(&tour.id);
+        tour.path = normalize_dva_identifier(&tour.path);
+
+        for row in tour.rows.iter_mut().chain(tour.flights.iter_mut()) {
+            row.flight_id = normalize_dva_identifier(&row.flight_id);
+            row.source_id = normalize_dva_identifier(&row.source_id);
+            row.id = normalize_dva_identifier(&row.id);
+            row.tour_path = normalize_dva_identifier(&row.tour_path);
+            row.tour_row_id = normalize_dva_identifier(&row.tour_row_id);
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::items_after_test_module)] // The shared fixture test stays beside the ID normalizer it protects.
+mod tests {
+    use super::*;
+    use serde_json::Value;
+
+    #[test]
+    fn shared_tour_id_fixture_matches_backend_migration_contract() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../test-fixtures/deltava/tour-row-id-cases.json"
+        ))
+        .expect("shared tour row fixture should parse");
+        let canonical = fixture["canonicalRowId"]
+            .as_str()
+            .expect("canonical row ID should be present");
+        let legacy_canonical = fixture["legacyCanonicalRowId"]
+            .as_str()
+            .expect("legacy canonical row ID should be present");
+        let derived = fixture["derivedProgressRowId"]
+            .as_str()
+            .expect("derived row ID should be present");
+        let legacy_derived = fixture["legacyDerivedProgressRowId"]
+            .as_str()
+            .expect("legacy derived row ID should be present");
+
+        assert_eq!(normalize_dva_identifier(legacy_canonical), canonical);
+        assert_eq!(normalize_dva_identifier(legacy_derived), derived);
+        assert!(DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE
+            .contains("return `dva:${tourId}${composite ? `:${composite}` : ''}`;"));
+        assert!(!DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE.contains("return `dva:dva:${tourId}"));
+    }
+}
+
 fn app_storage_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
         .path()
@@ -937,6 +994,8 @@ async fn build_tours_sync_payload_from_web_result(
     mut result: DeltaToursSyncPayload,
     debug_enabled: bool,
 ) -> Result<DeltaToursSyncPayload, String> {
+    normalize_tour_payload_identifiers(&mut result);
+
     if result.last_sync_at.is_none() {
         result.last_sync_at = Some(iso_now_utc());
     }
@@ -1191,7 +1250,7 @@ pub async fn sync_delta_virtual_tours(
     .visible(false)
     .center()
     .data_directory(webview_data_directory)
-    .on_navigation(|url| is_allowed_deltava_url(url))
+    .on_navigation(is_allowed_deltava_url)
     .on_page_load(move |webview_window, payload| {
         if payload.event() == tauri::webview::PageLoadEvent::Finished
             && should_probe_for_schedule(payload.url())

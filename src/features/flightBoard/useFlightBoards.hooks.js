@@ -92,7 +92,7 @@ export function useFlightBoards({
       null
     );
   }, [activeFlightBoardId, flightBoards]);
-  const flightBoard = activeFlightBoard?.entries || [];
+  const flightBoard = useMemo(() => activeFlightBoard?.entries || [], [activeFlightBoard]);
 
   const shortlist = useMemo(
     () =>

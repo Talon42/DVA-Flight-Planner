@@ -390,6 +390,7 @@ fn close_briefing_window(app: &AppHandle, label: &str) {
 }
 
 #[cfg(windows)]
+#[allow(clippy::type_complexity)] // Sender type records the exact one-shot briefing result contract.
 fn attach_windows_briefing_message_handler(
     window: &WebviewWindow,
     app: AppHandle,
@@ -679,7 +680,7 @@ async fn fetch_delta_virtual_tour_briefing_windows(
     .visible(false)
     .center()
     .data_directory(webview_data_directory)
-    .on_navigation(|url| is_allowed_deltava_url(url))
+    .on_navigation(is_allowed_deltava_url)
     .on_page_load({
         let flow_state = flow_state.clone();
         move |webview_window, payload| {

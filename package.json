@@ -14,14 +14,18 @@
     "lint:airports": "node scripts/audit-airport-timezone-labels.mjs",
     "build": "vite build",
     "lint": "eslint . --cache --cache-location .eslintcache",
+    "lint:ci": "eslint . --max-warnings=0",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "format:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
     "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml --locked",
-    "validate": "npm run test:run && npm run lint && npm run audit:data && npm run lint:airports && npm run build && npm run format:rust && npm run test:rust && npm run check:rust"
+    "clippy:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings",
+    "validate:fast": "npm run lint:ci && npm run audit:data && npm run lint:airports && npm run test:run",
+    "validate": "npm run validate:fast && npm run format:rust && npm run clippy:rust && npm run test:rust && npm run build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
@@ -47,6 +51,7 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.4.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

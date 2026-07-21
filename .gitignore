@@ -18,5 +18,7 @@
 /.agents
 /.npm-cache
 /.eslintcache
-/docs/instructions
+/coverage/
+/docs/instructions/*
+!/docs/instructions/VALIDATION.md
 /tmp/

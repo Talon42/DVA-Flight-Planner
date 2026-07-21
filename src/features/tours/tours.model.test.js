@@ -3,8 +3,10 @@ import { getTourCompletionDateLabel } from "./tourCompletion.selectors.js";
 import {
   buildDvaTourCanonicalRowId,
   buildDvaTourDerivedProgressRowId,
+  buildLegacyDvaTourCanonicalRowId,
   normalizeDvaTourId
 } from "./tourIds.model.js";
+import TOUR_ROW_ID_CASE from "../../../test-fixtures/deltava/tour-row-id-cases.json";
 import { parseTourFlightCode, parseTourRoute } from "./tourParsing.model.js";
 import { mergeTourProgressSources, summarizeTourCompletion } from "./tourProgress.selectors.js";
 import { normalizeTourRows } from "./tourRows.model.js";
@@ -46,14 +48,40 @@ describe("tour parsing and row identity", () => {
   });
 
   it("builds stable canonical and backend-derived row IDs", () => {
-    const canonical = buildDvaTourCanonicalRowId("42", MODERN_ROW);
-    const derived = buildDvaTourDerivedProgressRowId("dva:42", MODERN_ROW);
+    const canonical = buildDvaTourCanonicalRowId(TOUR_ROW_ID_CASE.tourId, TOUR_ROW_ID_CASE.row);
+    const derived = buildDvaTourDerivedProgressRowId(
+      `dva:${TOUR_ROW_ID_CASE.tourId}`,
+      TOUR_ROW_ID_CASE.row
+    );
 
     expect(normalizeDvaTourId("42")).toBe("dva:42");
-    expect(canonical).toContain("dva:dva:42:airline-DL:flight-123");
-    expect(canonical).toContain(":dep-KATL:arr-KJFK:");
-    expect(derived).toContain("dva:dva:42:airline-DL:flight-123");
-    expect(derived).not.toContain(":route-");
+    expect(normalizeDvaTourId("dva:dva:42")).toBe("dva:42");
+    expect(canonical).toBe(TOUR_ROW_ID_CASE.canonicalRowId);
+    expect(derived).toBe(TOUR_ROW_ID_CASE.derivedProgressRowId);
+    expect(buildLegacyDvaTourCanonicalRowId(canonical)).toBe(
+      TOUR_ROW_ID_CASE.legacyCanonicalRowId
+    );
+  });
+
+  it("restores legacy double-prefixed progress while migrating the visible row ID", () => {
+    const [row] = normalizeTourRows(
+      { id: "dva:42", label: "Sanitized Tour" },
+      [TOUR_ROW_ID_CASE.row],
+      {
+        [TOUR_ROW_ID_CASE.legacyCanonicalRowId]: {
+          completed: true,
+          source: "manual",
+          completedAt: "2026-07-20T12:00:00Z"
+        }
+      }
+    );
+
+    expect(row.tourRowId).toBe(TOUR_ROW_ID_CASE.canonicalRowId);
+    expect(row).toMatchObject({
+      isCompleted: true,
+      completionSource: "manual",
+      completedAt: "2026-07-20T12:00:00Z"
+    });
   });
 
   it("normalizes modern rows and restores derived completion metadata", () => {

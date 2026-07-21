@@ -289,7 +289,7 @@ async fn store_logbook_json_in_dir(
     Ok(crate::DeltaLogbookArtifact {
         file_name,
         path: final_path.to_string_lossy().into_owned(),
-        bytes: trimmed.as_bytes().len(),
+        bytes: trimmed.len(),
         content_type,
     })
 }

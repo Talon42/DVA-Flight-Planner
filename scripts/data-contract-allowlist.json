@@ -1,0 +1,38 @@
+{
+  "airportRequiredFieldExceptions": {
+    "EDDX": "Historical airport row retained without a reliable IANA timezone.",
+    "EDLP": "Source catalog does not currently provide a reliable IANA timezone.",
+    "EGNX": "Source catalog does not currently provide a reliable IANA timezone.",
+    "EGSS": "Source catalog does not currently provide a reliable IANA timezone.",
+    "ENDU": "Source catalog does not currently provide a reliable IANA timezone.",
+    "EPRZ": "Source catalog does not currently provide a reliable IANA timezone.",
+    "YOLW": "Source catalog does not currently provide a reliable IANA timezone.",
+    "ZLGL": "Source catalog does not currently provide a reliable IANA timezone."
+  },
+  "airportTimezoneExceptions": {
+    "EDDT": "Closed historical airport row contains a known legacy timezone value.",
+    "EDDX": "Historical airport row retained without a reliable IANA timezone.",
+    "EDLP": "Source catalog does not currently provide a reliable IANA timezone.",
+    "EGNX": "Source catalog does not currently provide a reliable IANA timezone.",
+    "EGSS": "Source catalog does not currently provide a reliable IANA timezone.",
+    "ENDU": "Source catalog does not currently provide a reliable IANA timezone.",
+    "EPRZ": "Source catalog does not currently provide a reliable IANA timezone.",
+    "YOLW": "Source catalog does not currently provide a reliable IANA timezone.",
+    "ZLGL": "Source catalog does not currently provide a reliable IANA timezone."
+  },
+  "duplicateAirportIcaoExceptions": {},
+  "unknownAircraftFamilyExceptions": {},
+  "aircraftFamilyCoverageExceptions": {},
+  "missingAirlineLogoExceptions": {
+    "JAI": "Historical airline intentionally uses no bundled logo.",
+    "NC": "Historical airline logo is stored under the legacy NCA asset name.",
+    "NEE": "Historical airline logo is stored under the legacy NEH asset name.",
+    "PAA": "Historical airline logo is stored under the legacy PAN-H asset name."
+  },
+  "orphanAirlineLogoExceptions": {
+    "DAL-H": "Historical Delta logo variant used outside the current airline catalog.",
+    "NCA": "Legacy asset name for North Central Airlines.",
+    "NEH": "Legacy asset name for Northeast Airlines.",
+    "PAN-H": "Legacy asset name for Pan American Airways."
+  }
+}

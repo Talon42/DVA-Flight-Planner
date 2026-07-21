@@ -514,7 +514,7 @@ fn extract_simbrief_xml_filename_stem(xml_file_value: &str) -> Option<String> {
 
     let file_name = parsed_url
         .path_segments()
-        .and_then(|segments| segments.last())
+        .and_then(|mut segments| segments.next_back())
         .unwrap_or_default();
     let stem = file_name.strip_suffix(".xml")?;
     let normalized_stem = stem.trim().to_ascii_uppercase();
@@ -631,7 +631,7 @@ fn spawn_simbrief_callback_page_server() {
         };
 
         let accept_future = async {
-            while let Ok((mut stream, _)) = listener.accept().await {
+            if let Ok((mut stream, _)) = listener.accept().await {
                 let mut request_buffer = [0_u8; 2048];
                 let _ = stream.read(&mut request_buffer).await;
                 let body = simbrief_callback_success_html();
@@ -642,7 +642,6 @@ fn spawn_simbrief_callback_page_server() {
                 );
                 let _ = stream.write_all(response.as_bytes()).await;
                 let _ = stream.shutdown().await;
-                break;
             }
         };
 
@@ -982,11 +981,7 @@ fn extract_route_point_from_map(
         return None;
     }
 
-    let Some((latitude, longitude)) =
-        extract_coordinate_pair_from_value(&Value::Object(map.clone()))
-    else {
-        return None;
-    };
+    let (latitude, longitude) = extract_coordinate_pair_from_value(&Value::Object(map.clone()))?;
 
     Some(SimBriefRoutePoint {
         ident,
@@ -1529,7 +1524,7 @@ async fn fetch_simbrief_xml_file_stem(
     )
     .ok()?;
 
-    let body = fetch_text_from_url(client, &url.to_string()).await.ok()?;
+    let body = fetch_text_from_url(client, url.as_ref()).await.ok()?;
     let xml_file = extract_xml_file_value(&body)?;
     extract_simbrief_xml_filename_stem(&xml_file)
 }

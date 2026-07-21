@@ -1,10 +1,6 @@
 // Duty location helpers keep airport, country, and region matching out of App.jsx.
 import { buildAirportCatalogOptions, buildAirportOptions, getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 
-function normalizeIcao(value) {
-  return String(value || "").trim().toUpperCase();
-}
-
 // Reads duty location data from the flight first, then falls back to the airport catalog.
 function readDutyLocationField(flight, side) {
   const airport = getAirportByIcao(flight?.[side]);

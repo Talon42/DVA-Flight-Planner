@@ -4,14 +4,16 @@ import process from "node:process";
 
 const console = globalThis.console;
 const airportsPath = path.resolve("src/data/airports.json");
+const allowlistPath = path.resolve("scripts/data-contract-allowlist.json");
 const raw = fs.readFileSync(airportsPath, "utf8");
 const data = JSON.parse(raw);
+const allowlist = JSON.parse(fs.readFileSync(allowlistPath, "utf8"));
 const airports = Array.isArray(data.airports) ? data.airports : [];
 
 const offsetLabelPattern = /^(?:GMT|UTC)[+-]\d{1,2}(?::\d{2})?$/i;
 const uniqueLabels = new Set();
 const failures = [];
-const warnings = [];
+const allowedTimezoneExceptions = [];
 
 function isValidTimezone(timezone) {
   const normalizedTimezone = String(timezone || "").trim();
@@ -51,14 +53,21 @@ for (const airport of airports) {
   uniqueLabels.add(timezoneLabel);
 
   if (!isValidTimezone(timezone)) {
-    warnings.push(`${icao}: timezone "${timezone || "(empty)"}" is invalid or missing`);
+    const reason = allowlist.airportTimezoneExceptions?.[icao];
+    if (reason) {
+      allowedTimezoneExceptions.push({ icao, reason, timezone: timezone || "(empty)" });
+    } else {
+      failures.push(`${icao}: timezone "${timezone || "(empty)"}" is invalid or missing`);
+    }
   }
 }
 
-if (warnings.length) {
-  console.warn(`[airport-timezone-labels] ${warnings.length} airports have invalid or missing IANA timezones.`);
-  for (const warning of warnings.slice(0, 20)) {
-    console.warn(`  - ${warning}`);
+if (allowedTimezoneExceptions.length) {
+  console.log(
+    `[airport-timezone-labels] Allowed invalid or missing IANA timezone exceptions: ${allowedTimezoneExceptions.length}`
+  );
+  for (const exception of allowedTimezoneExceptions.slice(0, 20)) {
+    console.log(`  - ${exception.icao}: ${exception.timezone} (${exception.reason})`);
   }
 }
 

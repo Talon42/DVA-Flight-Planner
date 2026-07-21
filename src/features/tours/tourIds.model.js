@@ -6,20 +6,17 @@ export function normalizeDvaTourId(tourOrId) {
       return "";
     }
 
-    return normalizedId.startsWith("dva:") ? normalizedId : `dva:${normalizedId}`;
+    const sourceId = normalizedId.replace(/^(?:dva:)+/i, "");
+    return sourceId ? `dva:${sourceId}` : "";
   }
 
   const explicitId = String(tourOrId?.id || "").trim();
-  if (explicitId.startsWith("dva:")) {
-    return explicitId;
+  if (explicitId) {
+    return normalizeDvaTourId(explicitId);
   }
 
   const sourceId = String(tourOrId?.sourceId || "").trim();
-  if (sourceId) {
-    return sourceId.startsWith("dva:") ? sourceId : `dva:${sourceId}`;
-  }
-
-  return "";
+  return sourceId ? normalizeDvaTourId(sourceId) : "";
 }
 
 // Normalizes row fragments used in generated IDs to stable uppercase tokens.
@@ -74,7 +71,15 @@ export function buildDvaTourCanonicalRowId(tourId, row) {
     route ? `route-${route}` : ""
   ].filter(Boolean);
 
-  return segments.length ? `dva:${normalizedTourId}:${segments.join(":")}` : "";
+  return segments.length ? `${normalizedTourId}:${segments.join(":")}` : "";
+}
+
+// Rebuilds the former double-prefixed ID so existing saved progress remains readable.
+export function buildLegacyDvaTourCanonicalRowId(canonicalRowId) {
+  const normalizedRowId = String(canonicalRowId || "").trim();
+  return normalizedRowId.startsWith("dva:")
+    ? normalizedRowId.replace(/^dva:/, "dva:dva:")
+    : "";
 }
 
 // Preserves older row IDs so existing stored data can still be matched.
@@ -91,9 +96,16 @@ export function buildLegacyDvaTourRowId(tourId, rowOrId) {
     return "";
   }
 
-  return rawId.startsWith(`dva:${normalizedTourId}:`)
-    ? rawId
-    : `dva:${normalizedTourId}:${rawId}`;
+  const legacyPrefix = `dva:${normalizedTourId}:`;
+  if (rawId.startsWith(legacyPrefix)) {
+    return rawId;
+  }
+
+  if (rawId.startsWith(`${normalizedTourId}:`)) {
+    return `dva:${rawId}`;
+  }
+
+  return `${legacyPrefix}${rawId}`;
 }
 
 // Builds the lookup key used to resolve flights by tour path and row ID.
@@ -153,5 +165,5 @@ export function buildDvaTourDerivedProgressRowId(tourId, row) {
     equipment ? `eq-${equipment}` : ""
   ].filter(Boolean);
 
-  return segments.length ? `dva:${normalizedTourId}:${segments.join(":")}` : "";
+  return segments.length ? `${normalizedTourId}:${segments.join(":")}` : "";
 }

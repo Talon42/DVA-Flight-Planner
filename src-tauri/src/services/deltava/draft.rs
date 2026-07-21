@@ -249,12 +249,12 @@ fn format_app_log_value(value: &Value) -> String {
         Value::Bool(boolean) => boolean.to_string(),
         Value::Number(number) => number.to_string(),
         Value::String(text) => {
-            let normalized = text.trim().replace('\r', " ").replace('\n', " ");
+            let normalized = text.trim().replace(['\r', '\n'], " ");
             let truncated = truncate_log_text(&normalized, 160);
             if is_simple_log_token(&truncated) {
                 truncated
             } else {
-                serde_json::to_string(&truncated).unwrap_or_else(|_| truncated)
+                serde_json::to_string(&truncated).unwrap_or(truncated)
             }
         }
         other => serde_json::to_string(&sanitize_app_log_value(other))
@@ -783,6 +783,7 @@ async fn inject_deltava_draft_submit_script_after_delay(
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Parameters mirror the DVA form and window lifecycle contract.
 fn schedule_deltava_draft_submit_script(
     window: tauri::WebviewWindow,
     app: AppHandle,
@@ -944,7 +945,7 @@ async fn run_deltava_draft_submission_attempt(
     .visible(false)
     .center()
     .data_directory(webview_data_directory)
-    .on_navigation(|url| is_allowed_deltava_draft_url(url))
+    .on_navigation(is_allowed_deltava_draft_url)
     .on_page_load(move |webview_window, payload| {
         if payload.event() != tauri::webview::PageLoadEvent::Finished
             || !is_allowed_deltava_draft_url(payload.url())
@@ -1171,6 +1172,7 @@ async fn run_deltava_draft_submission_attempt(
 }
 
 #[cfg(windows)]
+#[allow(clippy::too_many_arguments)] // Handler inputs are explicit ownership boundaries for one draft run.
 fn attach_windows_draft_message_handler(
     window: &tauri::WebviewWindow,
     draft_window: tauri::WebviewWindow,
@@ -1760,7 +1762,7 @@ pub async fn delete_deltava_draft_flight_report(
     .visible(false)
     .center()
     .data_directory(webview_data_directory)
-    .on_navigation(|url| is_allowed_deltava_draft_url(url))
+    .on_navigation(is_allowed_deltava_draft_url)
     .on_page_load(move |webview_window, payload| {
         if payload.event() != tauri::webview::PageLoadEvent::Finished
             || !is_allowed_deltava_draft_url(payload.url())

@@ -553,6 +553,7 @@ fn extract_airport_code(value: &Value, keys: &[&str]) -> Option<String> {
 
 fn extract_tour_path(tour: &Value) -> Option<String> {
     extract_string_field(tour, &["tourPath", "path", "id"])
+        .map(|value| normalize_tour_identifier(&value))
 }
 
 fn extract_tour_rows(tour: &Value) -> Vec<Value> {
@@ -564,13 +565,24 @@ fn extract_tour_rows(tour: &Value) -> Vec<Value> {
 }
 
 fn extract_tour_row_id(tour_path: &str, row: &Value, index: usize) -> String {
-    extract_string_field(row, &["tourRowId", "flightId", "sourceId", "id"]).unwrap_or_else(|| {
-        let tour_row_number = row
-            .get("leg")
-            .and_then(Value::as_i64)
-            .unwrap_or((index + 1) as i64);
-        format!("{tour_path}:leg-{tour_row_number}")
-    })
+    extract_string_field(row, &["tourRowId", "flightId", "sourceId", "id"])
+        .map(|value| normalize_tour_identifier(&value))
+        .unwrap_or_else(|| {
+            let tour_row_number = row
+                .get("leg")
+                .and_then(Value::as_i64)
+                .unwrap_or((index + 1) as i64);
+            format!("{tour_path}:leg-{tour_row_number}")
+        })
+}
+
+// Reads legacy double-prefixed caches while all newly derived progress uses one `dva:` prefix.
+fn normalize_tour_identifier(value: &str) -> String {
+    let mut normalized = value.trim().to_string();
+    while normalized.starts_with("dva:dva:") {
+        normalized = normalized.replacen("dva:dva:", "dva:", 1);
+    }
+    normalized
 }
 
 #[derive(Default)]
@@ -659,6 +671,7 @@ fn build_logbook_tour_credit_scan_from_values(
     result
 }
 
+#[allow(clippy::too_many_arguments)] // Reconciliation diagnostics are explicit for deterministic tests.
 fn build_tour_progress_rows_with_debug(
     credits: &[LogbookTourCreditCandidate],
     tour_rows: &[Value],
@@ -1448,10 +1461,11 @@ mod tests {
     }
 
     fn completed_row_id(cache: &DeltaTourProgressCache, tour_key: &str, row_id: &str) -> bool {
+        let normalized_row_id = normalize_tour_identifier(row_id);
         cache
             .tour_progress
             .get(tour_key)
-            .and_then(|tour| tour.rows.get(row_id))
+            .and_then(|tour| tour.rows.get(&normalized_row_id))
             .is_some_and(|row| row.completed)
     }
 
@@ -1529,6 +1543,13 @@ mod tests {
         );
 
         let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(cache
+            .tour_progress
+            .get("dva:16")
+            .expect("tour progress should exist")
+            .rows
+            .keys()
+            .all(|row_id| !row_id.contains("dva:dva:")));
         assert!(completed_row_id(
             &cache,
             "dva:16",

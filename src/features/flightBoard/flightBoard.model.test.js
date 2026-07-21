@@ -180,7 +180,8 @@ describe("Flight Board model", () => {
 
     expect(entry.flightId).toBe(entry.tourRowId);
     expect(entry.linkedFlightId).toBe(entry.tourRowId);
-    expect(entry.tourRowId).toContain("dva:dva:42:airline-DL:flight-123");
+    expect(entry.tourRowId).toContain("dva:42:airline-DL:flight-123");
+    expect(entry.tourRowId).not.toContain("dva:dva:");
   });
 
   it("rejects non-object persisted entries", () => {

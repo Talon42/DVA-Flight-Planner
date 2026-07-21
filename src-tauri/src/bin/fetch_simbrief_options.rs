@@ -1,11 +1,14 @@
-use std::{env, fs, path::PathBuf};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 const INPUTS_LIST_URL: &str = "https://www.simbrief.com/api/inputs.list.json";
 const INPUTS_AIRFRAMES_URL: &str = "https://www.simbrief.com/api/inputs.airframes.json";
 
 async fn fetch_and_save(
     client: &reqwest::Client,
-    output_dir: &PathBuf,
+    output_dir: &Path,
     url: &str,
     body_name: &str,
     meta_name: &str,

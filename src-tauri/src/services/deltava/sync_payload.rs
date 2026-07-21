@@ -67,6 +67,7 @@ fn profile_outcome_status(
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)] // Tests stay next to the private payload normalization helpers.
 mod tests {
     use super::*;
     use crate::models::DeltaLogbookPilotProfileMetadata;

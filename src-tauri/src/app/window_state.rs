@@ -40,7 +40,7 @@ fn capture_main_window_state(
     let maximized = window.is_maximized().ok().unwrap_or(false);
 
     if maximized && preserve_bounds_if_maximized {
-        let mut state = read_saved_main_window_state(&app).unwrap_or_default();
+        let mut state = read_saved_main_window_state(app).unwrap_or_default();
         state.maximized = true;
         return Some(state);
     }
@@ -77,7 +77,7 @@ pub(crate) fn persist_main_window_state(
         return;
     };
 
-    let _ = write_saved_main_window_state(&window.app_handle(), &state);
+    let _ = write_saved_main_window_state(window.app_handle(), &state);
 }
 
 fn window_state_intersects_monitor(
@@ -154,7 +154,7 @@ fn sanitize_saved_main_window_state(
 }
 
 pub(crate) fn restore_main_window_state(window: &WebviewWindow) {
-    let Some(saved_state) = read_saved_main_window_state(&window.app_handle()) else {
+    let Some(saved_state) = read_saved_main_window_state(window.app_handle()) else {
         return;
     };
     let mut state = sanitize_saved_main_window_state(window, saved_state);
@@ -177,7 +177,7 @@ pub(crate) fn restore_main_window_state(window: &WebviewWindow) {
         let _ = window.maximize();
     }
 
-    let _ = write_saved_main_window_state(&window.app_handle(), &state);
+    let _ = write_saved_main_window_state(window.app_handle(), &state);
 }
 
 #[cfg(test)]

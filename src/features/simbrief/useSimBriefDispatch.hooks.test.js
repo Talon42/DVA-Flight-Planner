@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSimBriefDispatch } from "./useSimBriefDispatch.hooks.js";
 
@@ -113,7 +113,10 @@ function createHookOptions(overrides = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.closeWindow.mockReset().mockResolvedValue(undefined);
   mocks.fetchAircraftTypes.mockResolvedValue({ types: [] });
+  mocks.refreshDispatch.mockReset();
+  mocks.startDispatch.mockReset();
 });
 
 describe("useSimBriefDispatch aircraft types", () => {
@@ -246,5 +249,107 @@ describe("useSimBriefDispatch workflow", () => {
     expect(result.current.simBriefDispatchState.message).toContain(
       "Save a SimBrief Navigraph Alias or Pilot ID"
     );
+  });
+
+  it("blocks a duplicate dispatch until the active workflow finishes", async () => {
+    const pendingDispatch = deferred();
+    mocks.startDispatch.mockReturnValueOnce(pendingDispatch.promise);
+    const options = createHookOptions();
+    const { result } = renderHook(() => useSimBriefDispatch(options));
+    let firstDispatch;
+
+    act(() => {
+      firstDispatch = result.current.handleStartSimBriefDispatch();
+    });
+    await waitFor(() => expect(mocks.startDispatch).toHaveBeenCalledOnce());
+
+    await act(() => result.current.handleStartSimBriefDispatch());
+    expect(mocks.startDispatch).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      pendingDispatch.resolve({ staticId: "new-static", ofpXmlId: "OFP-123" });
+      await firstDispatch;
+    });
+
+    mocks.startDispatch.mockResolvedValueOnce({ staticId: "next-static", ofpXmlId: "OFP-456" });
+    await act(() => result.current.handleStartSimBriefDispatch());
+    expect(mocks.startDispatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports a dispatch service rejection and releases the in-flight guard", async () => {
+    mocks.startDispatch.mockRejectedValueOnce(new Error("Sanitized dispatch failure."));
+    const options = createHookOptions();
+    const { result } = renderHook(() => useSimBriefDispatch(options));
+
+    await act(() => result.current.handleStartSimBriefDispatch());
+
+    expect(result.current.simBriefDispatchState).toMatchObject({
+      isDispatching: false,
+      message: "Sanitized dispatch failure."
+    });
+    expect(options.submitDraftReportForBoardEntry).not.toHaveBeenCalled();
+    expect(mocks.closeWindow).toHaveBeenCalledOnce();
+
+    mocks.startDispatch.mockResolvedValueOnce({ staticId: "retry-static", ofpXmlId: "OFP-789" });
+    await act(() => result.current.handleStartSimBriefDispatch());
+    expect(mocks.startDispatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports draft submission rejection after preserving the returned plan", async () => {
+    const plan = { staticId: "new-static", ofpXmlId: "OFP-123" };
+    mocks.startDispatch.mockResolvedValue(plan);
+    const options = createHookOptions({
+      submitDraftReportForBoardEntry: vi.fn().mockRejectedValue(
+        new Error("Sanitized draft submission failure.")
+      )
+    });
+    const { result } = renderHook(() => useSimBriefDispatch(options));
+
+    await act(() => result.current.handleStartSimBriefDispatch());
+
+    expect(options.applySimBriefPlanToBoardEntry).toHaveBeenCalledWith("entry-1", plan);
+    expect(result.current.simBriefDispatchState.message).toBe(
+      "Sanitized draft submission failure."
+    );
+    expect(mocks.closeWindow).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a successful result and unlocks dispatch when window cleanup rejects", async () => {
+    mocks.startDispatch.mockResolvedValue({ staticId: "new-static", ofpXmlId: "OFP-123" });
+    mocks.closeWindow.mockRejectedValueOnce(new Error("Sanitized close failure."));
+    const options = createHookOptions();
+    const { result } = renderHook(() => useSimBriefDispatch(options));
+
+    await act(() => result.current.handleStartSimBriefDispatch());
+
+    expect(result.current.simBriefDispatchState.message).toBe("SimBrief flight plan loaded.");
+    expect(mocks.logError).toHaveBeenCalledWith(
+      "SimBrief",
+      "dispatch-window-close-failed",
+      expect.any(Error),
+      expect.objectContaining({ stage: "cleanup-window" })
+    );
+
+    await act(() => result.current.handleStartSimBriefDispatch());
+    expect(mocks.startDispatch).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["missing", {}, "no new plan ID was returned"],
+    ["unchanged", { staticId: "existing-static" }, "matched the previous one"]
+  ])("rejects a regenerated plan with a %s static ID", async (_case, plan, expectedMessage) => {
+    const selectedShortlistFlight = createFlight({
+      simbriefPlan: { staticId: "existing-static", aircraftType: "B738" }
+    });
+    mocks.startDispatch.mockResolvedValue(plan);
+    const options = createHookOptions({ selectedShortlistFlight });
+    const { result } = renderHook(() => useSimBriefDispatch(options));
+
+    await act(() => result.current.handleRegenerateSimBriefDispatch());
+
+    expect(result.current.simBriefDispatchState.message).toContain(expectedMessage);
+    expect(options.applySimBriefPlanToBoardEntry).not.toHaveBeenCalled();
+    expect(options.submitDraftReportForBoardEntry).not.toHaveBeenCalled();
+    expect(mocks.closeWindow).toHaveBeenCalledOnce();
   });
 });

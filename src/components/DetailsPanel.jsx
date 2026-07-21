@@ -225,7 +225,9 @@ export default function DetailsPanel({
     if (dragState?.handleElement?.releasePointerCapture && dragState.pointerId !== undefined) {
       try {
         dragState.handleElement.releasePointerCapture(dragState.pointerId);
-      } catch {}
+      } catch {
+        // Pointer capture may already be released when the browser cancels a drag.
+      }
     }
 
     const activeDropTarget = dropTargetRef.current;
@@ -272,7 +274,9 @@ export default function DetailsPanel({
     if (event.currentTarget?.setPointerCapture) {
       try {
         event.currentTarget.setPointerCapture(event.pointerId);
-      } catch {}
+      } catch {
+        // Dragging still works when this browser cannot acquire pointer capture.
+      }
     }
     pointerDragStateRef.current = {
       boardEntryId,

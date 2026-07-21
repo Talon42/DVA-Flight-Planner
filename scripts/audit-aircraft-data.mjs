@@ -8,6 +8,7 @@ const AIRCRAFT_CATALOG_FILE = path.join(ROOT_DIR, "src", "data", "aircraft_catal
 const AIRPORTS_FILE = path.join(ROOT_DIR, "src", "data", "airports.json");
 const AIRLINES_FILE = path.join(ROOT_DIR, "src", "data", "airlines.json");
 const AIRLINE_LOGOS_DIR = path.join(ROOT_DIR, "src", "data", "images", "Logos");
+const ALLOWLIST_FILE = path.join(ROOT_DIR, "scripts", "data-contract-allowlist.json");
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -18,6 +19,32 @@ function normalizeKey(value) {
 }
 
 const catalog = readJson(AIRCRAFT_CATALOG_FILE);
+const allowlist = readJson(ALLOWLIST_FILE);
+const contractFailures = [];
+
+function partitionAllowed(items, exceptions, getKey) {
+  return items.reduce(
+    (result, item) => {
+      const key = getKey(item);
+      if (key && exceptions?.[key]) {
+        result.allowed.push({ item, key, reason: exceptions[key] });
+      } else {
+        result.failures.push(item);
+      }
+      return result;
+    },
+    { allowed: [], failures: [] }
+  );
+}
+
+function reportAllowed(label, allowed) {
+  if (allowed.length) {
+    console.log(`[aircraft-data] Allowed ${label}: ${allowed.length}`);
+    for (const entry of allowed.slice(0, 10)) {
+      console.log(`  - ${entry.key}: ${entry.reason}`);
+    }
+  }
+}
 const aircraftRows = Array.isArray(catalog.aircraftCatalog) ? catalog.aircraftCatalog : [];
 const aircraftFamilies = Array.isArray(catalog.aircraftFamilies) ? catalog.aircraftFamilies : [];
 const equipmentTypes = Array.isArray(catalog.equipmentTypes) ? catalog.equipmentTypes : [];
@@ -76,18 +103,31 @@ if (duplicateBuckets.length) {
   process.exit(1);
 }
 
-if (unknownFamilyProfiles.length) {
-  console.warn(
-    `[aircraft-data] ${unknownFamilyProfiles.length} profile rows still resolve to Unknown family.`
-  );
-  console.warn(
-    `  Sample: ${unknownFamilyProfiles.slice(0, 8).map((row) => row?.aircraftProfile || row?.name || row?.["Aircraft Profile"] || "").filter(Boolean).join(", ")}`
+const unknownFamilyResult = partitionAllowed(
+  unknownFamilyProfiles,
+  allowlist.unknownAircraftFamilyExceptions,
+  (row) => String(row?.aircraftProfile || row?.name || row?.["Aircraft Profile"] || "").trim()
+);
+reportAllowed("unknown aircraft-family exceptions", unknownFamilyResult.allowed);
+if (unknownFamilyResult.failures.length) {
+  contractFailures.push(
+    `${unknownFamilyResult.failures.length} aircraft profiles resolve to Unknown family: ${unknownFamilyResult.failures
+      .slice(0, 8)
+      .map((row) => row?.aircraftProfile || row?.name || row?.["Aircraft Profile"] || "")
+      .filter(Boolean)
+      .join(", ")}`
   );
 }
 
-if (familyCoverageGaps.length) {
-  console.warn(
-    `[aircraft-data] Families present on rows but missing from aircraftFamilies: ${familyCoverageGaps.join(", ")}`
+const familyCoverageResult = partitionAllowed(
+  familyCoverageGaps,
+  allowlist.aircraftFamilyCoverageExceptions,
+  (family) => family
+);
+reportAllowed("aircraft-family catalog exceptions", familyCoverageResult.allowed);
+if (familyCoverageResult.failures.length) {
+  contractFailures.push(
+    `Families are missing from aircraftFamilies: ${familyCoverageResult.failures.join(", ")}`
   );
 }
 
@@ -119,13 +159,33 @@ for (const airport of airportRows) {
 const duplicateAirports = [...airportDuplicateCounts.entries()].filter(([, count]) => count > 1);
 
 console.log(`[aircraft-data] Airports: ${airportRows.length}`);
-if (badAirports.length) {
-  console.warn(
-    `[aircraft-data] ${badAirports.length} airports are missing required lookup fields or coordinates.`
+const badAirportResult = partitionAllowed(
+  badAirports,
+  allowlist.airportRequiredFieldExceptions,
+  (airport) => String(airport?.icao || "").trim().toUpperCase()
+);
+reportAllowed("airport required-field exceptions", badAirportResult.allowed);
+if (badAirportResult.failures.length) {
+  contractFailures.push(
+    `${badAirportResult.failures.length} airports are missing required lookup fields or coordinates: ${badAirportResult.failures
+      .slice(0, 20)
+      .map((airport) => airport?.icao || "(missing ICAO)")
+      .join(", ")}`
   );
 }
-if (duplicateAirports.length) {
-  console.warn(`[aircraft-data] ${duplicateAirports.length} duplicate airport ICAO codes found.`);
+
+const duplicateAirportResult = partitionAllowed(
+  duplicateAirports,
+  allowlist.duplicateAirportIcaoExceptions,
+  ([icao]) => icao
+);
+reportAllowed("duplicate airport ICAO exceptions", duplicateAirportResult.allowed);
+if (duplicateAirportResult.failures.length) {
+  contractFailures.push(
+    `Duplicate airport ICAO codes found: ${duplicateAirportResult.failures
+      .map(([icao, count]) => `${icao} (${count})`)
+      .join(", ")}`
+  );
 }
 
 const airlinesData = readJson(AIRLINES_FILE);
@@ -137,18 +197,42 @@ const logoFiles = fs.existsSync(AIRLINE_LOGOS_DIR)
   : [];
 const airlineIcaos = airlineRows.map((row) => String(row?.ICAO || "").trim().toUpperCase()).filter(Boolean);
 const missingLogos = airlineIcaos.filter((icao) => !logoFiles.includes(icao));
-const intentionalOrphanLogos = new Set(["DAL-H", "NCA", "NEH", "PAN-H"]);
-const orphanLogos = logoFiles.filter((icao) => !airlineIcaos.includes(icao) && !intentionalOrphanLogos.has(icao));
+const orphanLogos = logoFiles.filter((icao) => !airlineIcaos.includes(icao));
 
 console.log(`[aircraft-data] Airlines: ${airlineRows.length}`);
 console.log(`[aircraft-data] Airline logos: ${logoFiles.length}`);
-if (missingLogos.length) {
-  console.warn(
-    `[aircraft-data] ${missingLogos.length} airlines do not have a matching logo file.`
+const missingLogoResult = partitionAllowed(
+  missingLogos,
+  allowlist.missingAirlineLogoExceptions,
+  (icao) => icao
+);
+reportAllowed("missing airline-logo exceptions", missingLogoResult.allowed);
+if (missingLogoResult.failures.length) {
+  contractFailures.push(
+    `Airlines do not have a matching logo file: ${missingLogoResult.failures.join(", ")}`
   );
 }
-if (orphanLogos.length) {
-  console.warn(`[aircraft-data] ${orphanLogos.length} logo files are not mapped to an airline row.`);
+
+const orphanLogoResult = partitionAllowed(
+  orphanLogos,
+  allowlist.orphanAirlineLogoExceptions,
+  (icao) => icao
+);
+reportAllowed("orphan airline-logo exceptions", orphanLogoResult.allowed);
+if (orphanLogoResult.failures.length) {
+  contractFailures.push(
+    `Logo files are not mapped to an airline row: ${orphanLogoResult.failures.join(", ")}`
+  );
+}
+
+if (contractFailures.length) {
+  console.error(`[aircraft-data] Contract validation failed with ${contractFailures.length} finding groups.`);
+  for (const failure of contractFailures) {
+    console.error(`  - ${failure}`);
+  }
+  process.exitCode = 1;
+} else {
+  console.log("[aircraft-data] Mandatory contracts passed.");
 }
 
 console.log("[aircraft-data] Audit complete.");

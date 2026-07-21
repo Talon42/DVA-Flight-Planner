@@ -289,7 +289,6 @@ function buildGreedyAttempt(startFlight, context) {
     requestedLength,
     flightsByOrigin,
     dutyFilters,
-    addonAirports,
     rng,
     trace,
     safety
@@ -603,9 +602,9 @@ export function buildDutySchedule({
     };
   }
 
-  let selectedFlights = [];
-  let status = "failure";
-  let reasonCodes = ["max-attempts-exhausted"];
+  let selectedFlights;
+  let status;
+  let reasonCodes;
 
   if (normalizedFilters.dutyTargetMode === "flexible") {
     const flexibleFlights = resolveFlexibleDutySchedule(

@@ -169,6 +169,7 @@ export function useSimBriefDispatch({
   const [isSimBriefAircraftTypesLoading, setIsSimBriefAircraftTypesLoading] = useState(false);
   const [simBriefAircraftTypesError, setSimBriefAircraftTypesError] = useState("");
   const loadRequestIdRef = useRef(0);
+  const dispatchInFlightRef = useRef(false);
   const simBriefDispatchOptions = buildDvaAircraftOptionsWithCustomAirframes(
     simBriefCustomAirframes
   );
@@ -267,7 +268,7 @@ export function useSimBriefDispatch({
   }, [handleFetchSimBriefAircraftTypes, isDesktopSimBriefAvailable]);
 
   const runSimBriefDispatchWorkflow = useCallback(async ({ forceNewDispatch = false } = {}) => {
-    if (!selectedShortlistFlight) {
+    if (!selectedShortlistFlight || dispatchInFlightRef.current) {
       return;
     }
 
@@ -327,6 +328,8 @@ export function useSimBriefDispatch({
       return;
     }
 
+    // A ref closes the same-render gap where two clicks can start duplicate desktop workflows.
+    dispatchInFlightRef.current = true;
     setSimBriefDispatchState({
       flightId,
       isDispatching: true,
@@ -702,12 +705,27 @@ export function useSimBriefDispatch({
       });
     } finally {
       setPendingMapFlightPathViewMode?.(null);
-      await closeSimBriefDispatchWindow();
+      try {
+        await closeSimBriefDispatchWindow();
+      } catch (cleanupError) {
+        try {
+          await logSystemError("SimBrief", "dispatch-window-close-failed", cleanupError, {
+            dispatchRunId,
+            dispatchMode,
+            stage: "cleanup-window"
+          });
+        } catch {
+          // Cleanup logging must not keep dispatch locked or replace its primary result.
+        }
+      } finally {
+        dispatchInFlightRef.current = false;
+      }
     }
   }, [
     applySimBriefPlanToBoardEntry,
     flightBoard,
     isDesktopSimBriefAvailable,
+    isDevToolsEnabled,
     selectedShortlistFlight,
     setExpandedBoardFlightId,
     setPendingMapFlightPathViewMode,

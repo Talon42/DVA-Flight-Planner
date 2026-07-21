@@ -235,9 +235,7 @@ fn extract_row_value(
 
     let expected_lower = expected_label.to_lowercase();
     let lower_row_text = normalized_row_text.to_lowercase();
-    let Some(label_index) = lower_row_text.find(&expected_lower) else {
-        return None;
-    };
+    let label_index = lower_row_text.find(&expected_lower)?;
 
     let extracted = normalized_row_text
         .get(label_index + expected_label.len()..)
@@ -517,14 +515,14 @@ mod tests {
         assert_eq!(parsed.payload_passengers, "");
         assert_eq!(parsed.payload_cargo, "");
         assert_eq!(parsed.passengers_carried_raw, "");
-        assert_eq!(parsed.found_passengers_carried, false);
-        assert_eq!(parsed.found_payload_weight, false);
+        assert!(!parsed.found_passengers_carried);
+        assert!(!parsed.found_payload_weight);
         assert_eq!(parsed.departure_route, "");
-        assert_eq!(parsed.found_departure_route, false);
-        assert_eq!(parsed.found_flight_route, false);
-        assert_eq!(parsed.found_arrival_route, false);
-        assert_eq!(parsed.found_takeoff_runway, false);
-        assert_eq!(parsed.found_landing_runway, false);
+        assert!(!parsed.found_departure_route);
+        assert!(!parsed.found_flight_route);
+        assert!(!parsed.found_arrival_route);
+        assert!(!parsed.found_takeoff_runway);
+        assert!(!parsed.found_landing_runway);
     }
 
     #[test]
@@ -578,7 +576,7 @@ mod tests {
         assert_eq!(parsed.payload_raw, "");
         assert_eq!(parsed.payload_passengers, "121");
         assert_eq!(parsed.payload_cargo, "");
-        assert_eq!(parsed.found_payload_weight, false);
+        assert!(!parsed.found_payload_weight);
     }
 
     #[test]

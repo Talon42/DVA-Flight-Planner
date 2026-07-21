@@ -172,6 +172,7 @@ function formatFlightCode(flightCode) {
 }
 
 // Builds the shared schedule flight table columns with airport detail actions and UTC time cells.
+// eslint-disable-next-line react-refresh/only-export-components -- table definitions are consumed outside React render files
 export function getFlightTableColumns({
   addonAirports,
   vatsimCoverageIndex = null,

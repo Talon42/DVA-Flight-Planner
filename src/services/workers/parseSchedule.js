@@ -246,7 +246,8 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
       throw new Error(
         `Import parser failed at flight row ${index + 1}: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
+        { cause: error }
       );
     }
   }

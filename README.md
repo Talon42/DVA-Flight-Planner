@@ -140,3 +140,9 @@ Settings covers the app's main integrations and maintenance tools:
 The app stores local schedule, logbook, tour, settings, and Flight Board data on your device. DVA password storage uses the desktop credential flow rather than plain app settings.
 
 Use `Settings` > `Advanced` > `Delete User Data` to clear saved local data, DVA credentials, temporary sync data, and browser data where possible.
+
+## Validation
+
+Codex must run the applicable checks from `docs/instructions/VALIDATION.md` before reporting a file-changing task complete. Use `npm run validate:fast` during iteration and `npm run validate` for cross-cutting work or release readiness.
+
+Tests and data audits use local fixtures and mocks; they do not require live DVA or SimBrief services. GitHub Actions does not run validation on branch pushes. Application builds and releases may run complete validation when they are manually initiated.

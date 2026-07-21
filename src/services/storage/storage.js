@@ -420,6 +420,8 @@ function base64ToUint8Array(value) {
   return bytes;
 }
 
+// Kept for compatibility with compressed schedules even though new writes are currently plain JSON.
+// eslint-disable-next-line no-unused-vars
 async function compressPersistedPayload(text) {
   if (typeof CompressionStream === "undefined") {
     return {
@@ -1005,7 +1007,7 @@ async function openLogFile(relativePath, storageKey) {
         // no-op: we'll throw the original open error below
       }
       const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(`Unable to open log file: ${fullPath} (${reason})`);
+      throw new Error(`Unable to open log file: ${fullPath} (${reason})`, { cause: error });
     }
   }
 

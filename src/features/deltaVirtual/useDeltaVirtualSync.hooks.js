@@ -37,6 +37,36 @@ function showDeltaVirtualSyncFailureWarning(setStatusMessage, setDvaSyncWarning,
   });
 }
 
+// Cleanup must never keep a completed DVA operation locked or hide its primary result.
+async function cleanupDeltaVirtualOperation({ category, removeDownloadedSchedule, syncRunId }) {
+  try {
+    await closeDeltaVirtualSyncWindow();
+  } catch (error) {
+    try {
+      await logSystemError(category, "cleanup-window-close-failed", error, {
+        syncRunId,
+        stage: "cleanup-window"
+      });
+    } catch {
+      // Cleanup logging is also best effort so operation state can always reset.
+    }
+  }
+
+  try {
+    await pruneDeltaVirtualStorage(removeDownloadedSchedule);
+  } catch (error) {
+    try {
+      await logSystemError(category, "cleanup-storage-prune-failed", error, {
+        syncRunId,
+        stage: "cleanup-storage",
+        removeDownloadedSchedule
+      });
+    } catch {
+      // Cleanup logging is also best effort so operation state can always reset.
+    }
+  }
+}
+
 // Owns the Delta Virtual sync workflow so App.jsx can keep the shell and settings wiring thin.
 export function useDeltaVirtualSync({
   dvaFirstName = "",
@@ -123,9 +153,6 @@ export function useDeltaVirtualSync({
 
     const syncRunId = createLogRunId("sync");
     const syncStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
-    await logSystemEvent("DVA Sync", "started", {
-      syncRunId
-    });
 
     const hasSavedDeltaVirtualCredentials =
       Boolean(String(dvaFirstName || "").trim()) &&
@@ -158,6 +185,9 @@ export function useDeltaVirtualSync({
     let shouldRemoveDownloadedSchedule = false;
 
     try {
+      await logSystemEvent("DVA Sync", "started", {
+        syncRunId
+      });
       setStatusMessage?.("Syncing data from Delta Virtual.");
       const syncedFile = await syncScheduleFromDeltaVirtual({
         syncRunId,
@@ -322,10 +352,16 @@ export function useDeltaVirtualSync({
         });
       }
     } finally {
-      await closeDeltaVirtualSyncWindow();
-      await pruneDeltaVirtualStorage(shouldRemoveDownloadedSchedule);
-      setIsSyncing(false);
-      isSyncingRef.current = false;
+      try {
+        await cleanupDeltaVirtualOperation({
+          category: "DVA Sync",
+          removeDownloadedSchedule: shouldRemoveDownloadedSchedule,
+          syncRunId
+        });
+      } finally {
+        setIsSyncing(false);
+        isSyncingRef.current = false;
+      }
     }
   }, [
     dvaFirstName,
@@ -352,9 +388,6 @@ export function useDeltaVirtualSync({
 
     const syncRunId = createLogRunId("logbook-refresh");
     const syncStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
-    await logSystemEvent("DVA Logbook Refresh", "started", {
-      syncRunId
-    });
 
     const hasSavedDeltaVirtualCredentials =
       Boolean(String(dvaFirstName || "").trim()) &&
@@ -386,6 +419,9 @@ export function useDeltaVirtualSync({
     setStatusMessage?.("Refreshing Delta Virtual logbook.");
 
     try {
+      await logSystemEvent("DVA Logbook Refresh", "started", {
+        syncRunId
+      });
       setStatusMessage?.("Refreshing Delta Virtual logbook.");
       const refreshResult = await refreshDeltaVirtualLogbook({
         syncRunId,
@@ -445,10 +481,16 @@ export function useDeltaVirtualSync({
         });
       }
     } finally {
-      await closeDeltaVirtualSyncWindow();
-      await pruneDeltaVirtualStorage(false);
-      setIsRefreshingLogbook(false);
-      isRefreshingLogbookRef.current = false;
+      try {
+        await cleanupDeltaVirtualOperation({
+          category: "DVA Logbook Refresh",
+          removeDownloadedSchedule: false,
+          syncRunId
+        });
+      } finally {
+        setIsRefreshingLogbook(false);
+        isRefreshingLogbookRef.current = false;
+      }
     }
   }, [
     dvaFirstName,

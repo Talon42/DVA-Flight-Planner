@@ -2,6 +2,7 @@ import { cn } from "../../components/ui/cn";
 import { LOGBOOK_EMPTY_VALUE } from "../../domain/logbook/logbook.model.js";
 
 // Reuses the same landing-rate category colors used by the logbook flights table.
+// eslint-disable-next-line react-refresh/only-export-components -- palette helper is part of this small badge module
 export function getLandingGradePaletteClassName(grade) {
   const normalizedGrade = String(grade || "").trim();
 
@@ -21,6 +22,7 @@ export function getLandingGradePaletteClassName(grade) {
 }
 
 // Reuses the same grade colors, but only for inline text instead of the full badge treatment.
+// eslint-disable-next-line react-refresh/only-export-components -- text helper is part of this small badge module
 export function getLandingGradeTextClassName(grade) {
   const normalizedGrade = String(grade || "").trim();
 

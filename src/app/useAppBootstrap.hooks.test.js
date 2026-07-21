@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { renderHook, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppBootstrap } from "./useAppBootstrap.hooks.js";
 
@@ -105,6 +106,63 @@ function renderBootstrap(setters) {
       schedule: null
     })
   );
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+// Tracks the startup slices whose coherence matters after asynchronous hydration.
+function useStatefulBootstrapHarness(passiveSetters) {
+  const [schedule, setSchedule] = useState(null);
+  const [flightBoards, setFlightBoards] = useState([]);
+  const [activeFlightBoardId, setActiveFlightBoardId] = useState("");
+  const [plannerMode, setPlannerMode] = useState("schedule");
+  const [simBriefUsername, setSimBriefUsername] = useState("");
+  const [dvaFirstName, setDvaFirstName] = useState("");
+  const [dvaLastName, setDvaLastName] = useState("");
+  const [dvaHasPassword, setDvaHasPassword] = useState(false);
+  const [filters, setFilters] = useState({});
+  const [dutyFilters, setDutyFilters] = useState({});
+
+  const bootstrap = useAppBootstrap({
+    ...passiveSetters,
+    activeFlightBoardId,
+    deferredDutyFilters: dutyFilters,
+    deferredFilters: filters,
+    dutyFilters,
+    filters,
+    flightBoards,
+    schedule,
+    setActiveFlightBoardId,
+    setDutyFilters,
+    setDvaFirstName,
+    setDvaLastName,
+    setDvaHasPassword,
+    setFilters,
+    setFlightBoards,
+    setPlannerMode,
+    setSchedule,
+    setSimBriefUsername
+  });
+
+  return {
+    ...bootstrap,
+    activeFlightBoardId,
+    dvaCredentials: {
+      firstName: dvaFirstName,
+      lastName: dvaLastName,
+      hasPassword: dvaHasPassword
+    },
+    flightBoards,
+    plannerMode,
+    schedule,
+    simBriefUsername
+  };
 }
 
 beforeEach(() => {
@@ -285,5 +343,80 @@ describe("useAppBootstrap", () => {
     expect(setters.setDeltaVirtualToursCache).toHaveBeenCalledWith(null);
     expect(logging.logAppError).toHaveBeenCalled();
     expect(logging.logSystemError).toHaveBeenCalled();
+  });
+
+  it("hydrates coherent state and reconciles stale boards with an invalid active-board ID", async () => {
+    const flight = {
+      flightId: "flight-1",
+      flightCode: "DL100",
+      airline: "DL",
+      from: "KATL",
+      to: "KJFK"
+    };
+    storage.readSavedSchedule.mockResolvedValue({ flights: [flight] });
+    storage.readSavedUiState.mockResolvedValue({
+      activeFlightBoardId: "missing-board",
+      flightBoards: [
+        {
+          id: "board-1",
+          name: "Recovered Board",
+          entries: [
+            { boardEntryId: "matched", linkedFlightId: "flight-1", ...flight },
+            {
+              boardEntryId: "stale",
+              linkedFlightId: "removed-flight",
+              flightId: "removed-flight",
+              flightCode: "DL200",
+              airline: "DL",
+              from: "KJFK",
+              to: "KBOS"
+            }
+          ]
+        }
+      ],
+      filters: "corrupt-filter-state",
+      plannerMode: "duty"
+    });
+    storage.readSimBriefSettings.mockResolvedValue({ username: "sanitized-navigator" });
+    readDeltaVirtualCredentials.mockResolvedValue({
+      firstName: "Jane",
+      lastName: "Pilot",
+      hasPassword: true
+    });
+    const passiveSetters = createSetters();
+    const { result } = renderHook(() => useStatefulBootstrapHarness(passiveSetters));
+
+    await waitFor(() => expect(result.current.isStartupReady).toBe(true));
+
+    expect(result.current.schedule).toEqual({ flights: [flight] });
+    expect(result.current.activeFlightBoardId).toBe("board-1");
+    expect(result.current.flightBoards[0].entries).toEqual([
+      expect.objectContaining({ boardEntryId: "matched", linkedFlightId: "flight-1", isStale: false }),
+      expect.objectContaining({ boardEntryId: "stale", linkedFlightId: null, isStale: true })
+    ]);
+    expect(result.current.plannerMode).toBe("duty");
+    expect(result.current.simBriefUsername).toBe("sanitized-navigator");
+    expect(result.current.dvaCredentials).toEqual({
+      firstName: "Jane",
+      lastName: "Pilot",
+      hasPassword: true
+    });
+  });
+
+  it("does not apply a slow saved schedule after hydration unmounts", async () => {
+    const savedSchedule = deferred();
+    storage.readSavedSchedule.mockReturnValue(savedSchedule.promise);
+    const setters = createSetters();
+    const { unmount } = renderBootstrap(setters);
+
+    unmount();
+    await act(async () => {
+      savedSchedule.resolve({ flights: [{ flightId: "late-flight" }] });
+      await savedSchedule.promise;
+      await Promise.resolve();
+    });
+
+    expect(setters.setSchedule).not.toHaveBeenCalled();
+    expect(setters.setFlightBoards).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import { getAirlineIcao, getAirlineNameByIata } from "../../domain/airlines/airl
 import {
   buildDvaTourCanonicalRowId,
   buildDvaTourDerivedProgressRowId,
+  buildLegacyDvaTourCanonicalRowId,
   buildLegacyDvaTourRowId,
   normalizeDvaTourId
 } from "./tourIds.model";
@@ -88,10 +89,14 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
     if (isModernTourFlight(row)) {
       const flightId = buildDvaTourCanonicalRowId(tourId, row);
       const derivedProgressFlightId = buildDvaTourDerivedProgressRowId(tourId, row);
+      const legacyCanonicalFlightId = buildLegacyDvaTourCanonicalRowId(flightId);
       const legacyFlightId = buildLegacyDvaTourRowId(tourId, row);
       // Match the current UI row ID first, then the backend-derived progress ID, so
       // manual completions stay intact while logbook-derived completions still load.
       const manualProgressEntry = progressById?.[flightId] || null;
+      const legacyCanonicalProgressEntry = legacyCanonicalFlightId
+        ? progressById?.[legacyCanonicalFlightId] || null
+        : null;
       const derivedProgressEntry = derivedProgressFlightId
         ? progressById?.[derivedProgressFlightId] || null
         : null;
@@ -102,11 +107,13 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
       const progressEntry =
         manualProgressEntry?.completed
           ? manualProgressEntry
-          : derivedProgressEntry?.completed
-            ? derivedProgressEntry
-            : legacyProgressEntry?.completed
-              ? legacyProgressEntry
-              : null;
+          : legacyCanonicalProgressEntry?.completed
+            ? legacyCanonicalProgressEntry
+            : derivedProgressEntry?.completed
+              ? derivedProgressEntry
+              : legacyProgressEntry?.completed
+                ? legacyProgressEntry
+                : null;
       const tourLeg = index + 1;
       const airline = String(row?.airline || "").trim().toUpperCase();
       const airlineName = String(
@@ -217,6 +224,7 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
         segment: String(row?.segment || `Leg ${tourLeg}`).trim(),
         isCompleted: Boolean(
           manualProgressEntry?.completed ||
+            legacyCanonicalProgressEntry?.completed ||
             derivedProgressEntry?.completed ||
             legacyProgressEntry?.completed
         ),
@@ -293,10 +301,14 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
       equipment: String(row?.aircraft || row?.equipment || "").trim(),
       leg: index + 1
     });
+    const legacyCanonicalFlightId = buildLegacyDvaTourCanonicalRowId(flightId);
     const legacyFlightId = buildLegacyDvaTourRowId(tourId, row);
     // Match the current UI row ID first, then the backend-derived progress ID, so
     // manual completions stay intact while logbook-derived completions still load.
     const manualProgressEntry = progressById?.[flightId] || null;
+    const legacyCanonicalProgressEntry = legacyCanonicalFlightId
+      ? progressById?.[legacyCanonicalFlightId] || null
+      : null;
     const derivedProgressEntry = derivedProgressFlightId
       ? progressById?.[derivedProgressFlightId] || null
       : null;
@@ -307,11 +319,13 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
     const progressEntry =
       manualProgressEntry?.completed
         ? manualProgressEntry
-        : derivedProgressEntry?.completed
-          ? derivedProgressEntry
-          : legacyProgressEntry?.completed
-            ? legacyProgressEntry
-            : null;
+        : legacyCanonicalProgressEntry?.completed
+          ? legacyCanonicalProgressEntry
+          : derivedProgressEntry?.completed
+            ? derivedProgressEntry
+            : legacyProgressEntry?.completed
+              ? legacyProgressEntry
+              : null;
     const tourLeg = index + 1;
 
     return {
@@ -349,6 +363,7 @@ export function normalizeTourRows(tour, rows, progressById = {}) {
       tourSourceId,
       isCompleted: Boolean(
         manualProgressEntry?.completed ||
+          legacyCanonicalProgressEntry?.completed ||
           derivedProgressEntry?.completed ||
           legacyProgressEntry?.completed
       ),

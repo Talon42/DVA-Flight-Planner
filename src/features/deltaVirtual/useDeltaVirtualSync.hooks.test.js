@@ -58,6 +58,14 @@ function createProps(overrides = {}) {
   };
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   logging.createLogRunId.mockImplementation((prefix) => `${prefix}-run`);
@@ -221,5 +229,213 @@ describe("useDeltaVirtualSync", () => {
     );
     expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledWith(false);
     expect(result.current.isSyncing).toBe(false);
+  });
+
+  it.each([
+    ["window closing", true, false],
+    ["storage pruning", false, true],
+    ["both cleanup commands", true, true]
+  ])("unlocks sync when %s fails", async (_label, closeFails, pruneFails) => {
+    if (closeFails) {
+      deltaVirtual.closeDeltaVirtualSyncWindow.mockRejectedValueOnce(
+        new Error("Unable to close fixture window.")
+      );
+    }
+    if (pruneFails) {
+      deltaVirtual.pruneDeltaVirtualStorage.mockRejectedValueOnce(
+        new Error("Unable to prune fixture storage.")
+      );
+    }
+    const props = createProps();
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+
+    await act(() => result.current.handleDeltaVirtualSync());
+
+    expect(result.current.isSyncing).toBe(false);
+    expect(deltaVirtual.closeDeltaVirtualSyncWindow).toHaveBeenCalledTimes(1);
+    expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledTimes(1);
+
+    await act(() => result.current.handleDeltaVirtualSync());
+
+    expect(deltaVirtual.syncScheduleFromDeltaVirtual).toHaveBeenCalledTimes(2);
+    expect(result.current.isSyncing).toBe(false);
+    expect(logging.logSystemError).toHaveBeenCalledWith(
+      expect.stringMatching(/^DVA Sync$/),
+      expect.stringMatching(/^cleanup-/),
+      expect.any(Error),
+      expect.objectContaining({ syncRunId: "sync-run" })
+    );
+  });
+
+  it("unlocks logbook refresh and attempts both cleanup commands when cleanup fails", async () => {
+    deltaVirtual.closeDeltaVirtualSyncWindow.mockRejectedValueOnce(
+      new Error("Unable to close fixture window.")
+    );
+    deltaVirtual.pruneDeltaVirtualStorage.mockRejectedValueOnce(
+      new Error("Unable to prune fixture storage.")
+    );
+    const props = createProps();
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+
+    await act(() => result.current.handleRefreshDeltaVirtualLogbook());
+
+    expect(result.current.isRefreshingLogbook).toBe(false);
+    expect(deltaVirtual.closeDeltaVirtualSyncWindow).toHaveBeenCalledOnce();
+    expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledOnce();
+
+    await act(() => result.current.handleRefreshDeltaVirtualLogbook());
+
+    expect(deltaVirtual.refreshDeltaVirtualLogbook).toHaveBeenCalledTimes(2);
+    expect(result.current.isRefreshingLogbook).toBe(false);
+  });
+
+  it("blocks same-render duplicate sync calls before asynchronous start logging settles", async () => {
+    const startedLog = deferred();
+    logging.logSystemEvent.mockImplementationOnce(() => startedLog.promise);
+    const props = createProps();
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+    let firstSync;
+
+    act(() => {
+      firstSync = result.current.handleDeltaVirtualSync();
+      void result.current.handleDeltaVirtualSync();
+    });
+
+    expect(logging.logSystemEvent).toHaveBeenCalledTimes(1);
+    expect(result.current.isSyncing).toBe(true);
+
+    await act(async () => {
+      startedLog.resolve();
+      await firstSync;
+    });
+    expect(deltaVirtual.syncScheduleFromDeltaVirtual).toHaveBeenCalledOnce();
+  });
+
+  it("prevents sync and logbook refresh from overlapping in either direction", async () => {
+    const pendingSchedule = deferred();
+    deltaVirtual.syncScheduleFromDeltaVirtual.mockReturnValueOnce(pendingSchedule.promise);
+    const props = createProps();
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+    let syncOperation;
+
+    act(() => {
+      syncOperation = result.current.handleDeltaVirtualSync();
+    });
+    await waitFor(() => expect(result.current.isSyncing).toBe(true));
+    await act(() => result.current.handleRefreshDeltaVirtualLogbook());
+    expect(deltaVirtual.refreshDeltaVirtualLogbook).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pendingSchedule.resolve({
+        fileName: "schedule.xml",
+        xmlText: "<SCHEDULE />",
+        warnings: []
+      });
+      await syncOperation;
+    });
+
+    const pendingLogbook = deferred();
+    deltaVirtual.refreshDeltaVirtualLogbook.mockReturnValueOnce(pendingLogbook.promise);
+    let logbookOperation;
+    act(() => {
+      logbookOperation = result.current.handleRefreshDeltaVirtualLogbook();
+    });
+    await waitFor(() => expect(result.current.isRefreshingLogbook).toBe(true));
+    await act(() => result.current.handleDeltaVirtualSync());
+    expect(deltaVirtual.syncScheduleFromDeltaVirtual).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      pendingLogbook.resolve({ logbookJson: { fileName: "logbook.json", bytes: 100 } });
+      await logbookOperation;
+    });
+  });
+
+  it("fails an unimportable schedule without deleting the downloaded fixture", async () => {
+    const importError = new Error("Sanitized import failure.");
+    const props = createProps({
+      processImportedSchedule: vi.fn().mockResolvedValue({ ok: false, error: importError })
+    });
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+
+    await act(() => result.current.handleDeltaVirtualSync());
+
+    expect(props.setDvaSyncWarning).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "sync_failed", detail: expect.stringContaining("could not be imported") })
+    );
+    expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledWith(false);
+    expect(result.current.isSyncing).toBe(false);
+  });
+
+  it("rejects a downloaded schedule that remains stale", async () => {
+    buildScheduleDateInfo.mockReturnValueOnce({ isCurrent: false, label: "July 1st" });
+    const props = createProps();
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+
+    await act(() => result.current.handleDeltaVirtualSync());
+
+    expect(props.onScheduleSyncComplete).not.toHaveBeenCalled();
+    expect(props.setDvaSyncWarning).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "sync_failed", detail: expect.stringContaining("July 1st") })
+    );
+    expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledWith(false);
+    expect(result.current.isSyncing).toBe(false);
+  });
+
+  it.each([
+    ["cancelled", "Delta Virtual sync canceled."],
+    ["auth_failed", "Delta Virtual Sync failed."],
+    ["unknown_failure", "Delta Virtual Sync failed."]
+  ])("resets state after a %s schedule failure", async (kind, expectedStatus) => {
+    deltaVirtual.syncScheduleFromDeltaVirtual.mockRejectedValueOnce(
+      Object.assign(new Error("Sanitized unknown sync failure."), { kind })
+    );
+    const props = createProps();
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+
+    await act(() => result.current.handleDeltaVirtualSync());
+
+    expect(props.setStatusMessage).toHaveBeenCalledWith(expect.stringContaining(expectedStatus));
+    expect(deltaVirtual.closeDeltaVirtualSyncWindow).toHaveBeenCalledOnce();
+    expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledWith(false);
+    expect(result.current.isSyncing).toBe(false);
+  });
+
+  it("continues base sync completion when tour synchronization fails", async () => {
+    deltaVirtual.syncDeltaVirtualTours.mockRejectedValueOnce(
+      new Error("Sanitized tour sync failure.")
+    );
+    const props = createProps();
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+
+    await act(() => result.current.handleDeltaVirtualSync());
+
+    expect(props.onScheduleSyncComplete).toHaveBeenCalledOnce();
+    expect(props.setDerivedTourProgress).toHaveBeenCalled();
+    expect(props.setStatusMessage).toHaveBeenCalledWith("Sanitized tour sync failure.");
+    expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledWith(true);
+    expect(result.current.isSyncing).toBe(false);
+  });
+
+  it("reports reset-session success and failure", async () => {
+    const props = createProps();
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+
+    await act(() => result.current.handleResetDeltaVirtualSyncSession());
+    expect(deltaVirtual.resetDeltaVirtualSyncSession).toHaveBeenCalledOnce();
+    expect(clearLogbookPirepDetailsRequests).toHaveBeenCalledOnce();
+    expect(props.setStatusMessage).toHaveBeenCalledWith(
+      "Delta Virtual sync session reset. Try syncing again."
+    );
+
+    deltaVirtual.resetDeltaVirtualSyncSession.mockRejectedValueOnce(
+      new Error("Sanitized reset failure.")
+    );
+    await act(() => result.current.handleResetDeltaVirtualSyncSession());
+    expect(props.setStatusMessage).toHaveBeenCalledWith("Sanitized reset failure.");
+    expect(logging.logSystemError).toHaveBeenCalledWith(
+      "DVA Sync Reset",
+      "failed",
+      expect.any(Error)
+    );
   });
 });

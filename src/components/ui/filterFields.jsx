@@ -242,6 +242,7 @@ export function RangeSlider({
 }
 
 // Smooths slider updates so filter changes are committed after the user pauses dragging.
+// eslint-disable-next-line react-refresh/only-export-components -- shared hook intentionally lives with its range field
 export function useTransientRangeSlider(lowValue, highValue, onCommit) {
   const [draftValues, setDraftValues] = useState([lowValue, highValue]);
   const commitTimeoutRef = useRef(null);
@@ -316,6 +317,7 @@ export function useTransientRangeSlider(lowValue, highValue, onCommit) {
 }
 
 // Builds an airline option with branding metadata for the shared searchable select.
+// eslint-disable-next-line react-refresh/only-export-components -- pure option builder is shared by filter consumers
 export function buildAirlineSelectOption(airline) {
   const airlineName = String(airline || "").trim();
 
