@@ -1,12 +1,10 @@
 use chrono::Utc;
 use regex::Regex;
-use reqwest::redirect::Policy;
 use scraper::{Html, Selector};
 
 use crate::{append_sync_log, models::DeltaLogbookPilotProfileMetadata};
 
 const DELTAVA_PROFILE_URL_PREFIX: &str = "https://www.deltava.org/profile.do?id=";
-const PROFILE_FETCH_TIMEOUT_SECONDS: u64 = 20;
 
 fn normalize_text(value: &str) -> String {
     value
@@ -89,19 +87,6 @@ pub(crate) fn derive_display_name_from_profile_header(header: &str) -> Option<St
     } else {
         Some(display_name)
     }
-}
-
-fn build_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(
-            PROFILE_FETCH_TIMEOUT_SECONDS,
-        ))
-        .redirect(Policy::limited(10))
-        .user_agent("DVA Flight Planner")
-        .build()
-        .map_err(|error| {
-            format!("fetch_failed: Unable to initialize Delta Virtual profile client: {error}")
-        })
 }
 
 fn parse_profile_header_text(document: &Html) -> (Option<String>, Option<String>, Option<String>) {
@@ -260,6 +245,7 @@ fn extract_joined_on_year(document: &Html) -> Option<i32> {
 }
 
 pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
+    client: &reqwest::Client,
     export_id: &str,
 ) -> Result<DeltaLogbookPilotProfileMetadata, String> {
     let normalized_export_id = normalize_text(export_id);
@@ -272,7 +258,6 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
         "pilot-profile:fetch-start exportId={normalized_export_id}"
     ));
 
-    let client = build_client()?;
     let response = match client.get(&profile_url).send().await {
         Ok(response) => response,
         Err(error) => {
@@ -293,9 +278,18 @@ pub(crate) async fn fetch_delta_virtual_pilot_profile_metadata(
             .map(|code| code.is_success())
             .unwrap_or(false)
     ));
-    let html_text = response.text().await.map_err(|error| {
-        format!("fetch_failed: Unable to read Delta Virtual profile response: {error}")
-    })?;
+    if !super::http::is_expected_deltava_endpoint(response.url(), "/profile.do") {
+        return Err(
+            "fetch_failed: Delta Virtual profile redirect reached an unexpected endpoint.".into(),
+        );
+    }
+
+    let html_text = super::http::read_bounded_response_text(
+        response,
+        super::http::MAX_DELTAVA_PROFILE_HTML_BYTES,
+        "Delta Virtual profile",
+    )
+    .await?;
 
     if !reqwest::StatusCode::from_u16(status)
         .map(|code| code.is_success())

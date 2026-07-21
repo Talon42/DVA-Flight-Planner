@@ -12,8 +12,7 @@ pub(crate) use window_state::{persist_main_window_state, restore_main_window_sta
 
 use crate::{
     services::deltava::{
-        draft::DraftSubmitManager, pirep_details::DeltaVirtualPirepDetailsClient,
-        tours::DeltaToursSyncManager,
+        draft::DraftSubmitManager, http::DeltaVirtualHttpClient, tours::DeltaToursSyncManager,
     },
     services::simbrief::dispatch::SimBriefDispatchManager,
 };
@@ -29,7 +28,7 @@ pub fn run() {
         .manage(SimBriefDispatchManager::default())
         .setup(|app| {
             let pirep_details_client =
-                DeltaVirtualPirepDetailsClient::try_new().map_err(std::io::Error::other)?;
+                DeltaVirtualHttpClient::try_new().map_err(std::io::Error::other)?;
             app.manage(pirep_details_client);
             let app_handle = app.handle().clone();
             let _ = initialize_sync_log_path(&app_handle);

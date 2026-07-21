@@ -3,6 +3,7 @@ pub(crate) mod accomplishments;
 pub(crate) mod auth;
 pub(crate) mod constants;
 pub(crate) mod draft;
+pub(crate) mod http;
 pub(crate) mod logbook;
 pub(crate) mod logbook_progress;
 pub(crate) mod login;

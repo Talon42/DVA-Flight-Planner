@@ -1,6 +1,6 @@
 use crate::{append_sync_log, DeltaLogbookPilotProfileMetadata};
 use std::{fs, path::Path};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 #[derive(Debug)]
 pub(crate) enum ProfileCacheResolveOutcome {
@@ -120,9 +120,14 @@ pub(crate) async fn resolve(
         "pilot-profile:resolved-export-id exportId={export_id}"
     ));
     let previous = cached.map(normalize);
+    let http_client = app.state::<super::http::DeltaVirtualHttpClient>();
     let refresh = refresh_outcome(
         previous.clone(),
-        super::pilot_profile::fetch_delta_virtual_pilot_profile_metadata(export_id).await,
+        super::pilot_profile::fetch_delta_virtual_pilot_profile_metadata(
+            http_client.client(),
+            export_id,
+        )
+        .await,
     );
     let ProfileCacheResolveOutcome::Ready(fetched) = refresh else {
         if let ProfileCacheResolveOutcome::Failed { ref error, .. } = refresh {

@@ -1,32 +1,15 @@
 use chrono::Utc;
-use reqwest::redirect::Policy;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+
+pub(crate) type DeltaVirtualPirepDetailsClient = super::http::DeltaVirtualHttpClient;
 
 const DELTAVA_PIREP_URL_PREFIX: &str = "https://www.deltava.org/pirep.do?id=";
-const PIREP_FETCH_TIMEOUT_SECONDS: u64 = 20;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeltaVirtualPirepDetailsRequest {
     pub pirep_id: serde_json::Value,
-}
-
-pub(crate) struct DeltaVirtualPirepDetailsClient {
-    client: reqwest::Client,
-}
-
-impl DeltaVirtualPirepDetailsClient {
-    pub(crate) fn try_new() -> Result<Self, String> {
-        Ok(Self {
-            client: build_client()?,
-        })
-    }
-
-    pub(crate) fn client(&self) -> &reqwest::Client {
-        &self.client
-    }
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -397,17 +380,6 @@ fn build_result_from_html(
     })
 }
 
-fn build_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(Duration::from_secs(PIREP_FETCH_TIMEOUT_SECONDS))
-        .redirect(Policy::limited(10))
-        .user_agent("DVA Flight Planner")
-        .build()
-        .map_err(|error| {
-            format!("fetch_failed: Unable to initialize Delta Virtual HTTP client: {error}")
-        })
-}
-
 fn log_parse_summary(parsed: &ParsedPirepDetails) {
     crate::append_sync_log(&format!(
         "pirep-details:parse-summary departureRoute={} flightRoute={} arrivalRoute={} takeoffRunway={} landingRunway={} passengersCarriedFound={} passengersParsed={} payloadWeightFound={} cargoParsed={}",
@@ -440,9 +412,17 @@ pub async fn fetch_delta_virtual_pirep_details(
 
     let status = response.status().as_u16();
     let final_url = response.url().to_string();
-    let html_text = response.text().await.map_err(|error| {
-        format!("fetch_failed: Unable to read Delta Virtual PIREP response: {error}")
-    })?;
+    if !super::http::is_expected_deltava_endpoint(response.url(), "/pirep.do") {
+        return Err(
+            "fetch_failed: Delta Virtual PIREP redirect reached an unexpected endpoint.".into(),
+        );
+    }
+    let html_text = super::http::read_bounded_response_text(
+        response,
+        super::http::MAX_DELTAVA_PIREP_HTML_BYTES,
+        "Delta Virtual PIREP",
+    )
+    .await?;
     crate::append_sync_log(&format!(
         "pirep-details:fetch-status status={status} bytes={} finalUrl={final_url}",
         html_text.len()
