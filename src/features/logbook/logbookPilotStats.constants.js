@@ -110,8 +110,6 @@ export function buildPilotStatsComparisonOptions(rows = []) {
   return [...STATIC_PILOT_STATS_COMPARISON_OPTIONS, ...yearOptions];
 }
 
-export const PILOT_STATS_COMPARISON_OPTIONS = STATIC_PILOT_STATS_COMPARISON_OPTIONS;
-
 // Returns the fixed registry entry for a Pilot Stats dashboard card.
 export function getPilotStatsCardDefinition(cardKey) {
   return PILOT_STATS_CARD_REGISTRY[String(cardKey || "").trim()] || null;
@@ -123,11 +121,6 @@ export function getPilotStatsDashboardCardKeys() {
     .slice()
     .sort((left, right) => Number(left.dashboardOrder || 0) - Number(right.dashboardOrder || 0))
     .map((card) => card.key);
-}
-
-// Preserves the existing helper name for callers that still import the registry key list.
-export function getPilotStatsCardKeys() {
-  return getPilotStatsDashboardCardKeys();
 }
 
 // Returns the dashboard cards in registry order so the overview can render every card by default.
@@ -168,14 +161,13 @@ export function resolvePilotStatsCard({ cardKey, stats }) {
   }
 
   const rankings = stats?.rankings || {};
-  const detailRows = stats?.detailRows || {};
   const records = stats?.records || {};
   const itemSources = {
-    airlines: rankings.airlines || detailRows.airlines || [],
-    equipment: rankings.equipment || detailRows.equipment || [],
-    recentLandings: stats?.recentLandings || detailRows.recentLandings || [],
-    topAirports: rankings.topAirports || detailRows.topAirports || [],
-    routes: rankings.routes || detailRows.routes || [],
+    airlines: rankings.airlines || [],
+    equipment: rankings.equipment || [],
+    recentLandings: stats?.recentLandings || [],
+    topAirports: rankings.topAirports || [],
+    routes: rankings.routes || [],
     records: records.summaryRows || []
   };
 
@@ -183,14 +175,14 @@ export function resolvePilotStatsCard({ cardKey, stats }) {
     ...card,
     items: [...(Array.isArray(itemSources[card.dataKey]) ? itemSources[card.dataKey] : [])],
     // The airport summary card splits the rankings into departure and arrival columns.
-    departureItems: [...(Array.isArray(detailRows.departureAirports) ? detailRows.departureAirports : [])],
-    arrivalItems: [...(Array.isArray(detailRows.arrivalAirports) ? detailRows.arrivalAirports : [])],
+    departureItems: [...(Array.isArray(rankings.departureAirports) ? rankings.departureAirports : [])],
+    arrivalItems: [...(Array.isArray(rankings.arrivalAirports) ? rankings.arrivalAirports : [])],
     maxRows: Number(card.maxRows || 0) || 0,
     hasData: Array.isArray(itemSources[card.dataKey]) && itemSources[card.dataKey].length > 0
   };
 }
 
-export function normalizePilotStatsComparisonPeriod(value, availableOptions = PILOT_STATS_COMPARISON_OPTIONS) {
+export function normalizePilotStatsComparisonPeriod(value, availableOptions = STATIC_PILOT_STATS_COMPARISON_OPTIONS) {
   const normalized = String(value || "").trim();
   const allowedValues = new Set((Array.isArray(availableOptions) ? availableOptions : []).map((option) => option.value));
 

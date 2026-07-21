@@ -17,7 +17,6 @@ function baseProps(overrides = {}) {
     profileMetadata: null,
     pilotStatsComparisonPeriod: "all",
     pilotStatsComparisonOptions: [],
-    pilotStatsDashboardSlots: {},
     pilotStatsDetailView: null,
     onRefreshLogbook: vi.fn(),
     onSelectTab: vi.fn(),

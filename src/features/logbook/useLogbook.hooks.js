@@ -41,24 +41,6 @@ function normalizePersistedSort(sort) {
   return { key, direction };
 }
 
-// Keeps persisted dashboard slot state lightweight before the layout-specific normalizer runs.
-function normalizePersistedPilotStatsDashboardSlots(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  const nextValue = {};
-  for (const [layoutMode, slots] of Object.entries(value)) {
-    if (!Array.isArray(slots)) {
-      continue;
-    }
-
-    nextValue[layoutMode] = slots.map((slotKey) => String(slotKey || "").trim()).filter(Boolean);
-  }
-
-  return nextValue;
-}
-
 // Keeps thrown invoke failures from exposing implementation details in the logbook workspace.
 function normalizeLogbookLoadError() {
   return "Unable to load the Delta Virtual logbook.";
@@ -86,7 +68,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const [sort, setSort] = useState(DEFAULT_LOGBOOK_SORT);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [pilotStatsComparisonPeriod, setPilotStatsComparisonPeriod] = useState(DEFAULT_PILOT_STATS_COMPARISON_PERIOD);
-  const [pilotStatsDashboardSlots, setPilotStatsDashboardSlots] = useState({});
   const [pilotStatsDetailView, setPilotStatsDetailView] = useState(null);
   const hasHydratedPersistedStateRef = useRef(false);
   const previousSelectedTabRef = useRef("flights");
@@ -132,7 +113,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     setFilters(normalizeLogbookFilters(persistedUiState.logbookFilters, filterBounds));
     setSort(normalizePersistedSort(persistedUiState.logbookSort));
     setPilotStatsComparisonPeriod(String(persistedUiState.pilotStatsComparisonPeriod || "").trim() || DEFAULT_PILOT_STATS_COMPARISON_PERIOD);
-    setPilotStatsDashboardSlots(normalizePersistedPilotStatsDashboardSlots(persistedUiState.pilotStatsDashboardSlots));
     setPilotStatsDetailView(
       String(persistedUiState.pilotStatsDetailView || "").trim() || null
     );
@@ -304,7 +284,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     pilotStatsComparisonPeriod,
     activePilotStatsComparisonPeriod,
     pilotStatsComparisonOptions,
-    pilotStatsDashboardSlots,
     pilotStatsDetailView,
     handleFilterChange,
     handleResetFilters,
@@ -312,7 +291,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     handleSelectRow,
     prepareForUserDataClear,
     setPilotStatsComparisonPeriod,
-    setPilotStatsDashboardSlots,
     setPilotStatsDetailView
   };
 }
