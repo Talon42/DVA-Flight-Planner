@@ -3,9 +3,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { LogbookFlightCell } from "./LogbookFlightsTable.jsx";
 import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
+import { logAppError } from "../../services/logging/appLog.client.js";
 
 vi.mock("../../services/tauri/desktopShell.client.js", () => ({
   openDesktopUrl: vi.fn()
+}));
+
+vi.mock("../../services/logging/appLog.client.js", () => ({
+  logAppError: vi.fn()
 }));
 
 describe("LogbookFlightCell", () => {
@@ -36,5 +41,33 @@ describe("LogbookFlightCell", () => {
 
     expect(openDesktopUrl).toHaveBeenCalledTimes(1);
     expect(onRowActivate).not.toHaveBeenCalled();
+  });
+
+  it("logs compact metadata when opening the PIREP fails without blocking the action", async () => {
+    const error = new Error("desktop opener unavailable");
+    openDesktopUrl.mockRejectedValueOnce(error);
+    logAppError.mockResolvedValueOnce(undefined);
+
+    render(
+      <LogbookFlightCell
+        row={{
+          airlineLogoSrc: null,
+          flightLabel: "DVA 123",
+          compactFlightLabel: "DVA123",
+          dvaPirepId: "0x123",
+          dvaPirepUrl: "https://www.deltava.org/pirep.do?id=0x123"
+        }}
+        column={{ presetKey: "expanded" }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open DVA PIREP 0x123" }));
+
+    await waitFor(() =>
+      expect(logAppError).toHaveBeenCalledWith("logbook-pirep-open-failed", error, {
+        category: "logbook-pirep",
+        hasValidPirepId: true
+      })
+    );
   });
 });

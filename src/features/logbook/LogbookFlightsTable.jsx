@@ -2,9 +2,11 @@ import { useMemo } from "react";
 import DataTable from "../../components/data-table/DataTable.jsx";
 import { selectableCellClassName } from "../../components/data-table/tableCellStyles";
 import { cn } from "../../components/ui/cn";
+import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
 import { getLogbookRowClassName } from "./logbookRowStyles.js";
 import { LandingGradeBadge } from "./logbookLandingGrade.jsx";
 import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
+import { logAppError } from "../../services/logging/appLog.client.js";
 
 const LOGBOOK_SELECTED_ROW_CLASS_NAME = "logbook-row-selected";
 
@@ -18,7 +20,11 @@ export function LogbookFlightCell({ row, column }) {
     try {
       await openDesktopUrl(row.dvaPirepUrl);
     } catch (error) {
-      console.error("Unable to open DVA PIREP page.", error);
+      // Keep opener failures non-blocking while recording only compact operational metadata.
+      void logAppError("logbook-pirep-open-failed", error, {
+        category: "logbook-pirep",
+        hasValidPirepId: Boolean(buildDvaPirepId(row?.dvaPirepId))
+      }).catch(() => {});
     }
   }
 
