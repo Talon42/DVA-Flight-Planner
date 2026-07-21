@@ -25,8 +25,8 @@ describe("DVA logbook duration normalization", () => {
 
   it("does not reinterpret numeric values based on magnitude", () => {
     expect(parseLogbookDurationMinutes(900)).toBe(0);
-    expect(parseLogbookBlockTimeMinutes(900)).toBe(15);
-    expect(parseLogbookBlockTimeMinutes(100000)).toBe(1667);
+    expect(parseLogbookBlockTimeMinutes(900)).toBe(0);
+    expect(parseLogbookBlockTimeMinutes(100000)).toBe(2);
   });
 
   it("uses the empty display for invalid values while preserving valid zero", () => {
@@ -36,8 +36,19 @@ describe("DVA logbook duration normalization", () => {
     expect(parseLogbookDurationMinutes(0)).toBe(0);
   });
 
+  it("keeps real long DVA millisecond values at their intended scale", () => {
+    expect(formatLogbookBlockTime(53567 * 60000)).toBe("892h 47m");
+    expect(formatLogbookAirborneTime(95950 * 60000)).toBe("1599h 10m");
+  });
+
   it("normalizes only at the domain boundary without changing the source entry", () => {
-    const entry = { id: "1", status: "APPROVED", duration: "bad", blockTime: 3600, airborneTime: 1800 };
+    const entry = {
+      id: "1",
+      status: "APPROVED",
+      duration: "bad",
+      blockTime: 3600000,
+      airborneTime: 1800000
+    };
     const [row] = normalizeLogbookRows([entry]);
 
     expect(row.durationMinutes).toBeNull();

@@ -152,7 +152,7 @@ export function parseLogbookDurationMinutes(value) {
   return parseNumericDurationMinutes(value, 60_000);
 }
 
-// DVA exports block and airborne numeric values in seconds; clock strings are HH:MM or HH:MM:SS.
+// DVA exports block and airborne numeric values in milliseconds; clock strings are HH:MM or HH:MM:SS.
 export function parseLogbookBlockTimeMinutes(value) {
   if (typeof value === "string") {
     const clockMinutes = parseClockDurationMinutes(value);
@@ -161,7 +161,7 @@ export function parseLogbookBlockTimeMinutes(value) {
     }
   }
 
-  return parseNumericDurationMinutes(value, 60);
+  return parseNumericDurationMinutes(value, 60_000);
 }
 
 export function parseLogbookAirborneTimeMinutes(value) {

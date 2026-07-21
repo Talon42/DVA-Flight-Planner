@@ -1,8 +1,8 @@
 {
   "contract": {
     "duration": "milliseconds",
-    "blockTime": "seconds",
-    "airborneTime": "seconds",
+    "blockTime": "milliseconds",
+    "airborneTime": "milliseconds",
     "clockStrings": ["HH:MM", "HH:MM:SS"]
   },
   "cases": [
@@ -15,12 +15,12 @@
     { "field": "duration", "raw": "not-a-duration", "minutes": null },
     { "field": "duration", "raw": -1, "minutes": null },
     { "field": "blockTime", "raw": 0, "minutes": 0 },
-    { "field": "blockTime", "raw": 60, "minutes": 1 },
-    { "field": "blockTime", "raw": 7200, "minutes": 120 },
+    { "field": "blockTime", "raw": 60000, "minutes": 1 },
+    { "field": "blockTime", "raw": 7200000, "minutes": 120 },
     { "field": "blockTime", "raw": "02:00", "minutes": 120 },
     { "field": "blockTime", "raw": "02:00:30", "minutes": 121 },
     { "field": "blockTime", "raw": "02:60", "minutes": null },
-    { "field": "airborneTime", "raw": 3600, "minutes": 60 },
+    { "field": "airborneTime", "raw": 3600000, "minutes": 60 },
     { "field": "airborneTime", "raw": "00:45:30", "minutes": 46 },
     { "field": "airborneTime", "raw": {}, "minutes": null }
   ]
