@@ -50,6 +50,13 @@ fn normalize_dva_logbook_month(raw_month: u32) -> Option<u32> {
     None
 }
 
+// Uses zero-based DVA months while retaining the historical one-based December value.
+pub(crate) fn extract_dva_logbook_date(entry: &Value) -> Option<NaiveDate> {
+    let (year, raw_month, day) = extract_logbook_date_parts(entry)?;
+    let month = normalize_dva_logbook_month(raw_month)?;
+    NaiveDate::from_ymd_opt(year, month, day)
+}
+
 // Normalizes supported Delta Virtual cache shapes into a flat list of entry objects for every reader.
 pub(crate) fn normalize_logbook_entries(value: &Value) -> Vec<Value> {
     if let Some(entries) = value.as_array() {
@@ -119,11 +126,7 @@ pub(crate) fn validate_logbook_entries(value: &Value) -> (Vec<DeltaLogbookEntry>
 pub(crate) fn extract_latest_logbook_date_iso(json: &Value) -> Option<String> {
     normalize_logbook_entries(json)
         .into_iter()
-        .filter_map(|entry| {
-            let (year, raw_month, day) = extract_logbook_date_parts(&entry)?;
-            let month = normalize_dva_logbook_month(raw_month)?;
-            NaiveDate::from_ymd_opt(year, month, day)
-        })
+        .filter_map(|entry| extract_dva_logbook_date(&entry))
         .max()
         .map(|date| date.format("%Y-%m-%d").to_string())
 }
@@ -387,6 +390,29 @@ mod tests {
         tokio::runtime::Runtime::new()
             .expect("runtime")
             .block_on(future)
+    }
+
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct LogbookDateCase {
+        name: String,
+        date: Value,
+        expected_iso: Option<String>,
+    }
+
+    #[test]
+    fn shared_date_fixture_enforces_zero_based_and_legacy_december_contract() {
+        let cases: Vec<LogbookDateCase> = serde_json::from_str(include_str!(
+            "../../../../test-fixtures/deltava/logbook-date-cases.json"
+        ))
+        .expect("logbook date cases");
+
+        for test_case in cases {
+            let entry = json!({ "date": test_case.date });
+            let actual =
+                extract_dva_logbook_date(&entry).map(|date| date.format("%Y-%m-%d").to_string());
+            assert_eq!(actual, test_case.expected_iso, "{}", test_case.name);
+        }
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, SecondsFormat, TimeZone, Utc};
+use chrono::{SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -10,7 +10,7 @@ use std::{
 use tauri::{AppHandle, Manager};
 
 use crate::append_sync_log;
-use crate::services::deltava::logbook::normalize_logbook_entries;
+use crate::services::deltava::logbook::{extract_dva_logbook_date, normalize_logbook_entries};
 
 const DELTAVA_TOUR_PROGRESS_FILE: &str = "dva-tour-progress.json";
 const DELTAVA_TOURS_CACHE_FILE: &str = "dva-tours-cache.json";
@@ -123,40 +123,6 @@ fn read_json_value(path: &Path) -> Option<Value> {
     serde_json::from_str::<Value>(&text).ok()
 }
 
-fn normalize_logbook_month(raw_month: u32) -> Option<u32> {
-    if raw_month <= 11 {
-        return Some(raw_month + 1);
-    }
-
-    if raw_month == 12 {
-        return Some(12);
-    }
-
-    None
-}
-
-fn extract_logbook_date_parts(entry: &Value) -> Option<(i32, u32, u32)> {
-    let date = entry.get("date")?;
-    let year = date
-        .get("y")
-        .and_then(Value::as_i64)
-        .and_then(|number| i32::try_from(number).ok())?;
-    let month = date
-        .get("m")
-        .and_then(Value::as_i64)
-        .and_then(|number| u32::try_from(number).ok())?;
-    let day = date
-        .get("d")
-        .and_then(Value::as_i64)
-        .and_then(|number| u32::try_from(number).ok())?;
-
-    if day < 1 {
-        return None;
-    }
-
-    Some((year, month, day))
-}
-
 fn epoch_seconds_to_iso(epoch_seconds: i64) -> Option<String> {
     Utc.timestamp_opt(epoch_seconds, 0)
         .single()
@@ -182,9 +148,7 @@ fn extract_logbook_entry_epoch_seconds(entry: &Value) -> Option<i64> {
         }
     }
 
-    let (year, raw_month, day) = extract_logbook_date_parts(entry)?;
-    let month = normalize_logbook_month(raw_month)?;
-    let date = NaiveDate::from_ymd_opt(year, month, day)?;
+    let date = extract_dva_logbook_date(entry)?;
     date.and_hms_opt(0, 0, 0)
         .map(|datetime| Utc.from_utc_datetime(&datetime).timestamp())
 }
@@ -1418,6 +1382,7 @@ pub fn normalize_epoch_seconds(value: &Value) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::NaiveDate;
     use serde_json::json;
 
     fn build_tours_json(rows: Vec<Value>, name: &str) -> Value {

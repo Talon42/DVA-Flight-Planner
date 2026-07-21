@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import dateCases from "../../../test-fixtures/deltava/logbook-date-cases.json";
 import {
   logbookDateFromParts,
   parseDvaLogbookDate,
@@ -21,10 +22,11 @@ describe("strict logbook dates", () => {
     expect(logbookDateFromParts(2026, 2, 31)).toBeNull();
   });
 
-  it("uses only the documented zero-based DVA month contract", () => {
-    expect(parseDvaLogbookDate({ y: 2026, m: 0, d: 1 })?.iso).toBe("2026-01-01");
-    expect(parseDvaLogbookDate({ y: 2026, m: 11, d: 31 })?.iso).toBe("2026-12-31");
-    expect(parseDvaLogbookDate({ y: 2026, m: 12, d: 1 })).toBeNull();
-    expect(parseDvaLogbookDate({ y: 2026, m: 1, d: 31 })).toBeNull();
+  it("uses the shared DVA zero-based and legacy-December contract", () => {
+    for (const testCase of dateCases) {
+      expect(parseDvaLogbookDate(testCase.date)?.iso ?? null, testCase.name).toBe(
+        testCase.expectedIso
+      );
+    }
   });
 });

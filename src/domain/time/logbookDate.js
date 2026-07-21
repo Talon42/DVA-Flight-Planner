@@ -45,7 +45,7 @@ export function parseLogbookDateSortKey(value) {
     : null;
 }
 
-// Parses the documented DVA date shape where m is zero-based (0 = January, 11 = December).
+// Parses canonical zero-based DVA months and the historical one-based value 12 for December.
 export function parseDvaLogbookDate(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 
@@ -55,9 +55,10 @@ export function parseDvaLogbookDate(value) {
   if (!Number.isInteger(year) || !Number.isInteger(zeroBasedMonth) || !Number.isInteger(day)) {
     return null;
   }
-  if (zeroBasedMonth < 0 || zeroBasedMonth > 11) return null;
+  if (zeroBasedMonth < 0 || zeroBasedMonth > 12) return null;
 
-  return buildValidatedDate(year, zeroBasedMonth + 1, day);
+  const calendarMonth = zeroBasedMonth === 12 ? 12 : zeroBasedMonth + 1;
+  return buildValidatedDate(year, calendarMonth, day);
 }
 
 export function logbookDateFromParts(year, month, day) {

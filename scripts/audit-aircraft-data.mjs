@@ -2,6 +2,11 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import {
+  hasRequiredAirportFields,
+  partitionAllowed,
+  requireNonEmptyAirportRows
+} from "./data-contracts.mjs";
 
 const ROOT_DIR = process.cwd();
 const AIRCRAFT_CATALOG_FILE = path.join(ROOT_DIR, "src", "data", "aircraft_catalog.json");
@@ -22,27 +27,18 @@ const catalog = readJson(AIRCRAFT_CATALOG_FILE);
 const allowlist = readJson(ALLOWLIST_FILE);
 const contractFailures = [];
 
-function partitionAllowed(items, exceptions, getKey) {
-  return items.reduce(
-    (result, item) => {
-      const key = getKey(item);
-      if (key && exceptions?.[key]) {
-        result.allowed.push({ item, key, reason: exceptions[key] });
-      } else {
-        result.failures.push(item);
-      }
-      return result;
-    },
-    { allowed: [], failures: [] }
-  );
-}
-
-function reportAllowed(label, allowed) {
-  if (allowed.length) {
-    console.log(`[aircraft-data] Allowed ${label}: ${allowed.length}`);
-    for (const entry of allowed.slice(0, 10)) {
+function reportPartition(label, result) {
+  if (result.allowed.length) {
+    console.log(`[aircraft-data] Allowed ${label}: ${result.allowed.length}`);
+    for (const entry of result.allowed.slice(0, 10)) {
       console.log(`  - ${entry.key}: ${entry.reason}`);
     }
+  }
+
+  if (result.staleExceptionKeys.length) {
+    contractFailures.push(
+      `Stale ${label} allowlist entries: ${result.staleExceptionKeys.join(", ")}`
+    );
   }
 }
 const aircraftRows = Array.isArray(catalog.aircraftCatalog) ? catalog.aircraftCatalog : [];
@@ -108,7 +104,7 @@ const unknownFamilyResult = partitionAllowed(
   allowlist.unknownAircraftFamilyExceptions,
   (row) => String(row?.aircraftProfile || row?.name || row?.["Aircraft Profile"] || "").trim()
 );
-reportAllowed("unknown aircraft-family exceptions", unknownFamilyResult.allowed);
+reportPartition("unknown aircraft-family exceptions", unknownFamilyResult);
 if (unknownFamilyResult.failures.length) {
   contractFailures.push(
     `${unknownFamilyResult.failures.length} aircraft profiles resolve to Unknown family: ${unknownFamilyResult.failures
@@ -124,7 +120,7 @@ const familyCoverageResult = partitionAllowed(
   allowlist.aircraftFamilyCoverageExceptions,
   (family) => family
 );
-reportAllowed("aircraft-family catalog exceptions", familyCoverageResult.allowed);
+reportPartition("aircraft-family catalog exceptions", familyCoverageResult);
 if (familyCoverageResult.failures.length) {
   contractFailures.push(
     `Families are missing from aircraftFamilies: ${familyCoverageResult.failures.join(", ")}`
@@ -138,15 +134,8 @@ if (missingSimBriefProfiles.length) {
 }
 
 const airportsData = readJson(AIRPORTS_FILE);
-const airportRows = Array.isArray(airportsData.airports) ? airportsData.airports : [];
-const badAirports = airportRows.filter(
-  (airport) =>
-    !String(airport?.icao || "").trim() ||
-    !String(airport?.name || "").trim() ||
-    !Number.isFinite(Number(airport?.lat)) ||
-    !Number.isFinite(Number(airport?.lng)) ||
-    !String(airport?.timezone || "").trim()
-);
+const airportRows = requireNonEmptyAirportRows(airportsData);
+const badAirports = airportRows.filter((airport) => !hasRequiredAirportFields(airport));
 const airportDuplicateCounts = new Map();
 for (const airport of airportRows) {
   const key = String(airport?.icao || "").trim().toUpperCase();
@@ -164,7 +153,7 @@ const badAirportResult = partitionAllowed(
   allowlist.airportRequiredFieldExceptions,
   (airport) => String(airport?.icao || "").trim().toUpperCase()
 );
-reportAllowed("airport required-field exceptions", badAirportResult.allowed);
+reportPartition("airport required-field exceptions", badAirportResult);
 if (badAirportResult.failures.length) {
   contractFailures.push(
     `${badAirportResult.failures.length} airports are missing required lookup fields or coordinates: ${badAirportResult.failures
@@ -179,7 +168,7 @@ const duplicateAirportResult = partitionAllowed(
   allowlist.duplicateAirportIcaoExceptions,
   ([icao]) => icao
 );
-reportAllowed("duplicate airport ICAO exceptions", duplicateAirportResult.allowed);
+reportPartition("duplicate airport ICAO exceptions", duplicateAirportResult);
 if (duplicateAirportResult.failures.length) {
   contractFailures.push(
     `Duplicate airport ICAO codes found: ${duplicateAirportResult.failures
@@ -206,7 +195,7 @@ const missingLogoResult = partitionAllowed(
   allowlist.missingAirlineLogoExceptions,
   (icao) => icao
 );
-reportAllowed("missing airline-logo exceptions", missingLogoResult.allowed);
+reportPartition("missing airline-logo exceptions", missingLogoResult);
 if (missingLogoResult.failures.length) {
   contractFailures.push(
     `Airlines do not have a matching logo file: ${missingLogoResult.failures.join(", ")}`
@@ -218,7 +207,7 @@ const orphanLogoResult = partitionAllowed(
   allowlist.orphanAirlineLogoExceptions,
   (icao) => icao
 );
-reportAllowed("orphan airline-logo exceptions", orphanLogoResult.allowed);
+reportPartition("orphan airline-logo exceptions", orphanLogoResult);
 if (orphanLogoResult.failures.length) {
   contractFailures.push(
     `Logo files are not mapped to an airline row: ${orphanLogoResult.failures.join(", ")}`

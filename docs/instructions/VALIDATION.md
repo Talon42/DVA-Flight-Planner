@@ -55,6 +55,8 @@ Use this non-gating report to identify modules with little or no execution:
     npm run test:coverage
 
 There is intentionally no percentage threshold. Generated/static data and test files are excluded.
+All JavaScript and JSX source modules are included, so files no test imports appear at zero coverage
+instead of being omitted from the report.
 
 ## Change-to-Command Matrix
 
