@@ -127,8 +127,12 @@ function normalizeSyncError(message) {
   return error;
 }
 
-function buildSafeLogbookResult(error = "") {
+const SAFE_LOGBOOK_ERROR = "Unable to load the Delta Virtual logbook.";
+
+function buildSafeLogbookResult({ status = "missing", errorCode = null, error = "" } = {}) {
   return {
+    status,
+    errorCode,
     dateIso: null,
     lastSyncAt: null,
     profileMetadata: null,
@@ -330,17 +334,26 @@ export async function readDeltaVirtualLogbook() {
   try {
     const result = await invokeAppCommand("read_deltava_logbook");
     const entries = Array.isArray(result?.entries) ? result.entries : [];
+    const status = String(result?.status || "ready").trim().toLowerCase();
+    const errorCode = result?.errorCode ?? result?.error_code ?? null;
+    const isInvalid = status === "invalid";
 
     return {
+      status: status === "missing" ? "missing" : isInvalid ? "invalid" : "ready",
+      errorCode,
       dateIso: result?.dateIso ?? result?.date_iso ?? null,
       lastSyncAt: result?.lastSyncAt ?? result?.last_sync_at ?? null,
       profileMetadata: result?.profileMetadata ?? result?.profile_metadata ?? null,
       entries,
       entryCount: Number(result?.entryCount ?? result?.entry_count ?? entries.length) || 0,
-      error: ""
+      error: isInvalid ? SAFE_LOGBOOK_ERROR : String(result?.error || "").trim()
     };
-  } catch (error) {
-    return buildSafeLogbookResult(error instanceof Error ? error.message : String(error));
+  } catch {
+    return buildSafeLogbookResult({
+      status: "invalid",
+      errorCode: "logbook_read_failed",
+      error: SAFE_LOGBOOK_ERROR
+    });
   }
 }
 

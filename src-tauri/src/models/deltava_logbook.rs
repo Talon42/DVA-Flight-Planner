@@ -1,6 +1,12 @@
 use serde::Serialize;
 use serde_json::Value;
 
+pub(crate) const LOGBOOK_STATUS_READY: &str = "ready";
+pub(crate) const LOGBOOK_STATUS_MISSING: &str = "missing";
+pub(crate) const LOGBOOK_STATUS_INVALID: &str = "invalid";
+pub(crate) const LOGBOOK_CACHE_INVALID_CODE: &str = "logbook_cache_invalid";
+pub(crate) const LOGBOOK_CACHE_INVALID_MESSAGE: &str = "Unable to load the Delta Virtual logbook.";
+
 /// Cached public pilot profile metadata derived from the Delta Virtual profile page.
 #[derive(Clone, Default, Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +39,9 @@ pub(crate) struct DeltaLogbookPilotProfileMetadata {
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeltaLogbookCachePayload {
+    pub status: &'static str,
+    pub error_code: Option<&'static str>,
+    pub error: Option<&'static str>,
     pub date_iso: Option<String>,
     pub last_sync_at: Option<String>,
     pub profile_metadata: Option<DeltaLogbookPilotProfileMetadata>,

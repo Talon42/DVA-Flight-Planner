@@ -294,13 +294,18 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
     let artifact = read_logbook_artifact(app);
     let (path, json) = match artifact {
         LogbookArtifactRead::Valid { path, document } => (path, document),
-        LogbookArtifactRead::Missing => return empty_logbook_cache(app),
+        LogbookArtifactRead::Missing => return empty_logbook_cache(app, crate::LOGBOOK_STATUS_MISSING, None, None),
         LogbookArtifactRead::Invalid { path, reason } => {
             append_sync_log(&format!(
                 "logbook:read-invalid {} ({reason})",
                 path.display()
             ));
-            return empty_logbook_cache(app);
+            return empty_logbook_cache(
+                app,
+                crate::LOGBOOK_STATUS_INVALID,
+                Some(crate::LOGBOOK_CACHE_INVALID_CODE),
+                Some(crate::LOGBOOK_CACHE_INVALID_MESSAGE),
+            );
         }
     };
 
@@ -314,6 +319,9 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
         .and_then(system_time_to_iso);
 
     crate::DeltaLogbookCachePayload {
+        status: crate::LOGBOOK_STATUS_READY,
+        error_code: None,
+        error: None,
         date_iso: extract_latest_logbook_date_iso(&json),
         last_sync_at,
         profile_metadata: crate::services::deltava::profile_cache::read(app),
@@ -322,8 +330,16 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
     }
 }
 
-fn empty_logbook_cache(app: &AppHandle) -> crate::DeltaLogbookCachePayload {
+fn empty_logbook_cache(
+    app: &AppHandle,
+    status: &'static str,
+    error_code: Option<&'static str>,
+    error: Option<&'static str>,
+) -> crate::DeltaLogbookCachePayload {
     crate::DeltaLogbookCachePayload {
+        status,
+        error_code,
+        error,
         date_iso: None,
         last_sync_at: None,
         profile_metadata: crate::services::deltava::profile_cache::read(app),

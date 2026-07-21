@@ -55,6 +55,9 @@ function normalizeLogbookLoadError() {
 // Owns cached-logbook loading, filtering, stats, and sorting outside App.jsx.
 export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) {
   const [cacheResult, setCacheResult] = useState({
+    status: "missing",
+    errorCode: null,
+    error: "",
     dateIso: null,
     lastSyncAt: null,
     profileMetadata: null,
@@ -136,15 +139,20 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
       }
 
       const nextEntries = Array.isArray(nextResult?.entries) ? nextResult.entries : [];
+      const nextStatus = String(nextResult?.status || "ready").trim().toLowerCase();
       const nextError = String(nextResult?.error || "").trim();
+      const isInvalid = nextStatus === "invalid" || Boolean(nextError);
 
       setCacheResult((current) => {
-        // A failed refresh must not replace the last usable cache with an empty result.
-        if (nextError && current.entries.length > 0 && nextEntries.length === 0) {
+        // Invalid reads must never replace usable rows or profile metadata with an empty payload.
+        if (isInvalid) {
           return current;
         }
 
         return {
+          status: nextStatus === "missing" ? "missing" : "ready",
+          errorCode: nextResult?.errorCode ?? null,
+          error: nextError,
           dateIso: nextResult?.dateIso ?? null,
           lastSyncAt: nextResult?.lastSyncAt ?? null,
           profileMetadata: nextResult?.profileMetadata ?? null,
@@ -230,6 +238,9 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const prepareForUserDataClear = useCallback(() => {
     requestGenerationRef.current += 1;
     setCacheResult({
+      status: "missing",
+      errorCode: null,
+      error: "",
       dateIso: null,
       lastSyncAt: null,
       profileMetadata: null,

@@ -26,7 +26,20 @@ function logbookResult(id) {
     profileMetadata: null,
     entries,
     entryCount: entries.length,
+    status: "ready",
+    errorCode: null,
     error: ""
+  };
+}
+
+function invalidLogbookResult() {
+  return {
+    status: "invalid",
+    errorCode: "logbook_cache_invalid",
+    error: "Unable to load the Delta Virtual logbook.",
+    entries: [],
+    entryCount: 0,
+    profileMetadata: null
   };
 }
 
@@ -70,6 +83,54 @@ describe("useLogbook loading", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.loadError).toBe("Unable to load the Delta Virtual logbook.");
     expect(result.current.cacheResult.entries).toEqual([{ id: "good-row", status: "APPROVED" }]);
+  });
+
+  it("preserves rows and profile metadata after an invalid reload", async () => {
+    const profileMetadata = { displayName: "Pilot One" };
+    readDeltaVirtualLogbook
+      .mockResolvedValueOnce({ ...logbookResult("good-row"), profileMetadata })
+      .mockResolvedValueOnce(invalidLogbookResult());
+    const { result, rerender } = renderHook(
+      ({ reloadVersion }) => useLogbook({ reloadVersion }),
+      { initialProps: { reloadVersion: 0 } }
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    rerender({ reloadVersion: 1 });
+    await waitFor(() => expect(result.current.loadError).toBe("Unable to load the Delta Virtual logbook."));
+
+    expect(result.current.cacheResult.entries).toEqual([{ id: "good-row", status: "APPROVED" }]);
+    expect(result.current.profileMetadata).toEqual(profileMetadata);
+  });
+
+  it("accepts a valid empty logbook as ready data", async () => {
+    readDeltaVirtualLogbook.mockResolvedValueOnce({
+      ...logbookResult(null),
+      status: "ready",
+      entries: [],
+      entryCount: 0
+    });
+    const { result } = renderHook(() => useLogbook());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.loadError).toBe("");
+    expect(result.current.cacheResult.entries).toEqual([]);
+  });
+
+  it("shows an initial missing cache as empty without an error", async () => {
+    readDeltaVirtualLogbook.mockResolvedValueOnce({
+      status: "missing",
+      errorCode: null,
+      error: "",
+      entries: [],
+      entryCount: 0,
+      profileMetadata: null
+    });
+    const { result } = renderHook(() => useLogbook());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.loadError).toBe("");
+    expect(result.current.allRows).toEqual([]);
   });
 
   it("does not let an older read overwrite a newer result", async () => {
