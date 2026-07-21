@@ -53,6 +53,7 @@ export default function TableRow({
   }
 
   function handleRowDoubleClick() {
+    // Double-click activates the row once; interactive cells stop this event when they own it.
     if (onActivateRow) {
       onActivateRow(rowId, row);
       return;
@@ -61,6 +62,19 @@ export default function TableRow({
     if (enableRowSelection) {
       onSelectRow?.(rowId, row);
     }
+  }
+
+  function handleRowKeyDown(event) {
+    if (
+      !enableRowSelection ||
+      (event.key !== "Enter" && event.key !== " ") ||
+      event.target !== event.currentTarget
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    onSelectRow?.(rowId, row);
   }
 
   function handleCellClick(column, event) {
@@ -86,6 +100,10 @@ export default function TableRow({
       data-layout-mode={layoutMode}
       onClick={handleRowClick}
       onDoubleClick={handleRowDoubleClick}
+      onKeyDown={handleRowKeyDown}
+      tabIndex={enableRowSelection ? 0 : undefined}
+      role={enableRowSelection ? "row" : undefined}
+      aria-selected={enableRowSelection ? Boolean(isSelected) : undefined}
       style={{
         ...style,
         width: "100%",
@@ -106,35 +124,33 @@ export default function TableRow({
           <div
             key={column.key}
             className={cn(
-              "flex min-w-0 self-stretch items-center px-3 bp-1024:px-2",
+              "flex min-w-0 self-stretch items-center px-3 text-[color:var(--table-row-text,var(--text-primary))] bp-1024:px-2 dark:text-[rgb(255,255,255)]",
               overflowClassName,
-              alignClassName
+              alignClassName,
+              bodyMdTextClassName
             )}
           >
-            <button
-              type="button"
-              className={cn(
-                "inline-flex max-w-full appearance-none border-0 bg-transparent p-0 text-left text-[color:var(--table-row-text,var(--text-primary))] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)] dark:text-[rgb(255,255,255)]",
-                column.onCellClick ? "cursor-pointer" : "cursor-default",
-                bodyMdTextClassName
-              )}
-              onClick={(event) => handleCellClick(column, event)}
-              onDoubleClick={(event) => {
-                event.stopPropagation();
-                handleRowDoubleClick();
-              }}
-              aria-label={column.cellAriaLabel?.(row, column)}
-              title={column.cellTitle?.(row, column)}
-            >
-              <span
+            {column.onCellClick ? (
+              <button
+                type="button"
                 className={cn(
-                  "inline-flex min-w-0 max-w-full items-center leading-none",
-                  column.onCellClick && selectableCellClassName
+                  "inline-flex max-w-full appearance-none border-0 bg-transparent p-0 text-left text-[color:var(--table-row-text,var(--text-primary))] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)] dark:text-[rgb(255,255,255)]",
+                  "cursor-pointer",
+                  selectableCellClassName
                 )}
+                onClick={(event) => handleCellClick(column, event)}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  handleRowDoubleClick();
+                }}
+                aria-label={column.cellAriaLabel?.(row, column)}
+                title={column.cellTitle?.(row, column)}
               >
                 {normalizeCellContent(content, column.truncate)}
-              </span>
-            </button>
+              </button>
+            ) : (
+              normalizeCellContent(content, column.truncate)
+            )}
           </div>
         );
       })}

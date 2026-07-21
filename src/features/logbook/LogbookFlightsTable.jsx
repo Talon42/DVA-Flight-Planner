@@ -9,7 +9,7 @@ import { openDesktopUrl } from "../../services/tauri/desktopShell.client.js";
 const LOGBOOK_SELECTED_ROW_CLASS_NAME = "logbook-row-selected";
 
 // Uses the wider preset to show a fuller flight label while preserving the compact label in tight layouts.
-function LogbookFlightCell({ row, column }) {
+export function LogbookFlightCell({ row, column }) {
   const flightLabel = column?.presetKey === "compact" ? row.compactFlightLabel : row.flightLabel || row.compactFlightLabel;
 
   async function handleOpenPirep(event) {
@@ -23,27 +23,21 @@ function LogbookFlightCell({ row, column }) {
   }
 
   const flightLabelContent = row.dvaPirepUrl ? (
-    <span
-      role="link"
-      tabIndex={0}
+    <button
+      type="button"
+      aria-label={`Open DVA PIREP ${row.dvaPirepId}`}
       title={`Open DVA PIREP ${row.dvaPirepId}`}
       className={cn(
-        "block min-w-0 truncate font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit focus-visible:outline-none",
+        "block min-w-0 max-w-full truncate border-0 bg-transparent p-0 text-left font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)]",
         selectableCellClassName
       )}
       onClick={handleOpenPirep}
       onDoubleClick={(event) => {
         event.stopPropagation();
       }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          handleOpenPirep(event);
-        }
-      }}
     >
       {flightLabel}
-    </span>
+    </button>
   ) : (
     <span className="block min-w-0 truncate font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit]">
       {flightLabel}
