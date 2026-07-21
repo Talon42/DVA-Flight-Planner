@@ -133,6 +133,20 @@ describe("useLogbook loading", () => {
     expect(result.current.allRows).toEqual([]);
   });
 
+  it("falls back to the default sort when persisted sort keys are invalid", async () => {
+    readDeltaVirtualLogbook.mockResolvedValueOnce(selectableLogbookResult());
+    const { result } = renderHook(() =>
+      useLogbook({
+        persistedUiState: {
+          logbookSort: { key: "unknown-column", direction: "asc" }
+        }
+      })
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.sort).toEqual({ key: "dateSortKey", direction: "asc" });
+  });
+
   it("keeps loading state explicit while the initial read is pending", async () => {
     const pendingRead = deferred();
     readDeltaVirtualLogbook.mockReturnValueOnce(pendingRead.promise);

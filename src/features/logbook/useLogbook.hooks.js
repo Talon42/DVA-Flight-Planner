@@ -22,9 +22,20 @@ import {
   normalizePilotStatsComparisonPeriod
 } from "./logbookPilotStats.constants.js";
 
+const LOGBOOK_SORT_KEYS = new Set([
+  "dateSortKey",
+  "compactFlightLabel",
+  "departure",
+  "arrival",
+  "equipment",
+  "durationMinutes",
+  "distanceNm",
+  "landingRate"
+]);
+
 function normalizePersistedSort(sort) {
-  const rawKey = String(sort?.key || DEFAULT_LOGBOOK_SORT.key).trim();
-  const key = rawKey;
+  const persistedKey = String(sort?.key || "").trim();
+  const key = LOGBOOK_SORT_KEYS.has(persistedKey) ? persistedKey : DEFAULT_LOGBOOK_SORT.key;
   const direction =
     sort?.direction === "asc" ? "asc" : sort?.direction === "desc" ? "desc" : DEFAULT_LOGBOOK_SORT.direction;
   return { key, direction };

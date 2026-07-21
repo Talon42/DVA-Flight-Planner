@@ -10,6 +10,10 @@ import { logAppError } from "../../services/logging/appLog.client.js";
 
 const LOGBOOK_SELECTED_ROW_CLASS_NAME = "logbook-row-selected";
 
+function getLogbookRowId(row) {
+  return row.id;
+}
+
 // Uses the wider preset to show a fuller flight label while preserving the compact label in tight layouts.
 export function LogbookFlightCell({ row, column }) {
   const flightLabel = column?.presetKey === "compact" ? row.compactFlightLabel : row.flightLabel || row.compactFlightLabel;
@@ -214,7 +218,7 @@ export default function LogbookFlightsTable({
       selectedRowClassName={LOGBOOK_SELECTED_ROW_CLASS_NAME}
       onSelectRow={onSelectRow}
       onActivateRow={onActivateRow}
-      getRowId={(row) => row.id}
+      getRowId={getLogbookRowId}
       getRowClassName={getLogbookRowClassName}
       initialVisibleRows={25}
       visibleRowPage={25}

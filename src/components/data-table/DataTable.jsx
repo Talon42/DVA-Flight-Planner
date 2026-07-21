@@ -25,6 +25,14 @@ const CONTENT_FILLER_COLUMN = Object.freeze({
   required: false
 });
 
+function getDefaultRowId(row) {
+  return row.id;
+}
+
+function getVirtualizedRowKey(index, data) {
+  return data.getRowId(data.rows[index]) || index;
+}
+
 const TableListOuter = forwardRef(function TableListOuter(props, ref) {
   const { className, style, ...rest } = props;
 
@@ -84,7 +92,7 @@ export default function DataTable({
   selectedRowClassName = "",
   onSelectRow,
   onActivateRow,
-  getRowId = (row) => row.id,
+  getRowId = getDefaultRowId,
   getRowClassName,
   renderRowOverlay,
   frameClassName = "",
@@ -291,7 +299,7 @@ export default function DataTable({
             height={listHeight}
             itemCount={visibleRows.length}
             itemData={itemData}
-            itemKey={(index, data) => data.getRowId(data.rows[index]) || index}
+            itemKey={getVirtualizedRowKey}
             itemSize={rowHeight}
             onItemsRendered={handleItemsRendered}
             outerElementType={TableListOuter}
