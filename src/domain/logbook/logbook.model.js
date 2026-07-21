@@ -241,25 +241,84 @@ function readAirportDisplay(airport) {
   return [icao || null, iata || null, name || null].filter(Boolean).join(" / ") || LOGBOOK_EMPTY_VALUE;
 }
 
-function normalizeStatus(value) {
-  const rawStatus = normalizeUpperText(value);
-  if (rawStatus === "OK") {
-    return "Approved";
+const LOGBOOK_STATUS_POLICIES = Object.freeze({
+  approved: Object.freeze({
+    canonical: "approved",
+    displayLabel: "Approved",
+    showInTable: true,
+    includeInStats: true,
+    includeInAirportProgress: true,
+    includeInTourEligibility: true,
+    includeInAccomplishmentEligibility: true
+  }),
+  submitted: Object.freeze({
+    canonical: "submitted",
+    displayLabel: "Pending",
+    showInTable: true,
+    includeInStats: true,
+    includeInAirportProgress: true,
+    includeInTourEligibility: true,
+    includeInAccomplishmentEligibility: true
+  }),
+  held: Object.freeze({
+    canonical: "held",
+    displayLabel: "HOLD",
+    showInTable: true,
+    includeInStats: true,
+    includeInAirportProgress: false,
+    includeInTourEligibility: false,
+    includeInAccomplishmentEligibility: false
+  }),
+  rejected: Object.freeze({
+    canonical: "rejected",
+    displayLabel: "Rejected",
+    showInTable: true,
+    includeInStats: false,
+    includeInAirportProgress: false,
+    includeInTourEligibility: false,
+    includeInAccomplishmentEligibility: false
+  }),
+  draft: Object.freeze({
+    canonical: "draft",
+    displayLabel: "Draft",
+    showInTable: false,
+    includeInStats: false,
+    includeInAirportProgress: false,
+    includeInTourEligibility: false,
+    includeInAccomplishmentEligibility: false
+  }),
+  unknown: Object.freeze({
+    canonical: "unknown",
+    displayLabel: LOGBOOK_EMPTY_VALUE,
+    showInTable: false,
+    includeInStats: false,
+    includeInAirportProgress: false,
+    includeInTourEligibility: false,
+    includeInAccomplishmentEligibility: false
+  })
+});
+
+// Defines the canonical cross-runtime policy for every Delta Virtual logbook status.
+export function normalizeLogbookStatus(value) {
+  const normalized = normalizeUpperText(value);
+
+  if (["OK", "ACCEPTED", "APPROVED", "COMPLETED", "COMPLETE"].includes(normalized)) {
+    return LOGBOOK_STATUS_POLICIES.approved;
+  }
+  if (["SUBMITTED", "PENDING"].includes(normalized)) {
+    return LOGBOOK_STATUS_POLICIES.submitted;
+  }
+  if (normalized === "HOLD") {
+    return LOGBOOK_STATUS_POLICIES.held;
+  }
+  if (normalized === "REJECTED") {
+    return LOGBOOK_STATUS_POLICIES.rejected;
+  }
+  if (normalized === "DRAFT") {
+    return LOGBOOK_STATUS_POLICIES.draft;
   }
 
-  if (rawStatus === "REJECTED") {
-    return "Rejected";
-  }
-
-  if (rawStatus === "SUBMITTED" || rawStatus === "PENDING") {
-    return "Pending";
-  }
-
-  return normalizeText(value) || LOGBOOK_EMPTY_VALUE;
-}
-
-function isEligibleLogbookStatus(value) {
-  return ["SUBMITTED", "HOLD", "OK", "REJECTED"].includes(normalizeUpperText(value));
+  return LOGBOOK_STATUS_POLICIES.unknown;
 }
 
 // Normalizes Delta Virtual logbook ids into the PIREP id format used by the report page.
@@ -439,8 +498,9 @@ export function normalizeLogbookRows(entries) {
       return;
     }
 
-    // Keep only the statuses that represent synced logbook reports, not editable draft records.
-    if (!isEligibleLogbookStatus(entry.status)) {
+    const statusPolicy = normalizeLogbookStatus(entry.status);
+    // Table visibility comes from the canonical policy so draft and unknown records fail closed.
+    if (!statusPolicy.showInTable) {
       return;
     }
 
@@ -500,7 +560,13 @@ export function normalizeLogbookRows(entries) {
       // The export's pax field is the authoritative passenger count for logbook records.
       passengerCount: toNumber(entry.pax),
       statusRaw: normalizeText(entry.status) || LOGBOOK_EMPTY_VALUE,
-      statusDisplay: normalizeStatus(entry.status),
+      statusCanonical: statusPolicy.canonical,
+      statusDisplay: statusPolicy.displayLabel,
+      showInTable: statusPolicy.showInTable,
+      includeInStats: statusPolicy.includeInStats,
+      includeInAirportProgress: statusPolicy.includeInAirportProgress,
+      includeInTourEligibility: statusPolicy.includeInTourEligibility,
+      includeInAccomplishmentEligibility: statusPolicy.includeInAccomplishmentEligibility,
       simulator: readSimulator(entry),
       landingRate,
       landingRateDisplay: formatSignedAviationNumber(landingRate, "fpm"),
@@ -514,7 +580,7 @@ export function normalizeLogbookRows(entries) {
         readAirportCode(entry.airportD),
         readAirportCode(entry.airportA),
         normalizeText(entry.eqType),
-        normalizeStatus(entry.status),
+        statusPolicy.displayLabel,
         normalizeText(entry.simulator || entry.sim)
       ]
         .join(" ")

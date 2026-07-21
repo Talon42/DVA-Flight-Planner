@@ -1,16 +1,12 @@
-function normalizeStatus(value) {
-  return String(value ?? "").trim().toUpperCase();
-}
-
 // Returns the semantic row class used for logbook status emphasis.
 export function getLogbookRowClassName(row) {
-  const rawStatus = normalizeStatus(row?.statusRaw);
+  const status = String(row?.statusCanonical || "unknown");
 
-  if (rawStatus === "REJECTED") {
+  if (status === "rejected") {
     return "logbook-row-status-rejected";
   }
 
-  if (["SUBMITTED", "PENDING", "HOLD"].includes(rawStatus)) {
+  if (status === "submitted" || status === "held") {
     return "logbook-row-status-pending";
   }
 

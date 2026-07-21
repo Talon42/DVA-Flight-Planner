@@ -219,13 +219,12 @@ function LogbookPilotStatsDashboardPages({ cards, pageSize, onPilotStatsDetailVi
 
 export default function LogbookPilotStats({
   stats,
-  summaryStats,
   profileMetadata,
   pilotStatsComparisonPeriod = "off",
   pilotStatsDetailView = null,
   onPilotStatsDetailViewChange
 }) {
-  const displayStats = useMemo(() => summaryStats || stats || {}, [stats, summaryStats]);
+  const displayStats = useMemo(() => stats || {}, [stats]);
   const summary = displayStats.summary || null;
   const comparisons = displayStats.comparisons || null;
   const detailRows = useMemo(() => displayStats.detailRows || EMPTY_DETAIL_ROWS, [displayStats.detailRows]);

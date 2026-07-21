@@ -7,7 +7,8 @@ function landingRow(landingRate, dateIso, sourceIndex) {
     dateSortKey: Number(dateIso.replaceAll("-", "")),
     sourceIndex,
     statusRaw: "APPROVED",
-    statusDisplay: "Approved"
+    statusDisplay: "Approved",
+    includeInStats: true
   };
 }
 

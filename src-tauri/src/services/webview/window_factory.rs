@@ -14,7 +14,7 @@ use crate::services::deltava::sync_types::{
 };
 use crate::{
     app::state::DeltaSyncFinishOutcome,
-    append_sync_log, append_sync_log_debug, services::storage::file_store, DeltaSyncManager,
+    append_sync_log, append_sync_log_debug, DeltaSyncManager,
     DeltaSyncPayload, DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_DOWNLOAD_FILE,
     DELTAVA_SYNC_RESULT_MESSAGE_PREFIX, DELTAVA_XML_MESSAGE_PREFIX,
 };
@@ -264,7 +264,7 @@ fn attach_windows_xml_message_handler(
                                 tauri::async_runtime::spawn(async move {
                                     let result = match serde_json::from_str::<DeltaWebSyncResult>(&payload_text) {
                                         Ok(web_result) if web_result.nonce == sync_nonce => {
-                                            file_store::build_delta_sync_payload_from_web_result(
+                                            crate::services::deltava::sync_payload::build_delta_sync_payload_from_web_result(
                                                 &app_handle,
                                                 web_result,
                                                 debug_enabled,
@@ -318,7 +318,7 @@ fn attach_windows_xml_message_handler(
                                     let result = match serde_json::from_str::<DeltaWebLogbookRefreshResult>(&payload_text)
                                     {
                                         Ok(web_result) if web_result.nonce == sync_nonce => {
-                                            file_store::build_delta_logbook_refresh_payload_from_web_result(
+                                            crate::services::deltava::sync_payload::build_delta_logbook_refresh_payload_from_web_result(
                                                 &app_handle,
                                                 web_result,
                                                 debug_enabled,

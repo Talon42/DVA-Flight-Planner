@@ -96,7 +96,6 @@ export default function LogbookPanel({
   sort,
   selectedRowId,
   pilotStats,
-  summaryStats,
   profileMetadata,
   pilotStatsComparisonPeriod,
   pilotStatsComparisonOptions,
@@ -167,7 +166,6 @@ export default function LogbookPanel({
           <div className="h-full min-h-0 overflow-hidden">
             <LogbookPilotStats
               stats={pilotStats}
-              summaryStats={summaryStats}
               profileMetadata={profileMetadata}
               pilotStatsComparisonPeriod={activePilotStatsComparisonPeriod}
               pilotStatsDashboardSlots={pilotStatsDashboardSlots}

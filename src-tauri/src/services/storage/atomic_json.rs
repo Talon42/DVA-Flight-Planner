@@ -134,6 +134,14 @@ pub(crate) fn write_atomic_json(path: &Path, json: &str) -> Result<(), String> {
 }
 
 #[cfg(test)]
+pub(crate) fn write_atomic_json_with_simulated_final_rename_failure(
+    path: &Path,
+    json: &str,
+) -> Result<(), String> {
+    atomic_write_json_internal(path, json, true)
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};

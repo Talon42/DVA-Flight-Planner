@@ -177,10 +177,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     [pilotStatsComparisonOptions, pilotStatsComparisonPeriod]
   );
   const pilotStats = useMemo(
-    () => selectLogbookPilotStats(filteredRows, { comparisonPeriod: activePilotStatsComparisonPeriod }),
-    [activePilotStatsComparisonPeriod, filteredRows]
-  );
-  const allRowsPilotStats = useMemo(
     () =>
       selectLogbookPilotStats(allRows, {
         comparisonPeriod: activePilotStatsComparisonPeriod
@@ -194,8 +190,10 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const filterOptions = useMemo(() => selectLogbookFilterOptions(allRows), [allRows]);
 
   useEffect(() => {
-    setSelectedRowId(null);
-  }, [filters, sort]);
+    setSelectedRowId((current) =>
+      current && !filteredRows.some((row) => row.id === current) ? null : current
+    );
+  }, [filteredRows]);
 
   const handleFilterChange = useCallback(
     (key, value) => {
@@ -243,7 +241,6 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     filterBounds,
     filterOptions,
     pilotStats,
-    allRowsPilotStats,
     profileMetadata: cacheResult.profileMetadata,
     pilotStatsComparisonPeriod,
     activePilotStatsComparisonPeriod,

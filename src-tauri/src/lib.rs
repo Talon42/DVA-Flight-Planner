@@ -1,5 +1,6 @@
 mod app;
 mod commands;
+mod domain;
 mod models;
 mod services;
 

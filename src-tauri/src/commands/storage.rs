@@ -12,7 +12,7 @@ pub(crate) fn write_ui_state(app: AppHandle, json: String) -> Result<(), String>
 
 #[tauri::command]
 pub(crate) fn prune_deltava_storage(app: AppHandle, remove_downloaded_schedule: bool) {
-    crate::services::storage::file_store::prune_deltava_storage(
+    crate::services::webview::profile_cleanup::prune_deltava_storage(
         &app,
         remove_downloaded_schedule,
         false,
@@ -21,19 +21,19 @@ pub(crate) fn prune_deltava_storage(app: AppHandle, remove_downloaded_schedule: 
 
 #[tauri::command]
 pub(crate) fn read_deltava_logbook_metadata(app: AppHandle) -> crate::DeltaLogbookMetadata {
-    crate::services::storage::file_store::read_deltava_logbook_metadata(&app)
+    crate::services::deltava::logbook_progress::read_deltava_logbook_metadata(&app)
 }
 
 #[tauri::command]
 pub(crate) fn read_deltava_logbook_progress(app: AppHandle) -> crate::DeltaLogbookProgress {
-    crate::services::storage::file_store::read_deltava_logbook_progress(&app)
+    crate::services::deltava::logbook_progress::read_deltava_logbook_progress(&app)
 }
 
 #[tauri::command]
 pub(crate) fn read_deltava_accomplishment_eligibility(
     app: AppHandle,
 ) -> crate::services::deltava::sync_types::DeltaAccomplishmentEligibilityStore {
-    crate::services::storage::file_store::read_deltava_accomplishment_eligibility(&app)
+    crate::services::deltava::accomplishment_cache::read(&app)
 }
 
 #[tauri::command]

@@ -370,13 +370,8 @@ fn extract_logbook_status(value: &Value) -> Option<String> {
 }
 
 fn is_eligible_logbook_status(status: Option<&str>) -> bool {
-    match status {
-        None => true,
-        Some(value) => matches!(
-            value.trim().to_ascii_lowercase().as_str(),
-            "ok" | "submitted" | "approved" | "completed" | "complete"
-        ),
-    }
+    crate::domain::deltava::logbook_status::LogbookStatus::from_raw(status)
+        .include_in_tour_eligibility()
 }
 
 fn extract_logbook_airport_code(value: &Value, key: &str) -> Option<String> {

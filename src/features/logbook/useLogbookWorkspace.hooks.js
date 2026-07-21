@@ -58,9 +58,8 @@ export function useLogbookWorkspace({
       selectedTab: logbook.selectedTab,
       sort: logbook.sort,
       selectedRowId: logbook.selectedRowId,
-      // Pilot stats apply the selected comparison period inside the stats selector.
-      pilotStats: logbook.allRowsPilotStats,
-      summaryStats: logbook.allRowsPilotStats,
+      // Pilot stats intentionally use the complete normalized logbook, independent of table filters.
+      pilotStats: logbook.pilotStats,
       profileMetadata: logbook.profileMetadata,
       pilotStatsComparisonPeriod: logbook.activePilotStatsComparisonPeriod,
       pilotStatsComparisonOptions: logbook.pilotStatsComparisonOptions,
@@ -81,7 +80,7 @@ export function useLogbookWorkspace({
       isRefreshingLogbook,
       isSyncing,
       logbook.allRows,
-      logbook.allRowsPilotStats,
+      logbook.pilotStats,
       logbook.handleSelectRow,
       logbook.handleSort,
       logbook.profileMetadata,

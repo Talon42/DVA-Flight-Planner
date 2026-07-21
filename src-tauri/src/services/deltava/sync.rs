@@ -13,7 +13,6 @@ use crate::{
     app::state::DeltaSyncFinishOutcome,
     services::{
         deltava::auth::{read_auth_context_internal, DeltaVirtualAuthContext},
-        storage::file_store,
         webview::{
             injected_scripts::{build_deltava_auto_sync_script, build_deltava_logbook_refresh_script},
             window_factory,
@@ -331,7 +330,7 @@ pub(crate) fn reset_deltava_sync_session(app: AppHandle) -> Result<(), String> {
         log_ignored_finish("reset", outcome);
     }
     window_factory::close_deltava_sync_window(&app);
-    file_store::reset_deltava_sync_session_storage(&app)?;
+    crate::services::webview::profile_cleanup::reset_deltava_sync_session_storage(&app)?;
     append_sync_log("reset-session:succeeded");
     Ok(())
 }

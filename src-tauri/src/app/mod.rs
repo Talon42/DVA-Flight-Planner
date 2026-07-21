@@ -34,7 +34,7 @@ pub fn run() {
             let app_handle = app.handle().clone();
             let _ = initialize_sync_log_path(&app_handle);
             tauri::async_runtime::spawn(async move {
-                crate::services::storage::file_store::prune_deltava_storage(
+                crate::services::webview::profile_cleanup::prune_deltava_storage(
                     &app_handle,
                     false,
                     true,

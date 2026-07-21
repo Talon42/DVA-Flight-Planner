@@ -30,6 +30,24 @@ function logbookResult(id) {
   };
 }
 
+function selectableLogbookResult(ids = ["1001", "1002"]) {
+  const departures = ["KATL", "KLAX"];
+  const entries = ids.map((id, index) => ({
+    id,
+    status: "APPROVED",
+    airline: "DVA",
+    flight: String(index + 1),
+    airportD: { icao: departures[index] || "KATL" },
+    airportA: { icao: "KJFK" },
+    date: { y: 2026, m: 6, d: index + 1 }
+  }));
+  return {
+    ...logbookResult(null),
+    entries,
+    entryCount: entries.length
+  };
+}
+
 describe("useLogbook loading", () => {
   beforeEach(() => {
     readDeltaVirtualLogbook.mockReset();
@@ -95,5 +113,71 @@ describe("useLogbook loading", () => {
 
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it("preserves selection through sorting and filters that keep the row visible", async () => {
+    readDeltaVirtualLogbook.mockResolvedValueOnce(selectableLogbookResult());
+    const { result } = renderHook(() => useLogbook());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => result.current.handleSelectRow("1001"));
+    act(() => result.current.handleSort("departure"));
+    expect(result.current.selectedRowId).toBe("1001");
+
+    act(() => result.current.handleFilterChange("departure", ["KATL"]));
+    await waitFor(() => expect(result.current.selectedRowId).toBe("1001"));
+  });
+
+  it("clears selection only when filtering removes the row", async () => {
+    readDeltaVirtualLogbook.mockResolvedValueOnce(selectableLogbookResult());
+    const { result } = renderHook(() => useLogbook());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => result.current.handleSelectRow("1001"));
+    act(() => result.current.handleFilterChange("departure", ["KLAX"]));
+
+    await waitFor(() => expect(result.current.selectedRowId).toBeNull());
+  });
+
+  it("keeps a visible selection when filters reset and supports explicit clearing", async () => {
+    readDeltaVirtualLogbook.mockResolvedValueOnce(selectableLogbookResult());
+    const { result } = renderHook(() => useLogbook());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => result.current.handleFilterChange("departure", ["KLAX"]));
+    act(() => result.current.handleSelectRow("1002"));
+    act(() => result.current.handleResetFilters());
+    await waitFor(() => expect(result.current.selectedRowId).toBe("1002"));
+
+    act(() => result.current.handleSelectRow(null));
+    expect(result.current.selectedRowId).toBeNull();
+  });
+
+  it("clears selection when the selected row disappears after reload", async () => {
+    readDeltaVirtualLogbook
+      .mockResolvedValueOnce(selectableLogbookResult())
+      .mockResolvedValueOnce(selectableLogbookResult(["1001"]));
+    const { result, rerender } = renderHook(
+      ({ reloadVersion }) => useLogbook({ reloadVersion }),
+      { initialProps: { reloadVersion: 0 } }
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.handleSelectRow("1002"));
+
+    rerender({ reloadVersion: 1 });
+
+    await waitFor(() => expect(result.current.selectedRowId).toBeNull());
+  });
+
+  it("computes pilot stats from the full logbook instead of filtered table rows", async () => {
+    readDeltaVirtualLogbook.mockResolvedValueOnce(selectableLogbookResult());
+    const { result } = renderHook(() => useLogbook());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.pilotStats.totalFlights).toBe(2);
+
+    act(() => result.current.handleFilterChange("departure", ["KATL"]));
+
+    await waitFor(() => expect(result.current.filteredRows).toHaveLength(1));
+    expect(result.current.pilotStats.totalFlights).toBe(2);
   });
 });
