@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
@@ -507,11 +507,14 @@ export default function LogbookPilotStatsSummaryPanel({
   const rafIdRef = useRef(0);
   const isTileGridVariant = variant === "airline-grid" || variant === "equipment-grid";
   const usesFixedTileFit = isTileGridVariant && !isCompactTileMode;
-  const rowItems = Array.isArray(items) ? items : [];
+  const rowItems = useMemo(() => (Array.isArray(items) ? items : []), [items]);
   const departureAirportItems = Array.isArray(departureItems) ? departureItems : [];
   const arrivalAirportItems = Array.isArray(arrivalItems) ? arrivalItems : [];
   const effectiveMaxRows = autoFitRows ? Math.min(maxRows, fitItems) : maxRows;
-  const rows = rowItems.slice(0, Math.min(effectiveMaxRows, rowItems.length));
+  const rows = useMemo(
+    () => rowItems.slice(0, Math.min(effectiveMaxRows, rowItems.length)),
+    [effectiveMaxRows, rowItems]
+  );
   const airportMaxRows = Math.max(1, Math.floor(Number(maxRows) || 1));
   const departureRows = departureAirportItems.slice(0, airportMaxRows);
   const arrivalRows = arrivalAirportItems.slice(0, airportMaxRows);

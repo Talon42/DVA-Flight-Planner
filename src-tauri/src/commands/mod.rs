@@ -13,6 +13,7 @@ pub(crate) fn app_invoke_handler(
 ) -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
         self::storage::append_app_log_text,
+        self::storage::write_ui_state,
         self::deltava_logbook::read_deltava_logbook,
         self::deltava_pirep_details::fetch_delta_virtual_pirep_details,
         self::deltava_sync::start_deltava_sync,

@@ -747,20 +747,7 @@ export async function readSavedUiState() {
   }
 }
 
-export async function writeSavedUiState(uiState) {
-  const serialized = JSON.stringify(uiState || {});
-
-  if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(UI_STATE_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
-    return;
-  }
-
-  window.localStorage.setItem("flight-planner.ui-state", serialized);
-}
+export { saveUiState as writeSavedUiState } from "./uiState.storage.js";
 
 export async function readSavedDevToolsEnabled() {
   if (isTauriRuntime()) {

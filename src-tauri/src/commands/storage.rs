@@ -6,6 +6,11 @@ pub(crate) fn append_app_log_text(app: AppHandle, text: String) -> Result<(), St
 }
 
 #[tauri::command]
+pub(crate) fn write_ui_state(app: AppHandle, json: String) -> Result<(), String> {
+    crate::services::storage::ui_state::write_ui_state(&app, &json)
+}
+
+#[tauri::command]
 pub(crate) fn prune_deltava_storage(app: AppHandle, remove_downloaded_schedule: bool) {
     crate::services::storage::file_store::prune_deltava_storage(
         &app,

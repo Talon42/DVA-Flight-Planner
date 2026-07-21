@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
 import { fetchDeltaVirtualPirepDetails } from "../../services/tauri/deltaVirtual.client.js";
 
@@ -75,6 +75,32 @@ function getOrFetchPirepDetails(pirepId) {
   return requestPromise;
 }
 
+function areShallowObjectsEqual(left, right) {
+  if (left === right) {
+    return true;
+  }
+
+  const leftKeys = Object.keys(left || {});
+  const rightKeys = Object.keys(right || {});
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key) => Object.is(left?.[key], right?.[key]))
+  );
+}
+
+function arePirepDetailMapsEqual(left, right) {
+  const leftKeys = Object.keys(left || {});
+  const rightKeys = Object.keys(right || {});
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (pirepId) =>
+        Object.prototype.hasOwnProperty.call(right || {}, pirepId) &&
+        areShallowObjectsEqual(left[pirepId], right[pirepId])
+    )
+  );
+}
+
 // Owns the lazy Delta Virtual PIREP detail fetch for the selected logbook row.
 export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true } = {}) {
   const [details, setDetails] = useState(EMPTY_PIREP_DETAILS);
@@ -145,16 +171,20 @@ export function useLogbookPirepDetails(selectedLogbookFlight, { enabled = true }
 export function useVisibleLogbookPirepDetails(logbookFlights, { enabled = true, limit = 0 } = {}) {
   const [detailsByPirepId, setDetailsByPirepId] = useState({});
   const requestIdRef = useRef(0);
+  const visiblePirepIds = useMemo(() => {
+    const candidateRows = Array.isArray(logbookFlights) ? logbookFlights : [];
+    const visibleRows = limit > 0 ? candidateRows.slice(0, limit) : candidateRows;
+    return [...new Set(visibleRows.map((row) => buildLogbookPirepId(row)).filter(Boolean))];
+  }, [limit, logbookFlights]);
+  const visiblePirepIdSignature = visiblePirepIds.join("\u001f");
 
   useEffect(() => {
     requestIdRef.current += 1;
     const requestId = requestIdRef.current;
-    const candidateRows = Array.isArray(logbookFlights) ? logbookFlights : [];
-    const visibleRows = limit > 0 ? candidateRows.slice(0, limit) : candidateRows;
-    const pirepIds = [...new Set(visibleRows.map((row) => buildLogbookPirepId(row)).filter(Boolean))];
+    const pirepIds = visiblePirepIdSignature ? visiblePirepIdSignature.split("\u001f") : [];
 
     if (!enabled || !pirepIds.length) {
-      setDetailsByPirepId({});
+      setDetailsByPirepId((current) => (Object.keys(current).length > 0 ? {} : current));
       return undefined;
     }
 
@@ -170,7 +200,9 @@ export function useVisibleLogbookPirepDetails(logbookFlights, { enabled = true, 
       }
     }
 
-    setDetailsByPirepId(nextCachedDetails);
+    setDetailsByPirepId((current) =>
+      arePirepDetailMapsEqual(current, nextCachedDetails) ? current : nextCachedDetails
+    );
 
     if (!missingPirepIds.length) {
       return undefined;
@@ -196,12 +228,16 @@ export function useVisibleLogbookPirepDetails(logbookFlights, { enabled = true, 
           }
         }
 
-        return nextValue;
+        return arePirepDetailMapsEqual(current, nextValue) ? current : nextValue;
       });
     });
 
-    return undefined;
-  }, [enabled, limit, logbookFlights]);
+    return () => {
+      if (requestIdRef.current === requestId) {
+        requestIdRef.current += 1;
+      }
+    };
+  }, [enabled, visiblePirepIdSignature]);
 
   return detailsByPirepId;
 }

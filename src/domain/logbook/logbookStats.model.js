@@ -694,6 +694,37 @@ function buildDelta(currentValue, priorValue, { format = "number", lowerIsBetter
   };
 }
 
+// Compares landing averages by distance from the target rather than signed FPM direction.
+function buildLandingTargetDelta(currentValue, priorValue) {
+  if (!Number.isFinite(currentValue) || !Number.isFinite(priorValue)) {
+    return {
+      value: LOGBOOK_EMPTY_VALUE,
+      status: "neutral",
+      rawValue: null
+    };
+  }
+
+  const currentDistance = Math.abs(currentValue - BEST_LANDING_TARGET_FPM);
+  const priorDistance = Math.abs(priorValue - BEST_LANDING_TARGET_FPM);
+  const improvement = priorDistance - currentDistance;
+
+  if (improvement === 0) {
+    return {
+      value: LOGBOOK_EMPTY_VALUE,
+      status: "neutral",
+      rawValue: 0
+    };
+  }
+
+  return {
+    value: `${formatNumber(Math.abs(improvement), { maximumFractionDigits: 0 })} fpm ${
+      improvement > 0 ? "closer" : "farther"
+    }`,
+    status: improvement > 0 ? "positive" : "negative",
+    rawValue: improvement
+  };
+}
+
 function buildPeriodMetrics(rows) {
   const totals = sumRows(rows);
   const averageLandingRate =
@@ -741,11 +772,7 @@ function buildComparisonBundle(rows, periodKey) {
       totalDistanceNm: buildDelta(current.totalDistanceNm, prior.totalDistanceNm, { unit: "nm" }),
       totalDurationMinutes: buildDelta(current.totalDurationMinutes, prior.totalDurationMinutes, { format: "minutes" }),
       totalAirborneMinutes: buildDelta(current.totalAirborneMinutes, prior.totalAirborneMinutes, { format: "minutes" }),
-      averageLandingRate: buildDelta(current.averageLandingRate, prior.averageLandingRate, {
-        format: "signed",
-        lowerIsBetter: true,
-        unit: "fpm"
-      })
+      averageLandingRate: buildLandingTargetDelta(current.averageLandingRate, prior.averageLandingRate)
     }
   };
 }

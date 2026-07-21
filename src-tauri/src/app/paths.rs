@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager};
 
 pub(crate) const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
 pub(crate) const MAIN_WINDOW_STATE_FILE: &str = "main-window-state.json";
+pub(crate) const UI_STATE_FILE: &str = "ui-state.json";
 pub(crate) const DELTAVA_SYNC_DOWNLOAD_FILE: &str = "deltava-pfpxsched.xml";
 pub(crate) const DELTAVA_LOGBOOK_FILE: &str = "logbook.json";
 pub(crate) const DELTAVA_LOGBOOK_PROFILE_FILE: &str = "dva-logbook-profile.json";
@@ -34,6 +35,10 @@ pub(crate) fn addon_airport_cache_path(app: &AppHandle) -> Result<PathBuf, Strin
 
 pub(crate) fn main_window_state_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_storage_dir(app)?.join(MAIN_WINDOW_STATE_FILE))
+}
+
+pub(crate) fn ui_state_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app_storage_dir(app)?.join(UI_STATE_FILE))
 }
 
 /// Returns the per-user Delta Virtual sync directory under local app data.

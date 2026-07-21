@@ -78,9 +78,12 @@ import {
 } from "../services/logging/appLog.client.js";
 import {
   deleteStoredUserData,
-  writeGettingStartedState,
-  writeSavedUiState
+  writeGettingStartedState
 } from "../services/storage/storage.js";
+import {
+  saveUiState,
+  saveUiStateImmediate
+} from "../services/storage/uiState.storage.js";
 import { openDesktopUrl } from "../services/tauri/desktopShell.client.js";
 import {
   DEFAULT_FLIGHT_BOARD_NAME,
@@ -206,29 +209,29 @@ export default function App() {
   // Writes the current UI state immediately so preference toggles cannot be lost on exit.
   const handleSetMapOptions = useCallback(
     (updater) => {
-      setMapOptions((currentMapOptions) => {
-        const previousMapOptions = normalizeMapOptions(currentMapOptions);
-        const nextMapOptions = normalizeMapOptions(
-          typeof updater === "function" ? updater(previousMapOptions) : updater
-        );
+      const previousMapOptions = normalizeMapOptions(uiStateSnapshotRef.current.mapOptions);
+      const nextMapOptions = normalizeMapOptions(
+        typeof updater === "function" ? updater(previousMapOptions) : updater
+      );
+      uiStateSnapshotRef.current = {
+        ...uiStateSnapshotRef.current,
+        mapOptions: nextMapOptions
+      };
+      setMapOptions(nextMapOptions);
 
-        void logAppEvent("map-options-changed", {
-          previousMapOptions,
-          nextMapOptions
-        }).catch(() => {});
-        void logAppEvent("persist-ui-state-map-options", {
-          mapOptions: nextMapOptions
-        }).catch(() => {});
+      void logAppEvent("map-options-changed", {
+        previousMapOptions,
+        nextMapOptions
+      }).catch(() => {});
+      void logAppEvent("persist-ui-state-map-options", {
+        mapOptions: nextMapOptions
+      }).catch(() => {});
 
-        writeSavedUiState(buildCurrentUiStatePayload({ mapOptions: nextMapOptions })).catch(
-          (error) => {
-            setStatusMessage(error.message || "Unable to persist the current planner state.");
-            logAppError("persist-ui-state-failed", error).catch(() => {});
-          }
-        );
-
-        return nextMapOptions;
-      });
+      saveUiStateImmediate(buildCurrentUiStatePayload({ mapOptions: nextMapOptions })).catch(
+        (error) => {
+          setStatusMessage(error instanceof Error ? error.message : "Unable to persist the current planner state.");
+        }
+      );
     },
     [buildCurrentUiStatePayload]
   );
@@ -1094,7 +1097,7 @@ export default function App() {
       cachedEntryCount: cachedEntries.length
     });
 
-    void writeSavedUiState(buildCurrentUiStatePayload({ flightBoards }))
+    void saveUiStateImmediate(buildCurrentUiStatePayload({ flightBoards }))
       .then(() => {
         void logAppEvent("persist-flight-board-cache-succeeded", {
           reason: "flight-board-cache",
@@ -1108,8 +1111,7 @@ export default function App() {
         });
       })
       .catch((error) => {
-        setStatusMessage(error.message || "Unable to persist the current planner state.");
-        logAppError("persist-flight-board-cache-failed", error).catch(() => {});
+        setStatusMessage(error instanceof Error ? error.message : "Unable to persist the current planner state.");
       });
   }, [buildCurrentUiStatePayload, buildFlightBoardCacheSignature, currentFlightBoardCacheSignature, flightBoards, isHydrating]);
   useDebouncedEffect(
@@ -1118,9 +1120,8 @@ export default function App() {
         return;
       }
 
-      writeSavedUiState(buildCurrentUiStatePayload()).catch((error) => {
-        setStatusMessage(error.message || "Unable to persist the current planner state.");
-        logAppError("persist-ui-state-failed", error).catch(() => {});
+      saveUiState(buildCurrentUiStatePayload()).catch((error) => {
+        setStatusMessage(error instanceof Error ? error.message : "Unable to persist the current planner state.");
       });
     },
     [

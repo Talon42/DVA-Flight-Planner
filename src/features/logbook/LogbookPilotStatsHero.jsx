@@ -282,7 +282,7 @@ export default function LogbookPilotStatsHero({
       ),
       value: summary?.averageLandingRate || LOGBOOK_EMPTY_VALUE,
       valueToneClassName: getLandingGradeTextClassName(summary?.averageLandingRateGrade),
-      delta: useComparison ? formatDeltaValue(deltas.averageLandingRate?.rawValue, "fpm") : "",
+      delta: useComparison ? deltas.averageLandingRate?.value || LOGBOOK_EMPTY_VALUE : "",
       deltaStatus: deltas.averageLandingRate?.status
     }
   ];

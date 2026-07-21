@@ -47,6 +47,11 @@ function normalizePersistedPilotStatsDashboardSlots(value) {
   return nextValue;
 }
 
+// Keeps thrown invoke failures from exposing implementation details in the logbook workspace.
+function normalizeLogbookLoadError() {
+  return "Unable to load the Delta Virtual logbook.";
+}
+
 // Owns cached-logbook loading, filtering, stats, and sorting outside App.jsx.
 export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) {
   const [cacheResult, setCacheResult] = useState({
@@ -67,10 +72,21 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const [pilotStatsDetailView, setPilotStatsDetailView] = useState(null);
   const hasHydratedPersistedStateRef = useRef(false);
   const previousSelectedTabRef = useRef("flights");
+  const requestGenerationRef = useRef(0);
+  const isMountedRef = useRef(false);
 
   const allRows = useMemo(() => normalizeLogbookRows(cacheResult.entries), [cacheResult.entries]);
   const pilotStatsComparisonOptions = useMemo(() => buildPilotStatsComparisonOptions(allRows), [allRows]);
   const filterBounds = useMemo(() => selectLogbookFilterBounds(allRows), [allRows]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      requestGenerationRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     setFilters((current) => normalizeLogbookFilters(current, filterBounds));
@@ -105,26 +121,47 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   }, [selectedTab]);
 
   const loadLogbook = useCallback(async () => {
-    setIsLoading(true);
-    const nextResult = await readDeltaVirtualLogbook();
-    const nextEntries = Array.isArray(nextResult?.entries) ? nextResult.entries : [];
-    const nextError = String(nextResult?.error || "").trim();
+    requestGenerationRef.current += 1;
+    const requestGeneration = requestGenerationRef.current;
 
-    setCacheResult((current) => {
-      if (nextError && current.entries.length > 0 && nextEntries.length === 0) {
-        return current;
+    if (isMountedRef.current) {
+      setIsLoading(true);
+      setLoadError("");
+    }
+
+    try {
+      const nextResult = await readDeltaVirtualLogbook();
+      if (!isMountedRef.current || requestGenerationRef.current !== requestGeneration) {
+        return;
       }
 
-      return {
-        dateIso: nextResult?.dateIso ?? null,
-        lastSyncAt: nextResult?.lastSyncAt ?? null,
-        profileMetadata: nextResult?.profileMetadata ?? null,
-        entries: nextEntries,
-        entryCount: Number(nextResult?.entryCount ?? nextEntries.length) || 0
-      };
-    });
-    setLoadError(nextError);
-    setIsLoading(false);
+      const nextEntries = Array.isArray(nextResult?.entries) ? nextResult.entries : [];
+      const nextError = String(nextResult?.error || "").trim();
+
+      setCacheResult((current) => {
+        // A failed refresh must not replace the last usable cache with an empty result.
+        if (nextError && current.entries.length > 0 && nextEntries.length === 0) {
+          return current;
+        }
+
+        return {
+          dateIso: nextResult?.dateIso ?? null,
+          lastSyncAt: nextResult?.lastSyncAt ?? null,
+          profileMetadata: nextResult?.profileMetadata ?? null,
+          entries: nextEntries,
+          entryCount: Number(nextResult?.entryCount ?? nextEntries.length) || 0
+        };
+      });
+      setLoadError(nextError);
+    } catch {
+      if (isMountedRef.current && requestGenerationRef.current === requestGeneration) {
+        setLoadError(normalizeLogbookLoadError());
+      }
+    } finally {
+      if (isMountedRef.current && requestGenerationRef.current === requestGeneration) {
+        setIsLoading(false);
+      }
+    }
   }, []);
 
   useEffect(() => {
