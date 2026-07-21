@@ -6,61 +6,21 @@ import {
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 import {
   buildLogbookFilterBounds,
+  compileLogbookFilterPredicate,
   normalizeLogbookFilters,
-  shouldIncludeLogbookDateRow,
-  shouldIncludeLogbookDurationRow,
-  shouldIncludeLogbookDistanceRow
 } from "./logbookFilters.model.js";
 
 // Filters the normalized logbook rows against the active logbook filters.
-export function selectFilteredLogbookRows({ rows, filters }) {
+export function selectFilteredLogbookRows({ rows, filters, filterBounds, filterPredicate }) {
   const activeRows = Array.isArray(rows) ? rows : [];
   if (!activeRows.length) {
     return [];
   }
 
-  const filterBounds = buildLogbookFilterBounds(activeRows);
-  const normalizedFilters = normalizeLogbookFilters(filters, filterBounds);
-
-  return activeRows.filter((row) => {
-    if (!shouldIncludeLogbookDateRow(row.dateSortKey, normalizedFilters, filterBounds)) {
-      return false;
-    }
-
-    if (!shouldIncludeLogbookDurationRow(row.durationMinutes, normalizedFilters, filterBounds)) {
-      return false;
-    }
-
-    if (normalizedFilters.airline.length && !normalizedFilters.airline.includes(row.airlineDisplayName)) {
-      return false;
-    }
-
-    if (normalizedFilters.equipment.length && !normalizedFilters.equipment.includes(row.equipment)) {
-      return false;
-    }
-
-    if (normalizedFilters.departure.length && !normalizedFilters.departure.includes(row.departure)) {
-      return false;
-    }
-
-    if (normalizedFilters.arrival.length && !normalizedFilters.arrival.includes(row.arrival)) {
-      return false;
-    }
-
-    if (
-      normalizedFilters.departureOrArrival.length &&
-      !normalizedFilters.departureOrArrival.includes(row.departure) &&
-      !normalizedFilters.departureOrArrival.includes(row.arrival)
-    ) {
-      return false;
-    }
-
-    if (!shouldIncludeLogbookDistanceRow(row.distanceNm, filters, filterBounds)) {
-      return false;
-    }
-
-    return true;
-  });
+  const bounds = filterBounds || buildLogbookFilterBounds(activeRows);
+  const predicate =
+    filterPredicate || compileLogbookFilterPredicate(normalizeLogbookFilters(filters, bounds), bounds);
+  return activeRows.filter(predicate);
 }
 
 // Applies the visible logbook column sort while preserving a stable date/id tie-break.

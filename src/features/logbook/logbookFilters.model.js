@@ -192,6 +192,82 @@ export function normalizeLogbookFilters(savedFilters, bounds = DEFAULT_DISTANCE_
   return nextFilters;
 }
 
+// Compiles normalized filter state into immutable values used by every row check.
+// Keeping this work outside the row predicate avoids repeated normalization and allocations.
+export function buildLogbookFilterContext(filters, bounds = DEFAULT_DISTANCE_BOUNDS) {
+  const safeFilters = filters || DEFAULT_LOGBOOK_FILTERS;
+  const minDateSortKey = Number(bounds?.minDateSortKey) || 0;
+  const maxDateSortKey = Number(bounds?.maxDateSortKey) || 0;
+  const maxDurationMinutes = Number(bounds?.maxDurationMinutes) || 0;
+  const maxDistanceNm = Number(bounds?.maxDistanceNm) || 0;
+  const selectedStart = dateStringToSortKey(safeFilters.dateStart);
+  const selectedEnd = dateStringToSortKey(safeFilters.dateEnd);
+  const dateMin = Number.isFinite(selectedStart) ? selectedStart : minDateSortKey;
+  const dateMax = Number.isFinite(selectedEnd) ? selectedEnd : maxDateSortKey;
+  const durationMin = Number.isFinite(safeFilters.durationMin) ? safeFilters.durationMin : 0;
+  const durationMax = Number.isFinite(safeFilters.durationMax)
+    ? safeFilters.durationMax
+    : Math.max(maxDurationMinutes, durationMin);
+  const distanceMin = Number.isFinite(safeFilters.distanceMin) ? safeFilters.distanceMin : 0;
+  const distanceMax = Number.isFinite(safeFilters.distanceMax)
+    ? safeFilters.distanceMax
+    : Math.max(maxDistanceNm, distanceMin);
+
+  return {
+    dateMin,
+    dateMax,
+    hasDateConstraint: dateMin !== minDateSortKey || dateMax !== maxDateSortKey,
+    durationMin,
+    durationMax,
+    hasDurationConstraint: durationMin !== 0 || durationMax !== maxDurationMinutes,
+    distanceMin,
+    distanceMax,
+    hasDistanceConstraint: distanceMin > 0 || Number.isFinite(safeFilters.distanceMax),
+    airlines: new Set(safeFilters.airline || []),
+    equipment: new Set(safeFilters.equipment || []),
+    departures: new Set(safeFilters.departure || []),
+    arrivals: new Set(safeFilters.arrival || []),
+    departureOrArrival: new Set(safeFilters.departureOrArrival || [])
+  };
+}
+
+// Creates the allocation-free row predicate used by the filtered logbook selector.
+export function compileLogbookFilterPredicate(filters, bounds = DEFAULT_DISTANCE_BOUNDS) {
+  const context = buildLogbookFilterContext(filters, bounds);
+
+  return (row) => {
+    if (!Number.isFinite(row.dateSortKey)) {
+      if (context.hasDateConstraint) return false;
+    } else if (row.dateSortKey < context.dateMin || row.dateSortKey > context.dateMax) {
+      return false;
+    }
+
+    if (!Number.isFinite(row.durationMinutes)) {
+      if (context.hasDurationConstraint) return false;
+    } else if (
+      row.durationMinutes < context.durationMin ||
+      row.durationMinutes > context.durationMax
+    ) {
+      return false;
+    }
+
+    if (context.airlines.size && !context.airlines.has(row.airlineDisplayName)) return false;
+    if (context.equipment.size && !context.equipment.has(row.equipment)) return false;
+    if (context.departures.size && !context.departures.has(row.departure)) return false;
+    if (context.arrivals.size && !context.arrivals.has(row.arrival)) return false;
+    if (
+      context.departureOrArrival.size &&
+      !context.departureOrArrival.has(row.departure) &&
+      !context.departureOrArrival.has(row.arrival)
+    ) {
+      return false;
+    }
+
+    if (!Number.isFinite(row.distanceNm)) return !context.hasDistanceConstraint;
+    return row.distanceNm >= context.distanceMin && row.distanceNm <= context.distanceMax;
+  };
+}
+
 // Maps the persisted date filters to the effective date range used by the selectors.
 export function getEffectiveLogbookDateRange(filters, bounds = DEFAULT_DISTANCE_BOUNDS) {
   const normalizedFilters = normalizeLogbookFilters(filters, bounds);

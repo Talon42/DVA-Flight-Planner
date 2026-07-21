@@ -3,6 +3,7 @@ import { normalizeLogbookRows } from "../../domain/logbook/logbook.model.js";
 import { readDeltaVirtualLogbook } from "../../services/tauri/deltaVirtual.client.js";
 import {
   applyLogbookFilterChange,
+  compileLogbookFilterPredicate,
   DEFAULT_LOGBOOK_FILTERS,
   DEFAULT_LOGBOOK_SORT,
   normalizeLogbookFilters,
@@ -82,6 +83,14 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   const allRows = useMemo(() => normalizeLogbookRows(cacheResult.entries), [cacheResult.entries]);
   const pilotStatsComparisonOptions = useMemo(() => buildPilotStatsComparisonOptions(allRows), [allRows]);
   const filterBounds = useMemo(() => selectLogbookFilterBounds(allRows), [allRows]);
+  const normalizedFilters = useMemo(
+    () => normalizeLogbookFilters(filters, filterBounds),
+    [filterBounds, filters]
+  );
+  const filterPredicate = useMemo(
+    () => compileLogbookFilterPredicate(normalizedFilters, filterBounds),
+    [filterBounds, normalizedFilters]
+  );
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -181,8 +190,8 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
   }, [loadLogbook, reloadVersion]);
 
   const filteredRows = useMemo(
-    () => selectFilteredLogbookRows({ rows: allRows, filters }),
-    [allRows, filters]
+    () => selectFilteredLogbookRows({ rows: allRows, filterBounds, filterPredicate }),
+    [allRows, filterBounds, filterPredicate]
   );
   const activePilotStatsComparisonPeriod = useMemo(
     () => normalizePilotStatsComparisonPeriod(pilotStatsComparisonPeriod, pilotStatsComparisonOptions),
