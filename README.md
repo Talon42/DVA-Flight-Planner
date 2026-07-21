@@ -141,6 +141,8 @@ The app stores local schedule, logbook, tour, settings, and Flight Board data on
 
 Use `Settings` > `Advanced` > `Delete User Data` to clear saved local data, DVA credentials, temporary sync data, and browser data where possible.
 
+The desktop filesystem capability and app-owned storage boundaries are documented in [Filesystem permissions](docs/FILESYSTEM_PERMISSIONS.md).
+
 ## Validation
 
 Codex must run the applicable checks from `docs/instructions/VALIDATION.md` before reporting a file-changing task complete. Use `npm run validate:fast` during iteration and `npm run validate` for cross-cutting work or release readiness.

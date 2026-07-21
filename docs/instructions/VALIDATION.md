@@ -13,6 +13,19 @@ Always report:
 
 Never describe validation as passed when a required check was skipped or only partially executed.
 
+## Test Asset Lifecycle
+
+Keep automated tests and their support files synchronized with application behavior:
+
+- New behavior requires meaningful regression coverage at the narrowest stable layer that verifies the user-visible behavior or important contract.
+- Changed behavior requires updating the affected tests, sanitized fixtures, mocks, helpers, and contract assertions. Preserve explicit compatibility cases when existing user data or external payloads may still use them.
+- Removed behavior requires removing obsolete tests, fixtures, mocks, snapshots, helpers, allowlist entries, and test-only modules, then searching for stale references.
+- Parser, import/export, storage-format, IPC, or external-service contract changes require representative sanitized fixtures. Cross-runtime contracts should use the same fixture where practical.
+- Reuse an existing representative fixture when it already covers the contract; do not create duplicate fixtures solely to satisfy this checklist.
+- If no automated test or test-asset change is appropriate, state why in the completion report and identify any remaining behavior that needs manual verification.
+
+Tests and fixtures must preserve application boundaries and must not change production behavior merely to make testing easier.
+
 ## Validation Levels
 
 ### Targeted iteration
