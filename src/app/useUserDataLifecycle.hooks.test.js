@@ -145,14 +145,25 @@ describe("user data lifecycle", () => {
     await act(() => result.current.handleDeleteUserData());
 
     expect(result.current.clearFailure).toEqual(partialResult);
+    expect(persistence.suspendUiStateWrites).toHaveBeenCalledOnce();
+    expect(persistence.suspendSimBriefSettingsWrites).toHaveBeenCalledOnce();
     expect(reloadPage).not.toHaveBeenCalled();
   });
 
   it("retries a partial deletion without confirming again", async () => {
+    const sequence = [];
+    persistence.suspendUiStateWrites.mockImplementation(() => sequence.push("suspend-ui"));
+    persistence.suspendSimBriefSettingsWrites.mockImplementation(() => sequence.push("suspend-simbrief"));
     const confirmDelete = vi.fn(async () => true);
     const deleteUserData = vi.fn()
-      .mockResolvedValueOnce({ ok: false, failures: [{ target: "uiState", reasonCode: "in_use" }] })
-      .mockResolvedValueOnce({ ok: true, failures: [] });
+      .mockImplementationOnce(async () => {
+        sequence.push("backend-clear-1");
+        return { ok: false, failures: [{ target: "uiState", reasonCode: "in_use" }] };
+      })
+      .mockImplementationOnce(async () => {
+        sequence.push("backend-clear-2");
+        return { ok: true, failures: [] };
+      });
     const reloadPage = vi.fn();
     const { result } = renderHook(() => useUserDataLifecycle({
       confirmDelete,
@@ -165,7 +176,32 @@ describe("user data lifecycle", () => {
 
     expect(confirmDelete).toHaveBeenCalledOnce();
     expect(deleteUserData).toHaveBeenCalledTimes(2);
+    expect(sequence.filter((step) => step === "suspend-ui")).toHaveLength(2);
+    expect(sequence.lastIndexOf("suspend-ui")).toBeGreaterThan(sequence.indexOf("backend-clear-1"));
+    expect(sequence.lastIndexOf("suspend-ui")).toBeLessThan(sequence.indexOf("backend-clear-2"));
     expect(reloadPage).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the structured partial failure when a retry meets late write suppression", async () => {
+    const partialResult = {
+      ok: false,
+      failures: [{ target: "uiState", reasonCode: "in_use" }]
+    };
+    const deleteUserData = vi.fn().mockResolvedValueOnce(partialResult);
+    const { result } = renderHook(() => useUserDataLifecycle({
+      confirmDelete: async () => true,
+      deleteUserData
+    }));
+
+    await act(() => result.current.handleDeleteUserData());
+    persistence.flushUiStateWrites.mockRejectedValueOnce(new Error(
+      "profile_clear_in_progress: User data persistence is disabled until reload."
+    ));
+    await act(() => result.current.retryUserDataClear());
+
+    expect(result.current.clearFailure).toEqual(partialResult);
+    expect(deleteUserData).toHaveBeenCalledOnce();
+    expect(persistence.logAppError).not.toHaveBeenCalled();
   });
 
   it("collapses double invocation into one deletion transaction", async () => {

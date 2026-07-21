@@ -9,6 +9,7 @@ import {
   suspendSimBriefSettingsWrites
 } from "../services/storage/simBriefSettings.storage.js";
 import { logAppError } from "../services/logging/appLog.client.js";
+import { isPersistenceWriteSuppressedError } from "../services/tauri/storage.client.js";
 
 // Owns the suspend-flush-delete-reload lifecycle so deleted state cannot be rewritten.
 export function useUserDataLifecycle({
@@ -22,11 +23,14 @@ export function useUserDataLifecycle({
   const [clearFailure, setClearFailure] = useState(null);
   const isDeletingRef = useRef(false);
   const isDeleteBlockedRef = useRef(Boolean(isDeleteBlocked));
+  const clearFailureRef = useRef(null);
   isDeleteBlockedRef.current = Boolean(isDeleteBlocked);
 
   const executeClear = useCallback(async () => {
+    const previousClearFailure = clearFailureRef.current;
     setIsDeletingUserData(true);
     setClearFailure(null);
+    clearFailureRef.current = null;
 
     try {
       suspendUiStateWrites();
@@ -38,12 +42,22 @@ export function useUserDataLifecycle({
         reloadPage();
         return true;
       }
-      setClearFailure(result || { failures: [{ target: "userData", reasonCode: "unknown" }] });
+      const failure = result || { failures: [{ target: "userData", reasonCode: "unknown" }] };
+      clearFailureRef.current = failure;
+      setClearFailure(failure);
       return false;
     } catch (error) {
-      setClearFailure({
+      if (previousClearFailure && isPersistenceWriteSuppressedError(error)) {
+        // A late rejected write must not replace the backend's actionable partial-clear result.
+        clearFailureRef.current = previousClearFailure;
+        setClearFailure(previousClearFailure);
+        return false;
+      }
+      const failure = {
         failures: [{ target: "userData", reasonCode: "request_failed" }]
-      });
+      };
+      clearFailureRef.current = failure;
+      setClearFailure(failure);
       await logAppError("delete-user-data-failed", error);
       return false;
     } finally {

@@ -1,10 +1,33 @@
 import { invokeAppCommand } from "./invoke.client.js";
 
+export const PERSISTENCE_WRITE_SUPPRESSED_ERROR =
+  "profile_clear_in_progress: User data persistence is disabled until reload.";
+
+export function isPersistenceWriteSuppressedError(error) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message === PERSISTENCE_WRITE_SUPPRESSED_ERROR;
+}
+
+// Treats only the backend's permanent post-clear write suppression as an intentional no-op.
+async function invokePersistenceWrite(commandName, args, options) {
+  try {
+    return await invokeAppCommand(commandName, args, {
+      ...options,
+      isExpectedError: isPersistenceWriteSuppressedError
+    });
+  } catch (error) {
+    if (isPersistenceWriteSuppressedError(error)) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
 // Persists one serialized UI-state snapshot through the Rust atomic writer.
 export async function writeUiStateJson(json) {
   const serialized = String(json ?? "");
 
-  return invokeAppCommand(
+  return invokePersistenceWrite(
     "write_ui_state",
     { json: serialized },
     {
@@ -29,7 +52,7 @@ export async function readAppStorageFile(key) {
 // Writes one Rust-allowlisted app-owned storage file with backend validation.
 export async function writeAppStorageFile(key, contents) {
   const serialized = String(contents ?? "");
-  return invokeAppCommand("write_app_storage_file", { key, contents: serialized }, {
+  return invokePersistenceWrite("write_app_storage_file", { key, contents: serialized }, {
     subsystem: "App Storage",
     event: "app-storage-write-failed",
     metadata: { key, byteCount: new TextEncoder().encode(serialized).length }
@@ -37,7 +60,7 @@ export async function writeAppStorageFile(key, contents) {
 }
 
 export async function quarantineAppStorageFile(key) {
-  return invokeAppCommand("quarantine_app_storage_file", { key }, {
+  return invokePersistenceWrite("quarantine_app_storage_file", { key }, {
     subsystem: "App Storage",
     event: "app-storage-quarantine-failed",
     metadata: { key }
@@ -45,7 +68,7 @@ export async function quarantineAppStorageFile(key) {
 }
 
 export async function ensureAppLogFile(header) {
-  return invokeAppCommand("ensure_app_log_file", { header: String(header || "") }, {
+  return invokePersistenceWrite("ensure_app_log_file", { header: String(header || "") }, {
     subsystem: "App Storage",
     event: "app-log-ensure-failed"
   });

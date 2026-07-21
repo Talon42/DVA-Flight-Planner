@@ -1,6 +1,6 @@
 use tauri::{AppHandle, State};
 
-use crate::app::state::UserDataPersistenceGate;
+use crate::app::state::{UserDataPersistenceGate, PERSISTENCE_WRITE_SUPPRESSED_ERROR};
 
 #[tauri::command]
 pub(crate) async fn append_app_log_text(
@@ -8,7 +8,10 @@ pub(crate) async fn append_app_log_text(
     gate: State<'_, UserDataPersistenceGate>,
     text: String,
 ) -> Result<(), String> {
-    let _guard = gate.lock().await;
+    let Ok(_guard) = gate.begin_write().await else {
+        // Logging is best-effort and must not turn suppression into recursive logging failures.
+        return Ok(());
+    };
     crate::app::logging::append_app_log_text(&app, &text)
 }
 
@@ -18,7 +21,10 @@ pub(crate) async fn write_ui_state(
     gate: State<'_, UserDataPersistenceGate>,
     json: String,
 ) -> Result<(), String> {
-    let _guard = gate.lock().await;
+    let _guard = gate
+        .begin_write()
+        .await
+        .map_err(|_| PERSISTENCE_WRITE_SUPPRESSED_ERROR.to_string())?;
     crate::services::storage::ui_state::write_ui_state(&app, &json)
 }
 
@@ -34,7 +40,10 @@ pub(crate) async fn write_app_storage_file(
     key: String,
     contents: String,
 ) -> Result<(), String> {
-    let _guard = gate.lock().await;
+    let _guard = gate
+        .begin_write()
+        .await
+        .map_err(|_| PERSISTENCE_WRITE_SUPPRESSED_ERROR.to_string())?;
     crate::services::storage::app_files::write(&app, &key, &contents)
 }
 
@@ -44,7 +53,10 @@ pub(crate) async fn quarantine_app_storage_file(
     gate: State<'_, UserDataPersistenceGate>,
     key: String,
 ) -> Result<(), String> {
-    let _guard = gate.lock().await;
+    let _guard = gate
+        .begin_write()
+        .await
+        .map_err(|_| PERSISTENCE_WRITE_SUPPRESSED_ERROR.to_string())?;
     crate::services::storage::app_files::quarantine(&app, &key)
 }
 
@@ -54,7 +66,10 @@ pub(crate) async fn ensure_app_log_file(
     gate: State<'_, UserDataPersistenceGate>,
     header: String,
 ) -> Result<String, String> {
-    let _guard = gate.lock().await;
+    let _guard = gate
+        .begin_write()
+        .await
+        .map_err(|_| PERSISTENCE_WRITE_SUPPRESSED_ERROR.to_string())?;
     crate::services::storage::app_files::ensure_app_log(&app, &header)
 }
 
@@ -89,12 +104,8 @@ pub(crate) async fn clear_user_data(
     app: AppHandle,
     gate: State<'_, UserDataPersistenceGate>,
 ) -> Result<crate::services::storage::user_data::UserDataClearResult, String> {
-    let _guard = gate.lock().await;
-    let result = crate::services::storage::user_data::clear_user_data(&app);
-    if result.is_ok() {
-        gate.suppress_window_state();
-    }
-    Ok(result)
+    let _guard = gate.begin_clear().await;
+    Ok(crate::services::storage::user_data::clear_user_data(&app))
 }
 
 #[tauri::command]

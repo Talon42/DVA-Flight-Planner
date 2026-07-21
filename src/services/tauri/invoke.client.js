@@ -145,6 +145,9 @@ export async function invokeAppCommand(commandName, args = {}, options = {}) {
   try {
     return await invoke(commandName, args);
   } catch (error) {
+    if (typeof options.isExpectedError === "function" && options.isExpectedError(error)) {
+      throw error;
+    }
     const line = buildLogLine(
       options.subsystem || "Tauri",
       options.event || "command-failed",

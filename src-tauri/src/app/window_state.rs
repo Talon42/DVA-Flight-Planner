@@ -60,15 +60,16 @@ fn capture_main_window_state(
     })
 }
 
+fn should_persist_main_window_state(gate: &UserDataPersistenceGate) -> bool {
+    !gate.writes_are_suppressed()
+}
+
 pub(crate) fn persist_main_window_state(
     window: &WebviewWindow,
     preserve_bounds_if_maximized: bool,
 ) {
-    if window
-        .app_handle()
-        .state::<UserDataPersistenceGate>()
-        .should_suppress_window_state()
-    {
+    let gate = window.app_handle().state::<UserDataPersistenceGate>();
+    if !should_persist_main_window_state(&gate) {
         return;
     }
 
@@ -177,4 +178,19 @@ pub(crate) fn restore_main_window_state(window: &WebviewWindow) {
     }
 
     let _ = write_saved_main_window_state(&window.app_handle(), &state);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{should_persist_main_window_state, UserDataPersistenceGate};
+
+    #[tokio::test]
+    async fn window_state_is_not_persisted_after_clear_starts() {
+        let gate = UserDataPersistenceGate::default();
+        assert!(should_persist_main_window_state(&gate));
+
+        let clear_guard = gate.begin_clear().await;
+        assert!(!should_persist_main_window_state(&gate));
+        drop(clear_guard);
+    }
 }
