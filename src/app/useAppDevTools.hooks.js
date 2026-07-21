@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DEV_TOOLS_STORAGE_KEY,
-  DEV_WINDOW_WIDTH_STORAGE_KEY
+  DEV_WINDOW_WIDTH_STORAGE_KEY,
+  isWindowsRuntime
 } from "./appRuntime.js";
-import { logAppError, logAppEvent } from "../services/logging/appLog.client.js";
+import {
+  logAppError,
+  logAppEvent,
+  setDebugLoggingEnabled
+} from "../services/logging/appLog.client.js";
 import {
   readSavedDevToolsEnabled as readPersistedDevToolsEnabled,
   writeSavedDevToolsEnabled
@@ -73,6 +78,19 @@ export function useAppDevTools({ isDesktopAddonScanAvailable, setStatusMessage }
     });
   }, [isDevToolsEnabled]);
 
+  useEffect(() => {
+    window.localStorage.setItem(DEV_TOOLS_STORAGE_KEY, isDevToolsEnabled ? "true" : "false");
+  }, [isDevToolsEnabled]);
+
+  useEffect(() => {
+    if (devWindowWidth === null) {
+      window.localStorage.removeItem(DEV_WINDOW_WIDTH_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(DEV_WINDOW_WIDTH_STORAGE_KEY, String(devWindowWidth));
+  }, [devWindowWidth]);
+
   function handleToggleDevTools() {
     const nextValue = !isDevToolsEnabled;
     setIsDevToolsEnabled(nextValue);
@@ -91,7 +109,7 @@ export function useAppDevTools({ isDesktopAddonScanAvailable, setStatusMessage }
     setIsDevWindowMenuOpen((current) => !current);
   }
 
-  function handleOpenDevContextMenu(event) {
+  const handleOpenDevContextMenu = useCallback((event) => {
     if (!isDevToolsEnabled || !isDesktopAddonScanAvailable) {
       setIsDevWindowMenuOpen(false);
       setIsDevContextMenuOpen(false);
@@ -104,12 +122,88 @@ export function useAppDevTools({ isDesktopAddonScanAvailable, setStatusMessage }
       x: Math.max(12, Math.min(event.clientX, Math.max(12, window.innerWidth - 236))),
       y: Math.max(12, Math.min(event.clientY, Math.max(12, window.innerHeight - 72)))
     });
-  }
+  }, [isDesktopAddonScanAvailable, isDevToolsEnabled]);
 
-  function handleCloseDevContextMenu() {
+  const handleCloseDevContextMenu = useCallback(() => {
     setIsDevWindowMenuOpen(false);
     setIsDevContextMenuOpen(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!isDevWindowMenuOpen && !isDevContextMenuOpen) {
+      return undefined;
+    }
+
+    function handlePointerDown(event) {
+      if (
+        !devWindowMenuRef.current?.contains(event.target) &&
+        !devContextMenuRef.current?.contains(event.target)
+      ) {
+        handleCloseDevContextMenu();
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        handleCloseDevContextMenu();
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [handleCloseDevContextMenu, isDevContextMenuOpen, isDevWindowMenuOpen]);
+
+  useEffect(() => {
+    // Dev mode swaps the browser's default right-click menu for a menu that can open Dev Tools.
+    function handleContextMenu(event) {
+      event.preventDefault();
+      handleOpenDevContextMenu(event);
+    }
+
+    window.addEventListener("contextmenu", handleContextMenu);
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu);
+    };
+  }, [handleOpenDevContextMenu]);
+
+  useEffect(() => {
+    if (!isDevToolsEnabled) {
+      handleCloseDevContextMenu();
+    }
+  }, [handleCloseDevContextMenu, isDevToolsEnabled]);
+
+  useEffect(() => {
+    if (!isDesktopAddonScanAvailable || !isWindowsRuntime()) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    // Keep the desktop window pinned above others while dev tools are enabled on Windows.
+    async function syncAlwaysOnTop() {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        if (!cancelled) {
+          await getCurrentWindow().setAlwaysOnTop(isDevToolsEnabled);
+        }
+      } catch (error) {
+        await logAppError("window-always-on-top-sync-failed", error);
+      }
+    }
+
+    void syncAlwaysOnTop();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDevToolsEnabled, isDesktopAddonScanAvailable]);
+
+  useEffect(() => {
+    setDebugLoggingEnabled(isDevToolsEnabled);
+  }, [isDevToolsEnabled]);
 
   async function handleOpenMainDevtools() {
     if (!isDesktopAddonScanAvailable || !isDevToolsEnabled) {

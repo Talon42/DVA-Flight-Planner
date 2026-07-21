@@ -9,11 +9,8 @@ import {
 } from "react";
 import AppShell from "./AppShell.jsx";
 import {
-  DEV_TOOLS_STORAGE_KEY,
-  DEV_WINDOW_WIDTH_STORAGE_KEY,
   THEME_STORAGE_KEY,
   isTauriRuntime,
-  isWindowsRuntime,
   readSavedTheme
 } from "./appRuntime.js";
 import {
@@ -69,7 +66,6 @@ import {
   logAppError,
   logAppEvent,
   getAppSessionId,
-  setDebugLoggingEnabled,
   openAppLogFile
 } from "../services/logging/appLog.client.js";
 import { writeGettingStartedState } from "../services/storage/storage.js";
@@ -203,8 +199,6 @@ export default function App() {
     devWindowWidthPresets,
     handleToggleDevTools,
     handleToggleDevWindowMenu,
-    handleOpenDevContextMenu,
-    handleCloseDevContextMenu,
     handleOpenMainDevtools,
     handleSelectDevWindowWidth
   } = appDevTools;
@@ -676,104 +670,6 @@ export default function App() {
     document.documentElement.style.colorScheme = theme;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
-
-  useEffect(() => {
-    window.localStorage.setItem(DEV_TOOLS_STORAGE_KEY, isDevToolsEnabled ? "true" : "false");
-  }, [isDevToolsEnabled]);
-
-  useEffect(() => {
-    if (devWindowWidth === null) {
-      window.localStorage.removeItem(DEV_WINDOW_WIDTH_STORAGE_KEY);
-      return;
-    }
-
-    window.localStorage.setItem(DEV_WINDOW_WIDTH_STORAGE_KEY, String(devWindowWidth));
-  }, [devWindowWidth]);
-
-  useEffect(() => {
-    if (!isDevWindowMenuOpen && !isDevContextMenuOpen) {
-      return undefined;
-    }
-
-    function handlePointerDown(event) {
-      if (
-        !devWindowMenuRef.current?.contains(event.target) &&
-        !devContextMenuRef.current?.contains(event.target)
-      ) {
-        handleCloseDevContextMenu();
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        handleCloseDevContextMenu();
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [
-    devContextMenuRef,
-    devWindowMenuRef,
-    handleCloseDevContextMenu,
-    isDevContextMenuOpen,
-    isDevWindowMenuOpen
-  ]);
-
-  useEffect(() => {
-    // Dev mode swaps the browser's default right-click menu for a menu that can open Dev Tools.
-    function handleContextMenu(event) {
-      event.preventDefault();
-      handleOpenDevContextMenu(event);
-    }
-
-    window.addEventListener("contextmenu", handleContextMenu);
-    return () => {
-      window.removeEventListener("contextmenu", handleContextMenu);
-    };
-  }, [handleOpenDevContextMenu]);
-
-  useEffect(() => {
-    if (!isDevToolsEnabled) {
-      handleCloseDevContextMenu();
-    }
-  }, [handleCloseDevContextMenu, isDevToolsEnabled]);
-
-  useEffect(() => {
-    if (!isDesktopAddonScanAvailable || !isWindowsRuntime()) {
-      return;
-    }
-
-    let cancelled = false;
-
-    // Keep the desktop window pinned above others while dev tools are enabled on Windows.
-    const syncAlwaysOnTop = async () => {
-      try {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        if (cancelled) {
-          return;
-        }
-
-        await getCurrentWindow().setAlwaysOnTop(isDevToolsEnabled);
-      } catch (error) {
-        await logAppError("window-always-on-top-sync-failed", error);
-      }
-    };
-
-    syncAlwaysOnTop();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isDevToolsEnabled, isDesktopAddonScanAvailable]);
-
-  useEffect(() => {
-    setDebugLoggingEnabled(isDevToolsEnabled);
-  }, [isDevToolsEnabled]);
 
   useEffect(() => {
     logAppEvent("start", {
