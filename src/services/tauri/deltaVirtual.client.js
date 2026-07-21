@@ -138,6 +138,8 @@ function buildSafeLogbookResult({ status = "missing", errorCode = null, error = 
     profileMetadata: null,
     entries: [],
     entryCount: 0,
+    acceptedEntryCount: 0,
+    rejectedEntryCount: 0,
     error: String(error || "").trim()
   };
 }
@@ -346,6 +348,9 @@ export async function readDeltaVirtualLogbook() {
       profileMetadata: result?.profileMetadata ?? result?.profile_metadata ?? null,
       entries,
       entryCount: Number(result?.entryCount ?? result?.entry_count ?? entries.length) || 0,
+      acceptedEntryCount:
+        Number(result?.acceptedEntryCount ?? result?.accepted_entry_count ?? entries.length) || 0,
+      rejectedEntryCount: Number(result?.rejectedEntryCount ?? result?.rejected_entry_count ?? 0) || 0,
       error: isInvalid ? SAFE_LOGBOOK_ERROR : String(result?.error || "").trim()
     };
   } catch {

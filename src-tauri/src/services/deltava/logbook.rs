@@ -8,6 +8,7 @@ use std::{
 use tauri::AppHandle;
 use tokio::io::AsyncWriteExt;
 
+use crate::models::deltava_logbook::DeltaLogbookEntry;
 use crate::services::deltava::sync_types::MAX_DELTAVA_LOGBOOK_JSON_BYTES;
 use crate::{append_sync_log, DELTAVA_LOGBOOK_FILE};
 
@@ -69,6 +70,49 @@ fn has_supported_logbook_root(value: &Value) -> bool {
         || SUPPORTED_LOGBOOK_ROOT_KEYS
             .iter()
             .any(|key| value.get(*key).is_some_and(Value::is_array))
+}
+
+fn has_non_empty_json_value(value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::String(text)) => !text.trim().is_empty(),
+        Some(Value::Number(_)) => true,
+        Some(Value::Object(_)) | Some(Value::Array(_)) => true,
+        _ => false,
+    }
+}
+
+// Matches the frontend's minimum useful-row gate before a value crosses the IPC boundary.
+fn is_useful_logbook_entry(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+
+    ["logbookId", "id", "flight", "flightNumber", "flightCode"]
+        .iter()
+        .any(|key| has_non_empty_json_value(object.get(*key)))
+        || ["airportD", "airportA"]
+            .iter()
+            .any(|key| has_non_empty_json_value(object.get(*key)))
+}
+
+// Validates and projects raw entries into the small frontend DTO; rejected rows are never serialized.
+pub(crate) fn validate_logbook_entries(value: &Value) -> (Vec<DeltaLogbookEntry>, usize) {
+    let mut accepted = Vec::new();
+    let mut rejected = 0;
+
+    for entry in normalize_logbook_entries(value) {
+        if !is_useful_logbook_entry(&entry) {
+            rejected += 1;
+            continue;
+        }
+
+        match serde_json::from_value::<DeltaLogbookEntry>(entry) {
+            Ok(entry) => accepted.push(entry),
+            Err(_) => rejected += 1,
+        }
+    }
+
+    (accepted, rejected)
 }
 
 // Derives the true latest DVA logbook date by scanning every supported entry shape instead of trusting array order.
@@ -280,10 +324,12 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
         }
     };
 
-    let entries = normalize_logbook_entries(&json)
-        .into_iter()
-        .filter(|entry| entry.is_object())
-        .collect::<Vec<_>>();
+    let (entries, rejected_entry_count) = validate_logbook_entries(&json);
+    append_sync_log(&format!(
+        "logbook:read-rows accepted={} rejected={}",
+        entries.len(),
+        rejected_entry_count
+    ));
     let last_sync_at = fs::metadata(&path)
         .ok()
         .and_then(|metadata| metadata.modified().ok())
@@ -297,6 +343,8 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
         last_sync_at,
         profile_metadata: crate::services::deltava::profile_cache::read(app),
         entry_count: entries.len(),
+        accepted_entry_count: entries.len(),
+        rejected_entry_count,
         entries,
     }
 }
@@ -316,6 +364,8 @@ fn empty_logbook_cache(
         profile_metadata: crate::services::deltava::profile_cache::read(app),
         entries: Vec::new(),
         entry_count: 0,
+        accepted_entry_count: 0,
+        rejected_entry_count: 0,
     }
 }
 
@@ -353,6 +403,23 @@ mod tests {
         assert_eq!(normalize_logbook_entries(&logbook).len(), 1);
         assert_eq!(normalize_logbook_entries(&data).len(), 1);
         assert!(normalize_logbook_entries(&json!({ "logbookId": 6, "status": "OK" })).is_empty());
+    }
+
+    #[test]
+    fn fixture_projects_only_valid_frontend_rows_and_reports_rejections() {
+        let document: Value = serde_json::from_str(include_str!(
+            "../../../../test-fixtures/deltava/logbook-boundary.json"
+        ))
+        .expect("boundary fixture");
+
+        let (entries, rejected) = validate_logbook_entries(&document);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(rejected, 2);
+
+        let serialized = serde_json::to_value(&entries).expect("serialized DTO entries");
+        assert_eq!(serialized.as_array().map(Vec::len), Some(2));
+        assert!(serialized.to_string().contains("logbookId"));
+        assert!(!serialized.to_string().contains("profile"));
     }
 
     #[test]

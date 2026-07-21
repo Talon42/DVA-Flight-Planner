@@ -1,0 +1,29 @@
+[
+  {
+    "logbookId": 11384,
+    "status": "APPROVED",
+    "date": { "y": 2026, "m": 5, "d": 30 },
+    "airline": "DVA",
+    "flight": "101",
+    "airportD": { "icao": "KJFK", "iata": "JFK", "name": "John F Kennedy" },
+    "airportA": { "icao": "KATL", "iata": "ATL", "name": "Atlanta" },
+    "eqType": "B738",
+    "duration": 7200000,
+    "blockTime": 7200000,
+    "airborneTime": 6000000,
+    "distance": 500,
+    "landing": { "vSpeed": -250 },
+    "pax": 120,
+    "aircraft": { "icao": "B738", "name": "Boeing 737-800" }
+  },
+  {
+    "id": "submitted-1",
+    "status": "SUBMITTED",
+    "flightNumber": "202",
+    "airportD": { "icao": "KATL" },
+    "airportA": { "icao": "KJFK" },
+    "blockTime": "01:30:00"
+  },
+  { "profile": { "displayName": "Unrelated" } },
+  "not-a-row"
+]

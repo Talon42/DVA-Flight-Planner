@@ -63,7 +63,9 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
     lastSyncAt: null,
     profileMetadata: null,
     entries: [],
-    entryCount: 0
+    entryCount: 0,
+    acceptedEntryCount: 0,
+    rejectedEntryCount: 0
   });
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -169,7 +171,10 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
           lastSyncAt: nextResult?.lastSyncAt ?? null,
           profileMetadata: nextResult?.profileMetadata ?? null,
           entries: nextEntries,
-          entryCount: Number(nextResult?.entryCount ?? nextEntries.length) || 0
+          entryCount: Number(nextResult?.entryCount ?? nextEntries.length) || 0,
+          acceptedEntryCount:
+            Number(nextResult?.acceptedEntryCount ?? nextEntries.length) || 0,
+          rejectedEntryCount: Number(nextResult?.rejectedEntryCount ?? 0) || 0
         };
       });
       setLoadError(nextError);
@@ -258,7 +263,9 @@ export function useLogbook({ persistedUiState = null, reloadVersion = 0 } = {}) 
       lastSyncAt: null,
       profileMetadata: null,
       entries: [],
-      entryCount: 0
+      entryCount: 0,
+      acceptedEntryCount: 0,
+      rejectedEntryCount: 0
     });
     setBackendStatus("missing");
     setSelectedRowId(null);

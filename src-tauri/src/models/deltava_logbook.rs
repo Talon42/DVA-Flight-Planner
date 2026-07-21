@@ -35,6 +35,111 @@ pub(crate) struct DeltaLogbookPilotProfileMetadata {
     pub fetched_at_utc: Option<String>,
 }
 
+/// Validated logbook row fields consumed by the frontend normalizer and detail card.
+/// Values stay unformatted so the domain layer remains the owner of display shaping.
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DeltaLogbookEntry {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logbook_id: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub date: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub airline: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub airline_code: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub airline_iata: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flight: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flight_number: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flight_no: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flight_code: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub airport_d: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub airport_a: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub eq_type: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aircraft: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulator: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sim: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fdr: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fdr_source: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub leg: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tail_code: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tail_number: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ac_code: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aircraft_code: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block_time: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub airborne_time: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub distance: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landing: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub takeoff: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_fuel: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub takeoff_fuel: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub takeoff_weight: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub takeoff_speed: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landing_fuel: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landing_weight: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landing_speed: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avg_frame_rate: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pax: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submitted_on: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disposed_on: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taxi_time: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub takeoff_time: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landing_time: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_time: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_time_result: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_time: Option<Value>,
+}
+
 /// Returns the cached Delta Virtual logbook document in a frontend-safe shape.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,6 +150,8 @@ pub(crate) struct DeltaLogbookCachePayload {
     pub date_iso: Option<String>,
     pub last_sync_at: Option<String>,
     pub profile_metadata: Option<DeltaLogbookPilotProfileMetadata>,
-    pub entries: Vec<Value>,
+    pub entries: Vec<DeltaLogbookEntry>,
     pub entry_count: usize,
+    pub accepted_entry_count: usize,
+    pub rejected_entry_count: usize,
 }
