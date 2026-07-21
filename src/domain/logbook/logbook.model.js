@@ -114,37 +114,58 @@ function buildDateSortKey(entry) {
   return parts.year * 10_000 + parts.month * 100 + parts.day;
 }
 
-function parseDurationMinutes(value) {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return null;
-    }
-
-    if (/^\d+:\d{2}(:\d{2})?$/.test(trimmed)) {
-      const parts = trimmed.split(":").map((part) => Number(part));
-      if (parts.length === 2) {
-        return parts[0] * 60 + parts[1];
-      }
-
-      return Math.round(parts[0] * 60 + parts[1] + parts[2] / 60);
-    }
-  }
-
-  const numeric = toNumber(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) {
+function parseClockDurationMinutes(value) {
+  const trimmed = normalizeText(value);
+  const match = /^(\d+):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
+  if (!match) {
     return null;
   }
 
-  if (numeric >= 100_000) {
-    return Math.round(numeric / 60_000);
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = match[3] === undefined ? 0 : Number(match[3]);
+  if (minutes > 59 || seconds > 59) {
+    return null;
   }
 
-  if (numeric >= 1_000) {
-    return Math.round(numeric / 60);
+  return hours * 60 + minutes + Math.round(seconds / 60);
+}
+
+function parseNumericDurationMinutes(value, divisor) {
+  const numeric = toNumber(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return null;
   }
 
-  return Math.round(numeric);
+  return Math.round(numeric / divisor);
+}
+
+// DVA exports overall duration in milliseconds; clock strings remain unit-explicit.
+export function parseLogbookDurationMinutes(value) {
+  if (typeof value === "string") {
+    const clockMinutes = parseClockDurationMinutes(value);
+    if (clockMinutes !== null) {
+      return clockMinutes;
+    }
+  }
+
+  return parseNumericDurationMinutes(value, 60_000);
+}
+
+// DVA exports block and airborne numeric values in seconds; clock strings are HH:MM or HH:MM:SS.
+export function parseLogbookBlockTimeMinutes(value) {
+  if (typeof value === "string") {
+    const clockMinutes = parseClockDurationMinutes(value);
+    if (clockMinutes !== null) {
+      return clockMinutes;
+    }
+  }
+
+  return parseNumericDurationMinutes(value, 60);
+}
+
+export function parseLogbookAirborneTimeMinutes(value) {
+  return parseLogbookBlockTimeMinutes(value);
 }
 
 function formatMinutes(value) {
@@ -183,7 +204,15 @@ function formatSignedAviationNumber(value, unit, options = {}) {
 }
 
 export function formatLogbookDuration(value) {
-  return formatMinutes(parseDurationMinutes(value));
+  return formatMinutes(parseLogbookDurationMinutes(value));
+}
+
+export function formatLogbookBlockTime(value) {
+  return formatMinutes(parseLogbookBlockTimeMinutes(value));
+}
+
+export function formatLogbookAirborneTime(value) {
+  return formatMinutes(parseLogbookAirborneTimeMinutes(value));
 }
 
 export function formatLogbookTimestamp(value) {
@@ -430,8 +459,8 @@ function buildDetailGroups(entry, normalizedRow) {
       buildDetailItem("Landing Time", formatTimestamp(readNestedValue(entry.landingTime, entry?.landing?.time))),
       buildDetailItem("End Time", formatTimestamp(readNestedValue(entry.endTime, entry?.end?.time))),
       buildDetailItem("Duration", normalizedRow.durationDisplay, { showEmpty: true }),
-      buildDetailItem("Block Time", formatMinutes(parseDurationMinutes(entry.blockTime))),
-      buildDetailItem("Airborne Time", formatMinutes(parseDurationMinutes(entry.airborneTime)))
+      buildDetailItem("Block Time", formatLogbookBlockTime(entry.blockTime)),
+      buildDetailItem("Airborne Time", formatLogbookAirborneTime(entry.airborneTime))
     ].filter(Boolean),
     performance: [
       buildDetailItem("Distance", normalizedRow.distanceDisplay, { showEmpty: true }),
@@ -524,9 +553,12 @@ export function normalizeLogbookRows(entries) {
       airlineIata: airlineCode,
       airlineIcao: airlineCode
     });
-    const durationMinutes = parseDurationMinutes(entry.duration) ?? parseDurationMinutes(entry.blockTime);
-    const blockTimeMinutes = parseDurationMinutes(entry.blockTime);
-    const airborneMinutes = parseDurationMinutes(entry.airborneTime);
+    const hasDurationValue = entry.duration !== undefined && entry.duration !== null && normalizeText(entry.duration) !== "";
+    const durationMinutes = hasDurationValue
+      ? parseLogbookDurationMinutes(entry.duration)
+      : parseLogbookBlockTimeMinutes(entry.blockTime);
+    const blockTimeMinutes = parseLogbookBlockTimeMinutes(entry.blockTime);
+    const airborneMinutes = parseLogbookAirborneTimeMinutes(entry.airborneTime);
     const distanceNm = toNumber(entry.distance);
     const landingRate = toNumber(entry?.landing?.vSpeed);
     const row = {

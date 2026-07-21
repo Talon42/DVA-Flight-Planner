@@ -1,0 +1,27 @@
+{
+  "contract": {
+    "duration": "milliseconds",
+    "blockTime": "seconds",
+    "airborneTime": "seconds",
+    "clockStrings": ["HH:MM", "HH:MM:SS"]
+  },
+  "cases": [
+    { "field": "duration", "raw": 0, "minutes": 0 },
+    { "field": "duration", "raw": 60000, "minutes": 1 },
+    { "field": "duration", "raw": 3600000, "minutes": 60 },
+    { "field": "duration", "raw": 3599999, "minutes": 60 },
+    { "field": "duration", "raw": "01:30", "minutes": 90 },
+    { "field": "duration", "raw": "01:30:30", "minutes": 91 },
+    { "field": "duration", "raw": "not-a-duration", "minutes": null },
+    { "field": "duration", "raw": -1, "minutes": null },
+    { "field": "blockTime", "raw": 0, "minutes": 0 },
+    { "field": "blockTime", "raw": 60, "minutes": 1 },
+    { "field": "blockTime", "raw": 7200, "minutes": 120 },
+    { "field": "blockTime", "raw": "02:00", "minutes": 120 },
+    { "field": "blockTime", "raw": "02:00:30", "minutes": 121 },
+    { "field": "blockTime", "raw": "02:60", "minutes": null },
+    { "field": "airborneTime", "raw": 3600, "minutes": 60 },
+    { "field": "airborneTime", "raw": "00:45:30", "minutes": 46 },
+    { "field": "airborneTime", "raw": {}, "minutes": null }
+  ]
+}

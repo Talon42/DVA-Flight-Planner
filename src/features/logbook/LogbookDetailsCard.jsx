@@ -4,7 +4,8 @@ import { bodyMdTextClassName, bodySmTextClassName, labelTextClassName } from "..
 import {
   LOGBOOK_EMPTY_VALUE,
   formatLogbookAviationNumber,
-  formatLogbookDuration,
+  formatLogbookAirborneTime,
+  formatLogbookBlockTime,
   formatLogbookSignedAviationNumber,
   formatLogbookTimestamp
 } from "../../domain/logbook/logbook.model.js";
@@ -196,8 +197,8 @@ export default function LogbookDetailsCard({
   });
 
   const summaryItems = [
-    { label: "Flight Time", value: formatLogbookDuration(entry.airborneTime) },
-    { label: "Total Time", value: formatLogbookDuration(entry.blockTime) },
+    { label: "Flight Time", value: formatLogbookAirborneTime(entry.airborneTime) },
+    { label: "Total Time", value: formatLogbookBlockTime(entry.blockTime) },
     { label: "Distance", value: selectedLogbookFlight.distanceDisplay, title: selectedLogbookFlight.distanceDisplay },
     { label: "Passengers", value: formatLogbookAviationNumber(selectedLogbookFlight.passengerCount, "") },
     { label: "Cargo", value: formatWebOnlyDetailValue(payloadCargoValue) },
