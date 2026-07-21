@@ -331,12 +331,11 @@ fn parse_pirep_detail_html(html_text: &str) -> ParsedPirepDetails {
     parsed
 }
 
-fn build_result_from_html(
+fn build_result_from_parsed(
     source_url: String,
     numeric_id: u64,
-    html_text: &str,
+    parsed: ParsedPirepDetails,
 ) -> Result<DeltaVirtualPirepDetailsResult, String> {
-    let parsed = parse_pirep_detail_html(html_text);
     let route_summary = build_route_summary(
         &parsed.departure_route,
         &parsed.flight_route,
@@ -439,7 +438,7 @@ pub async fn fetch_delta_virtual_pirep_details(
 
     let parsed = parse_pirep_detail_html(&html_text);
     log_parse_summary(&parsed);
-    build_result_from_html(source_url, numeric_id, &html_text)
+    build_result_from_parsed(source_url, numeric_id, parsed)
 }
 
 #[cfg(test)]
@@ -605,10 +604,10 @@ mod tests {
 
     #[test]
     fn auth_page_is_not_required_for_parsing() {
-        let result = build_result_from_html(
+        let result = build_result_from_parsed(
             "https://www.deltava.org/pirep.do?id=0x1d2a91".to_string(),
             1911377,
-            SAMPLE_HTML,
+            parse_pirep_detail_html(SAMPLE_HTML),
         )
         .expect("sample html should parse");
 
