@@ -13,6 +13,12 @@ pub(crate) const DELTAVA_LOGBOOK_FILE: &str = "logbook.json";
 pub(crate) const DELTAVA_LOGBOOK_PROFILE_FILE: &str = "dva-logbook-profile.json";
 pub(crate) const DELTAVA_LOGBOOK_FALLBACK_FILE: &str = "dva-logbook.json";
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ExistingLogbookJsonPath {
+    Canonical(PathBuf),
+    Legacy(PathBuf),
+}
+
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
         .path()
@@ -111,37 +117,27 @@ pub(crate) fn build_accomplishment_eligibility_path(app: &AppHandle) -> Result<P
     Ok(accomplishments_dir.join("accomplishment-eligibility.json"))
 }
 
-pub(crate) fn resolve_existing_logbook_json_path(app: &AppHandle) -> Option<PathBuf> {
-    let logbook_dir = build_logbook_dir(app).ok()?;
+pub(crate) fn resolve_logbook_json_path_in_dir(
+    logbook_dir: &Path,
+) -> Option<ExistingLogbookJsonPath> {
     let canonical_path = logbook_dir.join(DELTAVA_LOGBOOK_FILE);
     if canonical_path.is_file() {
-        return Some(canonical_path);
+        return Some(ExistingLogbookJsonPath::Canonical(canonical_path));
     }
 
     let fallback_path = logbook_dir.join(DELTAVA_LOGBOOK_FALLBACK_FILE);
     if fallback_path.is_file() {
-        return Some(fallback_path);
+        return Some(ExistingLogbookJsonPath::Legacy(fallback_path));
     }
 
-    fs::read_dir(logbook_dir)
-        .ok()?
-        .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            let is_json = path
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .map(|extension| extension.eq_ignore_ascii_case("json"))
-                .unwrap_or(false);
-            if !path.is_file() || !is_json {
-                return None;
-            }
+    None
+}
 
-            let modified = entry.metadata().ok()?.modified().ok()?;
-            Some((modified, path))
-        })
-        .max_by_key(|(modified, _)| *modified)
-        .map(|(_, path)| path)
+pub(crate) fn resolve_existing_logbook_json_path(
+    app: &AppHandle,
+) -> Option<ExistingLogbookJsonPath> {
+    let logbook_dir = build_logbook_dir(app).ok()?;
+    resolve_logbook_json_path_in_dir(&logbook_dir)
 }
 
 pub(crate) fn build_webview_data_directory(app: &AppHandle) -> Result<PathBuf, String> {
@@ -149,4 +145,46 @@ pub(crate) fn build_webview_data_directory(app: &AppHandle) -> Result<PathBuf, S
     fs::create_dir_all(&data_dir)
         .map_err(|error| format!("download_failed: Unable to create webview data path: {error}"))?;
     Ok(data_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_test_dir() -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        std::env::temp_dir().join(format!("flight-planner-paths-test-{stamp}"))
+    }
+
+    #[test]
+    fn resolves_only_canonical_and_exact_legacy_logbook_files() {
+        let directory = unique_test_dir();
+        std::fs::create_dir_all(&directory).expect("test dir");
+
+        std::fs::write(directory.join(DELTAVA_LOGBOOK_PROFILE_FILE), "{}").expect("profile");
+        assert_eq!(resolve_logbook_json_path_in_dir(&directory), None);
+
+        std::fs::write(directory.join("unrelated.json"), "[]").expect("unrelated");
+        assert_eq!(resolve_logbook_json_path_in_dir(&directory), None);
+
+        let legacy = directory.join(DELTAVA_LOGBOOK_FALLBACK_FILE);
+        std::fs::write(&legacy, "[]").expect("legacy");
+        assert_eq!(
+            resolve_logbook_json_path_in_dir(&directory),
+            Some(ExistingLogbookJsonPath::Legacy(legacy))
+        );
+
+        let canonical = directory.join(DELTAVA_LOGBOOK_FILE);
+        std::fs::write(&canonical, "[]").expect("canonical");
+        assert_eq!(
+            resolve_logbook_json_path_in_dir(&directory),
+            Some(ExistingLogbookJsonPath::Canonical(canonical))
+        );
+
+        let _ = std::fs::remove_dir_all(&directory);
+    }
 }

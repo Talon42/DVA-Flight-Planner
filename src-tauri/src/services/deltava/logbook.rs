@@ -8,8 +8,17 @@ use std::{
 use tauri::AppHandle;
 use tokio::io::AsyncWriteExt;
 
-use crate::{append_sync_log, DELTAVA_LOGBOOK_FILE};
 use crate::services::deltava::sync_types::MAX_DELTAVA_LOGBOOK_JSON_BYTES;
+use crate::{append_sync_log, DELTAVA_LOGBOOK_FILE};
+
+const SUPPORTED_LOGBOOK_ROOT_KEYS: [&str; 4] = ["entries", "flights", "logbook", "data"];
+
+#[derive(Debug)]
+pub(crate) enum LogbookArtifactRead {
+    Missing,
+    Invalid { path: PathBuf, reason: String },
+    Valid { path: PathBuf, document: Value },
+}
 
 fn get_json_field_i32(value: &Value, key: &str) -> Option<i32> {
     value
@@ -46,24 +55,20 @@ pub(crate) fn normalize_logbook_entries(value: &Value) -> Vec<Value> {
         return entries.to_vec();
     }
 
-    for key in ["entries", "flights", "logbook", "data"] {
+    for key in SUPPORTED_LOGBOOK_ROOT_KEYS {
         if let Some(entries) = value.get(key).and_then(Value::as_array) {
             return entries.to_vec();
         }
-
-        if let Some(nested) = value.get(key) {
-            let nested_entries = normalize_logbook_entries(nested);
-            if !nested_entries.is_empty() {
-                return nested_entries;
-            }
-        }
-    }
-
-    if value.is_object() {
-        return vec![value.clone()];
     }
 
     Vec::new()
+}
+
+fn has_supported_logbook_root(value: &Value) -> bool {
+    value.is_array()
+        || SUPPORTED_LOGBOOK_ROOT_KEYS
+            .iter()
+            .any(|key| value.get(*key).is_some_and(Value::is_array))
 }
 
 // Derives the true latest DVA logbook date by scanning every supported entry shape instead of trusting array order.
@@ -84,9 +89,44 @@ fn system_time_to_iso(value: SystemTime) -> Option<String> {
     Some(date_time.to_rfc3339())
 }
 
-fn read_logbook_document(path: &Path) -> Option<Value> {
-    let text = fs::read_to_string(path).ok()?;
-    serde_json::from_str::<Value>(&text).ok()
+// Reads only the canonical or exact legacy artifact and rejects profile/unrelated JSON shapes.
+pub(crate) fn read_logbook_artifact(app: &AppHandle) -> LogbookArtifactRead {
+    let Some(path_kind) = crate::app::paths::resolve_existing_logbook_json_path(app) else {
+        return LogbookArtifactRead::Missing;
+    };
+    let path = match path_kind {
+        crate::app::paths::ExistingLogbookJsonPath::Canonical(path)
+        | crate::app::paths::ExistingLogbookJsonPath::Legacy(path) => path,
+    };
+    read_logbook_artifact_from_path(path)
+}
+
+fn read_logbook_artifact_from_path(path: PathBuf) -> LogbookArtifactRead {
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) => {
+            return LogbookArtifactRead::Invalid {
+                path,
+                reason: format!("unable to read artifact: {error}"),
+            };
+        }
+    };
+    let document = match serde_json::from_str::<Value>(&text) {
+        Ok(document) => document,
+        Err(error) => {
+            return LogbookArtifactRead::Invalid {
+                path,
+                reason: format!("invalid JSON: {error}"),
+            };
+        }
+    };
+    if !has_supported_logbook_root(&document) {
+        return LogbookArtifactRead::Invalid {
+            path,
+            reason: "root does not contain a supported logbook collection".into(),
+        };
+    }
+    LogbookArtifactRead::Valid { path, document }
 }
 
 fn collect_json_paths(logbook_dir: &Path) -> Vec<PathBuf> {
@@ -128,7 +168,10 @@ pub(crate) fn remove_stale_logbook_json_files(logbook_dir: &Path) {
         }
 
         if let Err(error) = fs::remove_file(&path) {
-            append_sync_log(&format!("logbook:cleanup-skip {} ({error})", path.display()));
+            append_sync_log(&format!(
+                "logbook:cleanup-skip {} ({error})",
+                path.display()
+            ));
         } else {
             append_sync_log(&format!("logbook:cleanup-remove {}", path.display()));
         }
@@ -187,9 +230,11 @@ async fn store_logbook_json_in_dir(
     let final_exists = final_path.exists();
     if final_exists {
         let _ = tokio::fs::remove_file(&backup_path).await;
-        tokio::fs::rename(&final_path, &backup_path).await.map_err(|error| {
-            format!("download_failed: Unable to preserve the existing logbook JSON: {error}")
-        })?;
+        tokio::fs::rename(&final_path, &backup_path)
+            .await
+            .map_err(|error| {
+                format!("download_failed: Unable to preserve the existing logbook JSON: {error}")
+            })?;
     }
 
     if simulate_final_rename_failure {
@@ -197,7 +242,10 @@ async fn store_logbook_json_in_dir(
         if final_exists {
             let _ = tokio::fs::rename(&backup_path, &final_path).await;
         }
-        return Err("download_failed: Unable to store logbook JSON: simulated final replacement failure.".into());
+        return Err(
+            "download_failed: Unable to store logbook JSON: simulated final replacement failure."
+                .into(),
+        );
     }
 
     if let Err(error) = tokio::fs::rename(&temp_path, &final_path).await {
@@ -205,7 +253,9 @@ async fn store_logbook_json_in_dir(
             let _ = tokio::fs::rename(&backup_path, &final_path).await;
         }
         let _ = tokio::fs::remove_file(&temp_path).await;
-        return Err(format!("download_failed: Unable to store logbook JSON: {error}"));
+        return Err(format!(
+            "download_failed: Unable to store logbook JSON: {error}"
+        ));
     }
 
     if tokio::fs::metadata(&final_path).await.is_err() {
@@ -241,25 +291,17 @@ pub(crate) async fn store_logbook_json(
 }
 
 pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCachePayload {
-    let Some(path) = crate::app::paths::resolve_existing_logbook_json_path(app) else {
-        return crate::DeltaLogbookCachePayload {
-            date_iso: None,
-            last_sync_at: None,
-            profile_metadata: crate::services::deltava::profile_cache::read(app),
-            entries: Vec::new(),
-            entry_count: 0,
-        };
-    };
-
-    let Some(json) = read_logbook_document(&path) else {
-        append_sync_log(&format!("logbook:read-invalid {}", path.display()));
-        return crate::DeltaLogbookCachePayload {
-            date_iso: None,
-            last_sync_at: None,
-            profile_metadata: crate::services::deltava::profile_cache::read(app),
-            entries: Vec::new(),
-            entry_count: 0,
-        };
+    let artifact = read_logbook_artifact(app);
+    let (path, json) = match artifact {
+        LogbookArtifactRead::Valid { path, document } => (path, document),
+        LogbookArtifactRead::Missing => return empty_logbook_cache(app),
+        LogbookArtifactRead::Invalid { path, reason } => {
+            append_sync_log(&format!(
+                "logbook:read-invalid {} ({reason})",
+                path.display()
+            ));
+            return empty_logbook_cache(app);
+        }
     };
 
     let entries = normalize_logbook_entries(&json)
@@ -277,6 +319,16 @@ pub(crate) fn read_deltava_logbook(app: &AppHandle) -> crate::DeltaLogbookCacheP
         profile_metadata: crate::services::deltava::profile_cache::read(app),
         entry_count: entries.len(),
         entries,
+    }
+}
+
+fn empty_logbook_cache(app: &AppHandle) -> crate::DeltaLogbookCachePayload {
+    crate::DeltaLogbookCachePayload {
+        date_iso: None,
+        last_sync_at: None,
+        profile_metadata: crate::services::deltava::profile_cache::read(app),
+        entries: Vec::new(),
+        entry_count: 0,
     }
 }
 
@@ -307,14 +359,52 @@ mod tests {
         let flights = json!({ "flights": [{ "logbookId": 3 }] });
         let logbook = json!({ "logbook": [{ "logbookId": 4 }] });
         let data = json!({ "data": [{ "logbookId": 5 }] });
-        let single = json!({ "logbookId": 6, "status": "OK" });
 
         assert_eq!(normalize_logbook_entries(&direct).len(), 1);
         assert_eq!(normalize_logbook_entries(&entries).len(), 1);
         assert_eq!(normalize_logbook_entries(&flights).len(), 1);
         assert_eq!(normalize_logbook_entries(&logbook).len(), 1);
         assert_eq!(normalize_logbook_entries(&data).len(), 1);
-        assert_eq!(normalize_logbook_entries(&single).len(), 1);
+        assert!(normalize_logbook_entries(&json!({ "logbookId": 6, "status": "OK" })).is_empty());
+    }
+
+    #[test]
+    fn artifact_validation_rejects_malformed_and_unrelated_objects() {
+        let directory = unique_test_dir();
+        std::fs::create_dir_all(&directory).expect("test dir");
+        let malformed = directory.join(DELTAVA_LOGBOOK_FILE);
+        std::fs::write(&malformed, "{not-json}").expect("malformed file");
+        assert!(matches!(
+            read_logbook_artifact_from_path(malformed),
+            LogbookArtifactRead::Invalid { .. }
+        ));
+
+        let unrelated = directory.join(DELTAVA_LOGBOOK_FILE);
+        std::fs::write(&unrelated, r#"{"profile":{"name":"Pilot"}}"#).expect("unrelated file");
+        assert!(matches!(
+            read_logbook_artifact_from_path(unrelated),
+            LogbookArtifactRead::Invalid { .. }
+        ));
+
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn artifact_validation_accepts_array_and_root_collection_exports() {
+        for (name, text) in [
+            ("array.json", r#"[{"logbookId":1}]"#),
+            ("root.json", r#"{"flights":[{"logbookId":2}]}"#),
+        ] {
+            let directory = unique_test_dir();
+            std::fs::create_dir_all(&directory).expect("test dir");
+            let path = directory.join(name);
+            std::fs::write(&path, text).expect("export file");
+            assert!(matches!(
+                read_logbook_artifact_from_path(path),
+                LogbookArtifactRead::Valid { .. }
+            ));
+            let _ = std::fs::remove_dir_all(&directory);
+        }
     }
 
     #[test]
@@ -359,11 +449,16 @@ mod tests {
         })
         .to_string();
 
-        let artifact = run_async(store_logbook_json_in_dir(&logbook_dir, &json_text, None, false))
-            .expect("store logbook");
+        let artifact = run_async(store_logbook_json_in_dir(
+            &logbook_dir,
+            &json_text,
+            None,
+            false,
+        ))
+        .expect("store logbook");
 
-        let stored_text = std::fs::read_to_string(logbook_dir.join(DELTAVA_LOGBOOK_FILE))
-            .expect("stored file");
+        let stored_text =
+            std::fs::read_to_string(logbook_dir.join(DELTAVA_LOGBOOK_FILE)).expect("stored file");
         assert_eq!(stored_text, json_text);
         assert_eq!(artifact.file_name, DELTAVA_LOGBOOK_FILE);
         assert_eq!(artifact.bytes, json_text.len());
@@ -379,8 +474,13 @@ mod tests {
             "a".repeat(MAX_DELTAVA_LOGBOOK_JSON_BYTES + 1)
         );
 
-        let error = run_async(store_logbook_json_in_dir(&logbook_dir, &oversized, None, false))
-            .expect_err("oversized payload");
+        let error = run_async(store_logbook_json_in_dir(
+            &logbook_dir,
+            &oversized,
+            None,
+            false,
+        ))
+        .expect_err("oversized payload");
 
         assert!(error.contains("exceeded"));
         assert!(!logbook_dir.join(DELTAVA_LOGBOOK_FILE).exists());
