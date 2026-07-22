@@ -238,7 +238,7 @@ export default function ScheduleTablePanel({
           inert={scheduleView === "map" ? undefined : ""}
           className={cn(
             "absolute inset-0 flex min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4",
-            scheduleView !== "map" && "invisible pointer-events-none"
+            scheduleView === "map" ? "opacity-100" : "pointer-events-none opacity-0"
           )}
         >
           <FlightMapPanel
