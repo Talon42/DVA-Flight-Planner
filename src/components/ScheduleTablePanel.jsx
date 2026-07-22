@@ -232,8 +232,29 @@ export default function ScheduleTablePanel({
         </div>
       ) : null}
 
-      <div className={cn("min-h-0 flex-1")}>
-        {scheduleView === "accomplishments" ? (
+      <div className={cn("relative min-h-0 flex-1")}>
+        <div
+          aria-hidden={scheduleView !== "map"}
+          inert={scheduleView === "map" ? undefined : ""}
+          className={cn(
+            "absolute inset-0 flex min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4",
+            scheduleView !== "map" && "invisible pointer-events-none"
+          )}
+        >
+          <FlightMapPanel
+            theme={theme}
+            activeFlightBoardEntries={activeFlightBoardEntries}
+            expandedBoardFlightId={expandedBoardFlightId}
+            vatsimNetwork={vatsimNetwork}
+            initialFlightPathViewMode={pendingMapFlightPathViewMode || "all"}
+            initialFitToRoute={pendingMapFitToRoute}
+            onConsumeInitialFitToRoute={onConsumePendingMapFitToRoute}
+            mapOptions={mapOptions}
+            setMapOptions={setMapOptions}
+          />
+        </div>
+
+        {scheduleView === "map" ? null : scheduleView === "accomplishments" ? (
           <div className="flex h-full min-h-0 px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
             <AccomplishmentsPanel
               accomplishment={selectedAccomplishment}
@@ -283,20 +304,6 @@ export default function ScheduleTablePanel({
               </div>
             </div>
           )
-        ) : scheduleView === "map" ? (
-          <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
-            <FlightMapPanel
-              theme={theme}
-              activeFlightBoardEntries={activeFlightBoardEntries}
-              expandedBoardFlightId={expandedBoardFlightId}
-              vatsimNetwork={vatsimNetwork}
-              initialFlightPathViewMode={pendingMapFlightPathViewMode || "all"}
-              initialFitToRoute={pendingMapFitToRoute}
-              onConsumeInitialFitToRoute={onConsumePendingMapFitToRoute}
-              mapOptions={mapOptions}
-              setMapOptions={setMapOptions}
-            />
-          </div>
         ) : scheduleView === "logbook" ? (
           <div className="flex h-full min-h-0 w-full min-w-0 px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">
             <LogbookPanel {...logbookProps} />
