@@ -19,6 +19,7 @@ import {
 import { useAppBootstrap } from "./useAppBootstrap.hooks.js";
 import { useAppUiStatePersistence } from "./useAppUiStatePersistence.hooks.js";
 import { useExternalFlightActions } from "./useExternalFlightActions.hooks.js";
+import { useFlightActivation } from "./useFlightActivation.hooks.js";
 import { useAddonAirports } from "../features/addons/useAddonAirports.hooks.js";
 import { useAppModals } from "./useAppModals.hooks.js";
 import { useAppConfirmations } from "./useAppConfirmations.hooks.js";
@@ -552,26 +553,13 @@ export default function App() {
     setSelectedAirportInfo(null);
   }, []);
 
-  const handleActivateRow = useCallback(
-    (row) => {
-      const didAddRow = handleAddToFlightBoard(row);
-
-      // Collapse the active selector panel only after a successful add so duplicate clicks do not hide context.
-      if (didAddRow) {
-        if (scheduleView === "accomplishments") {
-          setIsAccomplishmentSelectorCollapsed(true);
-        } else if (scheduleView === "tours") {
-          setIsTourSelectorCollapsed(true);
-        }
-      }
-    },
-    [
-      handleAddToFlightBoard,
-      scheduleView,
-      setIsAccomplishmentSelectorCollapsed,
-      setIsTourSelectorCollapsed
-    ]
-  );
+  const handleActivateRow = useFlightActivation({
+    handleAddToFlightBoard,
+    scheduleView,
+    setIsAccomplishmentSelectorCollapsed,
+    setIsTourSelectorCollapsed,
+    setPlannerControlsCollapsed
+  });
   useEffect(() => {
     // Accomplishments should always open expanded when the tab becomes active.
     if (scheduleView === "accomplishments") {

@@ -6,19 +6,6 @@ name = "Flight Planner App"
 script = ""
 
 [[actions]]
-name = "Clean Build"
-icon = "run"
-command = '''
-Remove-Item -Recurse -Force .\dist -ErrorAction SilentlyContinue
-npm ci
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-npm run validate
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-npm run tauri -- build
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-'''
-
-[[actions]]
 name = "Dev App"
 icon = "run"
 command = "npm run tauri dev"
