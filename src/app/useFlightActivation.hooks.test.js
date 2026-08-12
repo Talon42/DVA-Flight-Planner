@@ -25,12 +25,12 @@ describe("useFlightActivation", () => {
     expect(setPlannerControlsCollapsed).toHaveBeenCalledWith(true);
   });
 
-  it("keeps Basic Filters open when the flight is not added", () => {
+  it("collapses Basic Filters independently of the add result", () => {
     const { result, setPlannerControlsCollapsed } = renderFlightActivation({ didAddRow: false });
 
     act(() => result.current({ flightId: "flight-1" }));
 
-    expect(setPlannerControlsCollapsed).not.toHaveBeenCalled();
+    expect(setPlannerControlsCollapsed).toHaveBeenCalledWith(true);
   });
 
   it.each([

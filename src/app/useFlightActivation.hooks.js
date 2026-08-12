@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-// Coordinates the successful double-click add with the panel that should reveal the Flight Board.
+// Coordinates a double-click add with the panel that should reveal the Flight Board.
 export function useFlightActivation({
   handleAddToFlightBoard,
   scheduleView,
@@ -12,14 +12,18 @@ export function useFlightActivation({
     (row) => {
       const didAddRow = handleAddToFlightBoard(row);
 
-      // Keep the current context visible when an add is rejected, such as for a duplicate flight.
+      // Basic Filters should never obscure the board after a Flights-table activation.
+      if (scheduleView === "flights") {
+        setPlannerControlsCollapsed(true);
+        return;
+      }
+
+      // Keep selector context visible when an accomplishment or tour add is rejected.
       if (!didAddRow) {
         return;
       }
 
-      if (scheduleView === "flights") {
-        setPlannerControlsCollapsed(true);
-      } else if (scheduleView === "accomplishments") {
+      if (scheduleView === "accomplishments") {
         setIsAccomplishmentSelectorCollapsed(true);
       } else if (scheduleView === "tours") {
         setIsTourSelectorCollapsed(true);
