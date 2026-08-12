@@ -5,12 +5,9 @@ import aircraftCatalogData from "../../data/aircraft_catalog.json";
 import { normalizeEquipmentTypeValue, unwrapEquipmentTypeRows } from "../../domain/aircraft/equipmentTypes.js";
 
 const DATE_FORMAT = "MM/dd/yyyy HH:mm";
-const SHORT_ROUTE_SCHEDULE_SPEED_KTS = 325;
-const LONG_ROUTE_SCHEDULE_SPEED_KTS = 400;
-const MAX_SCHEDULE_GROUND_SPEED_KTS = 425;
-const EASTBOUND_TAILWIND_BOOST_KTS = 25;
-const LONG_ROUTE_SPEED_START_NM = 1000;
-const LONG_ROUTE_SPEED_FULL_NM = 2000;
+const SCHEDULE_BLOCK_ALLOWANCE_MINUTES = 50;
+const SCHEDULE_BASE_GROUND_SPEED_KTS = 450;
+const SCHEDULE_DIRECTIONAL_ADJUSTMENT_KTS = 30;
 
 function normalizeText(value) {
   return String(value ?? "").trim();
@@ -143,6 +140,8 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
       const staResult = parseScheduleTimestampOrDefault(rawFlight.sta, staZone, rawFlight.std);
       const stdLocal = stdResult.value;
       const rawStaLocal = staResult.value;
+      const stdUtc = stdLocal.toUTC();
+      const rawStaUtc = rawStaLocal.toUTC();
       const distanceNm =
         fromAirport && toAirport
           ? calculateGreatCircleNm(
@@ -184,18 +183,19 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         });
       }
 
-      const effectiveSpeedKts = calculateScheduleGroundSpeedKts(distanceNm, fromAirport, toAirport);
-      // Preserve a valid source STA; normalization is only a recovery path for invalid chronology.
-      const staLocal = rawStaLocal.toUTC() >= stdLocal.toUTC()
-        ? rawStaLocal
-        : normalizeArrivalDate(stdLocal, rawStaLocal, distanceNm, effectiveSpeedKts);
+      const effectiveSpeedKts = calculateScheduleGroundSpeedKts(fromAirport, toAirport);
+      const estimatedBlockMinutes = estimateBlockMinutes(distanceNm, effectiveSpeedKts);
+      // Known routes use one deterministic block-time contract; source STA is only a missing-data fallback.
+      const staUtc = Number.isFinite(estimatedBlockMinutes)
+        ? stdUtc.plus({ minutes: estimatedBlockMinutes })
+        : normalizeSourceArrivalDate(stdUtc, rawStaUtc);
+      const staLocal = staUtc.setZone(staZone);
 
       const airlineName =
         airlineMap.get(rawFlight.airline) || `${rawFlight.airline} (not in airline map)`;
-      const blockMinutes = Math.max(
-        0,
-        Math.round(staLocal.toUTC().diff(stdLocal.toUTC(), "minutes").minutes)
-      );
+      const blockMinutes = Number.isFinite(estimatedBlockMinutes)
+        ? estimatedBlockMinutes
+        : Math.max(0, Math.round(staUtc.diff(stdUtc, "minutes").minutes));
       const compatibility = resolveRouteCompatibility(rawFlight, distanceNm);
       const airlineIcao = airlineIcaoMap.get(rawFlight.airline) || "";
       const flightNumber = String(rawFlight.flightNumber || "").trim();
@@ -219,12 +219,12 @@ export function parseScheduleImport(fileName, xmlText, debug = () => {}) {
         hasMissingAirportData: missingIcaos.length > 0,
         stdLocal: stdLocal.toISO(),
         staLocal: staLocal.toISO(),
-        stdUtc: stdLocal.toUTC().toISO(),
-        staUtc: staLocal.toUTC().toISO(),
-        stdUtcMillis: stdLocal.toUTC().toMillis(),
-        staUtcMillis: staLocal.toUTC().toMillis(),
+        stdUtc: stdUtc.toISO(),
+        staUtc: staUtc.toISO(),
+        stdUtcMillis: stdUtc.toMillis(),
+        staUtcMillis: staUtc.toMillis(),
         localDepartureClock: stdLocal.toFormat("HH:mm"),
-        utcDepartureClock: stdLocal.toUTC().toFormat("HH:mm"),
+        utcDepartureClock: stdUtc.toFormat("HH:mm"),
         mtow: rawFlight.mtow,
         mlw: rawFlight.mlw,
         maxPax: rawFlight.maxPax,
@@ -484,58 +484,17 @@ function calculateGreatCircleNm(fromLatitude, fromLongitude, toLatitude, toLongi
   return Math.round(earthRadiusNm * c);
 }
 
-function normalizeArrivalDate(stdLocal, staLocal, distanceNm, effectiveSpeedKts) {
-  const candidates = [];
-  const estimatedMinutes = estimateBlockMinutes(distanceNm, effectiveSpeedKts);
+function normalizeSourceArrivalDate(stdLocal, staLocal) {
+  let candidate = staLocal;
 
-  for (let dayOffset = -2; dayOffset <= 2; dayOffset += 1) {
-    const candidate = staLocal.plus({ days: dayOffset });
-    const diffMinutes = candidate.toUTC().diff(stdLocal.toUTC(), "minutes").minutes;
-
-    if (diffMinutes >= 0) {
-      candidates.push({
-        dateTime: candidate,
-        diffMinutes,
-        source: "timezone-normalized"
-      });
-    }
+  while (candidate.toUTC() < stdLocal.toUTC()) {
+    candidate = candidate.plus({ days: 1 });
   }
 
-  const shortestClockGap = calculateShortestClockGapMinutes(stdLocal, staLocal);
-
-  if (Number.isFinite(shortestClockGap) && shortestClockGap > 0) {
-    candidates.push({
-      dateTime: stdLocal.plus({ minutes: shortestClockGap }),
-      diffMinutes: shortestClockGap,
-      source: "clock-gap"
-    });
-  }
-
-  if (!candidates.length) {
-    let candidate = staLocal;
-
-    while (candidate.toUTC() < stdLocal.toUTC()) {
-      candidate = candidate.plus({ days: 1 });
-    }
-
-    return candidate;
-  }
-
-  candidates.sort((left, right) => {
-    const leftScore = scoreArrivalCandidate(left, estimatedMinutes);
-    const rightScore = scoreArrivalCandidate(right, estimatedMinutes);
-
-    if (leftScore !== rightScore) {
-      return leftScore - rightScore;
-    }
-
-    return left.diffMinutes - right.diffMinutes;
-  });
-
-  return candidates[0].dateTime;
+  return candidate;
 }
 
-function estimateBlockMinutes(distanceNm, effectiveSpeedKts = SHORT_ROUTE_SCHEDULE_SPEED_KTS) {
+function estimateBlockMinutes(distanceNm, effectiveSpeedKts) {
   if (!Number.isFinite(distanceNm) || distanceNm < 0) {
     return null;
   }
@@ -544,11 +503,12 @@ function estimateBlockMinutes(distanceNm, effectiveSpeedKts = SHORT_ROUTE_SCHEDU
     return null;
   }
 
-  return Math.round((distanceNm / effectiveSpeedKts) * 60);
+  return Math.round(
+    SCHEDULE_BLOCK_ALLOWANCE_MINUTES + (distanceNm / effectiveSpeedKts) * 60
+  );
 }
 
-function calculateScheduleGroundSpeedKts(distanceNm, fromAirport, toAirport) {
-  const baseSpeedKts = calculateBaseScheduleGroundSpeedKts(distanceNm);
+function calculateScheduleGroundSpeedKts(fromAirport, toAirport) {
   const fromLatitude = fromAirport?.latitude;
   const fromLongitude = fromAirport?.longitude;
   const toLatitude = toAirport?.latitude;
@@ -561,11 +521,11 @@ function calculateScheduleGroundSpeedKts(distanceNm, fromAirport, toAirport) {
     !Number.isFinite(toLatitude) ||
     !Number.isFinite(toLongitude)
   ) {
-    return baseSpeedKts;
+    return null;
   }
 
-  if (!Number.isFinite(longitudeDelta) || longitudeDelta <= 0) {
-    return baseSpeedKts;
+  if (!Number.isFinite(longitudeDelta)) {
+    return null;
   }
 
   const bearingDegrees = calculateInitialBearingDegrees(
@@ -576,31 +536,12 @@ function calculateScheduleGroundSpeedKts(distanceNm, fromAirport, toAirport) {
   );
 
   if (!Number.isFinite(bearingDegrees)) {
-    return baseSpeedKts;
+    return null;
   }
 
-  const angleFromDueEast = Math.abs((((bearingDegrees - 90) % 360) + 540) % 360 - 180);
-  const eastboundFactor = Math.max(0, 1 - angleFromDueEast / 90);
-  const eastboundBoostKts = EASTBOUND_TAILWIND_BOOST_KTS * eastboundFactor;
-
-  return Math.min(MAX_SCHEDULE_GROUND_SPEED_KTS, baseSpeedKts + eastboundBoostKts);
-}
-
-function calculateBaseScheduleGroundSpeedKts(distanceNm) {
-  if (!Number.isFinite(distanceNm) || distanceNm < 0) {
-    return SHORT_ROUTE_SCHEDULE_SPEED_KTS;
-  }
-
-  if (distanceNm <= LONG_ROUTE_SPEED_START_NM) {
-    return SHORT_ROUTE_SCHEDULE_SPEED_KTS;
-  }
-
-  if (distanceNm >= LONG_ROUTE_SPEED_FULL_NM) {
-    return LONG_ROUTE_SCHEDULE_SPEED_KTS;
-  }
-
-  const progress = (distanceNm - LONG_ROUTE_SPEED_START_NM) / (LONG_ROUTE_SPEED_FULL_NM - LONG_ROUTE_SPEED_START_NM);
-  return SHORT_ROUTE_SCHEDULE_SPEED_KTS + (LONG_ROUTE_SCHEDULE_SPEED_KTS - SHORT_ROUTE_SCHEDULE_SPEED_KTS) * progress;
+  const eastWestFactor = Math.sin(degreesToRadians(bearingDegrees));
+  return SCHEDULE_BASE_GROUND_SPEED_KTS +
+    SCHEDULE_DIRECTIONAL_ADJUSTMENT_KTS * eastWestFactor;
 }
 
 function calculateInitialBearingDegrees(fromLatitude, fromLongitude, toLatitude, wrappedLongitudeDelta) {
@@ -636,29 +577,6 @@ function getWrappedLongitudeDelta(fromLongitude, toLongitude) {
   }
 
   return delta;
-}
-
-function calculateShortestClockGapMinutes(stdLocal, staLocal) {
-  const departureClockMinutes = stdLocal.hour * 60 + stdLocal.minute;
-  const arrivalClockMinutes = staLocal.hour * 60 + staLocal.minute;
-  const absoluteGap = Math.abs(arrivalClockMinutes - departureClockMinutes);
-
-  return Math.min(absoluteGap, 1440 - absoluteGap);
-}
-
-function scoreArrivalCandidate(candidate, estimatedMinutes) {
-  if (!Number.isFinite(estimatedMinutes)) {
-    return candidate.diffMinutes;
-  }
-
-  const deviation = Math.abs(candidate.diffMinutes - estimatedMinutes);
-  const inflationPenalty =
-    candidate.source === "timezone-normalized" &&
-    candidate.diffMinutes > estimatedMinutes * 2
-      ? candidate.diffMinutes - estimatedMinutes * 2
-      : 0;
-
-  return deviation + inflationPenalty;
 }
 
 function degreesToRadians(value) {

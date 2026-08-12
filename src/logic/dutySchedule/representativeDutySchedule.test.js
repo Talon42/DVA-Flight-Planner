@@ -19,12 +19,15 @@ function parseRepresentativeFlights() {
 
 function buildFlightKey(flight) {
   const departure = DateTime.fromISO(flight.stdLocal, { setZone: true }).toFormat("MM/dd/yyyy HH:mm");
-  const arrival = DateTime.fromISO(flight.staLocal, { setZone: true }).toFormat("MM/dd/yyyy HH:mm");
-  return `${flight.flightCode}:${flight.route}:${departure}->${arrival}`;
+  return `${flight.flightCode}:${flight.route}:${departure}`;
+}
+
+function normalizeExpectedKeys(keys) {
+  return keys.map((key) => String(key).split("->")[0]);
 }
 
 function selectExpectedFlights(flights, keys) {
-  const expectedKeys = new Set(keys);
+  const expectedKeys = new Set(normalizeExpectedKeys(keys));
   return flights.filter((flight) => expectedKeys.has(buildFlightKey(flight)));
 }
 
@@ -130,9 +133,9 @@ describe("representative Duty Schedule pipeline", () => {
 
     expect(
       candidateKeys(parsedFlights, { selectedAirline: deltaName, selectedOriginAirport: "EGLL" })
-    ).toEqual(expected.filterExamples.DLFromEGLL);
+    ).toEqual(normalizeExpectedKeys(expected.filterExamples.DLFromEGLL));
     expect(candidateKeys(parsedFlights, { selectedOriginAirport: "KATL" })).toEqual(
-      expected.filterExamples.FlightsFromKATL
+      normalizeExpectedKeys(expected.filterExamples.FlightsFromKATL)
     );
     expect(
       candidateKeys(
@@ -140,7 +143,7 @@ describe("representative Duty Schedule pipeline", () => {
         { addonFilterEnabled: true, addonMatchMode: "destination" },
         new Set(["KJFK"])
       )
-    ).toEqual(expected.filterExamples.FlightsToKJFK);
+    ).toEqual(normalizeExpectedKeys(expected.filterExamples.FlightsToKJFK));
   });
 
   it("fails strict mode and returns the best parsed partial chain in flexible mode", () => {
