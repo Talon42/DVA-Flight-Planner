@@ -15,6 +15,7 @@
     "build": "vite build",
     "lint": "eslint . --cache --cache-location .eslintcache",
     "lint:ci": "eslint . --max-warnings=0",
+    "lint:files": "eslint --max-warnings=0",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",
@@ -24,8 +25,10 @@
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
     "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml --locked",
     "clippy:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings",
-    "validate:fast": "npm run lint:ci && npm run audit:data && npm run lint:airports && npm run test:run",
-    "validate": "npm run validate:fast && npm run format:rust && npm run clippy:rust && npm run test:rust && npm run build"
+    "validate:frontend": "npm run lint:ci && npm run test:run",
+    "validate:rust": "npm run format:rust && npm run clippy:rust && npm run test:rust",
+    "validate:fast": "npm run validate:frontend && npm run audit:data && npm run lint:airports",
+    "validate": "npm run validate:fast && npm run validate:rust && npm run build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
