@@ -1,4 +1,4 @@
-import { Component } from "react";
+import { Component, useEffect } from "react";
 import Button from "../components/ui/Button";
 import Panel from "../components/ui/Panel";
 import ModalBackdrop from "../components/layout/ModalBackdrop";
@@ -24,6 +24,70 @@ const SETTINGS_TABS = [
   { id: "advanced", label: "Advanced" },
   { id: "about", label: "About" }
 ];
+
+function FlightBoardRepairModal({ prompt, onResolve }) {
+  useEffect(() => {
+    const previouslyFocusedElement = document.activeElement;
+    document.getElementById("flight-board-repair-dialog")?.querySelector("button")?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onResolve(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocusedElement instanceof HTMLElement) previouslyFocusedElement.focus();
+    };
+  }, [onResolve]);
+
+  return (
+    <ModalBackdrop onClick={() => onResolve(false)}>
+      <Panel
+        id="flight-board-repair-dialog"
+        as="section"
+        padding="lg"
+        className={cn(modalPanelClassName, "!w-[min(620px,100%)]")}
+        role="dialog"
+        aria-modal="true"
+        aria-label={
+          prompt.type === "alternate-airline"
+            ? "Use alternate airline for flight repair"
+            : "Flight not on today's schedule"
+        }
+        onClick={(event) => event.stopPropagation()}
+      >
+        <SectionHeader
+          eyebrow="Flight Board Repair"
+          title={
+            prompt.type === "alternate-airline"
+              ? "Use an Alternate Airline?"
+              : "Flight Not on Today’s Schedule"
+          }
+        />
+
+        {prompt.type === "alternate-airline" ? (
+          <p className={mutedTextClassName}>
+            {prompt.airline || "The original airline"} does not operate {prompt.from}-{prompt.to}{" "}
+            on today’s schedule. Use {prompt.candidateFlightCode || prompt.candidateAirline}{" "}
+            departing at {prompt.candidateDepartureLabel} instead?
+          </p>
+        ) : (
+          <p className={mutedTextClassName}>
+            No flight from {prompt.from} to {prompt.to} exists on today’s schedule.
+          </p>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => onResolve(false)}>
+            {prompt.type === "alternate-airline" ? "No" : "Close"}
+          </Button>
+          {prompt.type === "alternate-airline" ? (
+            <Button onClick={() => onResolve(true)}>Yes</Button>
+          ) : null}
+        </div>
+      </Panel>
+    </ModalBackdrop>
+  );
+}
 
 class SettingsModalBoundary extends Component {
   constructor(innerProps) {
@@ -146,6 +210,8 @@ export default function AppOverlayHost({
   onReloadAfterUserDataClearFailure,
   isDutyBoardOverwriteConfirmOpen,
   onResolveDutyBoardOverwriteConfirmation,
+  repairPrompt,
+  onResolveRepairPrompt,
   isSimBriefDispatchBlockedOpen,
   simBriefDispatchBlockedMessage,
   onCloseSimBriefDispatchBlocked,
@@ -397,6 +463,10 @@ export default function AppOverlayHost({
             </div>
           </Panel>
         </ModalBackdrop>
+      ) : null}
+
+      {repairPrompt ? (
+        <FlightBoardRepairModal prompt={repairPrompt} onResolve={onResolveRepairPrompt} />
       ) : null}
 
       {isSimBriefDispatchBlockedOpen ? (

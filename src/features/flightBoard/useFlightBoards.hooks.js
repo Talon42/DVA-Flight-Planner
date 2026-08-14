@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   findCustomAirframeByInternalId,
   getAircraftDisplayName,
@@ -6,6 +6,7 @@ import {
   resolveSimBriefDispatchAircraft
 } from "../../domain/aircraft/aircraftIdentity.js";
 import { buildTourFlightLookupKey } from "../tours/tourIds.model.js";
+import { deriveFlightNumber } from "../../domain/flights/flightIdentity.js";
 import { logAppEvent } from "../../services/logging/appLog.client.js";
 import {
   DEFAULT_FLIGHT_BOARD_NAME,
@@ -18,30 +19,68 @@ import {
   normalizeFlightBoardName
 } from "./flightBoard.model.js";
 
-// Rebuilds stale board entries against the live schedule so repair actions can stay targeted.
-function repairBoardEntryAgainstSchedule(entry, flights = []) {
+function normalizeRepairMatchValue(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function findClosestDeparture(flights, departureMillis) {
+  return (
+    [...flights].sort((left, right) => {
+      const leftDelta = Math.abs((Number(left.stdUtcMillis) || 0) - departureMillis);
+      const rightDelta = Math.abs((Number(right.stdUtcMillis) || 0) - departureMillis);
+      return (
+        leftDelta - rightDelta ||
+        String(left.flightId || "").localeCompare(String(right.flightId || ""))
+      );
+    })[0] || null
+  );
+}
+
+// Resolves the repair hierarchy without applying alternate-airline matches automatically.
+function findRepairMatch(entry, flights = []) {
   const normalizedEntry = normalizeBoardEntry(entry);
   if (!normalizedEntry) {
-    return null;
+    return { type: "missing-route", entry: null, flight: null };
   }
 
-  const matches = flights.filter(
+  const routeMatches = flights.filter(
     (flight) =>
-      String(flight.airline || "").trim() === normalizedEntry.airline &&
-      String(flight.from || "").trim().toUpperCase() === normalizedEntry.from &&
-      String(flight.to || "").trim().toUpperCase() === normalizedEntry.to
+      normalizeRepairMatchValue(flight.from) === normalizedEntry.from &&
+      normalizeRepairMatchValue(flight.to) === normalizedEntry.to
   );
 
-  if (!matches.length) {
-    return null;
+  if (!routeMatches.length) {
+    return { type: "missing-route", entry: normalizedEntry, flight: null };
   }
 
-  const currentDepartureMillis = Number(normalizedEntry.stdUtcMillis) || 0;
-  const repairedFlight = [...matches].sort((left, right) => {
-    const leftDelta = Math.abs((Number(left.stdUtcMillis) || 0) - currentDepartureMillis);
-    const rightDelta = Math.abs((Number(right.stdUtcMillis) || 0) - currentDepartureMillis);
-    return leftDelta - rightDelta || left.flightId.localeCompare(right.flightId);
-  })[0];
+  const departureMillis = Number(normalizedEntry.stdUtcMillis) || 0;
+  const airlineMatches = routeMatches.filter(
+    (flight) =>
+      normalizeRepairMatchValue(flight.airline) ===
+      normalizeRepairMatchValue(normalizedEntry.airline)
+  );
+  if (!airlineMatches.length) {
+    return {
+      type: "alternate-airline",
+      entry: normalizedEntry,
+      flight: findClosestDeparture(routeMatches, departureMillis)
+    };
+  }
+
+  const flightNumber = normalizeRepairMatchValue(deriveFlightNumber(normalizedEntry));
+  const numberMatches = airlineMatches.filter(
+    (flight) => normalizeRepairMatchValue(deriveFlightNumber(flight)) === flightNumber
+  );
+  return {
+    type: "direct",
+    entry: normalizedEntry,
+    flight: findClosestDeparture(numberMatches.length ? numberMatches : airlineMatches, departureMillis)
+  };
+}
+
+function buildRepairedBoardEntry(entry, repairedFlight) {
+  const normalizedEntry = normalizeBoardEntry(entry);
+  if (!normalizedEntry || !repairedFlight) return null;
 
   return buildBoardEntryFromFlight(repairedFlight, {
     boardEntryId: normalizedEntry.boardEntryId,
@@ -56,6 +95,12 @@ function repairBoardEntryAgainstSchedule(entry, flights = []) {
     completionOrder: normalizedEntry.completionOrder,
     isStale: false
   });
+}
+
+function getRepairDepartureLabel(flight) {
+  return String(
+    flight?.departureTimeLabel || flight?.stdLocal || flight?.stdUtc || "the scheduled departure"
+  ).trim();
 }
 
 // Owns the active flight-board derivations and mutations without pulling SimBrief workflow logic in with it.
@@ -81,6 +126,7 @@ export function useFlightBoards({
   simBriefDispatchStateRef = null,
   tourFlightsByKey = new Map()
 } = {}) {
+  const [repairPrompt, setRepairPrompt] = useState(null);
   const activeFlightBoard = useMemo(() => {
     if (!flightBoards.length) {
       return null;
@@ -727,17 +773,38 @@ export function useFlightBoards({
     });
   }
 
+  async function applyRepairMatch(boardEntryId, repairedFlight) {
+    const currentEntry = flightBoard.find((item) => item.boardEntryId === boardEntryId);
+    const repairedEntry = buildRepairedBoardEntry(currentEntry, repairedFlight);
+    if (!repairedEntry) return;
+
+    updateActiveFlightBoardEntries((currentEntries) =>
+      currentEntries.map((item) => (item.boardEntryId === boardEntryId ? repairedEntry : item))
+    );
+
+    setStatusMessage?.(
+      `Repaired ${repairedEntry.flightCode} ${repairedEntry.from}-${repairedEntry.to} from the current schedule.`
+    );
+    await logAppEvent("flight-board-repaired", {
+      boardEntryId,
+      linkedFlightId: repairedEntry.linkedFlightId,
+      flightCode: repairedEntry.flightCode
+    });
+  }
+
   async function handleRepairFlightBoardEntry(boardEntryId) {
     const entry = flightBoard.find((item) => item.boardEntryId === boardEntryId);
-    if (!entry || !schedule?.flights?.length) {
-      return;
-    }
+    if (!entry) return;
 
-    const repairedEntry = repairBoardEntryAgainstSchedule(entry, schedule.flights);
-    if (!repairedEntry) {
-      setStatusMessage?.(
-        `No matching flight was found for ${entry.airline} ${entry.from}-${entry.to} in the current schedule.`
-      );
+    const match = findRepairMatch(entry, schedule?.flights || []);
+    if (match.type === "missing-route") {
+      setRepairPrompt({
+        type: "missing-route",
+        boardEntryId,
+        airline: entry.airline,
+        from: entry.from,
+        to: entry.to
+      });
       await logAppEvent("flight-board-repair-missed", {
         boardEntryId,
         airline: entry.airline,
@@ -747,18 +814,48 @@ export function useFlightBoards({
       return;
     }
 
-    const nextFlightBoard = flightBoard.map((item) =>
-      item.boardEntryId === boardEntryId ? repairedEntry : item
-    );
-    updateActiveFlightBoardEntries(nextFlightBoard);
-    setStatusMessage?.(
-      `Repaired ${repairedEntry.flightCode} ${repairedEntry.from}-${repairedEntry.to} from the current schedule.`
-    );
-    await logAppEvent("flight-board-repaired", {
-      boardEntryId,
-      linkedFlightId: repairedEntry.linkedFlightId,
-      flightCode: repairedEntry.flightCode
-    });
+    if (match.type === "alternate-airline") {
+      setRepairPrompt({
+        type: "alternate-airline",
+        boardEntryId,
+        airline: entry.airline,
+        from: entry.from,
+        to: entry.to,
+        candidateFlight: match.flight,
+        candidateAirline: String(match.flight?.airline || "").trim(),
+        candidateFlightCode: String(match.flight?.flightCode || "").trim(),
+        candidateDepartureLabel: getRepairDepartureLabel(match.flight)
+      });
+      await logAppEvent("flight-board-repair-alternate-airline-prompted", {
+        boardEntryId,
+        airline: entry.airline,
+        alternateAirline: match.flight?.airline,
+        from: entry.from,
+        to: entry.to
+      });
+      return;
+    }
+
+    await applyRepairMatch(boardEntryId, match.flight);
+  }
+
+  async function handleResolveRepairPrompt(confirmed) {
+    const prompt = repairPrompt;
+    setRepairPrompt(null);
+    if (!prompt || prompt.type !== "alternate-airline") return;
+
+    if (!confirmed) {
+      await logAppEvent("flight-board-repair-alternate-airline-declined", {
+        boardEntryId: prompt.boardEntryId,
+        airline: prompt.airline,
+        alternateAirline: prompt.candidateAirline,
+        from: prompt.from,
+        to: prompt.to
+      });
+      return;
+    }
+
+    await applyRepairMatch(prompt.boardEntryId, prompt.candidateFlight);
   }
 
   function handleSelectFlightBoard(boardId) {
@@ -860,6 +957,7 @@ export function useFlightBoards({
     flightBoard,
     shortlist,
     selectedShortlistFlight,
+    repairPrompt,
     updateActiveFlightBoardEntries,
     applySimBriefPlanToBoardEntry,
     replaceFlightBoard,
@@ -869,6 +967,7 @@ export function useFlightBoards({
     handleRemoveFromFlightBoard,
     handleReorderFlightBoard,
     handleRepairFlightBoardEntry,
+    handleResolveRepairPrompt,
     handleSelectFlightBoard,
     handleCreateFlightBoard,
     handleRenameFlightBoard,
