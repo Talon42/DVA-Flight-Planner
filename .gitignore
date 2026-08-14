@@ -20,3 +20,5 @@
 /.eslintcache
 /docs/instructions
 /tmp/
+/.codex/
+/.agents/
