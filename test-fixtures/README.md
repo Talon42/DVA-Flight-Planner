@@ -8,10 +8,12 @@ These fixtures were derived from local real-world DVA/PFPX samples and sanitized
 - `deltava/representative-logbook.expected.json`: explicit expected outcomes for cross-layer Rust/frontend contract tests.
 - `schedules/representative-pfpxsched.xml`: thirty real schedule rows covering connected chains, tight turns, route revisits, multiple airlines, overnight flights, local-clock edge cases, duplicates, and route diversity.
 - `schedules/representative-pfpxsched.expected.json`: explicit parser/filter/Duty Schedule expectations.
+- `flight-board/stale-repair-cases.json`: stale flight-board matching combinations for route,
+  airline, flight number, closest STD, alternate-airline confirmation, and missing-route outcomes.
 
 The fixtures exercise the existing PFPX parser, Duty Schedule pipeline, Rust logbook storage/DTO
-boundary, and frontend logbook normalization/statistics. They do not test live DVA authentication,
-downloads, or SimBrief services.
+boundary, frontend logbook normalization/statistics, and flight-board schedule repair. They do not
+test live DVA authentication, downloads, or SimBrief services.
 
 ## Updating fixtures
 

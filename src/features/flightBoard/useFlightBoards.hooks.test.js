@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import staleRepairFixture from "../../../test-fixtures/flight-board/stale-repair-cases.json";
 import { buildTourFlightLookupKey } from "../tours/tourIds.model.js";
 import { useFlightBoards } from "./useFlightBoards.hooks.js";
 
@@ -185,6 +186,55 @@ describe("useFlightBoards board lifecycle", () => {
 });
 
 describe("useFlightBoards repair and tour progress", () => {
+  it.each(staleRepairFixture.cases)("matches stale fixture: $name", async (scenario) => {
+    const baseStdUtcMillis = Date.parse(staleRepairFixture.baseStdUtc);
+    const staleEntry = createBoardEntry({
+      ...staleRepairFixture.staleEntry,
+      ...scenario.entryOverrides,
+      linkedFlightId: null,
+      isStale: true,
+      stdUtcMillis: baseStdUtcMillis
+    });
+    const flights = scenario.flights.map((flight) => ({
+      ...flight,
+      flightCode:
+        flight.flightCode ||
+        `${String(flight.airline || "").trim().toUpperCase()}${flight.flightNumber}`,
+      stdUtcMillis: baseStdUtcMillis + flight.stdOffsetMinutes * 60_000
+    }));
+    const { result } = renderHook(() =>
+      useFlightBoardHarness({
+        flightBoards: [{ id: "board-1", name: "Flight Board", entries: [staleEntry] }],
+        schedule: { flights }
+      })
+    );
+
+    await act(async () => result.current.handleRepairFlightBoardEntry("entry-1"));
+
+    if (scenario.expected.outcome === "direct") {
+      expect(result.current.repairPrompt).toBeNull();
+      expect(result.current.flightBoard[0]).toMatchObject({
+        linkedFlightId: scenario.expected.flightId,
+        isStale: false
+      });
+      return;
+    }
+
+    expect(result.current.flightBoard[0]).toMatchObject({ linkedFlightId: null, isStale: true });
+    expect(result.current.repairPrompt?.type).toBe(scenario.expected.outcome);
+
+    if (scenario.expected.outcome === "alternate-airline") {
+      expect(result.current.repairPrompt?.candidateFlight?.flightId).toBe(
+        scenario.expected.flightId
+      );
+      await act(async () => result.current.handleResolveRepairPrompt(true));
+      expect(result.current.flightBoard[0]).toMatchObject({
+        linkedFlightId: scenario.expected.flightId,
+        isStale: false
+      });
+    }
+  });
+
   it("replaces a missing flight number with the same airline route's closest STD", async () => {
     const staleEntry = createBoardEntry({
       linkedFlightId: null,
