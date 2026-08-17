@@ -4,7 +4,8 @@ import {
   createLogRunId,
   logAppDebug,
   logSystemError,
-  logSystemEvent
+  logSystemEvent,
+  logSystemWarn
 } from "../../services/logging/appLog.client.js";
 import { readDeltaVirtualCredentials } from "../../services/tauri/deltaVirtualCredentials.client.js";
 import { readDeltaVirtualTourProgress } from "../../services/storage/storage.js";
@@ -24,7 +25,7 @@ import { clearLogbookPirepDetailsRequests } from "../logbook/logbookPirepDetails
 const DELTA_VIRTUAL_SYNC_FAILURE_GUIDANCE =
   "Delta Virtual Sync failed. Please check your Delta Virtual credentials, try again later, or post the app log on the DVA forums.";
 
-// Shows one consistent recovery message for failed or stale Delta Virtual schedule syncs.
+// Shows one consistent recovery message for failed Delta Virtual schedule syncs.
 function showDeltaVirtualSyncFailureWarning(setStatusMessage, setDvaSyncWarning, detail = "") {
   setStatusMessage?.(DELTA_VIRTUAL_SYNC_FAILURE_GUIDANCE);
   setDvaSyncWarning?.({
@@ -34,6 +35,18 @@ function showDeltaVirtualSyncFailureWarning(setStatusMessage, setDvaSyncWarning,
     detail,
     primaryAction: "open_delta_virtual_settings",
     primaryLabel: "Open Delta Virtual Settings"
+  });
+}
+
+// Reports stale upstream schedule data without misclassifying a successful sync as failed.
+function showDeltaVirtualStaleScheduleWarning(setStatusMessage, setDvaSyncWarning, scheduleDateLabel) {
+  const message = `Delta Virtual sync completed, but DVA is still publishing the ${scheduleDateLabel} schedule.`;
+  setStatusMessage?.(message);
+  setDvaSyncWarning?.({
+    kind: "schedule_stale",
+    title: "Delta Virtual schedule is awaiting an update.",
+    message,
+    detail: "The imported schedule is available, but it may be out of date. Sync again after DVA publishes the next schedule."
   });
 }
 
@@ -226,22 +239,20 @@ export function useDeltaVirtualSync({
 
       const importedScheduleDateInfo = buildScheduleDateInfo(importResult?.schedule?.flights || []);
       if (importedScheduleDateInfo.isCurrent === false) {
-        showDeltaVirtualSyncFailureWarning(
+        showDeltaVirtualStaleScheduleWarning(
           setStatusMessage,
           setDvaSyncWarning,
-          `The downloaded schedule still shows ${importedScheduleDateInfo.label}, so the footer schedule date did not update to the current DVA schedule.`
+          importedScheduleDateInfo.label
         );
-        await logSystemError(
+        await logSystemWarn(
           "DVA Sync",
-          "failed",
-          new Error("Delta Virtual schedule date did not update."),
+          "schedule-date-stale",
           {
             syncRunId,
             stage: "schedule-date",
             scheduleDate: importedScheduleDateInfo.label
           }
         );
-        return;
       }
       onScheduleSyncComplete?.();
       setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());

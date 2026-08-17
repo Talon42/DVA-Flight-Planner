@@ -7,7 +7,8 @@ const logging = vi.hoisted(() => ({
   createLogRunId: vi.fn(),
   logAppDebug: vi.fn(),
   logSystemError: vi.fn(),
-  logSystemEvent: vi.fn()
+  logSystemEvent: vi.fn(),
+  logSystemWarn: vi.fn()
 }));
 const readDeltaVirtualCredentials = vi.hoisted(() => vi.fn());
 const readDeltaVirtualTourProgress = vi.hoisted(() => vi.fn());
@@ -72,6 +73,7 @@ beforeEach(() => {
   logging.logAppDebug.mockResolvedValue(undefined);
   logging.logSystemError.mockResolvedValue(undefined);
   logging.logSystemEvent.mockResolvedValue(undefined);
+  logging.logSystemWarn.mockResolvedValue(undefined);
   readDeltaVirtualCredentials.mockResolvedValue({ hasPassword: true });
   readDeltaVirtualTourProgress.mockResolvedValue({
     tourProgress: { "dva:42": { rows: { row1: { completed: true } } } },
@@ -366,18 +368,36 @@ describe("useDeltaVirtualSync", () => {
     expect(result.current.isSyncing).toBe(false);
   });
 
-  it("rejects a downloaded schedule that remains stale", async () => {
+  it("completes sync with a warning when DVA is still publishing a stale schedule", async () => {
     buildScheduleDateInfo.mockReturnValueOnce({ isCurrent: false, label: "July 1st" });
     const props = createProps();
     const { result } = renderHook(() => useDeltaVirtualSync(props));
 
     await act(() => result.current.handleDeltaVirtualSync());
 
-    expect(props.onScheduleSyncComplete).not.toHaveBeenCalled();
+    expect(buildScheduleDateInfo).toHaveBeenCalledWith([{ flightId: "flight-1" }]);
+    expect(props.onScheduleSyncComplete).toHaveBeenCalledOnce();
+    expect(props.onLogbookSyncComplete).toHaveBeenCalledOnce();
+    expect(deltaVirtual.syncDeltaVirtualTours).toHaveBeenCalledOnce();
     expect(props.setDvaSyncWarning).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "sync_failed", detail: expect.stringContaining("July 1st") })
+      expect.objectContaining({
+        kind: "schedule_stale",
+        title: expect.stringContaining("awaiting an update"),
+        message: expect.stringContaining("July 1st")
+      })
     );
-    expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledWith(false);
+    expect(logging.logSystemWarn).toHaveBeenCalledWith(
+      "DVA Sync",
+      "schedule-date-stale",
+      expect.objectContaining({ stage: "schedule-date", scheduleDate: "July 1st" })
+    );
+    expect(logging.logSystemError).not.toHaveBeenCalledWith(
+      "DVA Sync",
+      "failed",
+      expect.anything(),
+      expect.objectContaining({ stage: "schedule-date" })
+    );
+    expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledWith(true);
     expect(result.current.isSyncing).toBe(false);
   });
 
