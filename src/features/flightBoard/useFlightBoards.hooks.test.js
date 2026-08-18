@@ -103,6 +103,43 @@ describe("useFlightBoards dispatch mutations", () => {
     ]);
     expect(result.current.flightBoard[0]).toEqual(updatedEntry);
   });
+
+  it("preserves a custom airframe link when SimBrief returns a different aircraft name", () => {
+    const customAirframes = [
+      {
+        internalId: "custom-md88",
+        name: "My MD-88",
+        baseType: "MD88",
+        matchAircraft: "MD-88"
+      }
+    ];
+    const flightBoards = [
+      {
+        id: "board-1",
+        name: "Flight Board",
+        entries: [createBoardEntry({ selectedAircraft: "custom-md88" })]
+      }
+    ];
+    const { result } = renderHook(() =>
+      useFlightBoardHarness({ flightBoards, simBriefCustomAirframes: customAirframes })
+    );
+
+    let updatedEntry;
+    act(() => {
+      updatedEntry = result.current.applySimBriefPlanToBoardEntry("entry-1", {
+        aircraft_type: "DC-9-88",
+        static_id: "static-md88"
+      });
+    });
+
+    expect(updatedEntry).toMatchObject({
+      selectedAircraft: "custom-md88",
+      simbriefPlan: {
+        aircraftType: "DC-9-88"
+      }
+    });
+    expect(result.current.flightBoard[0]).toEqual(updatedEntry);
+  });
 });
 
 describe("useFlightBoards board lifecycle", () => {

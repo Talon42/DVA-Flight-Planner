@@ -390,6 +390,10 @@ export function useFlightBoards({
     );
     const existingSelectedAircraft =
       getSelectedAircraftForFlight(normalizedBoardEntry, simBriefCustomAirframes) || "";
+    const selectedCustomAirframe = findCustomAirframeByInternalId(
+      normalizedBoardEntry.selectedAircraft,
+      simBriefCustomAirframes
+    );
     const refreshedSelectedAircraft =
       getAircraftDisplayName(normalizedPlan?.aircraftType) ||
       String(normalizedPlan?.aircraftType || "").trim();
@@ -415,7 +419,8 @@ export function useFlightBoards({
     return {
       ...normalizedBoardEntry,
       simbriefPlan: resolvedPlan,
-      selectedAircraft: resolvedSelectedAircraft,
+      // Keep the custom ID so its explicit DVA equipment link survives SimBrief's returned name.
+      selectedAircraft: selectedCustomAirframe?.internalId || resolvedSelectedAircraft,
       simbriefSelectedType: ""
     };
   }
