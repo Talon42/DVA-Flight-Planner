@@ -843,7 +843,10 @@ export default function App() {
     [scheduleFlights]
   );
 
-  const equipmentOptions = useMemo(() => selectScheduleEquipmentOptions(), []);
+  const equipmentOptions = useMemo(
+    () => selectScheduleEquipmentOptions({ flights: scheduleFlights }),
+    [scheduleFlights]
+  );
   const airportOptions = useMemo(
     () => selectAirportOptions({ flights: scheduleFlights }),
     [scheduleFlights]

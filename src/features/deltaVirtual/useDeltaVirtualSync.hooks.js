@@ -157,7 +157,7 @@ export function useDeltaVirtualSync({
       await logSystemEvent("DVA Sync", "succeeded", {
         syncRunId,
         file: syncedFile.fileName,
-        bytes: syncedFile.xmlText?.length || 0,
+        bytes: syncedFile.scheduleText?.length || 0,
         logbookJson: syncedFile.logbookJson?.fileName || null,
         warningCount: Array.isArray(syncedFile.warnings) ? syncedFile.warnings.length : 0,
         durationMs: Math.max(

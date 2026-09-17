@@ -87,9 +87,10 @@ export function buildBoardEntryFromFlight(flight, overrides = {}) {
     staUtcMillis: Number(flight?.staUtcMillis) || 0,
     blockMinutes: Number.isFinite(flight?.blockMinutes) ? flight.blockMinutes : null,
     distanceNm: Number.isFinite(flight?.distanceNm) ? flight.distanceNm : null,
-    compatibleEquipment: Array.isArray(flight?.compatibleEquipment)
-      ? [...flight.compatibleEquipment]
-      : [],
+    leg: String(flight?.leg || "").trim(),
+    effectiveDate: String(flight?.effectiveDate || "").trim(),
+    equipmentType: String(flight?.equipmentType || "").trim(),
+    scheduleSource: String(flight?.scheduleSource || "").trim(),
     selectedAircraft,
     simbriefSelectedType: "",
     draftNetwork: normalizeDraftNetwork(
@@ -194,7 +195,6 @@ export function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     distanceMi: Number.isFinite(flight?.distanceMi ?? flight?.distance_mi)
       ? flight?.distanceMi ?? flight?.distance_mi
       : null,
-    compatibleEquipment: [],
     selectedAircraft,
     simbriefSelectedType: "",
     draftNetwork: normalizeDraftNetwork(
@@ -264,7 +264,10 @@ export function normalizeBoardEntry(entry) {
     departureTimeLabel: String(entry.departureTimeLabel || "").trim(),
     distanceNm: Number.isFinite(entry.distanceNm) ? entry.distanceNm : null,
     distanceMi: Number.isFinite(entry.distanceMi) ? entry.distanceMi : null,
-    compatibleEquipment: Array.isArray(entry.compatibleEquipment) ? [...entry.compatibleEquipment] : [],
+    leg: String(entry.leg || "").trim(),
+    effectiveDate: String(entry.effectiveDate || "").trim(),
+    equipmentType: String(entry.equipmentType || "").trim(),
+    scheduleSource: String(entry.scheduleSource || "").trim(),
     selectedAircraft: resolveNormalizedAircraftSelection(
       entry.selectedAircraft || entry.simbriefSelectedType || ""
     ),

@@ -1,6 +1,6 @@
 const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
 (() => {
-  const targetUrl = 'https://www.deltava.org/pfpxsched.ws';
+  const targetUrl = 'https://www.deltava.org/search.ws';
   const logbookPageUrl = 'https://www.deltava.org/logbook.do';
   const logbookExportUrl = 'https://www.deltava.org/mylogbook.ws';
   const accomplishmentEligibilityUrl = 'https://www.deltava.org/acceligibility.do';
@@ -73,21 +73,28 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
     const doc = new DOMParser().parseFromString(html || '', 'text/html');
     return doc.querySelector('input[name="id"]')?.value || '';
   };
-  const fetchScheduleXml = async () => {
+  const fetchScheduleJson = async () => {
     const response = await fetch(targetUrl, {
       method: 'GET',
       credentials: 'include',
       cache: 'no-store'
     });
-    const xml = await response.text();
-    emitDebug(`xml:fetch-status:${response.status}:${xml.length}`);
+    const schedule = await response.json();
+    const resultCount = Array.isArray(schedule?.results) ? schedule.results.length : 0;
+    emitDebug(`schedule:fetch-status:${response.status}:${resultCount}`);
     if (!response.ok) {
-      throw new Error(`Schedule XML request failed with HTTP ${response.status}.`);
+      throw new Error(`Schedule request failed with HTTP ${response.status}.`);
     }
-    if (!xml || !xml.trimStart().startsWith('<')) {
-      throw new Error('Delta Virtual returned a non-schedule XML response.');
+    if (!schedule || typeof schedule !== 'object' || Array.isArray(schedule)) {
+      throw new Error('Delta Virtual returned an invalid schedule JSON response.');
     }
-    return xml;
+    if (!schedule.sources || typeof schedule.sources !== 'object' || !Array.isArray(schedule.results)) {
+      throw new Error('Delta Virtual returned an incomplete schedule JSON response.');
+    }
+    if (schedule.results.length <= 250) {
+      throw new Error(`Delta Virtual returned only ${schedule.results.length} schedule rows; the schedule service may be truncated.`);
+    }
+    return JSON.stringify(schedule);
   };
   const fetchLogbookJsonExport = async () => {
     emitDebug('logbook:page-fetch-start');
@@ -169,16 +176,16 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
     window.__flightPlannerDeltaDownloadsPosted = true;
 
     const payload = {
-      xml: { ok: false },
+      schedule: { ok: false },
       logbook: { ok: false },
       accomplishments: { ok: false }
     };
 
     try {
-      payload.xml = { ok: true, xmlText: await fetchScheduleXml() };
+      payload.schedule = { ok: true, scheduleText: await fetchScheduleJson() };
     } catch (error) {
-      payload.xml = { ok: false, error: error?.message || 'Schedule XML download failed.' };
-      emitDebug(`xml:error:${payload.xml.error}`);
+      payload.schedule = { ok: false, error: error?.message || 'Schedule download failed.' };
+      emitDebug(`schedule:error:${payload.schedule.error}`);
     }
 
     try {
@@ -241,7 +248,7 @@ const DELTAVA_AUTO_SYNC_SCRIPT: &str = r#"
   }
 
   if (window.location.href === targetUrl) {
-    emitDebug('state:at-pfpx');
+    emitDebug('state:at-schedule-endpoint');
     showSyncOverlay();
     if (window.__flightPlannerDeltaDownloadsPosted) {
       emitDebug('state:downloads-already-posted');

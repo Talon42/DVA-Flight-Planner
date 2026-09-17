@@ -49,7 +49,7 @@ export function buildScheduleDateInfo(flights = []) {
 
   const midpointOffsetDays = Math.floor(latest.diff(earliest, "days").days / 2);
   const effectiveScheduleDate = earliest.plus({ days: midpointOffsetDays });
-  // Delta Virtual publishes the next PFPX schedule at 09:00 UTC on the following day.
+  // Delta Virtual publishes the next schedule at 09:00 UTC on the following day.
   const staleAfterUtc = DateTime.utc(
     effectiveScheduleDate.year,
     effectiveScheduleDate.month,

@@ -55,21 +55,22 @@ export async function syncScheduleFromDeltaVirtual({
       debugEnabled: Boolean(debugEnabled)
     });
     const fileName = result?.fileName ?? result?.file_name;
-    const xmlText = result?.xmlText ?? result?.xml_text;
+    const scheduleText = result?.scheduleText ?? result?.schedule_text;
     const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
     const logbookJson = result?.logbookJson ?? result?.logbook_json ?? null;
 
-    if (!fileName || !xmlText) {
+    if (!fileName || !scheduleText) {
+      const scheduleDiagnostic = warnings[0] || "Delta Virtual schedule download failed.";
       const error = new Error(
         logbookJson
-          ? "partial_success: Delta Virtual schedule download failed, but logbook JSON was saved."
-          : "download_failed: Delta Virtual sync returned an incomplete payload."
+          ? `partial_success: ${scheduleDiagnostic} Logbook JSON was saved.`
+          : `download_failed: ${scheduleDiagnostic}`
       );
       error.syncResult = result;
       throw error;
     }
 
-    return { fileName, xmlText, warnings, logbookJson };
+    return { fileName, scheduleText, warnings, logbookJson };
   } catch (error) {
     if (error instanceof Error) {
       const normalized = normalizeSyncError(error.message);

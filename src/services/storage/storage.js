@@ -33,6 +33,19 @@ const DELTAVA_TOUR_PROGRESS_FILE = "dva-tour-progress.json";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const loggedCorruptStorageFiles = new Set();
+const OBSOLETE_SCHEDULE_FIELDS = [
+  "mtow",
+  "mlw",
+  "maxPax",
+  "compatibleEquipment",
+  "compatibleEquipmentLabel",
+  "compatibleFamilies",
+  "compatibleFamiliesLabel",
+  "compatibilityCount",
+  "compatibilityStatus",
+  "compatibilityReason",
+  "compatibilityRef"
+];
 
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -96,24 +109,6 @@ function getDefaultSimBriefSettings() {
     dispatchUnits: "LBS",
     customAirframes: []
   };
-}
-
-function buildCompactLabel(values, visibleCount) {
-  if (!values.length) {
-    return "None";
-  }
-
-  if (values.length <= visibleCount) {
-    return values.join(", ");
-  }
-
-  return `${values.slice(0, visibleCount).join(", ")} +${values.length - visibleCount}`;
-}
-
-function buildCompatibilityReason(compatibleEquipment) {
-  return compatibleEquipment.length
-    ? `${compatibleEquipment.length} equipment profiles are within the route range.`
-    : "No aircraft profiles are within the route range.";
 }
 
 function toClockValue(isoValue) {
@@ -442,30 +437,8 @@ async function decompressPersistedPayload(payloadEncoding, payload) {
   return textDecoder.decode(decompressed);
 }
 
-function buildPersistedCompatibilityCatalog(flights = []) {
-  const compatibilityCatalog = [];
-  const compatibilityMap = new Map();
-
-  const persistedFlights = flights.map((flight) => {
-    const compatibleEquipment = Array.isArray(flight.compatibleEquipment)
-      ? [...flight.compatibleEquipment]
-      : [];
-    const compatibleFamilies = Array.isArray(flight.compatibleFamilies)
-      ? [...flight.compatibleFamilies]
-      : [];
-    const compatibilityKey = JSON.stringify([compatibleEquipment, compatibleFamilies]);
-    let compatibilityRef = compatibilityMap.get(compatibilityKey);
-
-    if (compatibilityRef === undefined) {
-      compatibilityRef = compatibilityCatalog.length;
-      compatibilityCatalog.push({
-        compatibleEquipment,
-        compatibleFamilies
-      });
-      compatibilityMap.set(compatibilityKey, compatibilityRef);
-    }
-
-    return {
+function buildPersistedFlights(flights = []) {
+  return flights.map((flight) => ({
       flightId: flight.flightId,
       flightCode: flight.flightCode,
       flightNumber: deriveFlightNumber(flight),
@@ -487,9 +460,15 @@ function buildPersistedCompatibilityCatalog(flights = []) {
       staUtc: flight.staUtc,
       stdUtcMillis: flight.stdUtcMillis,
       staUtcMillis: flight.staUtcMillis,
-      mtow: flight.mtow,
-      mlw: flight.mlw,
-      maxPax: flight.maxPax,
+      leg: flight.leg,
+      effectiveDate: flight.effectiveDate,
+      equipmentType: flight.equipmentType,
+      scheduleSource: flight.scheduleSource,
+      historic: flight.historic,
+      academy: flight.academy,
+      sourceDurationMinutes: flight.sourceDurationMinutes,
+      sourceArrivalClock: flight.sourceArrivalClock,
+      sourceDistanceMiles: flight.sourceDistanceMiles,
       blockMinutes: flight.blockMinutes,
       distanceNm: flight.distanceNm,
       selectedAircraft:
@@ -498,64 +477,47 @@ function buildPersistedCompatibilityCatalog(flights = []) {
         String(flight.simbriefSelectedType || "").trim(),
       simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
       boardSequence: Number.isInteger(flight.boardSequence) ? flight.boardSequence : null,
-      compatibilityRef,
       notes: flight.notes || ""
-    };
-  });
-
-  return { compatibilityCatalog, persistedFlights };
+    }));
 }
 
 function createPersistedSchedule(savedSchedule) {
-  const { compatibilityCatalog, persistedFlights } = buildPersistedCompatibilityCatalog(
-    savedSchedule?.flights || []
-  );
-
   return {
     importedAt: savedSchedule.importedAt,
     sourceFileName: savedSchedule.sourceFileName || null,
     importSummary: savedSchedule.importSummary || null,
     shortlist: Array.isArray(savedSchedule.shortlist) ? savedSchedule.shortlist : [],
     uiState: savedSchedule.uiState || null,
-    compatibilityCatalog,
-    flights: persistedFlights
+    scheduleMetadata: savedSchedule.scheduleMetadata || null,
+    flights: buildPersistedFlights(savedSchedule?.flights || [])
   };
 }
 
-function hydratePersistedFlight(flight, compatibilityEntry, shortlistSet) {
-  const compatibleEquipment = Array.isArray(compatibilityEntry?.compatibleEquipment)
-    ? compatibilityEntry.compatibleEquipment
-    : [];
-  const compatibleFamilies = Array.isArray(compatibilityEntry?.compatibleFamilies)
-    ? compatibilityEntry.compatibleFamilies
-    : [];
+function hydratePersistedFlight(flight, shortlistSet) {
+  const normalizedFlight = { ...flight };
+  for (const field of OBSOLETE_SCHEDULE_FIELDS) {
+    delete normalizedFlight[field];
+  }
 
   return {
-    ...flight,
-    route: `${flight.from}-${flight.to}`,
-    localDepartureClock: toClockValue(flight.stdLocal),
-    utcDepartureClock: toClockValue(flight.stdUtc),
-    flightNumber: deriveFlightNumber(flight),
-    airlineIcao: String(flight.airlineIcao || "").trim().toUpperCase(),
-    callsign: deriveCallsign(flight),
-    compatibleEquipment,
-    compatibleEquipmentLabel: buildCompactLabel(compatibleEquipment, 3),
-    compatibleFamilies,
-    compatibleFamiliesLabel: buildCompactLabel(compatibleFamilies, 3),
-    compatibilityCount: compatibleEquipment.length,
-    compatibilityStatus: compatibleEquipment.length ? "compatible" : "none",
-    compatibilityReason: buildCompatibilityReason(compatibleEquipment),
-    missingAirportIcaos: Array.isArray(flight.missingAirportIcaos) ? flight.missingAirportIcaos : [],
-    hasMissingAirportData: Boolean(flight.hasMissingAirportData),
+    ...normalizedFlight,
+    route: `${normalizedFlight.from}-${normalizedFlight.to}`,
+    localDepartureClock: toClockValue(normalizedFlight.stdLocal),
+    utcDepartureClock: toClockValue(normalizedFlight.stdUtc),
+    flightNumber: deriveFlightNumber(normalizedFlight),
+    airlineIcao: String(normalizedFlight.airlineIcao || "").trim().toUpperCase(),
+    callsign: deriveCallsign(normalizedFlight),
+    missingAirportIcaos: Array.isArray(normalizedFlight.missingAirportIcaos) ? normalizedFlight.missingAirportIcaos : [],
+    hasMissingAirportData: Boolean(normalizedFlight.hasMissingAirportData),
     selectedAircraft:
-      String(flight.selectedAircraft || "").trim() ||
-      getSelectedAircraftForFlight(flight) ||
-      String(flight.simbriefSelectedType || "").trim(),
+      String(normalizedFlight.selectedAircraft || "").trim() ||
+      getSelectedAircraftForFlight(normalizedFlight) ||
+      String(normalizedFlight.simbriefSelectedType || "").trim(),
     simbriefSelectedType: "",
-    simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
-    isShortlisted: shortlistSet.has(flight.flightId),
-    boardSequence: Number.isInteger(flight.boardSequence) ? flight.boardSequence : null,
-    notes: flight.notes || ""
+    simbriefPlan: normalizeSimBriefPlan(normalizedFlight.simbriefPlan),
+    isShortlisted: shortlistSet.has(normalizedFlight.flightId),
+    boardSequence: Number.isInteger(normalizedFlight.boardSequence) ? normalizedFlight.boardSequence : null,
+    notes: normalizedFlight.notes || ""
   };
 }
 
@@ -565,6 +527,7 @@ function hydratePersistedSchedule(savedSchedule) {
       importedAt: savedSchedule?.importedAt || null,
       sourceFileName: savedSchedule?.sourceFileName || null,
       importSummary: savedSchedule?.importSummary || null,
+      scheduleMetadata: savedSchedule?.scheduleMetadata || null,
       shortlist: Array.isArray(savedSchedule?.shortlist) ? savedSchedule.shortlist : [],
       uiState: savedSchedule?.uiState || null,
       flights: []
@@ -573,19 +536,14 @@ function hydratePersistedSchedule(savedSchedule) {
 
   const shortlist = Array.isArray(savedSchedule.shortlist) ? savedSchedule.shortlist : [];
   const shortlistSet = new Set(shortlist);
-  const compatibilityCatalog = Array.isArray(savedSchedule.compatibilityCatalog)
-    ? savedSchedule.compatibilityCatalog
-    : [];
-
   return {
     importedAt: savedSchedule.importedAt,
     sourceFileName: savedSchedule.sourceFileName || null,
     importSummary: savedSchedule.importSummary || null,
+    scheduleMetadata: savedSchedule.scheduleMetadata || null,
     shortlist,
     uiState: savedSchedule.uiState || null,
-    flights: savedSchedule.flights.map((flight) =>
-      hydratePersistedFlight(flight, compatibilityCatalog[flight.compatibilityRef], shortlistSet)
-    )
+    flights: savedSchedule.flights.map((flight) => hydratePersistedFlight(flight, shortlistSet))
   };
 }
 
@@ -614,22 +572,10 @@ async function parseSavedScheduleText(text) {
       importedAt: parsed.importedAt,
       sourceFileName: parsed.sourceFileName || null,
       importSummary: parsed.importSummary || null,
+      scheduleMetadata: parsed.scheduleMetadata || null,
       shortlist: Array.isArray(parsed.shortlist) ? parsed.shortlist : [],
       uiState: parsed.uiState || null,
-      compatibilityCatalog: Array.isArray(parsed.compatibilityCatalog)
-        ? parsed.compatibilityCatalog
-        : parsed.flights.map((flight) => ({
-            compatibleEquipment: Array.isArray(flight?.compatibleEquipment)
-              ? flight.compatibleEquipment
-              : [],
-            compatibleFamilies: Array.isArray(flight?.compatibleFamilies)
-              ? flight.compatibleFamilies
-              : []
-          })),
-      flights: parsed.flights.map((flight, index) => ({
-        ...flight,
-        compatibilityRef: Number.isInteger(flight?.compatibilityRef) ? flight.compatibilityRef : index
-      }))
+      flights: parsed.flights
     });
   }
 
@@ -1283,11 +1229,11 @@ async function pickTextFile({ accept, filterName, extensions }) {
   });
 }
 
-export async function pickXmlScheduleFile() {
+export async function pickJsonScheduleFile() {
   const selectedFile = await pickTextFile({
-    accept: ".xml,text/xml",
-    filterName: "Schedule XML",
-    extensions: ["xml"]
+    accept: ".json,application/json",
+    filterName: "Schedule JSON",
+    extensions: ["json"]
   });
 
   if (!selectedFile) {
@@ -1296,7 +1242,7 @@ export async function pickXmlScheduleFile() {
 
   return {
     fileName: selectedFile.fileName,
-    xmlText: selectedFile.text
+    scheduleText: selectedFile.text
   };
 }
 

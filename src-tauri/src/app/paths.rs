@@ -7,7 +7,7 @@ use tauri::{AppHandle, Manager};
 
 pub(crate) const ADDON_AIRPORT_CACHE_FILE: &str = "addon-airports.json";
 pub(crate) const MAIN_WINDOW_STATE_FILE: &str = "main-window-state.json";
-pub(crate) const DELTAVA_SYNC_DOWNLOAD_FILE: &str = "deltava-pfpxsched.xml";
+pub(crate) const DELTAVA_SCHEDULE_FILE: &str = "deltava-schedule.json";
 pub(crate) const DELTAVA_LOGBOOK_FALLBACK_FILE: &str = "dva-logbook.json";
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -56,7 +56,7 @@ fn is_legacy_download_file(path: &Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
         .map(|name| {
-            name.starts_with("deltava-pfpxsched-") && name.to_ascii_lowercase().ends_with(".xml")
+            name.starts_with("deltava-pfpxsched") && name.to_ascii_lowercase().ends_with(".xml")
         })
         .unwrap_or(false)
 }
@@ -72,7 +72,7 @@ fn prune_legacy_downloads(directory: &Path) {
     }
 }
 
-pub(crate) fn build_download_path(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn build_schedule_path(app: &AppHandle) -> Result<PathBuf, String> {
     let download_dir = deltava_sync_dir(app)?.join("downloads");
     fs::create_dir_all(&download_dir)
         .map_err(|error| format!("download_failed: Unable to create sync directory: {error}"))?;
@@ -82,7 +82,7 @@ pub(crate) fn build_download_path(app: &AppHandle) -> Result<PathBuf, String> {
         prune_legacy_downloads(&current_dir);
     }
 
-    Ok(download_dir.join(DELTAVA_SYNC_DOWNLOAD_FILE))
+    Ok(download_dir.join(DELTAVA_SCHEDULE_FILE))
 }
 
 pub(crate) fn build_logbook_dir(app: &AppHandle) -> Result<PathBuf, String> {

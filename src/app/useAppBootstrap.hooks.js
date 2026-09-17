@@ -270,6 +270,7 @@ export function useAppBootstrap({
       setShouldAwaitRestoredScheduleStartup(true);
       setSchedule({
         importedAt: savedSchedule.importedAt,
+        scheduleMetadata: savedSchedule.scheduleMetadata,
         flights: savedSchedule.flights,
         importSummary: savedSchedule.importSummary
       });
