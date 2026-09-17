@@ -429,7 +429,11 @@ export default function AppOverlayHost({
           >
             <SectionHeader eyebrow="Schedule" title="Schedule Out of Date" />
 
-            <p className={mutedTextClassName}>Please click <b>Sync Now</b> to add flights to the flight board.</p>
+            <p className={mutedTextClassName}>
+              This flight was added to the Flight Board, but the schedule is out of date. Flights
+              may be rejected by Delta Virtual if they are not on today&apos;s schedule. Sync now to
+              refresh the schedule or select Close to continue.
+            </p>
 
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={onCloseStaleScheduleBlocked}>
