@@ -259,6 +259,20 @@ export function getFlightTableColumns({
       )
     },
     {
+      key: "equipmentType",
+      label: "Aircraft",
+      compactLabel: "Type",
+      ariaLabel: "Aircraft Type",
+      role: "shortCode",
+      compactMinWidth: 72,
+      minWidth: 96,
+      fr: 0.65,
+      align: "left",
+      sortable: true,
+      sortKey: "equipmentType",
+      renderCell: (row) => row?.equipmentType ?? "—"
+    },
+    {
       key: "departureTime",
       label: "STD Local",
       compactLabel: "STD",
