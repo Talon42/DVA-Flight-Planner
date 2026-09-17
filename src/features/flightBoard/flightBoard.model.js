@@ -39,6 +39,20 @@ function resolveNormalizedAircraftSelection(value) {
   return getAircraftDisplayName(value) || String(value || "").trim();
 }
 
+function toClockValue(isoValue) {
+  return typeof isoValue === "string" && isoValue.length >= 16 ? isoValue.slice(11, 16) : "";
+}
+
+// Normalizes optional absolute UTC milliseconds without manufacturing an epoch timestamp.
+export function normalizeUtcMillis(value) {
+  if (value === null || value === undefined || (typeof value === "string" && !value.trim())) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function createFlightBoard(name = DEFAULT_FLIGHT_BOARD_NAME, entries = []) {
   return {
     id: buildFlightBoardTabId(),
@@ -81,15 +95,18 @@ export function buildBoardEntryFromFlight(flight, overrides = {}) {
     staLocal: String(flight?.staLocal || "").trim(),
     stdUtc: String(flight?.stdUtc || "").trim(),
     staUtc: String(flight?.staUtc || "").trim(),
-    localDepartureClock: String(flight?.localDepartureClock || "").trim(),
-    utcDepartureClock: String(flight?.utcDepartureClock || "").trim(),
-    stdUtcMillis: Number(flight?.stdUtcMillis) || 0,
-    staUtcMillis: Number(flight?.staUtcMillis) || 0,
+    localDepartureClock:
+      String(flight?.localDepartureClock || "").trim() || toClockValue(flight?.stdLocal),
+    localArrivalClock:
+      String(flight?.localArrivalClock || "").trim() || toClockValue(flight?.staLocal),
+    stdUtcMillis: normalizeUtcMillis(flight?.stdUtcMillis),
+    staUtcMillis: normalizeUtcMillis(flight?.staUtcMillis),
     blockMinutes: Number.isFinite(flight?.blockMinutes) ? flight.blockMinutes : null,
     distanceNm: Number.isFinite(flight?.distanceNm) ? flight.distanceNm : null,
-    compatibleEquipment: Array.isArray(flight?.compatibleEquipment)
-      ? [...flight.compatibleEquipment]
-      : [],
+    leg: String(flight?.leg || "").trim(),
+    effectiveDate: String(flight?.effectiveDate || "").trim(),
+    equipmentType: String(flight?.equipmentType || "").trim(),
+    scheduleSource: String(flight?.scheduleSource || "").trim(),
     selectedAircraft,
     simbriefSelectedType: "",
     draftNetwork: normalizeDraftNetwork(
@@ -184,9 +201,9 @@ export function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     stdUtc: "",
     staUtc: "",
     localDepartureClock: "",
-    utcDepartureClock: "",
-    stdUtcMillis: 0,
-    staUtcMillis: 0,
+    localArrivalClock: "",
+    stdUtcMillis: null,
+    staUtcMillis: null,
     blockMinutes: Number.isFinite(flight?.blockMinutes) ? flight.blockMinutes : null,
     blockTimeLabel: String(flight?.blockTimeLabel || "").trim(),
     departureTimeLabel: String(flight?.departureTimeLabel || "").trim(),
@@ -194,7 +211,6 @@ export function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     distanceMi: Number.isFinite(flight?.distanceMi ?? flight?.distance_mi)
       ? flight?.distanceMi ?? flight?.distance_mi
       : null,
-    compatibleEquipment: [],
     selectedAircraft,
     simbriefSelectedType: "",
     draftNetwork: normalizeDraftNetwork(
@@ -255,16 +271,21 @@ export function normalizeBoardEntry(entry) {
     staLocal: String(entry.staLocal || "").trim(),
     stdUtc: String(entry.stdUtc || "").trim(),
     staUtc: String(entry.staUtc || "").trim(),
-    localDepartureClock: String(entry.localDepartureClock || "").trim(),
-    utcDepartureClock: String(entry.utcDepartureClock || "").trim(),
-    stdUtcMillis: Number(entry.stdUtcMillis) || 0,
-    staUtcMillis: Number(entry.staUtcMillis) || 0,
+    localDepartureClock:
+      String(entry.localDepartureClock || "").trim() || toClockValue(entry.stdLocal),
+    localArrivalClock:
+      String(entry.localArrivalClock || "").trim() || toClockValue(entry.staLocal),
+    stdUtcMillis: normalizeUtcMillis(entry.stdUtcMillis),
+    staUtcMillis: normalizeUtcMillis(entry.staUtcMillis),
     blockMinutes: Number.isFinite(entry.blockMinutes) ? entry.blockMinutes : null,
     blockTimeLabel: String(entry.blockTimeLabel || "").trim(),
     departureTimeLabel: String(entry.departureTimeLabel || "").trim(),
     distanceNm: Number.isFinite(entry.distanceNm) ? entry.distanceNm : null,
     distanceMi: Number.isFinite(entry.distanceMi) ? entry.distanceMi : null,
-    compatibleEquipment: Array.isArray(entry.compatibleEquipment) ? [...entry.compatibleEquipment] : [],
+    leg: String(entry.leg || "").trim(),
+    effectiveDate: String(entry.effectiveDate || "").trim(),
+    equipmentType: String(entry.equipmentType || "").trim(),
+    scheduleSource: String(entry.scheduleSource || "").trim(),
     selectedAircraft: resolveNormalizedAircraftSelection(
       entry.selectedAircraft || entry.simbriefSelectedType || ""
     ),

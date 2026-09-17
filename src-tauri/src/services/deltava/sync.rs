@@ -1,5 +1,4 @@
 use std::{
-    fs,
     sync::{Arc, Mutex},
     time::Instant,
 };
@@ -58,9 +57,7 @@ pub(crate) async fn start_deltava_sync(
     let started_at = Instant::now();
     close_deltava_sync_window(app.clone());
 
-    let download_path = crate::app::paths::build_download_path(&app)?;
     let webview_data_directory = build_webview_data_directory(&app)?;
-    let _ = fs::remove_file(&download_path);
 
     let focus_lost_at = Arc::new(Mutex::new(None::<Instant>));
     let (auth_context, auth_loaded_from_storage) = match read_auth_context_internal(&app) {
@@ -90,7 +87,7 @@ pub(crate) async fn start_deltava_sync(
         crate::services::deltava::login::build_deltava_login_automation_script(
             &auth_context,
             DELTAVA_LOGIN_URL,
-            "https://www.deltava.org/pfpxsched.ws",
+            "https://www.deltava.org/search.ws",
             &sync_nonce,
         );
     let auto_sync_script = build_deltava_auto_sync_script(&sync_nonce);
@@ -107,7 +104,6 @@ pub(crate) async fn start_deltava_sync(
     let _window = match window_factory::build_deltava_sync_window(
         app.clone(),
         webview_data_directory,
-        download_path,
         sync_nonce,
         debug_enabled,
         login_automation_script,

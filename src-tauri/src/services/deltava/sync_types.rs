@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeltaSyncPayload {
     pub file_name: Option<String>,
-    pub xml_text: Option<String>,
+    pub schedule_text: Option<String>,
     pub status: String,
-    pub xml_status: String,
+    pub schedule_status: String,
     pub logbook_status: String,
     pub accomplishment_eligibility: Option<DeltaAccomplishmentEligibilitySummary>,
     pub logbook_json: Option<DeltaLogbookArtifact>,
@@ -74,7 +74,7 @@ pub(crate) struct DeltaAccomplishmentEligibilitySummary {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeltaWebSyncResult {
     pub nonce: String,
-    pub xml: DeltaWebXmlResult,
+    pub schedule: DeltaWebScheduleResult,
     pub logbook: DeltaWebLogbookResult,
     #[serde(default)]
     pub accomplishments: Option<DeltaWebAccomplishmentsResult>,
@@ -89,16 +89,9 @@ pub(crate) struct DeltaWebDebugMessage {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct DeltaWebXmlCaptureMessage {
-    pub nonce: String,
-    pub xml_text: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct DeltaWebXmlResult {
+pub(crate) struct DeltaWebScheduleResult {
     pub ok: bool,
-    pub xml_text: Option<String>,
+    pub schedule_text: Option<String>,
     pub error: Option<String>,
 }
 

@@ -1,8 +1,9 @@
-import { formatDistanceNm, formatDuration, formatNumber, formatUtc } from "../../domain/formatting/formatters.js";
+import { formatDistanceNm, formatDuration, formatNumber } from "../../domain/formatting/formatters.js";
 import { getAirlineLogo, getAirlineLogoClassName } from "../../domain/airlines/airlineBranding.js";
 import planeLight from "../../data/images/plane_light.png";
 import { cn } from "../../components/ui/cn";
 import { bodySmTextClassName, bodyMdTextClassName, labelTextClassName } from "../../components/ui/typography";
+import { formatScheduleLocalDeparture } from "./detailsFlightBoardCardSummary.model.js";
 
 function simplifyAirportName(value) {
   const normalized = String(value || "").trim();
@@ -137,7 +138,7 @@ export default function DetailsFlightBoardCardSummary({ flight, selectedAccompli
     : formatDuration(flight.blockMinutes);
   const boardMetaTimeLabel = flight?.isTourFlight
     ? String(flight?.departureTimeLabel || "").trim() || "N/A"
-    : formatUtc(flight.stdUtc);
+    : formatScheduleLocalDeparture(flight.stdLocal, flight.localDepartureClock);
 
   return (
     <div className="route-banner route-banner--board grid min-w-0 gap-2 rounded-none bg-[var(--route-banner)] px-3 py-2.5 text-[var(--text-primary)] bp-1024:gap-1.5 bp-1024:px-2.5 bp-1024:py-2 dark:text-white">

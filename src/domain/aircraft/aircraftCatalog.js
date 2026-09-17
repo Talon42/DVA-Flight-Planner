@@ -142,7 +142,7 @@ export function resolveAircraftProfileOptionType(value) {
   return aircraftProfileAliasMap.get(normalizedValue) || "";
 }
 
-function getAircraftRangeAndWeightEligibility(profile, flight) {
+function getAircraftRangeEligibility(profile, flight) {
   if (!profile || !flight) {
     return false;
   }
@@ -155,40 +155,7 @@ function getAircraftRangeAndWeightEligibility(profile, flight) {
     return false;
   }
 
-  if (Number.isFinite(flight.mtow)) {
-    if (!Number.isFinite(profile.maximumTakeoffWeight)) {
-      return false;
-    }
-
-    if (profile.maximumTakeoffWeight > flight.mtow) {
-      return false;
-    }
-  }
-
-  if (Number.isFinite(flight.mlw)) {
-    if (!Number.isFinite(profile.maximumLandingWeight)) {
-      return false;
-    }
-
-    if (profile.maximumLandingWeight > flight.mlw) {
-      return false;
-    }
-  }
-
   return true;
-}
-
-// Applies the Basic Filters aircraft rule using route range plus imported schedule weight caps.
-export function supportsFlightByBasicAircraftFilterLimits(flight, equipmentType) {
-  ensureAircraftCatalogLoaded();
-
-  const normalizedType = String(equipmentType || "").trim().toUpperCase();
-  if (!normalizedType) {
-    return true;
-  }
-
-  const profile = aircraftProfileMap.get(normalizedType);
-  return getAircraftRangeAndWeightEligibility(profile, flight);
 }
 
 // Mirrors the Basic rule today so Duty Schedule stays behaviorally aligned, but keeps a separate
@@ -201,5 +168,5 @@ export function supportsFlightByDutyEquipmentLimits(flight, equipmentType) {
   }
 
   const profile = aircraftProfileMap.get(normalizedType);
-  return getAircraftRangeAndWeightEligibility(profile, flight);
+  return getAircraftRangeEligibility(profile, flight);
 }

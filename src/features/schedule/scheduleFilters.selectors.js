@@ -1,5 +1,4 @@
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
-import { supportsFlightByBasicAircraftFilterLimits } from "../../domain/aircraft/aircraftCatalog.js";
 import { matchesLocalTimeWindow } from "../../domain/time/clock";
 import { matchesVatsimCoverageMode } from "../../domain/vatsim/vatsimCoverage.js";
 
@@ -12,8 +11,7 @@ export function matchesSearch(flight, query) {
   const haystack = [
     flight.flightCode,
     flight.airlineName,
-    flight.compatibleEquipmentLabel,
-    flight.compatibleFamiliesLabel,
+    flight.equipmentType,
     flight.from,
     flight.to,
     flight.route,
@@ -128,13 +126,14 @@ export function selectFilteredScheduleFlights({
       return false;
     }
 
-    if (
-      filters.equipment.length &&
-      !filters.equipment.every((equipment) =>
-        supportsFlightByBasicAircraftFilterLimits(flight, equipment)
-      )
-    ) {
-      return false;
+    if (filters.equipment.length) {
+      const scheduledEquipment = String(flight.equipmentType || "").trim().toUpperCase();
+      const selectedEquipment = filters.equipment.map((equipment) =>
+        String(equipment || "").trim().toUpperCase()
+      );
+      if (!selectedEquipment.includes(scheduledEquipment)) {
+        return false;
+      }
     }
 
     if (flight.blockMinutes < filters.flightLengthMin || flight.blockMinutes > filters.flightLengthMax) {

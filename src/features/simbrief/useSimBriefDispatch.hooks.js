@@ -1,4 +1,3 @@
-import { DateTime } from "luxon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deriveCallsign, deriveFlightNumber } from "../../domain/flights/flightIdentity";
 import {
@@ -75,23 +74,7 @@ function buildSimBriefAircraftTypeSummary({
   return summary;
 }
 
-// Returns the dispatch timestamp and SimBrief departure date in UTC.
-function deriveSimBriefDepartureDateTimeUtc(flight, useCurrentUtc = false) {
-  const fallbackUtc = DateTime.utc().set({ second: 0, millisecond: 0 });
-  const scheduleUtc = !useCurrentUtc
-    ? DateTime.fromISO(String(flight?.stdUtc || "").trim(), { zone: "utc" })
-    : null;
-
-  const departureUtc =
-    scheduleUtc?.isValid === true
-      ? scheduleUtc.set({ second: 0, millisecond: 0 }).toUTC()
-      : fallbackUtc;
-
-  return {
-    departureTimeUtc: departureUtc.toISO(),
-    departureDate: departureUtc.toFormat("ddMMMyy").toUpperCase()
-  };
-}
+import { deriveSimBriefDepartureDateTimeUtc } from "./simBriefDispatchTime.model.js";
 
 function normalizeDispatchIdentifierPart(value) {
   return String(value || "")
@@ -417,9 +400,20 @@ export function useSimBriefDispatch({
           simBriefUseCurrentUtcForDispatchTime
         );
 
-        if (!flightNumber || !callsign || !departureTimeUtc || !departureDate) {
+        if (!departureTimeUtc || !departureDate) {
           const message =
-            "This flight is missing a dispatchable flight number, callsign, or departure date/time.";
+            "This flight has no absolute scheduled departure time. Enable Current UTC in SimBrief settings to dispatch it without schedule timing.";
+          setSimBriefDispatchState({
+            flightId,
+            isDispatching: false,
+            message
+          });
+          setStatusMessage?.(message);
+          return;
+        }
+
+        if (!flightNumber || !callsign) {
+          const message = "This flight is missing a dispatchable flight number or callsign.";
           setSimBriefDispatchState({
             flightId,
             isDispatching: false,

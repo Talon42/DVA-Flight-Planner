@@ -1,5 +1,6 @@
 use crate::app::paths::{
-    build_accomplishment_eligibility_path, build_logbook_dir, resolve_existing_logbook_json_path,
+    build_accomplishment_eligibility_path, build_logbook_dir, build_schedule_path,
+    resolve_existing_logbook_json_path,
 };
 use crate::services::deltava::draft::DVA_DRAFT_WEBVIEW_DIR;
 use crate::services::deltava::{
@@ -11,7 +12,7 @@ use crate::services::deltava::{
 };
 use crate::{
     append_sync_log, append_sync_log_debug, DELTAVA_LOGBOOK_FALLBACK_FILE,
-    DELTAVA_SYNC_DOWNLOAD_FILE,
+    DELTAVA_SCHEDULE_FILE,
 };
 use chrono::NaiveDate;
 use serde_json::Value;
@@ -337,8 +338,9 @@ fn sanitize_logbook_filename(filename_hint: Option<&str>) -> String {
 
 fn is_expected_cleanup_skip(error: &std::io::Error) -> bool {
     match error.raw_os_error() {
-        // ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION.
-        Some(5 | 32 | 33) => true,
+        // ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION /
+        // ERROR_DIR_NOT_EMPTY during best-effort WebView cleanup.
+        Some(5 | 32 | 33 | 145) => true,
         _ => false,
     }
 }
@@ -375,7 +377,7 @@ fn is_legacy_download_file(path: &Path) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
         .map(|name| {
-            name.starts_with("deltava-pfpxsched-") && name.to_ascii_lowercase().ends_with(".xml")
+            name.starts_with("deltava-pfpxsched") && name.to_ascii_lowercase().ends_with(".xml")
         })
         .unwrap_or(false)
 }
@@ -554,7 +556,146 @@ pub(crate) async fn store_logbook_json(
     })
 }
 
-/// Builds the final Delta sync payload once the webview has downloaded both artifacts.
+fn schedule_scalar_is_present(value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::String(value)) => !value.trim().is_empty(),
+        Some(Value::Number(_)) | Some(Value::Bool(_)) => true,
+        _ => false,
+    }
+}
+
+fn validate_schedule_json(schedule_text: &str) -> Result<usize, String> {
+    let schedule = serde_json::from_str::<Value>(schedule_text)
+        .map_err(|error| format!("invalid_json: Delta Virtual schedule JSON was invalid: {error}"))?;
+    let object = schedule
+        .as_object()
+        .ok_or_else(|| "invalid_schedule: Delta Virtual schedule response must be an object.".to_string())?;
+    let sources = object
+        .get("sources")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "invalid_schedule: Delta Virtual schedule response is missing sources.".to_string())?;
+    let results = object
+        .get("results")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "invalid_schedule: Delta Virtual schedule response is missing results.".to_string())?;
+
+    if results.len() <= 250 {
+        return Err(format!(
+            "schedule_truncated: Delta Virtual returned only {} schedule rows; the schedule service may be truncated.",
+            results.len()
+        ));
+    }
+
+    for (index, entry) in results.iter().enumerate() {
+        let row = entry.as_object().ok_or_else(|| {
+            format!("invalid_schedule: Delta Virtual schedule row {} is not an object.", index + 1)
+        })?;
+        for field in ["airline", "flight", "leg", "eqType", "src"] {
+            if !schedule_scalar_is_present(row.get(field)) {
+                return Err(format!(
+                    "invalid_schedule: Delta Virtual schedule row {} is missing {}.",
+                    index + 1,
+                    field
+                ));
+            }
+        }
+
+        for field in ["airportD", "airportA", "timeD"] {
+            if !row.get(field).is_some_and(Value::is_object) {
+                return Err(format!(
+                    "invalid_schedule: Delta Virtual schedule row {} is missing {}.",
+                    index + 1,
+                    field
+                ));
+            }
+        }
+
+        for field in ["airportD", "airportA"] {
+            if !row
+                .get(field)
+                .and_then(Value::as_object)
+                .and_then(|airport| airport.get("icao"))
+                .and_then(Value::as_str)
+                .is_some_and(|icao| !icao.trim().is_empty())
+            {
+                return Err(format!(
+                    "invalid_schedule: Delta Virtual schedule row {} is missing {}.icao.",
+                    index + 1,
+                    field
+                ));
+            }
+        }
+
+        let has_departure_clock = row
+            .get("timeD")
+            .and_then(Value::as_object)
+            .is_some_and(|time| {
+                time.get("text").and_then(Value::as_str).is_some_and(|text| !text.trim().is_empty())
+                    || time.get("h").is_some()
+                    || time.get("m").is_some()
+                    || time.get("s").is_some()
+            });
+        if !has_departure_clock {
+            return Err(format!(
+                "invalid_schedule: Delta Virtual schedule row {} is missing timeD.",
+                index + 1
+            ));
+        }
+
+        let source_id = row.get("src").and_then(Value::as_str).unwrap_or_default();
+        if !sources
+            .get(source_id)
+            .and_then(Value::as_object)
+            .and_then(|source| source.get("effectiveDate"))
+            .and_then(Value::as_i64)
+            .is_some()
+        {
+            return Err(format!(
+                "invalid_schedule: Delta Virtual schedule row {} references a source without effectiveDate.",
+                index + 1
+            ));
+        }
+    }
+
+    Ok(results.len())
+}
+
+async fn store_schedule_json(app: &AppHandle, schedule_text: &str) -> Result<(), String> {
+    let schedule_path = build_schedule_path(app)?;
+    let temp_path = schedule_path.with_extension("json.tmp");
+    let backup_path = schedule_path.with_extension("json.bak");
+    tokio::fs::write(&temp_path, schedule_text.as_bytes())
+        .await
+        .map_err(|error| format!("download_failed: Unable to write schedule JSON: {error}"))?;
+
+    let had_existing_schedule = schedule_path.exists();
+    if had_existing_schedule {
+        if backup_path.exists() {
+            tokio::fs::remove_file(&backup_path).await.map_err(|error| {
+                format!("download_failed: Unable to prepare schedule backup: {error}")
+            })?;
+        }
+        tokio::fs::rename(&schedule_path, &backup_path)
+            .await
+            .map_err(|error| format!("download_failed: Unable to prepare schedule replacement: {error}"))?;
+    }
+
+    if let Err(error) = tokio::fs::rename(&temp_path, &schedule_path).await {
+        if had_existing_schedule {
+            let _ = tokio::fs::rename(&backup_path, &schedule_path).await;
+        }
+        let _ = tokio::fs::remove_file(&temp_path).await;
+        return Err(format!("download_failed: Unable to store schedule JSON: {error}"));
+    }
+
+    if had_existing_schedule {
+        let _ = tokio::fs::remove_file(&backup_path).await;
+    }
+
+    Ok(())
+}
+
+/// Builds the final Delta sync payload once the webview has fetched both artifacts.
 pub(crate) async fn build_delta_sync_payload_from_web_result(
     app: &AppHandle,
     result: DeltaWebSyncResult,
@@ -562,21 +703,30 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
 ) -> Result<crate::DeltaSyncPayload, String> {
     let mut warnings = Vec::new();
 
-    let xml_text = if result.xml.ok {
-        let xml_text = result.xml.xml_text.unwrap_or_default();
-        let trimmed = xml_text.trim_start();
-        if !trimmed.starts_with('<') || !xml_text.contains("<FLIGHT>") {
-            warnings.push("Delta Virtual returned an invalid schedule XML response.".into());
-            None
-        } else {
-            Some(xml_text)
+    let schedule_text = if result.schedule.ok {
+        let schedule_text = result.schedule.schedule_text.unwrap_or_default();
+        match validate_schedule_json(&schedule_text) {
+            Ok(row_count) => match store_schedule_json(app, &schedule_text).await {
+                Ok(()) => {
+                    append_sync_log_debug(debug_enabled, &format!("schedule:validated rows={row_count}"));
+                    Some(schedule_text)
+                }
+                Err(error) => {
+                    warnings.push(error);
+                    None
+                }
+            },
+            Err(error) => {
+                warnings.push(error);
+                None
+            }
         }
     } else {
         warnings.push(
             result
-                .xml
+                .schedule
                 .error
-                .unwrap_or_else(|| "Delta Virtual schedule XML download failed.".into()),
+                .unwrap_or_else(|| "Delta Virtual schedule download failed.".into()),
         );
         None
     };
@@ -636,7 +786,7 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         None
     };
 
-    let xml_status = if xml_text.is_some() {
+    let schedule_status = if schedule_text.is_some() {
         "success"
     } else {
         "failed"
@@ -649,7 +799,7 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
     }
     .to_string();
 
-    if xml_text.is_none() && logbook_json.is_none() {
+    if schedule_text.is_none() && logbook_json.is_none() {
         return Err(format!(
             "download_failed: Delta Virtual sync failed. {}",
             summarize_warnings(&warnings)
@@ -657,7 +807,7 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         ));
     }
 
-    let status = if xml_text.is_some() && logbook_json.is_some() {
+    let status = if schedule_text.is_some() && logbook_json.is_some() {
         "success"
     } else {
         "partial"
@@ -665,12 +815,12 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
     .to_string();
 
     Ok(crate::DeltaSyncPayload {
-        file_name: xml_text
+        file_name: schedule_text
             .as_ref()
-            .map(|_| DELTAVA_SYNC_DOWNLOAD_FILE.to_string()),
-        xml_text,
+            .map(|_| DELTAVA_SCHEDULE_FILE.to_string()),
+        schedule_text,
         status,
-        xml_status,
+        schedule_status,
         logbook_status,
         accomplishment_eligibility,
         logbook_json,
@@ -696,7 +846,7 @@ pub(crate) fn prune_deltava_storage(
 
     if remove_downloaded_schedule {
         let download_dir = local_data_dir.join("deltava-sync").join("downloads");
-        remove_path_if_exists(&download_dir.join(DELTAVA_SYNC_DOWNLOAD_FILE));
+        remove_path_if_exists(&download_dir.join(DELTAVA_SCHEDULE_FILE));
         prune_legacy_downloads(&download_dir);
     }
 }
@@ -837,5 +987,59 @@ mod tests {
             arrival_airports.into_iter().collect::<Vec<_>>(),
             vec!["KJFK".to_string()]
         );
+    }
+
+    #[test]
+    fn schedule_validation_rejects_truncated_results() {
+        let schedule = serde_json::json!({
+            "sources": {},
+            "results": vec![serde_json::json!({}) ; 250]
+        });
+        let text = serde_json::to_string(&schedule).expect("schedule json");
+
+        let error = validate_schedule_json(&text).expect_err("truncated schedule");
+        assert!(error.contains("returned only 250 schedule rows"));
+    }
+
+    #[test]
+    fn schedule_validation_accepts_a_complete_structural_payload() {
+        let mut results = Vec::new();
+        for index in 0..251 {
+            results.push(serde_json::json!({
+                "airline": "DL",
+                "flight": index + 1,
+                "leg": 1,
+                "eqType": "B739",
+                "src": "AVSTACK",
+                "airportD": {"icao": "KBOS"},
+                "airportA": {"icao": "KDCA"},
+                "timeD": {"h": 6, "m": 0, "s": 0}
+            }));
+        }
+        let schedule = serde_json::json!({
+            "sources": {"AVSTACK": {"effectiveDate": 1786406400000i64}},
+            "results": results
+        });
+        let text = serde_json::to_string(&schedule).expect("schedule json");
+
+        assert_eq!(validate_schedule_json(&text).expect("complete schedule"), 251);
+    }
+
+    #[test]
+    fn expected_cleanup_skip_classifies_known_windows_cleanup_errors() {
+        for raw_error in [5, 32, 33, 145] {
+            let error = std::io::Error::from_raw_os_error(raw_error);
+            assert!(
+                is_expected_cleanup_skip(&error),
+                "Windows cleanup error {raw_error} should be expected"
+            );
+        }
+    }
+
+    #[test]
+    fn unexpected_cleanup_error_is_not_suppressed() {
+        let error = std::io::Error::from_raw_os_error(87);
+
+        assert!(!is_expected_cleanup_skip(&error));
     }
 }

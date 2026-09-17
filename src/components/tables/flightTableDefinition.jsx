@@ -260,7 +260,7 @@ export function getFlightTableColumns({
     },
     {
       key: "departureTime",
-      label: "STD UTC",
+      label: "STD Local",
       compactLabel: "STD",
       role: "time",
       compactMinWidth: 96,
@@ -268,17 +268,17 @@ export function getFlightTableColumns({
       fr: 0.8,
       align: "left",
       required: false,
-      optionalGroup: "utcTimes",
+      optionalGroup: "localTimes",
       optionalPriority: 1,
       sortable: true,
-      sortKey: "stdUtcMillis",
+      sortKey: "localDepartureClock",
       isTimeColumn: true,
-      ariaLabel: "Scheduled Time of Departure UTC",
-      renderCell: (row) => formatTimeOnly(row.stdUtc)
+      ariaLabel: "Scheduled Time of Departure Local",
+      renderCell: (row) => row.localDepartureClock || formatTimeOnly(row.stdLocal)
     },
     {
       key: "arrivalTime",
-      label: "STA UTC",
+      label: "STA Local",
       compactLabel: "STA",
       role: "time",
       compactMinWidth: 96,
@@ -286,13 +286,13 @@ export function getFlightTableColumns({
       fr: 0.8,
       align: "left",
       required: false,
-      optionalGroup: "utcTimes",
+      optionalGroup: "localTimes",
       optionalPriority: 1,
       sortable: true,
-      sortKey: "staUtcMillis",
+      sortKey: "localArrivalClock",
       isTimeColumn: true,
-      ariaLabel: "Scheduled Time of Arrival UTC",
-      renderCell: (row) => formatTimeOnly(row.staUtc)
+      ariaLabel: "Scheduled Time of Arrival Local",
+      renderCell: (row) => row.localArrivalClock || formatTimeOnly(row.staLocal)
     },
     {
       key: "distanceNm",

@@ -4,7 +4,7 @@ self.onmessage = (event) => {
   try {
     const payload = parseScheduleImport(
       event.data.fileName,
-      event.data.xmlText,
+      event.data.scheduleText,
       (message) => {
         self.postMessage({
           type: "debug",

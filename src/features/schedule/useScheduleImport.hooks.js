@@ -18,8 +18,45 @@ import {
 } from "../flightBoard/flightBoard.model.js";
 
 // Rebuilds active-board entries against a fresh flight list so saved shortlist state stays valid.
+function buildScheduleSemanticKey(flight, includeLeg = true) {
+  const airline = String(flight?.airline || "").trim().toUpperCase();
+  const flightNumber = String(flight?.flightNumber || "").trim();
+  const from = String(flight?.from || "").trim().toUpperCase();
+  const to = String(flight?.to || "").trim().toUpperCase();
+  const effectiveDate = String(flight?.effectiveDate || flight?.stdLocal?.slice(0, 10) || "").trim();
+  const departureClock = String(
+    flight?.localDepartureClock || flight?.stdLocal?.slice(11, 19) || ""
+  ).trim();
+  const leg = String(flight?.leg || "").trim();
+
+  if (!airline || !flightNumber || !from || !to || !effectiveDate || !departureClock) {
+    return "";
+  }
+
+  return [airline, flightNumber, includeLeg ? leg : "", from, to, effectiveDate, departureClock].join("|");
+}
+
+function buildUniqueScheduleMap(flights, includeLeg) {
+  const map = new Map();
+  for (const flight of flights || []) {
+    const key = buildScheduleSemanticKey(flight, includeLeg);
+    if (!key) {
+      continue;
+    }
+
+    if (map.has(key)) {
+      map.set(key, null);
+    } else {
+      map.set(key, flight);
+    }
+  }
+  return map;
+}
+
 function reconcileBoardWithSchedule(currentBoard, nextFlights) {
   const flightsById = new Map((nextFlights || []).map((flight) => [flight.flightId, flight]));
+  const flightsBySemanticKey = buildUniqueScheduleMap(nextFlights, true);
+  const flightsByLegacySemanticKey = buildUniqueScheduleMap(nextFlights, false);
 
   return (currentBoard || [])
     .map((entry) => {
@@ -32,9 +69,13 @@ function reconcileBoardWithSchedule(currentBoard, nextFlights) {
         return normalizedEntry;
       }
 
-      const matchedFlight = normalizedEntry.linkedFlightId
+      const matchedFlightById = normalizedEntry.linkedFlightId
         ? flightsById.get(normalizedEntry.linkedFlightId)
         : null;
+      const matchedFlightBySemantics = normalizedEntry.leg
+        ? flightsBySemanticKey.get(buildScheduleSemanticKey(normalizedEntry, true))
+        : flightsByLegacySemanticKey.get(buildScheduleSemanticKey(normalizedEntry, false));
+      const matchedFlight = matchedFlightById || matchedFlightBySemantics || null;
 
       if (!matchedFlight) {
         return {
@@ -77,6 +118,7 @@ function buildSavedSchedule(schedule, uiState) {
     importedAt: schedule.importedAt,
     sourceFileName: schedule.importSummary?.sourceFileName || null,
     importSummary: schedule.importSummary,
+    scheduleMetadata: schedule.scheduleMetadata || null,
     flights: schedule.flights,
     shortlist: activeBoardEntries.map((entry) => entry.linkedFlightId).filter(Boolean),
     uiState
@@ -93,7 +135,6 @@ export function useScheduleImport({
   flightBoards = [],
   plannerControlsCollapsed = false,
   plannerMode = "basic",
-  scheduleTableTimeDisplayMode = "local",
   scheduleView = "flights",
   selectedAccomplishmentName = "",
   selectedFlightId = null,
@@ -134,8 +175,6 @@ export function useScheduleImport({
         basicAdvancedFiltersOpen:
           overrides.basicAdvancedFiltersOpen ?? basicAdvancedFiltersOpen,
         basicAddonFiltersOpen: overrides.basicAddonFiltersOpen ?? basicAddonFiltersOpen,
-        scheduleTableTimeDisplayMode:
-          overrides.scheduleTableTimeDisplayMode ?? scheduleTableTimeDisplayMode,
         sort: overrides.sort ?? sort,
         selectedFlightId: overrides.selectedFlightId ?? selectedFlightId,
         scheduleView: overrides.scheduleView ?? scheduleView,
@@ -186,7 +225,6 @@ export function useScheduleImport({
       flightBoards,
       plannerControlsCollapsed,
       plannerMode,
-      scheduleTableTimeDisplayMode,
       scheduleView,
       selectedAccomplishmentName,
       selectedFlightId,
@@ -225,7 +263,7 @@ export function useScheduleImport({
       try {
         const imported = await runScheduleImport(
           scheduleFile.fileName,
-          scheduleFile.xmlText,
+          scheduleFile.scheduleText,
           appendDebug
         );
         importIssuesText = imported.importLog || "";
@@ -251,6 +289,7 @@ export function useScheduleImport({
         );
         const nextSchedule = {
           importedAt: imported.importedAt,
+          scheduleMetadata: imported.scheduleMetadata,
           flights: imported.flights,
           importSummary: {
             ...imported.importSummary,
@@ -299,7 +338,6 @@ export function useScheduleImport({
           file: scheduleFile.fileName,
           importedRows: imported.importSummary?.importedRows ?? imported.flights.length,
           omittedRows: imported.importSummary?.omittedRows ?? 0,
-          incompatibleRoutes: imported.importSummary?.incompatibleRoutes ?? 0,
           durationMs: Date.now() - startedAtMs
         });
         onScheduleImported?.(imported, nextSchedule);
