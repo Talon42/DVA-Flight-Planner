@@ -338,8 +338,9 @@ fn sanitize_logbook_filename(filename_hint: Option<&str>) -> String {
 
 fn is_expected_cleanup_skip(error: &std::io::Error) -> bool {
     match error.raw_os_error() {
-        // ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION.
-        Some(5 | 32 | 33) => true,
+        // ERROR_ACCESS_DENIED / ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION /
+        // ERROR_DIR_NOT_EMPTY during best-effort WebView cleanup.
+        Some(5 | 32 | 33 | 145) => true,
         _ => false,
     }
 }
@@ -1022,5 +1023,23 @@ mod tests {
         let text = serde_json::to_string(&schedule).expect("schedule json");
 
         assert_eq!(validate_schedule_json(&text).expect("complete schedule"), 251);
+    }
+
+    #[test]
+    fn expected_cleanup_skip_classifies_known_windows_cleanup_errors() {
+        for raw_error in [5, 32, 33, 145] {
+            let error = std::io::Error::from_raw_os_error(raw_error);
+            assert!(
+                is_expected_cleanup_skip(&error),
+                "Windows cleanup error {raw_error} should be expected"
+            );
+        }
+    }
+
+    #[test]
+    fn unexpected_cleanup_error_is_not_suppressed() {
+        let error = std::io::Error::from_raw_os_error(87);
+
+        assert!(!is_expected_cleanup_skip(&error));
     }
 }
