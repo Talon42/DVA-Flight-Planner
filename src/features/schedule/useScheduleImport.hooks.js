@@ -135,7 +135,6 @@ export function useScheduleImport({
   flightBoards = [],
   plannerControlsCollapsed = false,
   plannerMode = "basic",
-  scheduleTableTimeDisplayMode = "local",
   scheduleView = "flights",
   selectedAccomplishmentName = "",
   selectedFlightId = null,
@@ -176,8 +175,6 @@ export function useScheduleImport({
         basicAdvancedFiltersOpen:
           overrides.basicAdvancedFiltersOpen ?? basicAdvancedFiltersOpen,
         basicAddonFiltersOpen: overrides.basicAddonFiltersOpen ?? basicAddonFiltersOpen,
-        scheduleTableTimeDisplayMode:
-          overrides.scheduleTableTimeDisplayMode ?? scheduleTableTimeDisplayMode,
         sort: overrides.sort ?? sort,
         selectedFlightId: overrides.selectedFlightId ?? selectedFlightId,
         scheduleView: overrides.scheduleView ?? scheduleView,
@@ -228,7 +225,6 @@ export function useScheduleImport({
       flightBoards,
       plannerControlsCollapsed,
       plannerMode,
-      scheduleTableTimeDisplayMode,
       scheduleView,
       selectedAccomplishmentName,
       selectedFlightId,

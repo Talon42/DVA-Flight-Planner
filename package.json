@@ -9,7 +9,7 @@
     "lint:airports": "node scripts/audit-airport-timezone-labels.mjs",
     "build": "vite build",
     "lint": "eslint . --cache --cache-location .eslintcache",
-    "test:schedule": "vitest run src/domain/schedule/scheduleDate.test.js src/services/workers/parseSchedule.test.js src/features/schedule/scheduleFilters.selectors.test.js src/components/tables/flightTableDefinition.test.jsx src/features/details/detailsFlightBoardCardSummary.model.test.js",
+    "test:schedule": "vitest run src/domain/schedule/scheduleDate.test.js src/services/workers/parseSchedule.test.js src/features/schedule/scheduleFilters.selectors.test.js src/components/tables/flightTableDefinition.test.jsx src/features/details/detailsFlightBoardCardSummary.model.test.js src/features/flightBoard/flightBoard.model.test.js src/features/simbrief/simBriefDispatchTime.model.test.js src/logic/dutySchedule/buildDutySchedule.test.js",
     "preview": "vite preview",
     "tauri": "tauri"
   },

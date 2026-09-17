@@ -7,6 +7,7 @@ import {
   buildBoardEntryFromFlight,
   buildBoardEntryFromTourFlight,
   createFlightBoard,
+  normalizeUtcMillis,
   normalizeBoardEntry,
   normalizeFlightBoardName
 } from "./flightBoard.model.js";
@@ -29,10 +30,18 @@ function repairBoardEntryAgainstSchedule(entry, flights = []) {
     return null;
   }
 
-  const currentDepartureMillis = Number(normalizedEntry.stdUtcMillis) || 0;
+  const currentDepartureMillis = normalizeUtcMillis(normalizedEntry.stdUtcMillis);
   const repairedFlight = [...matches].sort((left, right) => {
-    const leftDelta = Math.abs((Number(left.stdUtcMillis) || 0) - currentDepartureMillis);
-    const rightDelta = Math.abs((Number(right.stdUtcMillis) || 0) - currentDepartureMillis);
+    const leftMillis = normalizeUtcMillis(left.stdUtcMillis);
+    const rightMillis = normalizeUtcMillis(right.stdUtcMillis);
+    const leftDelta =
+      currentDepartureMillis === null || leftMillis === null
+        ? Number.POSITIVE_INFINITY
+        : Math.abs(leftMillis - currentDepartureMillis);
+    const rightDelta =
+      currentDepartureMillis === null || rightMillis === null
+        ? Number.POSITIVE_INFINITY
+        : Math.abs(rightMillis - currentDepartureMillis);
     return leftDelta - rightDelta || left.flightId.localeCompare(right.flightId);
   })[0];
 

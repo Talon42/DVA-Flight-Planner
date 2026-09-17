@@ -7,4 +7,8 @@ describe("formatScheduleLocalDeparture", () => {
       "Sep 17, 21:30 Local"
     );
   });
+
+  it("falls back to the preserved local departure clock when the airport time is unresolved", () => {
+    expect(formatScheduleLocalDeparture(null, "12:40")).toBe("12:40 Local");
+  });
 });
