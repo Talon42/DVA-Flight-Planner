@@ -2487,7 +2487,7 @@
       "stateTerritory": "Germany",
       "runwayLength": 9896,
       "countryName": "Europe/Berlin",
-      "timezone": "52.56047859485743",
+      "timezone": "Europe/Berlin",
       "timezoneLabel": "CET",
       "takeoffRunways": [
         "Runway 26L, (7,947 feet, displaced 692 feet) - Heading 261°",

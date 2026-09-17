@@ -80,11 +80,11 @@ export function parseScheduleImport(fileName, scheduleText, debug = () => {}) {
       const fromAirport = airportMap.get(rawFlight.from);
       const toAirport = airportMap.get(rawFlight.to);
       const missingIcaos = [rawFlight.from, rawFlight.to].filter((icao) => !airportMap.has(icao));
-      const stdZone = fromAirport?.timezone || "UTC";
-      const staZone = toAirport?.timezone || "UTC";
+      const stdZone = fromAirport?.timezone || null;
+      const staZone = toAirport?.timezone || null;
       const stdResult = buildScheduleDateTime(rawFlight.effectiveDate, rawFlight.departureClock, stdZone);
       const stdLocal = stdResult.value;
-      const stdUtc = stdLocal.toUTC();
+      const stdUtc = stdLocal?.toUTC() || null;
       const distanceNm = fromAirport && toAirport
         ? calculateGreatCircleNm(
             fromAirport.latitude,
@@ -99,10 +99,11 @@ export function parseScheduleImport(fileName, scheduleText, debug = () => {}) {
       const blockMinutes = Number.isFinite(estimatedBlockMinutes)
         ? estimatedBlockMinutes
         : fallbackBlockMinutes;
-      const staUtc = Number.isFinite(blockMinutes)
+      const staUtc = stdUtc && Number.isFinite(blockMinutes)
         ? stdUtc.plus({ minutes: blockMinutes })
         : null;
-      const staLocal = staUtc ? staUtc.setZone(staZone) : null;
+      const staLocalResult = staUtc && staZone ? staUtc.setZone(staZone) : null;
+      const staLocal = staLocalResult?.isValid ? staLocalResult : null;
       const issuePrefix = `${rawFlight.airline}${rawFlight.flightNumber} ${rawFlight.from}-${rawFlight.to}`;
 
       if (missingIcaos.length) {
@@ -119,15 +120,15 @@ export function parseScheduleImport(fileName, scheduleText, debug = () => {}) {
         });
       }
 
-      if (stdResult.defaulted) {
+      if (stdResult.unresolved) {
         importIssues.push({
           severity: "warning",
-          kind: "invalid-time-defaulted",
+          kind: "unresolved-origin-timezone",
           flightId: buildFlightId(rawFlight),
           sourceFileName: fileName,
-          details: `${issuePrefix} imported with invalid departure time defaulted to 00:00.`,
+          details: `${issuePrefix} could not resolve the local departure datetime because origin timezone data is missing or invalid; preserved DVA local departure clock ${rawFlight.departureClock.slice(0, 5)}.`,
           loggedAt: importedAt,
-          defaultedScheduleTimes: {
+          preservedScheduleTimes: {
             std: true,
             rawStd: rawFlight.departureClock
           }
@@ -156,13 +157,13 @@ export function parseScheduleImport(fileName, scheduleText, debug = () => {}) {
         missingAirportIcaos: missingIcaos,
         hasMissingAirportData: missingIcaos.length > 0,
         effectiveDate: rawFlight.effectiveDate,
-        stdLocal: stdLocal.toISO(),
+        stdLocal: stdLocal?.toISO() || null,
         staLocal: staLocal?.toISO() || null,
-        stdUtc: stdUtc.toISO(),
+        stdUtc: stdUtc?.toISO() || null,
         staUtc: staUtc?.toISO() || null,
-        stdUtcMillis: stdUtc.toMillis(),
+        stdUtcMillis: stdUtc?.toMillis() ?? null,
         staUtcMillis: staUtc?.toMillis() ?? null,
-        localDepartureClock: stdLocal.toFormat("HH:mm"),
+        localDepartureClock: rawFlight.departureClock.slice(0, 5),
         localArrivalClock: staLocal?.toFormat("HH:mm") || "",
         equipmentType: rawFlight.equipmentType,
         scheduleSource: rawFlight.scheduleSource,
@@ -344,11 +345,15 @@ function readScheduleClock(value) {
 }
 
 function buildScheduleDateTime(dateToken, clock, zone) {
-  const normalizedClock = normalizeText(clock) || "00:00:00";
+  const normalizedClock = normalizeText(clock);
+  if (!normalizedClock || !normalizeText(zone)) {
+    return { value: null, unresolved: true };
+  }
+
   const value = DateTime.fromISO(`${dateToken}T${normalizedClock}`, { zone });
   return {
-    value: value.isValid ? value : DateTime.fromISO(`${dateToken}T00:00:00`, { zone: "UTC" }),
-    defaulted: !value.isValid
+    value: value.isValid ? value : null,
+    unresolved: !value.isValid
   };
 }
 

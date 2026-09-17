@@ -98,6 +98,63 @@ describe("parseScheduleImport", () => {
     expect(flight.utcDepartureClock).toBeUndefined();
   });
 
+  it("reconstructs EDDT departure using the corrected Europe/Berlin timezone", () => {
+    const { flight } = parseSingleFlight({
+      from: "EDDT",
+      to: "LFPG",
+      departure: "12:40:00"
+    });
+
+    expect(flight.fromTimezone).toBe("Europe/Berlin");
+    expect(flight.localDepartureClock).toBe("12:40");
+    expect(flight.stdLocal).toBe("2026-08-11T12:40:00.000+02:00");
+    expect(flight.stdUtc).toBe("2026-08-11T10:40:00.000Z");
+    expect(flight.localDepartureClock).not.toBe("00:00");
+  });
+
+  it("preserves a valid source departure clock when origin timezone resolution fails", () => {
+    const { result, flight } = parseSingleFlight({
+      from: "ZZZZ",
+      to: "KDCA",
+      departure: "12:40:00"
+    });
+
+    const timezoneIssue = result.importIssues.find((issue) => issue.kind === "unresolved-origin-timezone");
+    expect(flight.localDepartureClock).toBe("12:40");
+    expect(flight.stdLocal).toBeNull();
+    expect(flight.stdUtc).toBeNull();
+    expect(flight.stdUtcMillis).toBeNull();
+    expect(flight.staUtc).toBeNull();
+    expect(flight.staUtcMillis).toBeNull();
+    expect(flight.staLocal).toBeNull();
+    expect(flight.localArrivalClock).toBe("");
+    expect(timezoneIssue?.details).toContain("preserved DVA local departure clock 12:40");
+    expect(timezoneIssue?.details).not.toContain("defaulted to 00:00");
+  });
+
+  it("preserves a genuine midnight source departure without a timezone warning", () => {
+    const { result, flight } = parseSingleFlight({ departure: "00:00:00" });
+
+    expect(flight.localDepartureClock).toBe("00:00");
+    expect(flight.stdLocal).toBe("2026-08-11T00:00:00.000-04:00");
+    expect(flight.stdUtc).toBe("2026-08-11T04:00:00.000Z");
+    expect(result.importIssues.some((issue) => issue.kind === "unresolved-origin-timezone")).toBe(false);
+  });
+
+  it("keeps absolute arrival timing but leaves destination-local arrival unavailable without a destination timezone", () => {
+    const { flight } = parseSingleFlight({
+      from: "KBOS",
+      to: "ZZZZ",
+      departure: "06:00:00",
+      duration: 117 * 60_000
+    });
+
+    expect(flight.stdUtc).toBe("2026-08-11T10:00:00.000Z");
+    expect(flight.staUtc).toBe("2026-08-11T11:57:00.000Z");
+    expect(flight.staLocal).toBeNull();
+    expect(flight.localArrivalClock).toBe("");
+  });
+
   it("uses the calibrated reciprocal directional block-time model", () => {
     const routes = [
       ["KBOS", "KDCA", 346, 99],
@@ -143,7 +200,7 @@ describe("parseScheduleImport", () => {
 
   it("uses source duration only as the fallback when synthetic timing is unavailable", () => {
     const { flight } = parseSingleFlight({
-      from: "ZZZZ",
+      from: "KBOS",
       to: "YYYY",
       duration: 7_020_000,
       departure: "10:00:00",
@@ -152,12 +209,12 @@ describe("parseScheduleImport", () => {
 
     expect(flight.distanceNm).toBeNull();
     expect(flight.blockMinutes).toBe(117);
-    expect(flight.staUtc).toBe("2026-08-11T11:57:00.000Z");
+    expect(flight.staUtc).toBe("2026-08-11T15:57:00.000Z");
   });
 
   it("leaves arrival unavailable when neither planner nor DVA duration is valid", () => {
     const { flight } = parseSingleFlight({
-      from: "ZZZZ",
+      from: "KBOS",
       to: "YYYY",
       duration: null,
       arrival: "03:00:00"
