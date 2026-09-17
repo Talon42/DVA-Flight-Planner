@@ -9,6 +9,7 @@
     "lint:airports": "node scripts/audit-airport-timezone-labels.mjs",
     "build": "vite build",
     "lint": "eslint . --cache --cache-location .eslintcache",
+    "test:schedule": "vitest run src/services/workers/parseSchedule.test.js src/features/schedule/scheduleFilters.selectors.test.js",
     "preview": "vite preview",
     "tauri": "tauri"
   },
@@ -39,6 +40,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "tailwindcss": "^4.2.2",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "vitest": "^4.1.10"
   }
 }

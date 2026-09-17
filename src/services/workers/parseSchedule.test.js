@@ -13,7 +13,7 @@ function buildScheduleEntry({
   eqType = "B739",
   departure = "06:00:00",
   arrival = "07:57:00",
-  duration = 117,
+  duration = 117 * 60_000,
   distance = 400,
   src = "AVSTACK",
   historic = false,
@@ -142,7 +142,7 @@ describe("parseScheduleImport", () => {
     const { flight } = parseSingleFlight({
       from: "ZZZZ",
       to: "YYYY",
-      duration: 117,
+      duration: 7_020_000,
       departure: "10:00:00",
       arrival: "11:57:00"
     });
@@ -150,6 +150,34 @@ describe("parseScheduleImport", () => {
     expect(flight.distanceNm).toBeNull();
     expect(flight.blockMinutes).toBe(117);
     expect(flight.staUtc).toBe("2026-08-11T11:57:00.000Z");
+  });
+
+  it("converts a real DVA millisecond duration to rounded source minutes", () => {
+    const { flight } = parseSingleFlight({
+      from: "ZZZZ",
+      to: "YYYY",
+      duration: 7_020_000
+    });
+
+    expect(flight.sourceDurationMinutes).toBe(117);
+    expect(flight.blockMinutes).toBe(117);
+  });
+
+  it("converts numeric duration strings and rejects negative durations", () => {
+    const numericString = parseSingleFlight({
+      from: "ZZZZ",
+      to: "YYYY",
+      duration: "7020000"
+    }).flight;
+    const negative = parseSingleFlight({
+      from: "ZZZZ",
+      to: "YYYY",
+      duration: -1
+    }).flight;
+
+    expect(numericString.sourceDurationMinutes).toBe(117);
+    expect(negative.sourceDurationMinutes).toBeNull();
+    expect(negative.blockMinutes).toBeNull();
   });
 
   it("builds deterministic IDs from schedule semantics rather than array position", () => {

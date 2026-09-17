@@ -361,7 +361,7 @@ function buildScheduleDateTime(dateToken, clock, zone) {
 
 function parseDurationMinutes(value) {
   if (typeof value === "number") {
-    return Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+    return Number.isFinite(value) && value >= 0 ? Math.round(value / 60_000) : null;
   }
 
   const normalized = normalizeText(value);
@@ -375,7 +375,7 @@ function parseDurationMinutes(value) {
   }
 
   const numeric = Number(normalized);
-  return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric) : null;
+  return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric / 60_000) : null;
 }
 
 function normalizeSourceArrivalDate(stdUtc, sourceArrivalUtc) {
