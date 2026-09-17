@@ -125,6 +125,12 @@ function buildBootstrapProps() {
   };
 }
 
+function invokeBootstrapForTest(props) {
+  // This unit test supplies mocked React hooks so hydration can run without a component harness.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return useAppBootstrap(props);
+}
+
 async function flushHydration() {
   for (let index = 0; index < 8; index += 1) {
     await Promise.resolve();
@@ -143,7 +149,7 @@ describe("useAppBootstrap saved schedule hydration", () => {
       testState.savedUiState = { scheduleTableTimeDisplayMode };
       const props = buildBootstrapProps();
 
-      useAppBootstrap(props);
+      invokeBootstrapForTest(props);
       await flushHydration();
 
       expect(props.setSchedule).toHaveBeenCalledOnce();
