@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getFlightTableColumns } from "./flightTableDefinition.jsx";
-import { applyOptionalColumnGroups } from "../data-table/tableUtils.js";
+import { applyOptionalColumnGroups, resolveColumnsForPreset } from "../data-table/tableUtils.js";
 import { sortFlights } from "../../features/schedule/scheduleSort.selectors.js";
 
 function getTimeColumns() {
@@ -48,10 +48,18 @@ describe("schedule flight aircraft column", () => {
     const columns = getFlightTableColumns({ addonAirports: new Set() });
     const arrivalIndex = columns.findIndex((column) => column.key === "to");
     const aircraft = columns[arrivalIndex + 1];
+    const standardAircraft = resolveColumnsForPreset(columns, 1400, "standard").find(
+      (column) => column.key === "equipmentType"
+    );
+    const compactAircraft = resolveColumnsForPreset(columns, 1024, "compact").find(
+      (column) => column.key === "equipmentType"
+    );
 
     expect(aircraft.key).toBe("equipmentType");
     expect(aircraft.label).toBe("Aircraft");
     expect(aircraft.compactLabel).toBe("Type");
+    expect(standardAircraft.label).toBe("Aircraft");
+    expect(compactAircraft.label).toBe("Type");
     expect(aircraft.ariaLabel).toBe("Aircraft Type");
     expect(aircraft.sortKey).toBe("equipmentType");
     expect(aircraft.role).toBe("shortCode");
@@ -66,20 +74,31 @@ describe("schedule flight aircraft column", () => {
     expect(aircraft.renderCell({})).toBe("—");
   });
 
-  it("remains required and is retained when optional groups are removed", () => {
-    const aircraft = getFlightTableColumns({ addonAirports: new Set() }).find(
-      (column) => column.key === "equipmentType"
-    );
-    const compactColumns = getFlightTableColumns({ addonAirports: new Set() }).map((column) => ({
-      ...column,
-      minWidth: column.minWidth || column.compactMinWidth || 1
-    }));
-    const retainedColumns = applyOptionalColumnGroups(compactColumns, 1, 0);
+  it("uses the shared non-Airline sizing profile", () => {
+    const columns = getFlightTableColumns({ addonAirports: new Set() });
+    const airline = columns.find((column) => column.key === "airlineName");
+    const nonAirline = columns.filter((column) => column.key !== "airlineName");
 
-    expect(aircraft.required).not.toBe(false);
-    expect(aircraft.optionalGroup).toBeUndefined();
-    expect(aircraft.visibleFrom).toBeUndefined();
-    expect(aircraft.hiddenAtOrBelow).toBeUndefined();
-    expect(retainedColumns.some((column) => column.key === "equipmentType")).toBe(true);
+    expect(airline.minWidth).toBe(176);
+    expect(airline.fr).toBe(1.2);
+    expect(nonAirline.every((column) => column.compactMinWidth === 72)).toBe(true);
+    expect(nonAirline.every((column) => column.minWidth === 96)).toBe(true);
+    expect(nonAirline.every((column) => column.fr === 0.75)).toBe(true);
+  });
+
+  it("is the first optional schedule group removed by measured-width fitting", () => {
+    const columns = getFlightTableColumns({ addonAirports: new Set() });
+    const aircraft = columns.find((column) => column.key === "equipmentType");
+    const compactColumns = resolveColumnsForPreset(columns, 1024, "compact");
+    const retainedColumns = applyOptionalColumnGroups(compactColumns, 744, 0);
+
+    expect(aircraft.required).toBe(false);
+    expect(aircraft.optionalGroup).toBe("aircraft");
+    expect(aircraft.optionalPriority).toBeGreaterThan(
+      columns.find((column) => column.key === "departureTime").optionalPriority
+    );
+    expect(retainedColumns.some((column) => column.key === "equipmentType")).toBe(false);
+    expect(retainedColumns.some((column) => column.key === "departureTime")).toBe(true);
+    expect(retainedColumns.some((column) => column.key === "arrivalTime")).toBe(true);
   });
 });

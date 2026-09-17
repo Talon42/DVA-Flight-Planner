@@ -7,6 +7,13 @@ import { bodyMdTextClassName } from "../ui/typography";
 const BODY_CELL_CONTENT_CLASS =
   "flex h-full min-h-0 w-full items-center leading-none";
 
+const SCHEDULE_COLUMN_SIZING = {
+  compactMinWidth: 72,
+  minWidth: 96,
+  fr: 0.75,
+  align: "left"
+};
+
 function getAirportStatusBoxClassName({ addon, vatsim, missing = false }) {
   if (missing) {
     return [
@@ -192,10 +199,7 @@ export function getFlightTableColumns({
       compactLabel: "FL #",
       ariaLabel: "Flight Number",
       role: "shortCode",
-      compactMinWidth: 76,
-      minWidth: 92,
-      fr: 0.6,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       sortable: true,
       sortKey: "flightCode",
       renderCell: (row) => formatFlightCode(row.flightCode)
@@ -206,10 +210,7 @@ export function getFlightTableColumns({
       compactLabel: "DEP",
       ariaLabel: "Departure",
       role: "airportCode",
-      compactMinWidth: 76,
-      minWidth: 112,
-      fr: 0.75,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       allowOverflow: true,
       sortable: true,
       sortKey: "from",
@@ -235,10 +236,7 @@ export function getFlightTableColumns({
       compactLabel: "ARR",
       ariaLabel: "Arrival",
       role: "airportCode",
-      compactMinWidth: 76,
-      minWidth: 96,
-      fr: 0.75,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       allowOverflow: true,
       sortable: true,
       sortKey: "to",
@@ -264,10 +262,10 @@ export function getFlightTableColumns({
       compactLabel: "Type",
       ariaLabel: "Aircraft Type",
       role: "shortCode",
-      compactMinWidth: 72,
-      minWidth: 96,
-      fr: 0.65,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
+      required: false,
+      optionalGroup: "aircraft",
+      optionalPriority: 2,
       sortable: true,
       sortKey: "equipmentType",
       renderCell: (row) => row?.equipmentType ?? "—"
@@ -277,10 +275,7 @@ export function getFlightTableColumns({
       label: "STD Local",
       compactLabel: "STD",
       role: "time",
-      compactMinWidth: 96,
-      minWidth: 112,
-      fr: 0.8,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       required: false,
       optionalGroup: "localTimes",
       optionalPriority: 1,
@@ -295,10 +290,7 @@ export function getFlightTableColumns({
       label: "STA Local",
       compactLabel: "STA",
       role: "time",
-      compactMinWidth: 96,
-      minWidth: 112,
-      fr: 0.8,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       required: false,
       optionalGroup: "localTimes",
       optionalPriority: 1,
@@ -314,10 +306,7 @@ export function getFlightTableColumns({
       compactLabel: "Dist",
       ariaLabel: "Distance",
       role: "numeric",
-      compactMinWidth: 96,
-      minWidth: 112,
-      fr: 0.9,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       sortable: true,
       sortKey: "distanceNm",
       renderCell: (row) => formatDistanceNm(row.distanceNm)
@@ -328,10 +317,7 @@ export function getFlightTableColumns({
       compactLabel: "ETE",
       ariaLabel: "Estimated Time Enroute",
       role: "time",
-      compactMinWidth: 76,
-      minWidth: 82,
-      fr: 0.8,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       sortable: true,
       sortKey: "blockMinutes",
       renderCell: (row) => formatDuration(row.blockMinutes)
