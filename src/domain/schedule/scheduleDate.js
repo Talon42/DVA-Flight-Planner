@@ -24,7 +24,61 @@ export function getDayOrdinal(day) {
   }
 }
 
-export function buildScheduleDateInfo(flights = []) {
+function getScheduleEffectiveDateFromMetadata(scheduleMetadata) {
+  const rawEffectiveDate = scheduleMetadata?.sources?.AVSTACK?.effectiveDate;
+  if (rawEffectiveDate === null || rawEffectiveDate === undefined || String(rawEffectiveDate).trim() === "") {
+    return null;
+  }
+
+  const effectiveDate = DateTime.fromMillis(Number(rawEffectiveDate), { zone: "utc" });
+  return effectiveDate.isValid ? effectiveDate.startOf("day") : null;
+}
+
+function normalizeNowUtc(nowUtc) {
+  if (DateTime.isDateTime(nowUtc)) {
+    return nowUtc.toUTC();
+  }
+
+  if (nowUtc instanceof Date) {
+    return DateTime.fromJSDate(nowUtc, { zone: "utc" });
+  }
+
+  if (typeof nowUtc === "number") {
+    return DateTime.fromMillis(nowUtc, { zone: "utc" });
+  }
+
+  const parsed = DateTime.fromISO(String(nowUtc || ""), { zone: "utc" });
+  return parsed.isValid ? parsed : DateTime.utc();
+}
+
+function buildDateInfo(effectiveScheduleDate, nowUtc, labelHasYear = false) {
+  // Delta Virtual publishes the next schedule at 09:00 UTC on the following day.
+  const staleAfterUtc = DateTime.utc(
+    effectiveScheduleDate.year,
+    effectiveScheduleDate.month,
+    effectiveScheduleDate.day,
+    9
+  ).plus({ days: 1 });
+  const isCurrent = normalizeNowUtc(nowUtc) < staleAfterUtc;
+  const monthLabel = effectiveScheduleDate.toFormat("MMMM");
+  const dayLabel = `${effectiveScheduleDate.day}${getDayOrdinal(effectiveScheduleDate.day)}`;
+  const label = labelHasYear
+    ? `${monthLabel} ${dayLabel}, ${effectiveScheduleDate.toFormat("yyyy")}`
+    : `${monthLabel} ${dayLabel}`;
+
+  return { date: effectiveScheduleDate, isCurrent, label };
+}
+
+export function buildScheduleDateInfo(scheduleData = {}, nowUtc = DateTime.utc()) {
+  const isLegacyFlightsInput = Array.isArray(scheduleData);
+  const flights = isLegacyFlightsInput ? scheduleData : scheduleData?.flights || [];
+  const scheduleMetadata = isLegacyFlightsInput ? null : scheduleData?.scheduleMetadata;
+  const metadataDate = getScheduleEffectiveDateFromMetadata(scheduleMetadata);
+
+  if (metadataDate) {
+    return buildDateInfo(metadataDate, nowUtc);
+  }
+
   const dates = flights
     .map((flight) => DateTime.fromISO(String(flight?.stdLocal || "")))
     .filter((value) => value.isValid)
@@ -49,22 +103,8 @@ export function buildScheduleDateInfo(flights = []) {
 
   const midpointOffsetDays = Math.floor(latest.diff(earliest, "days").days / 2);
   const effectiveScheduleDate = earliest.plus({ days: midpointOffsetDays });
-  // Delta Virtual publishes the next schedule at 09:00 UTC on the following day.
-  const staleAfterUtc = DateTime.utc(
-    effectiveScheduleDate.year,
-    effectiveScheduleDate.month,
-    effectiveScheduleDate.day,
-    9
-  ).plus({ days: 1 });
-  const isCurrent = DateTime.utc() < staleAfterUtc;
-  const monthLabel = effectiveScheduleDate.toFormat("MMMM");
-  const dayLabel = `${effectiveScheduleDate.day}${getDayOrdinal(effectiveScheduleDate.day)}`;
-  const label =
-    earliest.year !== latest.year
-      ? `${monthLabel} ${dayLabel}, ${effectiveScheduleDate.toFormat("yyyy")}`
-      : `${monthLabel} ${dayLabel}`;
 
-  return { date: effectiveScheduleDate, isCurrent, label };
+  return buildDateInfo(effectiveScheduleDate, nowUtc, earliest.year !== latest.year);
 }
 
 export function buildFooterDateLabel(dateIso) {
