@@ -5,7 +5,7 @@ import {
   readViewportSize
 } from "./useAppLayout.hooks.js";
 import { DEFAULT_DERIVED_TOUR_PROGRESS } from "../features/tours/tours.constants.js";
-import { DEFAULT_SORT } from "../features/schedule/schedule.constants.js";
+import { DEFAULT_SORT, normalizeScheduleSort } from "../features/schedule/schedule.constants.js";
 import { buildFilterBounds, normalizeFilters } from "../features/schedule/scheduleFilters.model.js";
 import { buildRangeDefaults, normalizeDutyFilters } from "../logic/dutySchedule/dutyFilters";
 import { logAppError, logAppEvent, logSystemError, logSystemEvent } from "../services/logging/appLog.client.js";
@@ -302,7 +302,7 @@ export function useAppBootstrap({
       setScheduleTableTimeDisplayMode(
         savedUiState.scheduleTableTimeDisplayMode === "utc" ? "utc" : "local"
       );
-      setSort(savedUiState.sort || DEFAULT_SORT);
+      setSort(normalizeScheduleSort(savedUiState.sort || DEFAULT_SORT));
       setScheduleView("flights");
       setSelectedTourPath(String(savedUiState.selectedTourPath || "").trim());
       setSelectedAccomplishmentName(String(savedUiState.selectedAccomplishmentName || "").trim());

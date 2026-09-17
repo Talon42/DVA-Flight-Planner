@@ -83,9 +83,6 @@ export function parseScheduleImport(fileName, scheduleText, debug = () => {}) {
       const stdZone = fromAirport?.timezone || "UTC";
       const staZone = toAirport?.timezone || "UTC";
       const stdResult = buildScheduleDateTime(rawFlight.effectiveDate, rawFlight.departureClock, stdZone);
-      const sourceArrival = rawFlight.arrivalClock
-        ? buildScheduleDateTime(rawFlight.effectiveDate, rawFlight.arrivalClock, staZone)
-        : null;
       const stdLocal = stdResult.value;
       const stdUtc = stdLocal.toUTC();
       const distanceNm = fromAirport && toAirport
@@ -104,10 +101,8 @@ export function parseScheduleImport(fileName, scheduleText, debug = () => {}) {
         : fallbackBlockMinutes;
       const staUtc = Number.isFinite(blockMinutes)
         ? stdUtc.plus({ minutes: blockMinutes })
-        : sourceArrival?.value
-          ? normalizeSourceArrivalDate(stdUtc, sourceArrival.value.toUTC())
-          : stdUtc;
-      const staLocal = staUtc.setZone(staZone);
+        : null;
+      const staLocal = staUtc ? staUtc.setZone(staZone) : null;
       const issuePrefix = `${rawFlight.airline}${rawFlight.flightNumber} ${rawFlight.from}-${rawFlight.to}`;
 
       if (missingIcaos.length) {
@@ -162,19 +157,18 @@ export function parseScheduleImport(fileName, scheduleText, debug = () => {}) {
         hasMissingAirportData: missingIcaos.length > 0,
         effectiveDate: rawFlight.effectiveDate,
         stdLocal: stdLocal.toISO(),
-        staLocal: staLocal.toISO(),
+        staLocal: staLocal?.toISO() || null,
         stdUtc: stdUtc.toISO(),
-        staUtc: staUtc.toISO(),
+        staUtc: staUtc?.toISO() || null,
         stdUtcMillis: stdUtc.toMillis(),
-        staUtcMillis: staUtc.toMillis(),
+        staUtcMillis: staUtc?.toMillis() ?? null,
         localDepartureClock: stdLocal.toFormat("HH:mm"),
-        utcDepartureClock: stdUtc.toFormat("HH:mm"),
+        localArrivalClock: staLocal?.toFormat("HH:mm") || "",
         equipmentType: rawFlight.equipmentType,
         scheduleSource: rawFlight.scheduleSource,
         historic: rawFlight.historic,
         academy: rawFlight.academy,
         sourceDurationMinutes: rawFlight.sourceDurationMinutes,
-        sourceArrivalClock: rawFlight.arrivalClock,
         sourceDistanceMiles: rawFlight.sourceDistanceMiles,
         blockMinutes: Number.isFinite(blockMinutes) ? blockMinutes : null,
         distanceNm,
@@ -300,7 +294,6 @@ function readScheduleEntry(entry, sources) {
     academy: entry.academy ?? false,
     effectiveDate,
     departureClock: readScheduleClock(entry.timeD),
-    arrivalClock: readScheduleClock(entry.timeA),
     sourceDurationMinutes: parseDurationMinutes(entry.duration),
     sourceDistanceMiles: parseNumeric(entry.distance)
   };
@@ -376,14 +369,6 @@ function parseDurationMinutes(value) {
 
   const numeric = Number(normalized);
   return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric / 60_000) : null;
-}
-
-function normalizeSourceArrivalDate(stdUtc, sourceArrivalUtc) {
-  let candidate = sourceArrivalUtc;
-  while (candidate < stdUtc) {
-    candidate = candidate.plus({ days: 1 });
-  }
-  return candidate;
 }
 
 function estimateBlockMinutes(distanceNm, effectiveSpeedKts) {

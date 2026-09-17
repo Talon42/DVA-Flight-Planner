@@ -44,7 +44,9 @@ const OBSOLETE_SCHEDULE_FIELDS = [
   "compatibilityCount",
   "compatibilityStatus",
   "compatibilityReason",
-  "compatibilityRef"
+  "compatibilityRef",
+  "sourceArrivalClock",
+  "utcDepartureClock"
 ];
 
 function isTauriRuntime() {
@@ -456,6 +458,8 @@ function buildPersistedFlights(flights = []) {
       hasMissingAirportData: Boolean(flight.hasMissingAirportData),
       stdLocal: flight.stdLocal,
       staLocal: flight.staLocal,
+      localDepartureClock: flight.localDepartureClock,
+      localArrivalClock: flight.localArrivalClock,
       stdUtc: flight.stdUtc,
       staUtc: flight.staUtc,
       stdUtcMillis: flight.stdUtcMillis,
@@ -467,7 +471,6 @@ function buildPersistedFlights(flights = []) {
       historic: flight.historic,
       academy: flight.academy,
       sourceDurationMinutes: flight.sourceDurationMinutes,
-      sourceArrivalClock: flight.sourceArrivalClock,
       sourceDistanceMiles: flight.sourceDistanceMiles,
       blockMinutes: flight.blockMinutes,
       distanceNm: flight.distanceNm,
@@ -502,8 +505,10 @@ function hydratePersistedFlight(flight, shortlistSet) {
   return {
     ...normalizedFlight,
     route: `${normalizedFlight.from}-${normalizedFlight.to}`,
-    localDepartureClock: toClockValue(normalizedFlight.stdLocal),
-    utcDepartureClock: toClockValue(normalizedFlight.stdUtc),
+    localDepartureClock:
+      String(normalizedFlight.localDepartureClock || "").trim() || toClockValue(normalizedFlight.stdLocal),
+    localArrivalClock:
+      String(normalizedFlight.localArrivalClock || "").trim() || toClockValue(normalizedFlight.staLocal),
     flightNumber: deriveFlightNumber(normalizedFlight),
     airlineIcao: String(normalizedFlight.airlineIcao || "").trim().toUpperCase(),
     callsign: deriveCallsign(normalizedFlight),

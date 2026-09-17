@@ -94,7 +94,8 @@ describe("parseScheduleImport", () => {
     expect(flight.effectiveDate).toBe("2026-08-11");
     expect(flight.stdLocal).toBe("2026-08-11T06:00:00.000-04:00");
     expect(flight.stdUtc).toBe("2026-08-11T10:00:00.000Z");
-    expect(flight.utcDepartureClock).toBe("10:00");
+    expect(flight.localDepartureClock).toBe("06:00");
+    expect(flight.utcDepartureClock).toBeUndefined();
   });
 
   it("uses the calibrated reciprocal directional block-time model", () => {
@@ -121,7 +122,7 @@ describe("parseScheduleImport", () => {
       from: "KJFK",
       to: "LFPG",
       departure: "21:30:00",
-      arrival: "11:10:00"
+      arrival: "03:00:00"
     });
 
     expect(flight.staUtc).toBe("2026-08-12T08:59:00.000Z");
@@ -129,6 +130,8 @@ describe("parseScheduleImport", () => {
     expect(DateTime.fromISO(flight.staLocal, { setZone: true }).toFormat("MM/dd/yyyy HH:mm")).toBe(
       "08/12/2026 10:59"
     );
+    expect(flight.localArrivalClock).toBe("10:59");
+    expect(flight.sourceArrivalClock).toBeUndefined();
   });
 
   it("does not treat upstream statute-mile distance as planner nautical miles", () => {
@@ -150,6 +153,20 @@ describe("parseScheduleImport", () => {
     expect(flight.distanceNm).toBeNull();
     expect(flight.blockMinutes).toBe(117);
     expect(flight.staUtc).toBe("2026-08-11T11:57:00.000Z");
+  });
+
+  it("leaves arrival unavailable when neither planner nor DVA duration is valid", () => {
+    const { flight } = parseSingleFlight({
+      from: "ZZZZ",
+      to: "YYYY",
+      duration: null,
+      arrival: "03:00:00"
+    });
+
+    expect(flight.blockMinutes).toBeNull();
+    expect(flight.staUtc).toBeNull();
+    expect(flight.staLocal).toBeNull();
+    expect(flight.localArrivalClock).toBe("");
   });
 
   it("converts a real DVA millisecond duration to rounded source minutes", () => {

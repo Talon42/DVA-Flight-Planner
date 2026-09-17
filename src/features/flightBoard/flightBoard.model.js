@@ -39,6 +39,10 @@ function resolveNormalizedAircraftSelection(value) {
   return getAircraftDisplayName(value) || String(value || "").trim();
 }
 
+function toClockValue(isoValue) {
+  return typeof isoValue === "string" && isoValue.length >= 16 ? isoValue.slice(11, 16) : "";
+}
+
 export function createFlightBoard(name = DEFAULT_FLIGHT_BOARD_NAME, entries = []) {
   return {
     id: buildFlightBoardTabId(),
@@ -81,8 +85,10 @@ export function buildBoardEntryFromFlight(flight, overrides = {}) {
     staLocal: String(flight?.staLocal || "").trim(),
     stdUtc: String(flight?.stdUtc || "").trim(),
     staUtc: String(flight?.staUtc || "").trim(),
-    localDepartureClock: String(flight?.localDepartureClock || "").trim(),
-    utcDepartureClock: String(flight?.utcDepartureClock || "").trim(),
+    localDepartureClock:
+      String(flight?.localDepartureClock || "").trim() || toClockValue(flight?.stdLocal),
+    localArrivalClock:
+      String(flight?.localArrivalClock || "").trim() || toClockValue(flight?.staLocal),
     stdUtcMillis: Number(flight?.stdUtcMillis) || 0,
     staUtcMillis: Number(flight?.staUtcMillis) || 0,
     blockMinutes: Number.isFinite(flight?.blockMinutes) ? flight.blockMinutes : null,
@@ -185,7 +191,7 @@ export function buildBoardEntryFromTourFlight(flight, overrides = {}) {
     stdUtc: "",
     staUtc: "",
     localDepartureClock: "",
-    utcDepartureClock: "",
+    localArrivalClock: "",
     stdUtcMillis: 0,
     staUtcMillis: 0,
     blockMinutes: Number.isFinite(flight?.blockMinutes) ? flight.blockMinutes : null,
@@ -255,8 +261,10 @@ export function normalizeBoardEntry(entry) {
     staLocal: String(entry.staLocal || "").trim(),
     stdUtc: String(entry.stdUtc || "").trim(),
     staUtc: String(entry.staUtc || "").trim(),
-    localDepartureClock: String(entry.localDepartureClock || "").trim(),
-    utcDepartureClock: String(entry.utcDepartureClock || "").trim(),
+    localDepartureClock:
+      String(entry.localDepartureClock || "").trim() || toClockValue(entry.stdLocal),
+    localArrivalClock:
+      String(entry.localArrivalClock || "").trim() || toClockValue(entry.staLocal),
     stdUtcMillis: Number(entry.stdUtcMillis) || 0,
     staUtcMillis: Number(entry.staUtcMillis) || 0,
     blockMinutes: Number.isFinite(entry.blockMinutes) ? entry.blockMinutes : null,
