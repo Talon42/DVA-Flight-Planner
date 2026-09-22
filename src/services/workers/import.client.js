@@ -1,6 +1,6 @@
-export function runScheduleImport(fileName, xmlText, onDebug = () => {}) {
+export function runScheduleImport(fileName, scheduleText, onDebug = () => {}) {
   return new Promise((resolve, reject) => {
-    onDebug(`client:start file=${fileName} chars=${xmlText?.length || 0}`);
+    onDebug(`client:start file=${fileName} chars=${scheduleText?.length || 0}`);
     const worker = new Worker(new URL("../../workers/importWorker.js", import.meta.url), {
       type: "module"
     });
@@ -55,7 +55,7 @@ export function runScheduleImport(fileName, xmlText, onDebug = () => {}) {
 
     worker.postMessage({
       fileName,
-      xmlText
+      scheduleText
     });
   });
 }

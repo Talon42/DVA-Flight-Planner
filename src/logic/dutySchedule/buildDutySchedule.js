@@ -159,6 +159,16 @@ function normalizeIcao(value) {
   return String(value || "").trim().toUpperCase();
 }
 
+// Preserves unresolved schedule times as null instead of coercing them to the Unix epoch.
+function parseNullableUtcMillis(value) {
+  if (value === null || value === undefined || (typeof value === "string" && !value.trim())) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function getFlightDurationMinutes(flight) {
   if (Number.isFinite(flight?.blockMinutes) && flight.blockMinutes >= 0) {
     return {
@@ -167,8 +177,8 @@ function getFlightDurationMinutes(flight) {
     };
   }
 
-  const departureMillis = Number(flight?.stdUtcMillis);
-  const arrivalMillis = Number(flight?.staUtcMillis);
+  const departureMillis = parseNullableUtcMillis(flight?.stdUtcMillis);
+  const arrivalMillis = parseNullableUtcMillis(flight?.staUtcMillis);
   if (
     Number.isFinite(departureMillis) &&
     Number.isFinite(arrivalMillis) &&
@@ -187,8 +197,7 @@ function getFlightDurationMinutes(flight) {
 }
 
 function getNextDepartureMillis(flight) {
-  const departureMillis = Number(flight?.stdUtcMillis);
-  return Number.isFinite(departureMillis) ? departureMillis : null;
+  return parseNullableUtcMillis(flight?.stdUtcMillis);
 }
 
 function getNextDestinationIcao(flight) {

@@ -3,6 +3,12 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
+    environmentOptions: {
+      jsdom: {
+        url: "http://localhost"
+      }
+    },
+    setupFiles: ["./vitest.setup.js"],
     clearMocks: true,
     include: ["src/**/*.test.js", "src/**/*.test.jsx", "scripts/**/*.test.js"],
     coverage: {

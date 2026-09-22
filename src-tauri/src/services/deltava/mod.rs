@@ -11,7 +11,6 @@ pub(crate) mod pilot_profile;
 pub(crate) mod pirep_details;
 pub(crate) mod profile_cache;
 pub(crate) mod sync;
-pub(crate) mod sync_payload;
 pub(crate) mod sync_types;
 pub(crate) mod tour_briefing;
 pub(crate) mod tour_progress;

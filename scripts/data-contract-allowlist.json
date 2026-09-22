@@ -10,7 +10,6 @@
     "ZLGL": "Source catalog does not currently provide a reliable IANA timezone."
   },
   "airportTimezoneExceptions": {
-    "EDDT": "Closed historical airport row contains a known legacy timezone value.",
     "EDDX": "Historical airport row retained without a reliable IANA timezone.",
     "EDLP": "Source catalog does not currently provide a reliable IANA timezone.",
     "EGNX": "Source catalog does not currently provide a reliable IANA timezone.",

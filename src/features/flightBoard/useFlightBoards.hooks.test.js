@@ -203,7 +203,7 @@ describe("useFlightBoards board lifecycle", () => {
     ]);
   });
 
-  it("blocks additions from a stale schedule", () => {
+  it("adds flights before warning when the schedule is stale", () => {
     const onOpenStaleScheduleBlocked = vi.fn();
     const { result } = renderHook(() =>
       useFlightBoardHarness({
@@ -214,11 +214,11 @@ describe("useFlightBoards board lifecycle", () => {
     );
 
     act(() => {
-      expect(result.current.handleAddToFlightBoard("flight-2")).toBe(false);
+      expect(result.current.handleAddToFlightBoard("flight-2")).toBe(true);
     });
 
     expect(onOpenStaleScheduleBlocked).toHaveBeenCalledOnce();
-    expect(result.current.flightBoard).toHaveLength(1);
+    expect(result.current.flightBoard).toHaveLength(2);
   });
 });
 

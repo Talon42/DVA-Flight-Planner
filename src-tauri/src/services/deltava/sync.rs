@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::{sync::{Arc, Mutex}, time::Instant};
 
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::oneshot;
@@ -62,9 +58,7 @@ pub(crate) async fn start_deltava_sync(
     };
     let started_at = Instant::now();
 
-    let download_path = crate::app::paths::build_download_path(&app)?;
     let webview_data_directory = build_webview_data_directory(&app)?;
-    let _ = fs::remove_file(&download_path);
 
     let focus_lost_at = Arc::new(Mutex::new(None::<Instant>));
     let (auth_context, auth_loaded_from_storage) = match read_auth_context_internal(&app) {
@@ -94,7 +88,7 @@ pub(crate) async fn start_deltava_sync(
         crate::services::deltava::login::build_deltava_login_automation_script(
             &auth_context,
             DELTAVA_LOGIN_URL,
-            "https://www.deltava.org/pfpxsched.ws",
+            "https://www.deltava.org/search.ws",
             &sync_nonce,
         );
     let auto_sync_script = build_deltava_auto_sync_script(&sync_nonce);
@@ -117,7 +111,6 @@ pub(crate) async fn start_deltava_sync(
     let _window = match window_factory::build_deltava_sync_window(
         app.clone(),
         webview_data_directory,
-        download_path,
         sync_nonce.clone(),
         debug_enabled,
         login_automation_script,
@@ -207,14 +200,6 @@ pub(crate) async fn refresh_deltava_logbook(
     let started_at = Instant::now();
 
     let webview_data_directory = build_webview_data_directory(&app)?;
-    let refresh_download_path = crate::app::paths::deltava_sync_dir(&app)?
-        .join("logbook-refresh")
-        .join("refresh.tmp");
-    if let Some(parent) = refresh_download_path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            format!("download_failed: Unable to create logbook refresh directory: {error}")
-        })?;
-    }
     let focus_lost_at = Arc::new(Mutex::new(None::<Instant>));
     let (auth_context, auth_loaded_from_storage) = match read_auth_context_internal(&app) {
         Ok(context) => (context, true),
@@ -266,7 +251,6 @@ pub(crate) async fn refresh_deltava_logbook(
     let _window = match window_factory::build_deltava_sync_window(
         app.clone(),
         webview_data_directory,
-        refresh_download_path,
         sync_nonce.clone(),
         debug_enabled,
         login_automation_script,

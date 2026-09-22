@@ -1,7 +1,6 @@
 use std::{
-    collections::HashSet,
     path::PathBuf,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -10,14 +9,12 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 use crate::services::deltava::constants::DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX;
 use crate::services::deltava::sync_types::{
     DeltaWebDebugMessage, DeltaWebLogbookRefreshResult, DeltaWebSyncResult,
-    DeltaWebXmlCaptureMessage, MAX_DELTAVA_DEBUG_MESSAGE_BYTES,
-    MAX_DELTAVA_LOGBOOK_REFRESH_WEB_MESSAGE_BYTES, MAX_DELTAVA_SYNC_WEB_MESSAGE_BYTES,
-    MAX_DELTAVA_XML_CAPTURE_WEB_MESSAGE_BYTES,
+    MAX_DELTAVA_LOGBOOK_REFRESH_WEB_MESSAGE_BYTES,
 };
 use crate::{
-    app::state::DeltaSyncFinishOutcome, append_sync_log, append_sync_log_debug, DeltaSyncManager,
-    DeltaSyncPayload, DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_DOWNLOAD_FILE,
-    DELTAVA_SYNC_RESULT_MESSAGE_PREFIX, DELTAVA_XML_MESSAGE_PREFIX,
+    app::state::DeltaSyncFinishOutcome,
+    append_sync_log, append_sync_log_debug, services::storage::file_store, DeltaSyncManager,
+    DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
 };
 
 pub(crate) const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
@@ -26,17 +23,6 @@ const DELTAVA_FOCUS_LOSS_RECENT_WINDOW_MILLIS: u64 = 3000;
 const DELTAVA_CLOSE_AFTER_PROMPT_WAIT_SECONDS: u64 = 30;
 
 fn log_ignored_finish(source: &str, outcome: DeltaSyncFinishOutcome) {
-    if matches!(outcome, DeltaSyncFinishOutcome::SessionMismatch) {
-        static IGNORED_STALE_FINISHES: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-        let cache = IGNORED_STALE_FINISHES.get_or_init(|| Mutex::new(HashSet::new()));
-        if let Ok(mut seen) = cache.lock() {
-            let key = source.to_string();
-            if !seen.insert(key) {
-                return;
-            }
-        }
-    }
-
     append_sync_log(&format!(
         "DVA sync finish ignored: source={source} outcome={outcome:?}"
     ));
@@ -44,10 +30,6 @@ fn log_ignored_finish(source: &str, outcome: DeltaSyncFinishOutcome) {
 
 fn is_allowed_deltava_url(url: &tauri::webview::Url) -> bool {
     url.scheme() == "https" && url.domain() == Some("www.deltava.org")
-}
-
-fn is_schedule_download_url(url: &tauri::webview::Url) -> bool {
-    is_allowed_deltava_url(url) && url.path() == "/pfpxsched.ws"
 }
 
 /// Returns true for Delta Virtual pages where the sync script should run.
@@ -125,10 +107,9 @@ pub(crate) fn spawn_deltava_sync_focus_return_cleanup(
 }
 
 #[cfg(windows)]
-fn attach_windows_xml_message_handler(
+fn attach_windows_message_handler(
     window: &WebviewWindow,
     app: AppHandle,
-    download_path: PathBuf,
     sync_nonce: String,
     debug_enabled: bool,
 ) -> Result<(), String> {
@@ -162,7 +143,6 @@ fn attach_windows_xml_message_handler(
                 }
 
                 let app_handle = app.clone();
-                let xml_path = download_path.clone();
                 let sync_nonce = sync_nonce.clone();
                 let mut token = 0i64;
 
@@ -178,9 +158,6 @@ fn attach_windows_xml_message_handler(
                             let message = CoTaskMemPWSTR::from(message).to_string();
 
                             if let Some(debug_line) = message.strip_prefix(DELTAVA_DEBUG_MESSAGE_PREFIX) {
-                                if debug_line.len() > MAX_DELTAVA_DEBUG_MESSAGE_BYTES {
-                                    return Ok(());
-                                }
                                 if let Ok(debug_line) = serde_json::from_str::<DeltaWebDebugMessage>(debug_line) {
                                     if debug_line.nonce == sync_nonce {
                                         append_sync_log_debug(
@@ -247,24 +224,10 @@ fn attach_windows_xml_message_handler(
                                 let app_handle = app_handle.clone();
                                 let sync_nonce = sync_nonce.clone();
 
-                                if payload_text.len() > MAX_DELTAVA_SYNC_WEB_MESSAGE_BYTES {
-                                    let outcome = app_handle
-                                        .state::<DeltaSyncManager>()
-                                        .finish(
-                                            DELTAVA_SYNC_LABEL,
-                                            &sync_nonce,
-                                            Err("download_failed: Delta Virtual response was too large.".into()),
-                                        );
-                                    if outcome != DeltaSyncFinishOutcome::Completed {
-                                        log_ignored_finish("web-result-too-large", outcome);
-                                    }
-                                    return Ok(());
-                                }
-
                                 tauri::async_runtime::spawn(async move {
                                     let result = match serde_json::from_str::<DeltaWebSyncResult>(&payload_text) {
                                         Ok(web_result) if web_result.nonce == sync_nonce => {
-                                            crate::services::deltava::sync_payload::build_delta_sync_payload_from_web_result(
+                                            file_store::build_delta_sync_payload_from_web_result(
                                                 &app_handle,
                                                 web_result,
                                                 debug_enabled,
@@ -301,13 +264,11 @@ fn attach_windows_xml_message_handler(
                                 let sync_nonce = sync_nonce.clone();
 
                                 if payload_text.len() > MAX_DELTAVA_LOGBOOK_REFRESH_WEB_MESSAGE_BYTES {
-                                    let outcome = app_handle
-                                        .state::<DeltaSyncManager>()
-                                        .finish(
-                                            DELTAVA_SYNC_LABEL,
-                                            &sync_nonce,
-                                            Err("download_failed: Delta Virtual response was too large.".into()),
-                                        );
+                                    let outcome = app_handle.state::<DeltaSyncManager>().finish(
+                                        DELTAVA_SYNC_LABEL,
+                                        &sync_nonce,
+                                        Err("download_failed: Delta Virtual response was too large.".into()),
+                                    );
                                     if outcome != DeltaSyncFinishOutcome::Completed {
                                         log_ignored_finish("logbook-refresh-too-large", outcome);
                                     }
@@ -315,10 +276,9 @@ fn attach_windows_xml_message_handler(
                                 }
 
                                 tauri::async_runtime::spawn(async move {
-                                    let result = match serde_json::from_str::<DeltaWebLogbookRefreshResult>(&payload_text)
-                                    {
+                                    let result = match serde_json::from_str::<DeltaWebLogbookRefreshResult>(&payload_text) {
                                         Ok(web_result) if web_result.nonce == sync_nonce => {
-                                            crate::services::deltava::sync_payload::build_delta_logbook_refresh_payload_from_web_result(
+                                            file_store::build_delta_logbook_refresh_payload_from_web_result(
                                                 &app_handle,
                                                 web_result,
                                                 debug_enabled,
@@ -330,19 +290,6 @@ fn attach_windows_xml_message_handler(
                                             "download_failed: Unable to parse Delta Virtual logbook refresh result: {error}"
                                         )),
                                     };
-                                    if result.is_ok() {
-                                        append_sync_log("logbook-refresh-result-ready");
-                                        append_sync_log_debug(
-                                            debug_enabled,
-                                            "succeeded stage=logbook-refresh-result",
-                                        );
-                                    } else {
-                                        append_sync_log_debug(
-                                            debug_enabled,
-                                            "failed stage=logbook-refresh-result",
-                                        );
-                                    }
-
                                     let outcome = app_handle
                                         .state::<DeltaSyncManager>()
                                         .finish(DELTAVA_SYNC_LABEL, &sync_nonce, result);
@@ -353,80 +300,12 @@ fn attach_windows_xml_message_handler(
                                 return Ok(());
                             }
 
-                            if let Some(payload_text) = message.strip_prefix(DELTAVA_XML_MESSAGE_PREFIX) {
-                                let payload_text = payload_text.to_string();
-                                let app_handle = app_handle.clone();
-                                let xml_path = xml_path.clone();
-                                let sync_nonce = sync_nonce.clone();
-
-                                if payload_text.len() > MAX_DELTAVA_XML_CAPTURE_WEB_MESSAGE_BYTES {
-                                    let outcome = app_handle
-                                        .state::<DeltaSyncManager>()
-                                        .finish(
-                                            DELTAVA_SYNC_LABEL,
-                                            &sync_nonce,
-                                            Err("download_failed: Delta Virtual response was too large.".into()),
-                                        );
-                                    if outcome != DeltaSyncFinishOutcome::Completed {
-                                        log_ignored_finish("xml-capture-too-large", outcome);
-                                    }
-                                    return Ok(());
-                                }
-
-                                tauri::async_runtime::spawn(async move {
-                                    let Ok(message) = serde_json::from_str::<DeltaWebXmlCaptureMessage>(&payload_text) else {
-                                        return;
-                                    };
-                                    if message.nonce != sync_nonce {
-                                        return;
-                                    }
-
-                                    let xml_text = message.xml_text;
-                                    let trimmed = xml_text.trim_start().to_string();
-                                    append_sync_log_debug(debug_enabled, "schedule-fetch-requested");
-                                    let result = if !trimmed.starts_with('<') || !xml_text.contains("<FLIGHT>") {
-                                        Err("invalid_xml: Delta Virtual returned a non-schedule response.".to_string())
-                                    } else {
-                                        match tokio::fs::write(&xml_path, &xml_text).await {
-                                            Ok(_) => Ok(DeltaSyncPayload {
-                                                file_name: Some(DELTAVA_SYNC_DOWNLOAD_FILE.into()),
-                                                xml_text: Some(xml_text),
-                                                status: "partial".into(),
-                                                xml_status: "success".into(),
-                                                logbook_status: "failed".into(),
-                                                profile_status: "skipped".into(),
-                                                accomplishment_eligibility: None,
-                                                logbook_json: None,
-                                                warnings: vec![
-                                                    "Delta Virtual logbook JSON was not downloaded by the fallback XML capture path.".into(),
-                                                ],
-                                            }),
-                                            Err(error) => Err(format!(
-                                                "download_failed: Unable to persist Delta Virtual XML: {error}"
-                                            )),
-                                        }
-                                    };
-                                    if result.is_ok() {
-                                        append_sync_log("succeeded stage=xml-capture");
-                                    } else {
-                                        append_sync_log("failed stage=xml-capture");
-                                    }
-
-                                    let outcome = app_handle
-                                        .state::<DeltaSyncManager>()
-                                        .finish(DELTAVA_SYNC_LABEL, &sync_nonce, result);
-                                    if outcome != DeltaSyncFinishOutcome::Completed {
-                                        log_ignored_finish("xml-capture", outcome);
-                                    }
-                                });
-                            }
-
                             Ok(())
                         })),
                         &mut token,
                     )
                     .map_err(|error| {
-                        format!("download_failed: Unable to register Delta Virtual XML listener: {error}")
+                        format!("download_failed: Unable to register Delta Virtual message listener: {error}")
                     })?;
 
                 Ok(())
@@ -438,7 +317,7 @@ fn attach_windows_xml_message_handler(
                 }
             }
         })
-        .map_err(|error| format!("download_failed: Unable to attach Delta Virtual XML capture: {error}"))?;
+        .map_err(|error| format!("download_failed: Unable to attach Delta Virtual message handler: {error}"))?;
 
     if let Ok(mut slot) = registration_error.lock() {
         if let Some(error) = slot.take() {
@@ -450,11 +329,9 @@ fn attach_windows_xml_message_handler(
 }
 
 /// Builds the dedicated Delta Virtual sync window and wires all webview handlers.
-#[allow(clippy::too_many_arguments)] // Explicit resources make sync-window ownership and cleanup visible.
 pub(crate) fn build_deltava_sync_window(
     app: AppHandle,
     webview_data_directory: PathBuf,
-    download_path: PathBuf,
     sync_nonce: String,
     debug_enabled: bool,
     login_automation_script: String,
@@ -465,12 +342,8 @@ pub(crate) fn build_deltava_sync_window(
         .parse()
         .map_err(|error| format!("download_failed: Invalid Delta Virtual login URL: {error}"))?;
 
-    let app_for_download = app.clone();
     let app_for_close = app.clone();
-    let download_path_for_download_hook = download_path.clone();
     let focus_lost_at_for_events = focus_lost_at.clone();
-    let sync_nonce_for_download = sync_nonce.clone();
-    let sync_nonce_for_xml = sync_nonce.clone();
     let sync_nonce_for_close = sync_nonce.clone();
 
     let window = WebviewWindowBuilder::new(&app, DELTAVA_SYNC_LABEL, WebviewUrl::External(login_url))
@@ -481,7 +354,7 @@ pub(crate) fn build_deltava_sync_window(
         .visible(false)
         .center()
         .data_directory(webview_data_directory)
-        .on_navigation(is_allowed_deltava_url)
+        .on_navigation(|url| is_allowed_deltava_url(url))
         .on_page_load(move |webview_window, payload| {
             let event_name = match payload.event() {
                 tauri::webview::PageLoadEvent::Started => "Started",
@@ -511,95 +384,16 @@ pub(crate) fn build_deltava_sync_window(
                 }
             }
         })
-        .on_download(move |_webview, event| match event {
-            tauri::webview::DownloadEvent::Requested { url, destination } => {
-                append_sync_log_debug(debug_enabled, "schedule-fetch-requested");
-                if !is_schedule_download_url(&url) {
-                    return false;
-                }
-
-                *destination = download_path_for_download_hook.clone();
-                true
-            }
-            tauri::webview::DownloadEvent::Finished { url, path, success } => {
-                if !is_schedule_download_url(&url) {
-                    return true;
-                }
-
-                let resolved_path = path.unwrap_or_else(|| download_path_for_download_hook.clone());
-                let app_handle = app_for_download.clone();
-                let sync_nonce = sync_nonce_for_download.clone();
-
-                tauri::async_runtime::spawn(async move {
-                    let result = if success {
-                        match tokio::fs::read_to_string(&resolved_path).await {
-                            Ok(xml_text) => {
-                                let trimmed = xml_text.trim_start();
-                                if !trimmed.starts_with('<') || !xml_text.contains("<FLIGHT>") {
-                                    Err(
-                                        "invalid_xml: Delta Virtual returned a non-schedule response."
-                                            .into(),
-                                    )
-                                } else {
-                                    Ok(DeltaSyncPayload {
-                                        file_name: Some(DELTAVA_SYNC_DOWNLOAD_FILE.into()),
-                                        xml_text: Some(xml_text),
-                                        status: "partial".into(),
-                                        xml_status: "success".into(),
-                                        logbook_status: "failed".into(),
-                                        profile_status: "skipped".into(),
-                                        accomplishment_eligibility: None,
-                                        logbook_json: None,
-                                        warnings: vec![
-                                            "Delta Virtual logbook JSON was not downloaded by the fallback XML download path.".into(),
-                                        ],
-                                    })
-                                }
-                            }
-                            Err(error) => Err(format!(
-                                "download_failed: Unable to read downloaded schedule XML: {error}"
-                            )),
-                        }
-                    } else {
-                        Err("download_failed: Delta Virtual schedule download did not complete.".into())
-                    };
-
-                    if result.is_ok() {
-                        if let Ok(metadata) = tokio::fs::metadata(&resolved_path).await {
-                            append_sync_log(&format!(
-                                "schedule-fetch-succeeded source=download bytes={}",
-                                metadata.len()
-                            ));
-                        } else {
-                            append_sync_log("schedule-fetch-succeeded source=download bytes=0");
-                        }
-                    } else {
-                        append_sync_log("failed");
-                    }
-
-                    let outcome = app_handle
-                        .state::<DeltaSyncManager>()
-                        .finish(DELTAVA_SYNC_LABEL, &sync_nonce, result);
-                    if outcome != DeltaSyncFinishOutcome::Completed {
-                        log_ignored_finish("download", outcome);
-                    }
-                });
-
-                true
-            }
-            _ => true,
-        })
         .build()
         .map_err(|error| {
             format!("download_failed: Unable to open Delta Virtual sync window: {error}")
         })?;
 
     #[cfg(windows)]
-    attach_windows_xml_message_handler(
+    attach_windows_message_handler(
         &window,
         app.clone(),
-        download_path.clone(),
-        sync_nonce_for_xml.clone(),
+        sync_nonce.clone(),
         debug_enabled,
     )?;
 
@@ -620,11 +414,10 @@ pub(crate) fn build_deltava_sync_window(
             }
         }
         WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
-            let sync_nonce = sync_nonce_for_close.clone();
             let outcome = app_for_close.state::<DeltaSyncManager>().finish(
                 DELTAVA_SYNC_LABEL,
-                &sync_nonce,
-                Err("cancelled: Delta Virtual sync window was closed before the XML was downloaded.".into()),
+                &sync_nonce_for_close,
+                Err("cancelled: Delta Virtual sync window was closed before the schedule was fetched.".into()),
             );
             if outcome != DeltaSyncFinishOutcome::Completed {
                 log_ignored_finish("window-close", outcome);

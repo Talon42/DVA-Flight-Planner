@@ -113,13 +113,23 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
     return new TextDecoder().decode(bytes);
   };
-  const fetchScheduleXml = async () => {
+  const fetchScheduleJson = async () => {
     const response = await fetch(config.scheduleUrl, { method: 'GET', credentials: 'include', cache: 'no-store' });
-    const xml = await readBoundedText(response, config.limits.scheduleXml, 'Delta Virtual schedule XML');
-    emitDebug(`xml:fetch-status:${response.status}:${xml.length}`);
-    if (!response.ok) throw new Error(`Schedule XML request failed with HTTP ${response.status}.`);
-    if (!xml || !xml.trimStart().startsWith('<')) throw new Error('Delta Virtual returned a non-schedule XML response.');
-    return xml;
+    const scheduleText = await readBoundedText(response, config.limits.scheduleXml, 'Delta Virtual schedule JSON');
+    const schedule = JSON.parse(scheduleText);
+    const resultCount = Array.isArray(schedule?.results) ? schedule.results.length : 0;
+    emitDebug(`schedule:fetch-status:${response.status}:${resultCount}`);
+    if (!response.ok) throw new Error(`Schedule request failed with HTTP ${response.status}.`);
+    if (!schedule || typeof schedule !== 'object' || Array.isArray(schedule)) {
+      throw new Error('Delta Virtual returned an invalid schedule JSON response.');
+    }
+    if (!schedule.sources || typeof schedule.sources !== 'object' || !Array.isArray(schedule.results)) {
+      throw new Error('Delta Virtual returned an incomplete schedule JSON response.');
+    }
+    if (schedule.results.length <= 250) {
+      throw new Error(`Delta Virtual returned only ${schedule.results.length} schedule rows; the schedule service may be truncated.`);
+    }
+    return scheduleText;
   };
   const parseLogbookExportIdFromUrl = (url) => {
     try { return new URL(url).searchParams.get('id') || ''; } catch (_) { return ''; }
@@ -165,10 +175,6 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
   const postResult = (payload) => {
     if (window.chrome?.webview?.postMessage) window.chrome.webview.postMessage(config.resultPrefix + JSON.stringify({ nonce, ...payload }));
   };
-  const shouldTryScheduleFallback = (message) => {
-    const normalized = String(message || '').toLowerCase();
-    return !normalized.includes('exceeded the') && !normalized.includes('byte limit');
-  };
   const runDownloads = async () => {
     if (window[config.downloadsPostedKey]) { emitDebug('state:downloads-already-posted'); return true; }
     window[config.downloadsPostedKey] = true;
@@ -185,10 +191,9 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
       try { payload.accomplishments = { ok: true, htmlText: await fetchAccomplishmentEligibilityHtml() }; }
       catch (error) { payload.accomplishments = { ok: false, error: error?.message || 'Accomplishment eligibility download failed.' }; emitDebug(`accomplishments:error:${payload.accomplishments.error}`); }
     }
-    if (config.enabledArtifacts.schedule && !payload.xml.ok && window.location.href !== config.targetUrl && shouldTryScheduleFallback(payload.xml.error)) {
-      emitDebug(`xml:fallback-navigation:${config.targetUrl}`);
-      window[config.downloadsPostedKey] = false;
-      return false;
+    if (config.enabledArtifacts.schedule) {
+      try { payload.schedule = { ok: true, scheduleText: await fetchScheduleJson() }; }
+      catch (error) { payload.schedule = { ok: false, error: error?.message || 'Schedule download failed.' }; emitDebug(`schedule:error:${payload.schedule.error}`); }
     }
     postResult(payload);
     return true;
@@ -254,8 +259,8 @@ pub(crate) fn build_deltava_auto_sync_script(nonce: &str) -> String {
     build_script(
         SyncScriptConfig {
             mode: "full",
-            target_url: "https://www.deltava.org/pfpxsched.ws",
-            schedule_url: Some("https://www.deltava.org/pfpxsched.ws"),
+            target_url: "https://www.deltava.org/search.ws",
+            schedule_url: Some("https://www.deltava.org/search.ws"),
             logbook_page_url: "https://www.deltava.org/logbook.do",
             logbook_export_url: "https://www.deltava.org/mylogbook.ws",
             accomplishment_url: Some("https://www.deltava.org/acceligibility.do"),
@@ -329,7 +334,7 @@ mod tests {
     fn full_sync_enables_all_artifacts_and_limits() {
         let script = build_deltava_auto_sync_script("nonce-test");
         assert_shared_template_is_resolved(&script);
-        assert!(script.contains("https://www.deltava.org/pfpxsched.ws"));
+        assert!(script.contains("https://www.deltava.org/search.ws"));
         assert!(script.contains("https://www.deltava.org/acceligibility.do"));
         assert!(script.contains(DELTAVA_SYNC_RESULT_MESSAGE_PREFIX));
         assert!(script.contains(&MAX_DELTAVA_SCHEDULE_XML_BYTES.to_string()));

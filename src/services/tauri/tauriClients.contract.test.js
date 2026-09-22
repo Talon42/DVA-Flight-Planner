@@ -47,7 +47,7 @@ describe("frontend-to-Tauri command contracts", () => {
   it("starts DVA sync with normalized options and accepts snake-case results", async () => {
     invokeAppCommand.mockResolvedValue({
       file_name: "schedule.xml",
-      xml_text: "<SCHEDULE />",
+      schedule_text: "<SCHEDULE />",
       warnings: ["fixture warning"],
       logbook_json: { fileName: "logbook.json" }
     });
@@ -56,7 +56,7 @@ describe("frontend-to-Tauri command contracts", () => {
       syncScheduleFromDeltaVirtual({ syncRunId: " run-1 ", debugEnabled: 1 })
     ).resolves.toEqual({
       fileName: "schedule.xml",
-      xmlText: "<SCHEDULE />",
+      scheduleText: "<SCHEDULE />",
       warnings: ["fixture warning"],
       logbookJson: { fileName: "logbook.json" }
     });

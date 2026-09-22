@@ -8,6 +8,13 @@ import { selectableCellClassName } from "../data-table/tableCellStyles";
 const BODY_CELL_CONTENT_CLASS =
   "flex h-full min-h-0 w-full items-center leading-none";
 
+const SCHEDULE_COLUMN_SIZING = {
+  compactMinWidth: 72,
+  minWidth: 96,
+  fr: 0.75,
+  align: "left"
+};
+
 function getAirportStatusBoxClassName({ addon, vatsim, missing = false }) {
   if (missing) {
     return [
@@ -200,10 +207,7 @@ export function getFlightTableColumns({
       compactLabel: "FL #",
       ariaLabel: "Flight Number",
       role: "shortCode",
-      compactMinWidth: 72,
-      minWidth: 92,
-      fr: 0.6,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       sortable: true,
       sortKey: "flightCode",
       renderCell: (row) => formatFlightCode(row.flightCode)
@@ -214,10 +218,7 @@ export function getFlightTableColumns({
       compactLabel: "DEP",
       ariaLabel: "Departure",
       role: "airportCode",
-      compactMinWidth: 76,
-      minWidth: 112,
-      fr: 0.75,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       allowOverflow: true,
       sortable: true,
       sortKey: "from",
@@ -225,7 +226,6 @@ export function getFlightTableColumns({
         onAirportSelect?.({ airportIcao: row.from, side: "departure", row, sourceView }),
       stopRowSelectOnClick: true,
       cellAriaLabel: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
-      cellTitle: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.from}
@@ -245,10 +245,7 @@ export function getFlightTableColumns({
       compactLabel: "ARR",
       ariaLabel: "Arrival",
       role: "airportCode",
-      compactMinWidth: 76,
-      minWidth: 96,
-      fr: 0.75,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       allowOverflow: true,
       sortable: true,
       sortKey: "to",
@@ -256,7 +253,6 @@ export function getFlightTableColumns({
         onAirportSelect?.({ airportIcao: row.to, side: "arrival", row, sourceView }),
       stopRowSelectOnClick: true,
       cellAriaLabel: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
-      cellTitle: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.to}
@@ -271,40 +267,48 @@ export function getFlightTableColumns({
       )
     },
     {
+      key: "equipmentType",
+      label: "Aircraft",
+      compactLabel: "Type",
+      ariaLabel: "Aircraft Type",
+      role: "shortCode",
+      ...SCHEDULE_COLUMN_SIZING,
+      required: false,
+      optionalGroup: "aircraft",
+      optionalPriority: 2,
+      sortable: true,
+      sortKey: "equipmentType",
+      renderCell: (row) => row?.equipmentType ?? "—"
+    },
+    {
       key: "departureTime",
-      label: "STD UTC",
+      label: "STD Local",
       compactLabel: "STD",
       role: "time",
-      compactMinWidth: 96,
-      minWidth: 112,
-      fr: 0.8,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       required: false,
-      optionalGroup: "utcTimes",
+      optionalGroup: "localTimes",
       optionalPriority: 1,
       sortable: true,
-      sortKey: "stdUtcMillis",
+      sortKey: "localDepartureClock",
       isTimeColumn: true,
-      ariaLabel: "Scheduled Time of Departure UTC",
-      renderCell: (row) => formatTimeOnly(row.stdUtc)
+      ariaLabel: "Scheduled Time of Departure Local",
+      renderCell: (row) => row.localDepartureClock || formatTimeOnly(row.stdLocal)
     },
     {
       key: "arrivalTime",
-      label: "STA UTC",
+      label: "STA Local",
       compactLabel: "STA",
       role: "time",
-      compactMinWidth: 96,
-      minWidth: 112,
-      fr: 0.8,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       required: false,
-      optionalGroup: "utcTimes",
+      optionalGroup: "localTimes",
       optionalPriority: 1,
       sortable: true,
-      sortKey: "staUtcMillis",
+      sortKey: "localArrivalClock",
       isTimeColumn: true,
-      ariaLabel: "Scheduled Time of Arrival UTC",
-      renderCell: (row) => formatTimeOnly(row.staUtc)
+      ariaLabel: "Scheduled Time of Arrival Local",
+      renderCell: (row) => row.localArrivalClock || formatTimeOnly(row.staLocal)
     },
     {
       key: "distanceNm",
@@ -312,10 +316,7 @@ export function getFlightTableColumns({
       compactLabel: "Dist",
       ariaLabel: "Distance",
       role: "numeric",
-      compactMinWidth: 88,
-      minWidth: 112,
-      fr: 0.9,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       sortable: true,
       sortKey: "distanceNm",
       renderCell: (row) => formatDistanceNm(row.distanceNm)
@@ -326,10 +327,7 @@ export function getFlightTableColumns({
       compactLabel: "ETE",
       ariaLabel: "Estimated Time Enroute",
       role: "time",
-      compactMinWidth: 72,
-      minWidth: 82,
-      fr: 0.8,
-      align: "left",
+      ...SCHEDULE_COLUMN_SIZING,
       sortable: true,
       sortKey: "blockMinutes",
       renderCell: (row) => formatDuration(row.blockMinutes)

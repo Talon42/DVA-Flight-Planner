@@ -16,9 +16,9 @@ pub(crate) const MAX_DELTAVA_TOUR_BRIEFING_WEB_MESSAGE_BYTES: usize = 70 * 1024 
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeltaSyncPayload {
     pub file_name: Option<String>,
-    pub xml_text: Option<String>,
+    pub schedule_text: Option<String>,
     pub status: String,
-    pub xml_status: String,
+    pub schedule_status: String,
     pub logbook_status: String,
     pub profile_status: String,
     pub accomplishment_eligibility: Option<DeltaAccomplishmentEligibilitySummary>,
@@ -87,7 +87,7 @@ pub(crate) struct DeltaAccomplishmentEligibilitySummary {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DeltaWebSyncResult {
     pub nonce: String,
-    pub xml: DeltaWebXmlResult,
+    pub schedule: DeltaWebScheduleResult,
     pub logbook: DeltaWebLogbookResult,
     #[serde(default)]
     pub accomplishments: Option<DeltaWebAccomplishmentsResult>,
@@ -102,16 +102,9 @@ pub(crate) struct DeltaWebDebugMessage {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct DeltaWebXmlCaptureMessage {
-    pub nonce: String,
-    pub xml_text: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct DeltaWebXmlResult {
+pub(crate) struct DeltaWebScheduleResult {
     pub ok: bool,
-    pub xml_text: Option<String>,
+    pub schedule_text: Option<String>,
     pub error: Option<String>,
 }
 
@@ -120,6 +113,8 @@ pub(crate) struct DeltaWebXmlResult {
 pub(crate) struct DeltaWebLogbookResult {
     pub ok: bool,
     pub json_text: Option<String>,
+    #[serde(default)]
+    pub filename: Option<String>,
     pub content_type: Option<String>,
     #[serde(default)]
     pub export_id: Option<String>,

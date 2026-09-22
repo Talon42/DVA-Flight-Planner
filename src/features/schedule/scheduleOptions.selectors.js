@@ -1,5 +1,4 @@
 import { buildAirportOptions } from "../../domain/airports/airportCatalog.js";
-import { getAircraftProfileOptions } from "../../domain/aircraft/aircraftCatalog.js";
 import { buildGeoOptions } from "../../logic/dutySchedule/dutyLocation";
 
 // Collects the airlines present in the current schedule using the legacy sort order.
@@ -8,9 +7,14 @@ export function selectScheduleAirlines({ flights }) {
   return [...new Set(activeFlights.map((flight) => flight.airlineName))].sort();
 }
 
-// Returns the full DVA aircraft catalog so the aircraft picker is always complete.
-export function selectScheduleEquipmentOptions() {
-  return getAircraftProfileOptions();
+// Returns only equipment values actually scheduled by Delta Virtual in the active schedule.
+export function selectScheduleEquipmentOptions({ flights } = {}) {
+  const activeFlights = Array.isArray(flights) ? flights : [];
+  return [...new Set(
+    activeFlights
+      .map((flight) => String(flight?.equipmentType || "").trim())
+      .filter(Boolean)
+  )].sort((left, right) => left.localeCompare(right));
 }
 
 // Builds the airport options used by the schedule filters.

@@ -30,3 +30,5 @@ Desktop.ini
 /coverage/
 /docs/instructions/
 /tmp/
+/.codex/
+/.agents/

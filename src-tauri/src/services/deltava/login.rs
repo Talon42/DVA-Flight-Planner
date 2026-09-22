@@ -41,7 +41,7 @@ pub fn build_deltava_login_automation_script(
     let login_url = serde_json::to_string(login_url)
         .unwrap_or_else(|_| "\"https://www.deltava.org/login.do\"".to_string());
     let target_url = serde_json::to_string(target_url)
-        .unwrap_or_else(|_| "\"https://www.deltava.org/pfpxsched.ws\"".to_string());
+        .unwrap_or_else(|_| "\"https://www.deltava.org/search.ws\"".to_string());
 
     const TEMPLATE: &str = r#"
 (() => {

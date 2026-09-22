@@ -29,6 +29,20 @@ export const DEFAULT_FILTERS = {
 };
 
 export const DEFAULT_SORT = {
-  key: "stdUtcMillis",
+  key: "localDepartureClock",
   direction: "asc"
 };
+
+const LEGACY_SCHEDULE_SORT_KEYS = {
+  stdUtcMillis: "localDepartureClock",
+  staUtcMillis: "localArrivalClock"
+};
+
+// Migrates saved schedule-table sorting away from the old UTC presentation fields.
+export function normalizeScheduleSort(sort) {
+  const key = String(sort?.key || DEFAULT_SORT.key);
+  return {
+    key: LEGACY_SCHEDULE_SORT_KEYS[key] || key,
+    direction: sort?.direction === "desc" ? "desc" : "asc"
+  };
+}

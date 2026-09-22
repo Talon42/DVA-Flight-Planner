@@ -1,7 +1,7 @@
 {
   "name": "flight-planner-app",
   "private": true,
-  "version": "0.8.1-beta",
+  "version": "0.8.5-beta",
   "type": "module",
   "engines": {
     "node": "22.x"
@@ -16,6 +16,7 @@
     "lint": "eslint . --cache --cache-location .eslintcache",
     "lint:ci": "eslint . --max-warnings=0",
     "lint:files": "eslint --max-warnings=0",
+    "test:schedule": "vitest run src/domain/schedule/scheduleDate.test.js src/services/workers/parseSchedule.test.js src/features/schedule/scheduleFilters.selectors.test.js src/components/tables/flightTableDefinition.test.jsx src/features/details/detailsFlightBoardCardSummary.model.test.js src/features/flightBoard/flightBoard.model.test.js src/features/simbrief/simBriefDispatchTime.model.test.js src/logic/dutySchedule/buildDutySchedule.test.js src/app/useAppBootstrap.hooks.test.js",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",

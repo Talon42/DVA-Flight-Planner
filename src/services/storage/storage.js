@@ -36,13 +36,31 @@ const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
 const BROWSER_LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
 const DELTAVA_TOURS_CACHE_STORAGE_KEY = "flight-planner.deltava-tours-cache";
 const DELTAVA_TOUR_PROGRESS_STORAGE_KEY = "flight-planner.deltava-tour-progress";
+const DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
 const GETTING_STARTED_STORAGE_KEY = "flight-planner.getting-started";
 const WHATS_NEW_LAST_SEEN_RELEASE_STORAGE_KEY = "flight-planner.whats-new.last-seen-release-id";
+const DELTAVA_LOGBOOK_STORAGE_DIR = "flight-planner/deltava-sync/logbook";
+const DELTAVA_LOGBOOK_FALLBACK_FILE = "deltava-logbook.json";
 const DELTAVA_TOURS_CACHE_FILE = "dva-tours-cache.json";
 const DELTAVA_TOUR_PROGRESS_FILE = "dva-tour-progress.json";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const loggedCorruptStorageFiles = new Set();
+const OBSOLETE_SCHEDULE_FIELDS = [
+  "mtow",
+  "mlw",
+  "maxPax",
+  "compatibleEquipment",
+  "compatibleEquipmentLabel",
+  "compatibleFamilies",
+  "compatibleFamiliesLabel",
+  "compatibilityCount",
+  "compatibilityStatus",
+  "compatibilityReason",
+  "compatibilityRef",
+  "sourceArrivalClock",
+  "utcDepartureClock"
+];
 
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -117,24 +135,6 @@ export function normalizeSimBriefSettingsSnapshot(settings) {
       ? settings.customAirframes.map(normalizeAircraftCustomAirframe).filter(Boolean)
       : []
   };
-}
-
-function buildCompactLabel(values, visibleCount) {
-  if (!values.length) {
-    return "None";
-  }
-
-  if (values.length <= visibleCount) {
-    return values.join(", ");
-  }
-
-  return `${values.slice(0, visibleCount).join(", ")} +${values.length - visibleCount}`;
-}
-
-function buildCompatibilityReason(compatibleEquipment) {
-  return compatibleEquipment.length
-    ? `${compatibleEquipment.length} equipment profiles are within the route range.`
-    : "No aircraft profiles are within the route range.";
 }
 
 function toClockValue(isoValue) {
@@ -465,30 +465,8 @@ async function decompressPersistedPayload(payloadEncoding, payload) {
   return textDecoder.decode(decompressed);
 }
 
-function buildPersistedCompatibilityCatalog(flights = []) {
-  const compatibilityCatalog = [];
-  const compatibilityMap = new Map();
-
-  const persistedFlights = flights.map((flight) => {
-    const compatibleEquipment = Array.isArray(flight.compatibleEquipment)
-      ? [...flight.compatibleEquipment]
-      : [];
-    const compatibleFamilies = Array.isArray(flight.compatibleFamilies)
-      ? [...flight.compatibleFamilies]
-      : [];
-    const compatibilityKey = JSON.stringify([compatibleEquipment, compatibleFamilies]);
-    let compatibilityRef = compatibilityMap.get(compatibilityKey);
-
-    if (compatibilityRef === undefined) {
-      compatibilityRef = compatibilityCatalog.length;
-      compatibilityCatalog.push({
-        compatibleEquipment,
-        compatibleFamilies
-      });
-      compatibilityMap.set(compatibilityKey, compatibilityRef);
-    }
-
-    return {
+function buildPersistedFlights(flights = []) {
+  return flights.map((flight) => ({
       flightId: flight.flightId,
       flightCode: flight.flightCode,
       flightNumber: deriveFlightNumber(flight),
@@ -506,13 +484,20 @@ function buildPersistedCompatibilityCatalog(flights = []) {
       hasMissingAirportData: Boolean(flight.hasMissingAirportData),
       stdLocal: flight.stdLocal,
       staLocal: flight.staLocal,
+      localDepartureClock: flight.localDepartureClock,
+      localArrivalClock: flight.localArrivalClock,
       stdUtc: flight.stdUtc,
       staUtc: flight.staUtc,
       stdUtcMillis: flight.stdUtcMillis,
       staUtcMillis: flight.staUtcMillis,
-      mtow: flight.mtow,
-      mlw: flight.mlw,
-      maxPax: flight.maxPax,
+      leg: flight.leg,
+      effectiveDate: flight.effectiveDate,
+      equipmentType: flight.equipmentType,
+      scheduleSource: flight.scheduleSource,
+      historic: flight.historic,
+      academy: flight.academy,
+      sourceDurationMinutes: flight.sourceDurationMinutes,
+      sourceDistanceMiles: flight.sourceDistanceMiles,
       blockMinutes: flight.blockMinutes,
       distanceNm: flight.distanceNm,
       selectedAircraft:
@@ -521,64 +506,49 @@ function buildPersistedCompatibilityCatalog(flights = []) {
         String(flight.simbriefSelectedType || "").trim(),
       simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
       boardSequence: Number.isInteger(flight.boardSequence) ? flight.boardSequence : null,
-      compatibilityRef,
       notes: flight.notes || ""
-    };
-  });
-
-  return { compatibilityCatalog, persistedFlights };
+    }));
 }
 
 function createPersistedSchedule(savedSchedule) {
-  const { compatibilityCatalog, persistedFlights } = buildPersistedCompatibilityCatalog(
-    savedSchedule?.flights || []
-  );
-
   return {
     importedAt: savedSchedule.importedAt,
     sourceFileName: savedSchedule.sourceFileName || null,
     importSummary: savedSchedule.importSummary || null,
     shortlist: Array.isArray(savedSchedule.shortlist) ? savedSchedule.shortlist : [],
     uiState: savedSchedule.uiState || null,
-    compatibilityCatalog,
-    flights: persistedFlights
+    scheduleMetadata: savedSchedule.scheduleMetadata || null,
+    flights: buildPersistedFlights(savedSchedule?.flights || [])
   };
 }
 
-function hydratePersistedFlight(flight, compatibilityEntry, shortlistSet) {
-  const compatibleEquipment = Array.isArray(compatibilityEntry?.compatibleEquipment)
-    ? compatibilityEntry.compatibleEquipment
-    : [];
-  const compatibleFamilies = Array.isArray(compatibilityEntry?.compatibleFamilies)
-    ? compatibilityEntry.compatibleFamilies
-    : [];
+function hydratePersistedFlight(flight, shortlistSet) {
+  const normalizedFlight = { ...flight };
+  for (const field of OBSOLETE_SCHEDULE_FIELDS) {
+    delete normalizedFlight[field];
+  }
 
   return {
-    ...flight,
-    route: `${flight.from}-${flight.to}`,
-    localDepartureClock: toClockValue(flight.stdLocal),
-    utcDepartureClock: toClockValue(flight.stdUtc),
-    flightNumber: deriveFlightNumber(flight),
-    airlineIcao: String(flight.airlineIcao || "").trim().toUpperCase(),
-    callsign: deriveCallsign(flight),
-    compatibleEquipment,
-    compatibleEquipmentLabel: buildCompactLabel(compatibleEquipment, 3),
-    compatibleFamilies,
-    compatibleFamiliesLabel: buildCompactLabel(compatibleFamilies, 3),
-    compatibilityCount: compatibleEquipment.length,
-    compatibilityStatus: compatibleEquipment.length ? "compatible" : "none",
-    compatibilityReason: buildCompatibilityReason(compatibleEquipment),
-    missingAirportIcaos: Array.isArray(flight.missingAirportIcaos) ? flight.missingAirportIcaos : [],
-    hasMissingAirportData: Boolean(flight.hasMissingAirportData),
+    ...normalizedFlight,
+    route: `${normalizedFlight.from}-${normalizedFlight.to}`,
+    localDepartureClock:
+      String(normalizedFlight.localDepartureClock || "").trim() || toClockValue(normalizedFlight.stdLocal),
+    localArrivalClock:
+      String(normalizedFlight.localArrivalClock || "").trim() || toClockValue(normalizedFlight.staLocal),
+    flightNumber: deriveFlightNumber(normalizedFlight),
+    airlineIcao: String(normalizedFlight.airlineIcao || "").trim().toUpperCase(),
+    callsign: deriveCallsign(normalizedFlight),
+    missingAirportIcaos: Array.isArray(normalizedFlight.missingAirportIcaos) ? normalizedFlight.missingAirportIcaos : [],
+    hasMissingAirportData: Boolean(normalizedFlight.hasMissingAirportData),
     selectedAircraft:
-      String(flight.selectedAircraft || "").trim() ||
-      getSelectedAircraftForFlight(flight) ||
-      String(flight.simbriefSelectedType || "").trim(),
+      String(normalizedFlight.selectedAircraft || "").trim() ||
+      getSelectedAircraftForFlight(normalizedFlight) ||
+      String(normalizedFlight.simbriefSelectedType || "").trim(),
     simbriefSelectedType: "",
-    simbriefPlan: normalizeSimBriefPlan(flight.simbriefPlan),
-    isShortlisted: shortlistSet.has(flight.flightId),
-    boardSequence: Number.isInteger(flight.boardSequence) ? flight.boardSequence : null,
-    notes: flight.notes || ""
+    simbriefPlan: normalizeSimBriefPlan(normalizedFlight.simbriefPlan),
+    isShortlisted: shortlistSet.has(normalizedFlight.flightId),
+    boardSequence: Number.isInteger(normalizedFlight.boardSequence) ? normalizedFlight.boardSequence : null,
+    notes: normalizedFlight.notes || ""
   };
 }
 
@@ -588,6 +558,7 @@ function hydratePersistedSchedule(savedSchedule) {
       importedAt: savedSchedule?.importedAt || null,
       sourceFileName: savedSchedule?.sourceFileName || null,
       importSummary: savedSchedule?.importSummary || null,
+      scheduleMetadata: savedSchedule?.scheduleMetadata || null,
       shortlist: Array.isArray(savedSchedule?.shortlist) ? savedSchedule.shortlist : [],
       uiState: savedSchedule?.uiState || null,
       flights: []
@@ -596,19 +567,14 @@ function hydratePersistedSchedule(savedSchedule) {
 
   const shortlist = Array.isArray(savedSchedule.shortlist) ? savedSchedule.shortlist : [];
   const shortlistSet = new Set(shortlist);
-  const compatibilityCatalog = Array.isArray(savedSchedule.compatibilityCatalog)
-    ? savedSchedule.compatibilityCatalog
-    : [];
-
   return {
     importedAt: savedSchedule.importedAt,
     sourceFileName: savedSchedule.sourceFileName || null,
     importSummary: savedSchedule.importSummary || null,
+    scheduleMetadata: savedSchedule.scheduleMetadata || null,
     shortlist,
     uiState: savedSchedule.uiState || null,
-    flights: savedSchedule.flights.map((flight) =>
-      hydratePersistedFlight(flight, compatibilityCatalog[flight.compatibilityRef], shortlistSet)
-    )
+    flights: savedSchedule.flights.map((flight) => hydratePersistedFlight(flight, shortlistSet))
   };
 }
 
@@ -637,22 +603,10 @@ async function parseSavedScheduleText(text) {
       importedAt: parsed.importedAt,
       sourceFileName: parsed.sourceFileName || null,
       importSummary: parsed.importSummary || null,
+      scheduleMetadata: parsed.scheduleMetadata || null,
       shortlist: Array.isArray(parsed.shortlist) ? parsed.shortlist : [],
       uiState: parsed.uiState || null,
-      compatibilityCatalog: Array.isArray(parsed.compatibilityCatalog)
-        ? parsed.compatibilityCatalog
-        : parsed.flights.map((flight) => ({
-            compatibleEquipment: Array.isArray(flight?.compatibleEquipment)
-              ? flight.compatibleEquipment
-              : [],
-            compatibleFamilies: Array.isArray(flight?.compatibleFamilies)
-              ? flight.compatibleFamilies
-              : []
-          })),
-      flights: parsed.flights.map((flight, index) => ({
-        ...flight,
-        compatibilityRef: Number.isInteger(flight?.compatibilityRef) ? flight.compatibilityRef : index
-      }))
+      flights: parsed.flights
     });
   }
 
@@ -1128,11 +1082,11 @@ async function pickTextFile({ accept, filterName, extensions }) {
   });
 }
 
-export async function pickXmlScheduleFile() {
+export async function pickJsonScheduleFile() {
   const selectedFile = await pickTextFile({
-    accept: ".xml,text/xml",
-    filterName: "Schedule XML",
-    extensions: ["xml"]
+    accept: ".json,application/json",
+    filterName: "Schedule JSON",
+    extensions: ["json"]
   });
 
   if (!selectedFile) {
@@ -1141,6 +1095,68 @@ export async function pickXmlScheduleFile() {
 
   return {
     fileName: selectedFile.fileName,
-    xmlText: selectedFile.text
+    scheduleText: selectedFile.text
   };
+}
+
+export async function pickJsonLogbookFile() {
+  const selectedFile = await pickTextFile({
+    accept: ".json,application/json",
+    filterName: "Logbook JSON",
+    extensions: ["json"]
+  });
+
+  if (!selectedFile) {
+    return null;
+  }
+
+  return {
+    fileName: selectedFile.fileName,
+    jsonText: selectedFile.text
+  };
+}
+
+function sanitizeLogbookFilename(fileName) {
+  const rawName = String(fileName || "").split(/[\\/]/).pop()?.trim() || DELTAVA_LOGBOOK_FALLBACK_FILE;
+  const sanitized = rawName
+    .replace(/[^A-Za-z0-9._-]/g, "-")
+    .replace(/^[-._]+|[-._]+$/g, "");
+  const normalized = sanitized || DELTAVA_LOGBOOK_FALLBACK_FILE;
+
+  return normalized.toLowerCase().endsWith(".json") ? normalized : `${normalized}.json`;
+}
+
+export async function storeDeltaVirtualLogbookJson(fileName, jsonText) {
+  const trimmed = String(jsonText || "").trim();
+  if (!trimmed) {
+    throw new Error("Logbook JSON was empty.");
+  }
+
+  try {
+    JSON.parse(trimmed);
+  } catch (error) {
+    throw new Error(
+      `Logbook JSON was invalid: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
+  }
+
+  const normalizedFileName = sanitizeLogbookFilename(fileName);
+
+  if (isTauriRuntime()) {
+    const { mkdir, writeTextFile, BaseDirectory } = await loadFsModule();
+    await mkdir(DELTAVA_LOGBOOK_STORAGE_DIR, {
+      baseDir: BaseDirectory.AppLocalData,
+      recursive: true
+    });
+    await writeTextFile(`${DELTAVA_LOGBOOK_STORAGE_DIR}/${normalizedFileName}`, trimmed, {
+      baseDir: BaseDirectory.AppLocalData
+    });
+    return;
+  }
+
+  window.localStorage.setItem(
+    DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
+    JSON.stringify({ fileName: normalizedFileName, jsonText: trimmed })
+  );
 }

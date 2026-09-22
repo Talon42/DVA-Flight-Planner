@@ -393,7 +393,10 @@ export default function App() {
   const isDesktopSimBriefAvailable = isDesktopAddonScanAvailable;
   // Keep the derived flight list stable so downstream hooks can read it safely.
   const scheduleFlights = useMemo(() => schedule?.flights || [], [schedule]);
-  const scheduleDateInfo = buildScheduleDateInfo(schedule?.flights || []);
+  const scheduleDateInfo = buildScheduleDateInfo({
+    flights: schedule?.flights || [],
+    scheduleMetadata: schedule?.scheduleMetadata || null
+  });
   const isScheduleOutOfDate = Boolean(schedule?.flights?.length) && scheduleDateInfo.isCurrent === false;
   const scheduleDateLabel = scheduleDateInfo.label;
   const logbookLastReportLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
@@ -668,7 +671,10 @@ export default function App() {
     [scheduleFlights]
   );
 
-  const equipmentOptions = useMemo(() => selectScheduleEquipmentOptions(), []);
+  const equipmentOptions = useMemo(
+    () => selectScheduleEquipmentOptions({ flights: scheduleFlights }),
+    [scheduleFlights]
+  );
   const airportOptions = useMemo(
     () => selectAirportOptions({ flights: scheduleFlights }),
     [scheduleFlights]

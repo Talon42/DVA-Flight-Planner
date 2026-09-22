@@ -39,7 +39,6 @@ export default function AppMainWorkspace({
   onSortAccomplishmentFlights,
   onSortFlights,
   onAirportSelect,
-  onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow,
   plannerMode,
@@ -128,7 +127,6 @@ export default function AppMainWorkspace({
           onSortAccomplishmentFlights={onSortAccomplishmentFlights}
           onSortFlights={onSortFlights}
           onAirportSelect={onAirportSelect}
-          onToggleTimeDisplayMode={onToggleTimeDisplayMode}
           onSelectRow={onSelectRow}
           onActivateRow={onActivateRow}
           plannerMode={plannerMode}

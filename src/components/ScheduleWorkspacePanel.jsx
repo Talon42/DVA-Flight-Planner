@@ -41,7 +41,6 @@ export default function ScheduleWorkspacePanel({
   onSortAccomplishmentFlights,
   onSortFlights,
   onAirportSelect,
-  onToggleTimeDisplayMode,
   onSelectRow,
   onActivateRow,
   plannerMode,
@@ -109,7 +108,6 @@ export default function ScheduleWorkspacePanel({
               onSortAccomplishmentFlights={onSortAccomplishmentFlights}
               onSortFlights={onSortFlights}
               onAirportSelect={onAirportSelect}
-              onToggleTimeDisplayMode={onToggleTimeDisplayMode}
               onSelectRow={onSelectRow}
               onActivateRow={onActivateRow}
               dutyFilters={dutyFilters}

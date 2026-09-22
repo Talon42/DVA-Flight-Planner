@@ -495,12 +495,6 @@ export function useFlightBoards({
   }
 
   function handleAddToFlightBoard(flightId, clickedRow = null) {
-    if (!isScheduleCurrent) {
-      // Block new board entries until the active schedule has been refreshed.
-      onOpenStaleScheduleBlocked?.();
-      return false;
-    }
-
     if (scheduleView === "tours") {
       const normalizedFlightId = String(flightId || "").trim();
       const matchedTourFlight =
@@ -603,6 +597,10 @@ export function useFlightBoards({
         return false;
       }
 
+      if (isScheduleCurrent === false) {
+        onOpenStaleScheduleBlocked?.();
+      }
+
       return true;
     }
 
@@ -620,6 +618,10 @@ export function useFlightBoards({
       didAddFlightRow = true;
       return [...current, buildBoardEntryFromFlight(matchedFlight)];
     });
+
+    if (didAddFlightRow && isScheduleCurrent === false) {
+      onOpenStaleScheduleBlocked?.();
+    }
 
     return didAddFlightRow;
   }
