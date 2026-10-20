@@ -20,7 +20,6 @@ pub(crate) use models::{
 };
 pub(crate) use services::deltava::constants::{
     DELTAVA_AUTH_MESSAGE_PREFIX, DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
-    DELTAVA_LOGBOOK_REFRESH_RESULT_MESSAGE_PREFIX,
 };
 pub(crate) use services::deltava::sync_types::{
     DeltaLogbookArtifact, DeltaLogbookMetadata, DeltaLogbookProgress, DeltaSyncPayload,

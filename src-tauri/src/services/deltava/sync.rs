@@ -1,4 +1,7 @@
-use std::{sync::{Arc, Mutex}, time::Instant};
+use std::{
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::oneshot;

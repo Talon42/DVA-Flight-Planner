@@ -12,9 +12,9 @@ use crate::services::deltava::sync_types::{
     MAX_DELTAVA_LOGBOOK_REFRESH_WEB_MESSAGE_BYTES,
 };
 use crate::{
-    app::state::DeltaSyncFinishOutcome,
-    append_sync_log, append_sync_log_debug, services::storage::file_store, DeltaSyncManager,
-    DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
+    app::state::DeltaSyncFinishOutcome, append_sync_log, append_sync_log_debug,
+    services::storage::file_store, DeltaSyncManager, DELTAVA_DEBUG_MESSAGE_PREFIX,
+    DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
 };
 
 pub(crate) const DELTAVA_SYNC_LABEL: &str = "deltava-sync";
@@ -346,56 +346,52 @@ pub(crate) fn build_deltava_sync_window(
     let focus_lost_at_for_events = focus_lost_at.clone();
     let sync_nonce_for_close = sync_nonce.clone();
 
-    let window = WebviewWindowBuilder::new(&app, DELTAVA_SYNC_LABEL, WebviewUrl::External(login_url))
-        .title("Delta Virtual Sync")
-        .inner_size(520.0, 760.0)
-        .min_inner_size(460.0, 680.0)
-        .resizable(true)
-        .visible(false)
-        .center()
-        .data_directory(webview_data_directory)
-        .on_navigation(|url| is_allowed_deltava_url(url))
-        .on_page_load(move |webview_window, payload| {
-            let event_name = match payload.event() {
-                tauri::webview::PageLoadEvent::Started => "Started",
-                tauri::webview::PageLoadEvent::Finished => "Finished",
-            };
-            let url = payload.url().to_string();
-            let should_probe = should_probe_for_schedule(payload.url());
-            append_sync_log_debug(
-                debug_enabled,
-                &format!("webview:page-load event={event_name} url={url} probe={should_probe}"),
-            );
+    let window =
+        WebviewWindowBuilder::new(&app, DELTAVA_SYNC_LABEL, WebviewUrl::External(login_url))
+            .title("Delta Virtual Sync")
+            .inner_size(520.0, 760.0)
+            .min_inner_size(460.0, 680.0)
+            .resizable(true)
+            .visible(false)
+            .center()
+            .data_directory(webview_data_directory)
+            .on_navigation(|url| is_allowed_deltava_url(url))
+            .on_page_load(move |webview_window, payload| {
+                let event_name = match payload.event() {
+                    tauri::webview::PageLoadEvent::Started => "Started",
+                    tauri::webview::PageLoadEvent::Finished => "Finished",
+                };
+                let url = payload.url().to_string();
+                let should_probe = should_probe_for_schedule(payload.url());
+                append_sync_log_debug(
+                    debug_enabled,
+                    &format!("webview:page-load event={event_name} url={url} probe={should_probe}"),
+                );
 
-            if payload.event() == tauri::webview::PageLoadEvent::Finished && should_probe {
-                match webview_window.eval(&login_automation_script) {
-                    Ok(()) => append_sync_log_debug(debug_enabled, "webview:eval:login:ok"),
-                    Err(error) => append_sync_log_debug(
-                        debug_enabled,
-                        &format!("webview:eval:login:failed error={error}"),
-                    ),
+                if payload.event() == tauri::webview::PageLoadEvent::Finished && should_probe {
+                    match webview_window.eval(&login_automation_script) {
+                        Ok(()) => append_sync_log_debug(debug_enabled, "webview:eval:login:ok"),
+                        Err(error) => append_sync_log_debug(
+                            debug_enabled,
+                            &format!("webview:eval:login:failed error={error}"),
+                        ),
+                    }
+                    match webview_window.eval(&auto_sync_script) {
+                        Ok(()) => append_sync_log_debug(debug_enabled, "webview:eval:auto-sync:ok"),
+                        Err(error) => append_sync_log_debug(
+                            debug_enabled,
+                            &format!("webview:eval:auto-sync:failed error={error}"),
+                        ),
+                    }
                 }
-                match webview_window.eval(&auto_sync_script) {
-                    Ok(()) => append_sync_log_debug(debug_enabled, "webview:eval:auto-sync:ok"),
-                    Err(error) => append_sync_log_debug(
-                        debug_enabled,
-                        &format!("webview:eval:auto-sync:failed error={error}"),
-                    ),
-                }
-            }
-        })
-        .build()
-        .map_err(|error| {
-            format!("download_failed: Unable to open Delta Virtual sync window: {error}")
-        })?;
+            })
+            .build()
+            .map_err(|error| {
+                format!("download_failed: Unable to open Delta Virtual sync window: {error}")
+            })?;
 
     #[cfg(windows)]
-    attach_windows_message_handler(
-        &window,
-        app.clone(),
-        sync_nonce.clone(),
-        debug_enabled,
-    )?;
+    attach_windows_message_handler(&window, app.clone(), sync_nonce.clone(), debug_enabled)?;
 
     append_sync_log_debug(debug_enabled, "sync:webview-ready");
 

@@ -1,6 +1,5 @@
 use crate::app::paths::{
     build_accomplishment_eligibility_path, build_logbook_dir, build_schedule_path,
-    resolve_existing_logbook_json_path,
 };
 use crate::services::deltava::draft::DVA_DRAFT_WEBVIEW_DIR;
 use crate::services::deltava::{
@@ -13,12 +12,10 @@ use crate::services::deltava::{
     },
 };
 use crate::{
-    append_sync_log, append_sync_log_debug, DELTAVA_LOGBOOK_FALLBACK_FILE,
-    DELTAVA_SCHEDULE_FILE,
+    append_sync_log, append_sync_log_debug, DELTAVA_LOGBOOK_FALLBACK_FILE, DELTAVA_SCHEDULE_FILE,
 };
-use chrono::NaiveDate;
 use serde_json::Value;
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{fs, path::Path};
 use tauri::{AppHandle, Manager};
 
 const WEBVIEW_ROOT_PRUNE_DIRS: &[&str] = &[
@@ -95,195 +92,6 @@ const WEBVIEW_PROFILE_PRUNE_FILES: &[&str] = &[
     "Vpn Tokens",
     "Vpn Tokens-journal",
 ];
-
-fn get_json_field_i32(value: &Value, key: &str) -> Option<i32> {
-    value
-        .get(key)
-        .and_then(Value::as_i64)
-        .and_then(|number| i32::try_from(number).ok())
-}
-
-fn extract_logbook_date_parts(entry: &Value) -> Option<(i32, u32, u32)> {
-    let date = entry.get("date")?;
-    let year = get_json_field_i32(date, "y")?;
-    let month = get_json_field_i32(date, "m")?;
-    let day = get_json_field_i32(date, "d")?;
-    let month = u32::try_from(month).ok()?;
-    let day = u32::try_from(day).ok()?;
-    Some((year, month, day))
-}
-
-fn find_logbook_entries(json: &Value) -> Option<&Vec<Value>> {
-    json.as_array()
-        .or_else(|| json.get("flights").and_then(Value::as_array))
-}
-
-fn normalize_dva_logbook_month(raw_month: u32) -> Option<u32> {
-    if raw_month <= 11 {
-        return raw_month.checked_add(1);
-    }
-
-    if raw_month == 12 {
-        return Some(12);
-    }
-
-    None
-}
-
-fn extract_latest_logbook_date_iso(json: &Value) -> Option<String> {
-    let entries = find_logbook_entries(json)?;
-    let latest_entry = entries.last()?;
-    let (year, raw_month, day) = extract_logbook_date_parts(latest_entry)?;
-    let month = normalize_dva_logbook_month(raw_month)?;
-
-    NaiveDate::from_ymd_opt(year, month, day).map(|date| date.format("%Y-%m-%d").to_string())
-}
-
-fn normalize_logbook_airport_code(value: &str) -> Option<String> {
-    value
-        .split(|character: char| !character.is_ascii_alphanumeric())
-        .map(|part| part.trim().to_ascii_uppercase())
-        .find(|part| {
-            (3..=5).contains(&part.len()) && part.chars().all(|ch| ch.is_ascii_alphanumeric())
-        })
-}
-
-fn is_departure_airport_key(key: &str) -> bool {
-    matches!(
-        key,
-        "dep"
-            | "departure"
-            | "depart"
-            | "origin"
-            | "from"
-            | "fromicao"
-            | "depicao"
-            | "departureicao"
-            | "departureairport"
-            | "airportd"
-            | "dairport"
-            | "icaodep"
-            | "icaodeparture"
-    )
-}
-
-fn is_arrival_airport_key(key: &str) -> bool {
-    matches!(
-        key,
-        "arr"
-            | "arrival"
-            | "destination"
-            | "dest"
-            | "to"
-            | "toicao"
-            | "arricao"
-            | "arrivalicao"
-            | "arrivalairport"
-            | "airporta"
-            | "aairport"
-            | "icaoarr"
-            | "icaoarrival"
-    )
-}
-
-fn normalize_logbook_key(key: &str) -> String {
-    key.chars()
-        .filter(|character| character.is_ascii_alphanumeric())
-        .collect::<String>()
-        .to_ascii_lowercase()
-}
-
-fn extract_logbook_status(entry: &Value) -> Option<String> {
-    entry
-        .get("status")
-        .and_then(Value::as_str)
-        .map(|value| value.trim().to_ascii_lowercase())
-        .filter(|value| !value.is_empty())
-}
-
-fn is_completed_logbook_status(status: Option<&str>) -> bool {
-    matches!(
-        status.map(str::trim),
-        None
-            | Some("ok")
-            | Some("accepted")
-            | Some("submitted")
-            | Some("approved")
-            | Some("completed")
-            | Some("complete")
-    )
-}
-
-fn collect_airport_codes_from_value(value: &Value, airports: &mut BTreeSet<String>) {
-    match value {
-        Value::String(text) => {
-            if let Some(code) = normalize_logbook_airport_code(text) {
-                airports.insert(code);
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                collect_airport_codes_from_value(item, airports);
-            }
-        }
-        Value::Object(map) => {
-            for value in map.values() {
-                collect_airport_codes_from_value(value, airports);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn collect_airport_codes_from_airport_object(value: &Value, airports: &mut BTreeSet<String>) {
-    let Value::Object(map) = value else {
-        collect_airport_codes_from_value(value, airports);
-        return;
-    };
-
-    for key in ["icao", "icaoCode", "fsIcao", "code", "iata"] {
-        if let Some(code) = map
-            .get(key)
-            .and_then(Value::as_str)
-            .and_then(normalize_logbook_airport_code)
-        {
-            airports.insert(code);
-            return;
-        }
-    }
-}
-
-fn collect_logbook_airport_progress(
-    value: &Value,
-    visited_airports: &mut BTreeSet<String>,
-    arrival_airports: &mut BTreeSet<String>,
-) {
-    match value {
-        Value::Array(items) => {
-            for item in items {
-                collect_logbook_airport_progress(item, visited_airports, arrival_airports);
-            }
-        }
-        Value::Object(map) => {
-            for (key, value) in map {
-                let normalized_key = normalize_logbook_key(key);
-                if is_departure_airport_key(&normalized_key) {
-                    collect_airport_codes_from_airport_object(value, visited_airports);
-                } else if is_arrival_airport_key(&normalized_key) {
-                    let mut arrivals = BTreeSet::new();
-                    collect_airport_codes_from_airport_object(value, &mut arrivals);
-                    for airport in arrivals {
-                        arrival_airports.insert(airport.clone());
-                        visited_airports.insert(airport);
-                    }
-                } else {
-                    collect_logbook_airport_progress(value, visited_airports, arrival_airports);
-                }
-            }
-        }
-        _ => {}
-    }
-}
 
 fn summarize_warnings(warnings: &[String]) -> Option<String> {
     if warnings.is_empty() {
@@ -422,76 +230,6 @@ fn prune_webview_profile(root: &Path) {
     }
 }
 
-/// Reads the latest Delta Virtual logbook date from disk for the dashboard.
-pub(crate) fn read_deltava_logbook_metadata(app: &AppHandle) -> crate::DeltaLogbookMetadata {
-    let Some(path) = resolve_existing_logbook_json_path(app) else {
-        return crate::DeltaLogbookMetadata { date_iso: None };
-    };
-
-    let Ok(text) = fs::read_to_string(&path) else {
-        append_sync_log(&format!("logbook:metadata-read-failed {}", path.display()));
-        return crate::DeltaLogbookMetadata { date_iso: None };
-    };
-
-    let Ok(json) = serde_json::from_str::<Value>(&text) else {
-        append_sync_log(&format!("logbook:metadata-invalid-json {}", path.display()));
-        return crate::DeltaLogbookMetadata { date_iso: None };
-    };
-
-    let date_iso = extract_latest_logbook_date_iso(&json);
-    if date_iso.is_none() {
-        append_sync_log(&format!("logbook:metadata-date-missing {}", path.display()));
-    }
-
-    crate::DeltaLogbookMetadata { date_iso }
-}
-
-/// Reads visited and arrival airports from the newest Delta Virtual logbook file.
-pub(crate) fn read_deltava_logbook_progress(app: &AppHandle) -> crate::DeltaLogbookProgress {
-    let Some(path) = resolve_existing_logbook_json_path(app) else {
-        return crate::DeltaLogbookProgress {
-            date_iso: None,
-            visited_airports: Vec::new(),
-            arrival_airports: Vec::new(),
-        };
-    };
-
-    let Ok(text) = fs::read_to_string(&path) else {
-        append_sync_log(&format!("logbook:progress-read-failed {}", path.display()));
-        return crate::DeltaLogbookProgress {
-            date_iso: None,
-            visited_airports: Vec::new(),
-            arrival_airports: Vec::new(),
-        };
-    };
-
-    let Ok(json) = serde_json::from_str::<Value>(&text) else {
-        append_sync_log(&format!("logbook:progress-invalid-json {}", path.display()));
-        return crate::DeltaLogbookProgress {
-            date_iso: None,
-            visited_airports: Vec::new(),
-            arrival_airports: Vec::new(),
-        };
-    };
-
-    let mut visited_airports = BTreeSet::new();
-    let mut arrival_airports = BTreeSet::new();
-    if let Some(entries) = find_logbook_entries(&json) {
-        for entry in entries {
-            if !is_completed_logbook_status(extract_logbook_status(entry).as_deref()) {
-                continue;
-            }
-            collect_logbook_airport_progress(entry, &mut visited_airports, &mut arrival_airports);
-        }
-    }
-
-    crate::DeltaLogbookProgress {
-        date_iso: extract_latest_logbook_date_iso(&json),
-        visited_airports: visited_airports.into_iter().collect(),
-        arrival_airports: arrival_airports.into_iter().collect(),
-    }
-}
-
 /// Reads the latest stored DVA accomplishment eligibility snapshot.
 pub(crate) fn read_deltava_accomplishment_eligibility(
     app: &AppHandle,
@@ -512,10 +250,12 @@ fn store_deltava_accomplishment_eligibility(
     store: &DeltaAccomplishmentEligibilityStore,
 ) -> Result<DeltaAccomplishmentEligibilityStore, String> {
     let path = build_accomplishment_eligibility_path(app)?;
-    let json = serde_json::to_string_pretty(store)
-        .map_err(|error| format!("download_failed: Unable to serialize accomplishment eligibility: {error}"))?;
-    fs::write(&path, json)
-        .map_err(|error| format!("download_failed: Unable to write accomplishment eligibility: {error}"))?;
+    let json = serde_json::to_string_pretty(store).map_err(|error| {
+        format!("download_failed: Unable to serialize accomplishment eligibility: {error}")
+    })?;
+    fs::write(&path, json).map_err(|error| {
+        format!("download_failed: Unable to write accomplishment eligibility: {error}")
+    })?;
     Ok(store.clone())
 }
 
@@ -567,19 +307,24 @@ fn schedule_scalar_is_present(value: Option<&Value>) -> bool {
 }
 
 fn validate_schedule_json(schedule_text: &str) -> Result<usize, String> {
-    let schedule = serde_json::from_str::<Value>(schedule_text)
-        .map_err(|error| format!("invalid_json: Delta Virtual schedule JSON was invalid: {error}"))?;
-    let object = schedule
-        .as_object()
-        .ok_or_else(|| "invalid_schedule: Delta Virtual schedule response must be an object.".to_string())?;
+    let schedule = serde_json::from_str::<Value>(schedule_text).map_err(|error| {
+        format!("invalid_json: Delta Virtual schedule JSON was invalid: {error}")
+    })?;
+    let object = schedule.as_object().ok_or_else(|| {
+        "invalid_schedule: Delta Virtual schedule response must be an object.".to_string()
+    })?;
     let sources = object
         .get("sources")
         .and_then(Value::as_object)
-        .ok_or_else(|| "invalid_schedule: Delta Virtual schedule response is missing sources.".to_string())?;
+        .ok_or_else(|| {
+            "invalid_schedule: Delta Virtual schedule response is missing sources.".to_string()
+        })?;
     let results = object
         .get("results")
         .and_then(Value::as_array)
-        .ok_or_else(|| "invalid_schedule: Delta Virtual schedule response is missing results.".to_string())?;
+        .ok_or_else(|| {
+            "invalid_schedule: Delta Virtual schedule response is missing results.".to_string()
+        })?;
 
     if results.len() <= 250 {
         return Err(format!(
@@ -590,7 +335,10 @@ fn validate_schedule_json(schedule_text: &str) -> Result<usize, String> {
 
     for (index, entry) in results.iter().enumerate() {
         let row = entry.as_object().ok_or_else(|| {
-            format!("invalid_schedule: Delta Virtual schedule row {} is not an object.", index + 1)
+            format!(
+                "invalid_schedule: Delta Virtual schedule row {} is not an object.",
+                index + 1
+            )
         })?;
         for field in ["airline", "flight", "leg", "eqType", "src"] {
             if !schedule_scalar_is_present(row.get(field)) {
@@ -632,7 +380,9 @@ fn validate_schedule_json(schedule_text: &str) -> Result<usize, String> {
             .get("timeD")
             .and_then(Value::as_object)
             .is_some_and(|time| {
-                time.get("text").and_then(Value::as_str).is_some_and(|text| !text.trim().is_empty())
+                time.get("text")
+                    .and_then(Value::as_str)
+                    .is_some_and(|text| !text.trim().is_empty())
                     || time.get("h").is_some()
                     || time.get("m").is_some()
                     || time.get("s").is_some()
@@ -673,13 +423,17 @@ async fn store_schedule_json(app: &AppHandle, schedule_text: &str) -> Result<(),
     let had_existing_schedule = schedule_path.exists();
     if had_existing_schedule {
         if backup_path.exists() {
-            tokio::fs::remove_file(&backup_path).await.map_err(|error| {
-                format!("download_failed: Unable to prepare schedule backup: {error}")
-            })?;
+            tokio::fs::remove_file(&backup_path)
+                .await
+                .map_err(|error| {
+                    format!("download_failed: Unable to prepare schedule backup: {error}")
+                })?;
         }
         tokio::fs::rename(&schedule_path, &backup_path)
             .await
-            .map_err(|error| format!("download_failed: Unable to prepare schedule replacement: {error}"))?;
+            .map_err(|error| {
+                format!("download_failed: Unable to prepare schedule replacement: {error}")
+            })?;
     }
 
     if let Err(error) = tokio::fs::rename(&temp_path, &schedule_path).await {
@@ -687,7 +441,9 @@ async fn store_schedule_json(app: &AppHandle, schedule_text: &str) -> Result<(),
             let _ = tokio::fs::rename(&backup_path, &schedule_path).await;
         }
         let _ = tokio::fs::remove_file(&temp_path).await;
-        return Err(format!("download_failed: Unable to store schedule JSON: {error}"));
+        return Err(format!(
+            "download_failed: Unable to store schedule JSON: {error}"
+        ));
     }
 
     if had_existing_schedule {
@@ -710,7 +466,10 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         match validate_schedule_json(&schedule_text) {
             Ok(row_count) => match store_schedule_json(app, &schedule_text).await {
                 Ok(()) => {
-                    append_sync_log_debug(debug_enabled, &format!("schedule:validated rows={row_count}"));
+                    append_sync_log_debug(
+                        debug_enabled,
+                        &format!("schedule:validated rows={row_count}"),
+                    );
                     Some(schedule_text)
                 }
                 Err(error) => {
@@ -764,10 +523,10 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         if accomplishments.ok {
             let html_text = accomplishments.html_text.unwrap_or_default();
             let parsed = parse_accomplishment_eligibility_html(&html_text);
-            append_sync_log_debug(debug_enabled, &format!(
-                "accomplishments:parsed rows={}",
-                parsed.rows.len()
-            ));
+            append_sync_log_debug(
+                debug_enabled,
+                &format!("accomplishments:parsed rows={}", parsed.rows.len()),
+            );
 
             match store_deltava_accomplishment_eligibility(app, &parsed) {
                 Ok(store) => Some(build_accomplishment_eligibility_summary(&store)),
@@ -777,11 +536,9 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
                 }
             }
         } else {
-            warnings.push(
-                accomplishments
-                    .error
-                    .unwrap_or_else(|| "Delta Virtual accomplishment eligibility download failed.".into()),
-            );
+            warnings.push(accomplishments.error.unwrap_or_else(|| {
+                "Delta Virtual accomplishment eligibility download failed.".into()
+            }));
             None
         }
     } else {
@@ -929,104 +686,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extract_latest_logbook_date_uses_last_entry_date_object() {
-        let json: Value = serde_json::from_str(
-            r#"{"flights": [
-                {"date":{"y":2026,"m":3,"d":1},"time":"2099-01-01T00:00:00Z"},
-                {"date":{"y":2026,"m":4,"d":11},"time":"2000-01-01T00:00:00Z"}
-            ]}"#,
-        )
-        .expect("json");
-
-        assert_eq!(
-            extract_latest_logbook_date_iso(&json),
-            Some("2026-05-11".to_string())
-        );
-    }
-
-    #[test]
-    fn extract_latest_logbook_date_uses_zero_based_months() {
-        let json: Value = serde_json::from_str(
-            r#"{"flights": [
-                {"date":{"y":2026,"m":0,"d":31}},
-                {"date":{"y":2026,"m":3,"d":11}}
-            ]}"#,
-        )
-        .expect("json");
-
-        assert_eq!(
-            extract_latest_logbook_date_iso(&json),
-            Some("2026-04-11".to_string())
-        );
-    }
-
-    #[test]
-    fn collect_logbook_airport_progress_tracks_departures_and_arrivals() {
-        let json: Value = serde_json::from_str(
-            r#"{"flights": [
-                {"departureAirport":{"icao":"katl"},"arrivalAirport":{"icao":"KJFK"}},
-                {"airportD":{"icao":"KLAX","name":"Los Angeles"},"airportA":{"icao":"KSFO","name":"San Francisco"}}
-            ]}"#,
-        )
-        .expect("json");
-        let mut visited_airports = BTreeSet::new();
-        let mut arrival_airports = BTreeSet::new();
-
-        for entry in find_logbook_entries(&json).expect("entries") {
-            collect_logbook_airport_progress(entry, &mut visited_airports, &mut arrival_airports);
-        }
-
-        assert_eq!(
-            visited_airports.into_iter().collect::<Vec<_>>(),
-            vec![
-                "KATL".to_string(),
-                "KJFK".to_string(),
-                "KLAX".to_string(),
-                "KSFO".to_string()
-            ]
-        );
-        assert_eq!(
-            arrival_airports.into_iter().collect::<Vec<_>>(),
-            vec!["KJFK".to_string(), "KSFO".to_string()]
-        );
-    }
-
-    #[test]
-    fn completed_logbook_status_treats_submitted_as_completed() {
-        assert!(is_completed_logbook_status(Some("submitted")));
-        assert!(!is_completed_logbook_status(Some("rejected")));
-    }
-
-    #[test]
-    fn read_progress_filters_out_non_completed_statuses() {
-        let json: Value = serde_json::from_str(
-            r#"{"flights": [
-                {"status":"SUBMITTED","departureAirport":{"icao":"KATL"},"arrivalAirport":{"icao":"KJFK"}},
-                {"status":"REJECTED","departureAirport":{"icao":"KLAX"},"arrivalAirport":{"icao":"KSFO"}}
-            ]}"#,
-        )
-        .expect("json");
-        let mut visited_airports = BTreeSet::new();
-        let mut arrival_airports = BTreeSet::new();
-
-        for entry in find_logbook_entries(&json).expect("entries") {
-            if !is_completed_logbook_status(extract_logbook_status(entry).as_deref()) {
-                continue;
-            }
-            collect_logbook_airport_progress(entry, &mut visited_airports, &mut arrival_airports);
-        }
-
-        assert_eq!(
-            visited_airports.into_iter().collect::<Vec<_>>(),
-            vec!["KATL".to_string(), "KJFK".to_string()]
-        );
-        assert_eq!(
-            arrival_airports.into_iter().collect::<Vec<_>>(),
-            vec!["KJFK".to_string()]
-        );
-    }
-
-    #[test]
     fn schedule_validation_rejects_truncated_results() {
         let schedule = serde_json::json!({
             "sources": {},
@@ -1059,7 +718,10 @@ mod tests {
         });
         let text = serde_json::to_string(&schedule).expect("schedule json");
 
-        assert_eq!(validate_schedule_json(&text).expect("complete schedule"), 251);
+        assert_eq!(
+            validate_schedule_json(&text).expect("complete schedule"),
+            251
+        );
     }
 
     #[test]
