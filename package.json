@@ -29,7 +29,7 @@
     "validate:frontend": "npm run lint:ci && npm run test:run",
     "validate:rust": "npm run format:rust && npm run clippy:rust && npm run test:rust",
     "validate:fast": "npm run validate:frontend && npm run audit:data && npm run lint:airports",
-    "validate": "npm run validate:fast && npm run validate:rust && npm run build"
+    "validate": "npm run validate:fast && npm run build && npm run validate:rust"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
