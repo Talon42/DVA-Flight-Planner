@@ -198,12 +198,12 @@ function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "
 export default function LogbookPilotStatsHero({
   summary,
   comparison,
-  comparisonPeriod,
-  layoutMode,
+  comparisonPeriod = "off",
   profileMetadata
 }) {
   const airline = summary?.topAirline || null;
-  const useComparison = layoutMode === "wideTall" && comparisonPeriod !== "off" && Boolean(comparison?.deltas);
+  // Comparison content follows the selected period; CSS owns the responsive hero layout.
+  const useComparison = comparisonPeriod !== "off" && Boolean(comparison?.deltas);
   const deltas = comparison?.deltas || {};
   const airlineName = airline?.displayName || airline?.label || "Unknown Airline";
   const brandColor = getAirlinePrimaryColor({
