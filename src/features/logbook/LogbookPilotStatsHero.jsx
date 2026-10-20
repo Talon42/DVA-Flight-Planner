@@ -313,19 +313,19 @@ export default function LogbookPilotStatsHero({
         <div className="flex min-w-0 items-center gap-2 border-b border-[color:rgba(15,35,58,0.14)] pb-3 dark:border-white/10 bp-1024:border-b-0 bp-1024:pb-0">
           <SummaryAirlineMark airline={airline} />
           <div className="min-w-0">
-            <p className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em]", labelToneClassName)}>
+            <p title={topAirlineLabel} className={cn("m-0 truncate text-[0.56rem] font-semibold uppercase tracking-[0.16em]", labelToneClassName)}>
               {topAirlineLabel}
             </p>
-            <p className={cn("m-0 truncate text-[1.08rem] font-semibold leading-[1.1] tracking-[0] bp-1024:text-[1.2rem]", headingToneClassName)}>
+            <p title={profileDisplayName} className={cn("m-0 line-clamp-2 break-words text-[1.08rem] font-semibold leading-[1.1] tracking-[0] bp-1024:text-[1.2rem]", headingToneClassName)}>
               {profileDisplayName}
             </p>
             {profileMetaLine ? (
-              <p className={cn("m-0 truncate text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>
+              <p title={profileMetaLine} className={cn("m-0 line-clamp-2 break-words text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>
                 {profileMetaLine}
               </p>
             ) : null}
             {flyingSinceLine ? (
-              <p className={cn("m-0 truncate text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>
+              <p title={flyingSinceLine} className={cn("m-0 truncate text-[var(--text-muted)] dark:text-white/70", bodySmTextClassName)}>
                 {flyingSinceLine}
               </p>
             ) : null}

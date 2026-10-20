@@ -317,16 +317,17 @@ function buildLandingLocationLabel(item, pirepDetails) {
 function LandingRow({ item, pirepDetails }) {
   const landingRateValue = item?.landingRate || item?.value || LOGBOOK_EMPTY_VALUE;
 
+  // Container queries keep compact cards independent of the desktop window breakpoint.
   return (
-    <div className="grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
-      <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_auto] items-center gap-3">
-        <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.date || LOGBOOK_EMPTY_VALUE}</p>
-        <div className="min-w-0">
-          <p className={STAT_CARD_BODY_CLASS_NAME}>{buildLandingLocationLabel(item, pirepDetails)}</p>
-          <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.equipment || LOGBOOK_EMPTY_VALUE}</p>
+    <div className="@container grid gap-1.5 border-b border-[color:var(--line)] dark:border-[color:var(--line-strong)] pb-2 last:border-b-0 last:pb-0">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 @[22rem]:grid-cols-[5.5rem_minmax(0,1fr)_5.5rem_auto]">
+        <p className={cn(STAT_CARD_BODY_CLASS_NAME, "whitespace-nowrap !overflow-visible")}>{item?.date || LOGBOOK_EMPTY_VALUE}</p>
+        <div className="col-start-1 row-start-2 min-w-0 @[22rem]:col-auto @[22rem]:row-auto">
+          <p className={STAT_CARD_BODY_CLASS_NAME} title={buildLandingLocationLabel(item, pirepDetails)}>{buildLandingLocationLabel(item, pirepDetails)}</p>
+          <p className={STAT_CARD_BODY_CLASS_NAME} title={item?.equipment}>{item?.equipment || LOGBOOK_EMPTY_VALUE}</p>
         </div>
-        <p className={STAT_CARD_VALUE_CLASS_NAME}>{landingRateValue}</p>
-        <div className="flex shrink-0 items-center justify-end">
+        <p className={cn(STAT_CARD_VALUE_CLASS_NAME, "col-start-2 row-start-1 whitespace-nowrap !overflow-visible @[22rem]:col-auto @[22rem]:row-auto")}>{landingRateValue}</p>
+        <div className="col-start-2 row-start-2 flex shrink-0 items-center justify-end @[22rem]:col-auto @[22rem]:row-auto">
           <LandingGradeBadge grade={item?.badge} />
         </div>
       </div>
@@ -343,11 +344,64 @@ function AirportColumnRow({ item }) {
       <div className="flex min-w-0 items-baseline justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className={STAT_CARD_BODY_CLASS_NAME}>{item?.label}</p>
-          {airportName ? <p className={STAT_CARD_META_CLASS_NAME}>{airportName}</p> : null}
+          {airportName ? <p className={cn("m-0 line-clamp-2 break-words text-[var(--text-muted)]", bodyMdTextClassName)} title={airportName}>{airportName}</p> : null}
         </div>
         <div className="shrink-0 text-right">
           <p className={STAT_CARD_VALUE_CLASS_NAME}>{item?.value}</p>
           {item?.percentValue ? <p className={STAT_CARD_META_CLASS_NAME}>{item.percentValue}</p> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Measures each airport list independently; the disclosure also gets space before rows are admitted.
+function AirportPreviewColumn({ title, items, maxRows }) {
+  const bodyRef = useRef(null);
+  const measureRef = useRef(null);
+  const moreRef = useRef(null);
+  const [fitCount, setFitCount] = useState(0);
+
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    const measure = measureRef.current;
+    if (!body || !measure) return undefined;
+
+    const update = () => {
+      const rowHeights = Array.from(measure.children, (child) => Math.ceil(child.getBoundingClientRect().height));
+      const fit = (height) => getMeasuredPilotStatsFitCount({
+        bodyHeight: height, rowHeights, rowGap: 6, maxRows, itemCount: items.length
+      });
+      const allFit = fit(body.clientHeight);
+      // Keep the footer measurable even when hidden, so shrinking an all-visible list reserves its height.
+      const next = allFit < items.length ? fit(body.clientHeight - (moreRef.current?.clientHeight || 0) - 6) : allFit;
+      setFitCount(next);
+    };
+    update();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(update) : null;
+    observer?.observe(body);
+    observer?.observe(measure);
+    window.addEventListener("resize", update);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [items, maxRows]);
+
+  const remaining = items.length - fitCount;
+  return (
+    <div className="flex min-h-0 min-w-0 flex-col gap-2 px-3">
+      <p className={cn("m-0 text-[var(--text-heading)] font-semibold uppercase tracking-[0.12em]", bodyMdTextClassName)}>{title}</p>
+      <div ref={bodyRef} className="relative min-h-0 flex-1">
+        <div className="grid gap-1.5">
+          {items.slice(0, fitCount).map((item, index) => <AirportColumnRow key={index} item={item} />)}
+        </div>
+        <p ref={moreRef} aria-hidden={!remaining} className={cn("absolute bottom-0 m-0 text-[var(--text-muted)]", bodyMdTextClassName, !remaining && "invisible")}>
+          {`+${remaining} more`}
+        </p>
+        {!items.length ? <p className={STAT_CARD_META_CLASS_NAME}>No data available.</p> : null}
+        <div ref={measureRef} aria-hidden="true" className="pointer-events-none invisible absolute inset-x-0 top-0 grid gap-1.5">
+          {items.slice(0, maxRows).map((item, index) => <AirportColumnRow key={index} item={item} />)}
         </div>
       </div>
     </div>
@@ -516,9 +570,7 @@ export default function LogbookPilotStatsSummaryPanel({
     [effectiveMaxRows, rowItems]
   );
   const airportMaxRows = Math.max(1, Math.floor(Number(maxRows) || 1));
-  const departureRows = departureAirportItems.slice(0, airportMaxRows);
-  const arrivalRows = arrivalAirportItems.slice(0, airportMaxRows);
-  const hasAirportColumns = variant === "airport" && (departureRows.length > 0 || arrivalRows.length > 0);
+  const hasAirportColumns = variant === "airport" && (departureAirportItems.length > 0 || arrivalAirportItems.length > 0);
   const landingPirepDetailsById = useVisibleLogbookPirepDetails(rows, {
     enabled: variant === "landing",
     limit: rows.length
@@ -603,26 +655,6 @@ export default function LogbookPilotStatsSummaryPanel({
     return (
       <div ref={containerRef} className="grid gap-1.5">
         {safeRowItems.map((item, index) => renderRow(item, index))}
-      </div>
-    );
-  }
-
-  // Renders the airport rankings as two fixed columns so departures and arrivals stay visually separate.
-  function renderAirportColumns(columnTitle, rowItemsToRender) {
-    const safeRowItems = Array.isArray(rowItemsToRender) ? rowItemsToRender : [];
-
-    return (
-      <div className="flex min-h-0 flex-col gap-2 px-3">
-        <p className={cn("m-0 truncate text-[var(--text-heading)] font-semibold uppercase tracking-[0.12em]", bodyMdTextClassName)}>{columnTitle}</p>
-        {safeRowItems.length ? (
-          <div className="grid gap-1.5">
-            {safeRowItems.map((item, index) => (
-              <AirportColumnRow key={`${item?.label || item?.value || columnTitle.toLowerCase()}-${index}`} item={item} />
-            ))}
-          </div>
-        ) : (
-          <p className={cn("m-0 text-[var(--text-muted)]", bodyMdTextClassName)}>No data available.</p>
-        )}
       </div>
     );
   }
@@ -726,6 +758,7 @@ export default function LogbookPilotStatsSummaryPanel({
     updateFitItems();
     const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(bodyNode);
+    if (measureNode) observer.observe(measureNode);
 
     return () => {
       if (rafIdRef.current) {
@@ -770,11 +803,11 @@ export default function LogbookPilotStatsSummaryPanel({
 
       <div ref={bodyRef} className="relative min-h-0 flex-1 overflow-hidden">
         {hasAirportColumns ? (
-          <div className="grid min-h-0 grid-cols-2 divide-x divide-[color:var(--line)]">
-            {renderAirportColumns("Departure", departureRows)}
-            {renderAirportColumns("Arrival", arrivalRows)}
+          <div className="grid h-full min-h-0 grid-cols-2 divide-x divide-[color:var(--line)]">
+            <AirportPreviewColumn title="Departure" items={departureAirportItems} maxRows={airportMaxRows} />
+            <AirportPreviewColumn title="Arrival" items={arrivalAirportItems} maxRows={airportMaxRows} />
           </div>
-        ) : rows.length ? (
+        ) : rowItems.length ? (
           <>
             {renderRows(rows)}
             {autoFitRows ? (

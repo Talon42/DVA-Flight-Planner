@@ -61,7 +61,7 @@ function renderEquipmentCell(row) {
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
       <LogbookEquipmentGlyph equipment={equipment} className="h-10 w-10" />
-      <span className="min-w-0 truncate">{equipment}</span>
+      <span className="min-w-0 truncate" title={equipment}>{equipment}</span>
     </span>
   );
 }
@@ -78,7 +78,7 @@ function renderRecentLandingEquipmentCell(row) {
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-2", bodyMdTextClassName)}>
       <LogbookEquipmentGlyph equipment={equipment} className="h-10 w-10" />
-      <span className="min-w-0 truncate">{equipment}</span>
+      <span className="min-w-0 truncate" title={equipment}>{equipment}</span>
     </span>
   );
 }
@@ -442,8 +442,9 @@ function buildRecentLandingColumns() {
       getSortValue: (row) => resolveNumericSortValue(row?.rawLandingRate ?? row?.landingRate),
       renderCell: renderRecentLandingRateCell,
       align: "left",
-      minWidth: 190,
-      compactMinWidth: 160,
+      // Rate, grade badge, gap, and cell padding must fit before the table can scroll safely.
+      minWidth: 196,
+      compactMinWidth: 196,
       fr: 0.9
     })
   ];
@@ -666,7 +667,7 @@ function buildEquipmentColumns() {
       sortKey: "averageLandingRate",
       getSortValue: (row) => resolveNumericSortValue(row?.averageLandingRateValue ?? row?.averageLandingRate),
       renderCell: renderLandingRateCell,
-      ...getEquipmentColumnWidthProfile()
+      ...getEquipmentColumnWidthProfile({ minWidth: 196, compactMinWidth: 196 })
     }),
     buildPercentColumn({
       ...getEquipmentColumnWidthProfile(),

@@ -7,6 +7,7 @@ import {
   buildContentColumnTemplate,
   buildColumnTemplate,
   getTablePresetKey,
+  getResolvedColumnsMinWidth,
   resolveColumnsForPreset,
   resolvedColumnsFit
 } from "./tableUtils";
@@ -280,67 +281,80 @@ export default function DataTable({
         tableCanvasClassName
       )}
     >
-      <div className="w-full min-w-0 flex-none overflow-hidden">
-        <TableHeader
-          columns={displayColumns}
-          columnTemplate={columnTemplate}
-          sort={sort}
-          onSort={onSort}
-          scrollbarOffset={headerScrollbarOffset}
-          layoutMode={layoutMode}
-          activeSortClassName={activeSortClassName}
-        />
-      </div>
-
-      {virtualized ? (
-        <div ref={bodyRef} className="min-h-0 w-full min-w-0 flex-1">
-          <List
-            className="flight-list"
-            height={listHeight}
-            itemCount={visibleRows.length}
-            itemData={itemData}
-            itemKey={getVirtualizedRowKey}
-            itemSize={rowHeight}
-            onItemsRendered={handleItemsRendered}
-            outerElementType={TableListOuter}
-            outerRef={scrollContainerRef}
-            overscanCount={8}
-            width="100%"
-          >
-            {RowRenderer}
-          </List>
-        </div>
-      ) : (
+      {/* One horizontal viewport keeps header and body in lockstep, including keyboard focus scrolling. */}
+      <div
+        className="app-scrollbar flex min-h-0 w-full min-w-0 flex-1 overflow-x-auto overflow-y-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
+        role="region"
+        aria-label="Table columns"
+        tabIndex={0}
+      >
         <div
-          ref={scrollContainerRef}
-          className={cn(
-            "app-scrollbar relative z-0 min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden",
-            tableCanvasClassName
-          )}
+          className="flex min-h-0 min-w-full flex-1 flex-col"
+          style={{ minWidth: getResolvedColumnsMinWidth(resolvedColumns) + headerScrollbarOffset }}
         >
-          {rows.map((row) => {
-            const rowId = getRowId(row);
-            return (
-              <TableRow
-                key={rowId}
-              row={row}
-              rowId={rowId}
-              style={{ height: rowHeight }}
+          <div className="w-full min-w-0 flex-none overflow-hidden">
+            <TableHeader
               columns={displayColumns}
               columnTemplate={columnTemplate}
-              enableRowSelection={enableRowSelection}
-              isSelected={enableRowSelection && selectedRowId != null && selectedRowId === rowId}
-              selectedRowClassName={selectedRowClassName}
-              onSelectRow={onSelectRow}
-              onActivateRow={onActivateRow}
-              getRowClassName={getRowClassName}
-              renderRowOverlay={renderRowOverlay}
+              sort={sort}
+              onSort={onSort}
+              scrollbarOffset={headerScrollbarOffset}
               layoutMode={layoutMode}
+              activeSortClassName={activeSortClassName}
             />
-          );
-        })}
+          </div>
+
+          {virtualized ? (
+            <div ref={bodyRef} className="min-h-0 w-full min-w-0 flex-1">
+              <List
+                className="flight-list"
+                height={listHeight}
+                itemCount={visibleRows.length}
+                itemData={itemData}
+                itemKey={getVirtualizedRowKey}
+                itemSize={rowHeight}
+                onItemsRendered={handleItemsRendered}
+                outerElementType={TableListOuter}
+                outerRef={scrollContainerRef}
+                overscanCount={8}
+                width="100%"
+              >
+                {RowRenderer}
+              </List>
+            </div>
+          ) : (
+            <div
+              ref={scrollContainerRef}
+              className={cn(
+                "app-scrollbar relative z-0 min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden",
+                tableCanvasClassName
+              )}
+            >
+              {rows.map((row) => {
+                const rowId = getRowId(row);
+                return (
+                  <TableRow
+                    key={rowId}
+                  row={row}
+                  rowId={rowId}
+                  style={{ height: rowHeight }}
+                  columns={displayColumns}
+                  columnTemplate={columnTemplate}
+                  enableRowSelection={enableRowSelection}
+                  isSelected={enableRowSelection && selectedRowId != null && selectedRowId === rowId}
+                  selectedRowClassName={selectedRowClassName}
+                  onSelectRow={onSelectRow}
+                  onActivateRow={onActivateRow}
+                  getRowClassName={getRowClassName}
+                  renderRowOverlay={renderRowOverlay}
+                  layoutMode={layoutMode}
+                />
+              );
+            })}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
