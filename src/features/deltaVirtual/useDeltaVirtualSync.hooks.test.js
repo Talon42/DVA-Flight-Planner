@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import scheduleFixture from "../../../test-fixtures/schedules/representative-search-response.json";
 import { useDeltaVirtualSync } from "./useDeltaVirtualSync.hooks.js";
 
 const logging = vi.hoisted(() => ({
@@ -107,7 +108,7 @@ beforeEach(() => {
   });
   deltaVirtual.syncScheduleFromDeltaVirtual.mockResolvedValue({
     fileName: "deltava-schedule.json",
-    scheduleText: JSON.stringify({ sources: {}, results: [] }),
+    scheduleText: JSON.stringify(scheduleFixture),
     logbookJson: { fileName: "logbook.json" },
     warnings: []
   });
@@ -153,7 +154,7 @@ describe("useDeltaVirtualSync", () => {
 
     resolveScheduleSync({
       fileName: "deltava-schedule.json",
-      scheduleText: JSON.stringify({ sources: {}, results: [] }),
+      scheduleText: JSON.stringify(scheduleFixture),
       logbookJson: { fileName: "logbook.json" },
       warnings: []
     });
@@ -330,7 +331,7 @@ describe("useDeltaVirtualSync", () => {
     await act(async () => {
       pendingSchedule.resolve({
         fileName: "deltava-schedule.json",
-        scheduleText: JSON.stringify({ sources: {}, results: [] }),
+        scheduleText: JSON.stringify(scheduleFixture),
         warnings: []
       });
       await syncOperation;
