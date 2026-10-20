@@ -212,9 +212,24 @@ async fn store_logbook_json_in_dir(
         ));
     }
 
-    serde_json::from_str::<Value>(trimmed).map_err(|error| {
+    let document = serde_json::from_str::<Value>(trimmed).map_err(|error| {
         format!("invalid_json: Delta Virtual logbook JSON was invalid: {error}")
     })?;
+
+    // Validate before any filesystem changes: a foreign or partially invalid export must
+    // never replace a usable cache. Supported empty collections are legitimate logbooks.
+    if !has_supported_logbook_root(&document) {
+        return Err(
+            "invalid_json: Delta Virtual response did not contain a supported logbook collection."
+                .into(),
+        );
+    }
+    let (_, rejected) = validate_logbook_entries(&document);
+    if rejected > 0 {
+        return Err(format!(
+            "invalid_json: Delta Virtual logbook contained {rejected} invalid entries; the saved logbook was preserved."
+        ));
+    }
     append_sync_log("logbook:json-valid");
 
     let file_name = DELTAVA_LOGBOOK_FILE.to_string();
@@ -689,7 +704,7 @@ mod tests {
         let logbook_dir = unique_test_dir();
         let json_text = json!({
             "entries": [
-                { "date": { "y": 2026, "m": 0, "d": 2 }, "status": "OK" }
+                { "logbookId": 1, "date": { "y": 2026, "m": 0, "d": 2 }, "status": "OK" }
             ]
         })
         .to_string();
@@ -759,6 +774,70 @@ mod tests {
         assert!(!logbook_dir.join(DELTAVA_LOGBOOK_FILE).exists());
 
         let _ = std::fs::remove_dir_all(&logbook_dir);
+    }
+
+    #[test]
+    fn store_logbook_json_rejects_foreign_documents_without_touching_existing_artifacts() {
+        let cases: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../test-fixtures/deltava/invalid-logbook-downloads.json"
+        ))
+        .expect("invalid download cases");
+
+        for case in cases {
+            let directory = unique_test_dir();
+            std::fs::create_dir_all(&directory).expect("test dir");
+            let final_path = directory.join(DELTAVA_LOGBOOK_FILE);
+            let original =
+                include_str!("../../../../test-fixtures/deltava/representative-logbook.json");
+            std::fs::write(&final_path, original).expect("original logbook");
+            let legacy_path = directory.join(crate::app::paths::DELTAVA_LOGBOOK_FALLBACK_FILE);
+            std::fs::write(&legacy_path, original).expect("legacy logbook");
+            let before: BTreeSet<_> = std::fs::read_dir(&directory)
+                .expect("directory before rejection")
+                .map(|entry| entry.expect("directory entry").file_name())
+                .collect();
+
+            let error = run_async(store_logbook_json_in_dir(
+                &directory,
+                &case["document"].to_string(),
+                None,
+                false,
+            ))
+            .expect_err(case["name"].as_str().expect("case name"));
+
+            assert!(error.starts_with("invalid_json:"), "{error}");
+            assert_eq!(std::fs::read_to_string(&final_path).unwrap(), original);
+            assert_eq!(std::fs::read_to_string(&legacy_path).unwrap(), original);
+            let after: BTreeSet<_> = std::fs::read_dir(&directory)
+                .expect("directory after rejection")
+                .map(|entry| entry.expect("directory entry").file_name())
+                .collect();
+            assert_eq!(before, after, "no temporary or backup artifacts");
+            std::fs::remove_dir_all(directory).expect("cleanup");
+        }
+    }
+
+    #[test]
+    fn store_logbook_json_accepts_empty_and_populated_supported_collections() {
+        let entries = json!(normalize_logbook_entries(&representative_logbook_document()));
+        for collection in [json!([]), entries] {
+            let documents = std::iter::once(collection.clone()).chain(
+                SUPPORTED_LOGBOOK_ROOT_KEYS
+                    .iter()
+                    .map(|key| json!({ *key: collection.clone() })),
+            );
+            for document in documents {
+                let directory = unique_test_dir();
+                std::fs::create_dir_all(&directory).expect("test dir");
+                let final_path = directory.join(DELTAVA_LOGBOOK_FILE);
+                std::fs::write(&final_path, r#"[{"logbookId":1}]"#).expect("previous logbook");
+                let text = document.to_string();
+                run_async(store_logbook_json_in_dir(&directory, &text, None, false))
+                    .expect("supported collection");
+                assert_eq!(std::fs::read_to_string(final_path).unwrap(), text);
+                std::fs::remove_dir_all(directory).expect("cleanup");
+            }
+        }
     }
 
     #[test]
