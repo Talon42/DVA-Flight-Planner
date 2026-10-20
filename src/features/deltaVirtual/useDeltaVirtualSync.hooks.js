@@ -237,7 +237,8 @@ export function useDeltaVirtualSync({
         return;
       }
 
-      const importedScheduleDateInfo = buildScheduleDateInfo(importResult?.schedule?.flights || []);
+      // Preserve effective-date metadata so historical flights cannot skew schedule freshness.
+      const importedScheduleDateInfo = buildScheduleDateInfo(importResult?.schedule || {});
       if (importedScheduleDateInfo.isCurrent === false) {
         showDeltaVirtualStaleScheduleWarning(
           setStatusMessage,

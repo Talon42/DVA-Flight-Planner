@@ -375,7 +375,7 @@ describe("useDeltaVirtualSync", () => {
 
     await act(() => result.current.handleDeltaVirtualSync());
 
-    expect(buildScheduleDateInfo).toHaveBeenCalledWith([{ flightId: "flight-1" }]);
+    expect(buildScheduleDateInfo).toHaveBeenCalledWith({ flights: [{ flightId: "flight-1" }] });
     expect(props.onScheduleSyncComplete).toHaveBeenCalledOnce();
     expect(props.onLogbookSyncComplete).toHaveBeenCalledOnce();
     expect(deltaVirtual.syncDeltaVirtualTours).toHaveBeenCalledOnce();
@@ -397,6 +397,50 @@ describe("useDeltaVirtualSync", () => {
       expect.anything(),
       expect.objectContaining({ stage: "schedule-date" })
     );
+    expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledWith(true);
+    expect(result.current.isSyncing).toBe(false);
+  });
+
+  it.each([
+    ["current", Date.UTC(2026, 9, 20), false],
+    ["stale", Date.UTC(2026, 9, 18), true]
+  ])("uses effective-date metadata for a %s schedule containing historical flights", async (_state, effectiveDate, shouldWarn) => {
+    const { buildScheduleDateInfo: actualBuildScheduleDateInfo } = await vi.importActual(
+      "../../domain/schedule/scheduleDate.js"
+    );
+    // Fix the clock while exercising the real date policy through the sync hook.
+    buildScheduleDateInfo.mockImplementationOnce((schedule) =>
+      actualBuildScheduleDateInfo(schedule, "2026-10-20T20:09:57Z")
+    );
+    const schedule = {
+      flights: [
+        { stdLocal: "2014-08-20T06:00:00" },
+        { stdLocal: "2026-10-20T06:00:00" }
+      ],
+      scheduleMetadata: { sources: { AVSTACK: { effectiveDate } } }
+    };
+    const props = createProps({
+      processImportedSchedule: vi.fn().mockResolvedValue({ ok: true, schedule })
+    });
+    const { result } = renderHook(() => useDeltaVirtualSync(props));
+
+    await act(() => result.current.handleDeltaVirtualSync());
+
+    if (shouldWarn) {
+      expect(props.setDvaSyncWarning).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "schedule_stale", message: expect.stringContaining("October 18th") })
+      );
+    } else {
+      expect(props.setDvaSyncWarning).not.toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "schedule_stale" })
+      );
+      expect(logging.logSystemWarn).not.toHaveBeenCalledWith(
+        "DVA Sync", "schedule-date-stale", expect.anything()
+      );
+    }
+    expect(props.onScheduleSyncComplete).toHaveBeenCalledOnce();
+    expect(deltaVirtual.syncDeltaVirtualTours).toHaveBeenCalledOnce();
+    expect(deltaVirtual.closeDeltaVirtualSyncWindow).toHaveBeenCalledOnce();
     expect(deltaVirtual.pruneDeltaVirtualStorage).toHaveBeenCalledWith(true);
     expect(result.current.isSyncing).toBe(false);
   });
