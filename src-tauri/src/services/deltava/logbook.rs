@@ -312,6 +312,7 @@ async fn store_logbook_json_in_dir(
     })
 }
 
+// Both sync flows use this validated writer and the canonical cache filename.
 pub(crate) async fn store_logbook_json(
     app: &AppHandle,
     json_text: &str,
@@ -579,7 +580,7 @@ mod tests {
         .expect("store representative logbook");
         let stored_path = directory.join(DELTAVA_LOGBOOK_FILE);
 
-        assert_eq!(artifact.file_name, DELTAVA_LOGBOOK_FILE);
+        assert_eq!(artifact.file_name, "logbook.json");
         let stored_text =
             std::fs::read_to_string(&stored_path).expect("stored representative fixture");
         assert_eq!(stored_text, fixture_text.trim());
@@ -720,7 +721,7 @@ mod tests {
         let stored_text =
             std::fs::read_to_string(logbook_dir.join(DELTAVA_LOGBOOK_FILE)).expect("stored file");
         assert_eq!(stored_text, json_text);
-        assert_eq!(artifact.file_name, DELTAVA_LOGBOOK_FILE);
+        assert_eq!(artifact.file_name, "logbook.json");
         assert_eq!(artifact.bytes, json_text.len());
 
         let profile_path = logbook_dir.join(crate::app::paths::DELTAVA_LOGBOOK_PROFILE_FILE);
@@ -841,8 +842,13 @@ mod tests {
     }
 
     #[test]
-    fn store_logbook_json_rejects_invalid_json() {
+    fn store_logbook_json_rejects_invalid_json_without_overwriting_existing_logbook() {
         let logbook_dir = unique_test_dir();
+        std::fs::create_dir_all(&logbook_dir).expect("test dir");
+        let final_path = logbook_dir.join(DELTAVA_LOGBOOK_FILE);
+        let original =
+            include_str!("../../../../test-fixtures/deltava/representative-logbook.json");
+        std::fs::write(&final_path, original).expect("original logbook");
 
         let error = run_async(store_logbook_json_in_dir(
             &logbook_dir,
@@ -853,7 +859,9 @@ mod tests {
         .expect_err("invalid payload");
 
         assert!(error.contains("invalid_json"));
-        assert!(!logbook_dir.join(DELTAVA_LOGBOOK_FILE).exists());
+        assert_eq!(std::fs::read_to_string(final_path).unwrap(), original);
+        assert!(!logbook_dir.join("logbook.json.tmp").exists());
+        assert!(!logbook_dir.join("logbook.json.bak").exists());
 
         let _ = std::fs::remove_dir_all(&logbook_dir);
     }
@@ -865,7 +873,7 @@ mod tests {
         let final_path = logbook_dir.join(DELTAVA_LOGBOOK_FILE);
         let original_text = json!({
             "entries": [
-                { "date": { "y": 2026, "m": 0, "d": 1 }, "status": "OK" }
+                { "logbookId": 1, "date": { "y": 2026, "m": 0, "d": 1 }, "status": "OK" }
             ]
         })
         .to_string();
@@ -887,6 +895,67 @@ mod tests {
             original_text
         );
 
+        assert!(!logbook_dir.join("logbook.json.tmp").exists());
+        assert!(!logbook_dir.join("logbook.json.bak").exists());
+        run_async(store_logbook_json_in_dir(
+            &logbook_dir,
+            replacement_text,
+            None,
+            false,
+        ))
+        .expect("retry after replacement failure");
+        assert_eq!(
+            std::fs::read_to_string(final_path).unwrap(),
+            replacement_text.trim()
+        );
+
         let _ = std::fs::remove_dir_all(&logbook_dir);
+    }
+
+    #[test]
+    fn store_logbook_json_preserves_existing_artifacts_when_temp_write_fails_and_allows_retry() {
+        let directory = unique_test_dir();
+        std::fs::create_dir_all(&directory).expect("test dir");
+        let original =
+            include_str!("../../../../test-fixtures/deltava/representative-logbook.json");
+        let final_path = directory.join(DELTAVA_LOGBOOK_FILE);
+        let legacy_path = directory.join(crate::app::paths::DELTAVA_LOGBOOK_FALLBACK_FILE);
+        let profile_path = directory.join(crate::app::paths::DELTAVA_LOGBOOK_PROFILE_FILE);
+        std::fs::write(&final_path, original).expect("original logbook");
+        std::fs::write(&legacy_path, original).expect("legacy logbook");
+        std::fs::write(&profile_path, r#"{"displayName":"Cached Pilot"}"#).expect("profile");
+        // A directory at the temporary path forces a real filesystem write failure on Windows too.
+        let temp_path = directory.join("logbook.json.tmp");
+        std::fs::create_dir(&temp_path).expect("block temporary file");
+        let replacement = r#"{"entries":[{"logbookId":2}]}"#;
+
+        let error = run_async(store_logbook_json_in_dir(
+            &directory,
+            replacement,
+            None,
+            false,
+        ))
+        .expect_err("temporary write failure");
+        assert!(error.contains("Unable to write logbook JSON"), "{error}");
+        assert_eq!(std::fs::read_to_string(&final_path).unwrap(), original);
+        assert_eq!(std::fs::read_to_string(&legacy_path).unwrap(), original);
+        assert!(!directory.join("logbook.json.bak").exists());
+
+        std::fs::remove_dir(temp_path).expect("unblock temporary file");
+        let artifact = run_async(store_logbook_json_in_dir(
+            &directory,
+            replacement,
+            None,
+            false,
+        ))
+        .expect("retry after write failure");
+        assert_eq!(artifact.file_name, "logbook.json");
+        assert_eq!(std::fs::read_to_string(final_path).unwrap(), replacement);
+        assert!(!legacy_path.exists());
+        assert_eq!(
+            std::fs::read_to_string(profile_path).unwrap(),
+            r#"{"displayName":"Cached Pilot"}"#
+        );
+        std::fs::remove_dir_all(directory).expect("cleanup");
     }
 }

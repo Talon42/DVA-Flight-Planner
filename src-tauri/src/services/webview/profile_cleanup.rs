@@ -165,3 +165,22 @@ pub(crate) fn reset_deltava_sync_session_storage(app: &AppHandle) -> Result<(), 
     remove_path_if_exists(&crate::app::paths::deltava_webview_dir(app)?);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expected_cleanup_skip_classifies_known_windows_cleanup_errors() {
+        for raw_error in [5, 32, 33] {
+            let error = std::io::Error::from_raw_os_error(raw_error);
+            assert!(is_expected_cleanup_skip(&error));
+        }
+    }
+
+    #[test]
+    fn unexpected_cleanup_error_is_not_suppressed() {
+        let error = std::io::Error::from_raw_os_error(87);
+        assert!(!is_expected_cleanup_skip(&error));
+    }
+}

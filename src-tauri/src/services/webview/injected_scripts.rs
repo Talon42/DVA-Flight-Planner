@@ -154,12 +154,11 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ export: 'JSONExport', id: exportId })
     });
-    const filename = exportResponse.headers.get('X-Logbook-Filename') || '';
     const contentType = exportResponse.headers.get('Content-Type') || '';
     const jsonText = await readBoundedText(exportResponse, config.limits.logbookJson, 'Delta Virtual logbook JSON export');
     emitDebug(`logbook:export-status:${exportResponse.status}:${jsonText.length}`);
     if (!exportResponse.ok) throw new Error(`Logbook JSON export failed with HTTP ${exportResponse.status}.`);
-    return { jsonText, filename, contentType, exportId };
+    return { jsonText, contentType, exportId };
   };
   const fetchAccomplishmentEligibilityHtml = async () => {
     emitDebug('accomplishments:fetch-start');

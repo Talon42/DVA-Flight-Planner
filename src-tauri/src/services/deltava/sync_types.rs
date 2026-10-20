@@ -5,8 +5,6 @@ pub(crate) const MAX_DELTAVA_LOGBOOK_JSON_BYTES: usize = 25 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_LOGBOOK_PAGE_HTML_BYTES: usize = 5 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES: usize = 5 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_TOUR_BRIEFING_PDF_BYTES: usize = 50 * 1024 * 1024;
-pub(crate) const MAX_DELTAVA_DEBUG_MESSAGE_BYTES: usize = 4 * 1024;
-pub(crate) const MAX_DELTAVA_SYNC_WEB_MESSAGE_BYTES: usize = 40 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_LOGBOOK_REFRESH_WEB_MESSAGE_BYTES: usize = 26 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_TOUR_BRIEFING_WEB_MESSAGE_BYTES: usize = 70 * 1024 * 1024;
 
@@ -112,11 +110,7 @@ pub(crate) struct DeltaWebScheduleResult {
 pub(crate) struct DeltaWebLogbookResult {
     pub ok: bool,
     pub json_text: Option<String>,
-    #[serde(default)]
-    pub filename: Option<String>,
     pub content_type: Option<String>,
-    #[serde(default)]
-    pub export_id: Option<String>,
     pub error: Option<String>,
 }
 
@@ -138,6 +132,36 @@ pub(crate) struct DeltaWebAccomplishmentsResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn both_sync_results_accept_legacy_filename_hints_without_using_them_for_storage() {
+        let text = include_str!("../../../../test-fixtures/deltava/representative-logbook.json");
+        let logbook = serde_json::json!({
+            "ok": true,
+            "jsonText": text,
+            "filename": "dva-logbook-profile.json",
+            "contentType": "application/json",
+            "exportId": "fixture-export"
+        });
+        let full: DeltaWebSyncResult = serde_json::from_value(serde_json::json!({
+            "nonce": "fixture-nonce",
+            "schedule": { "ok": false, "error": "fixture failure" },
+            "logbook": logbook.clone()
+        }))
+        .expect("legacy full sync result");
+        let refresh: DeltaWebLogbookRefreshResult = serde_json::from_value(serde_json::json!({
+            "nonce": "fixture-nonce",
+            "logbook": logbook
+        }))
+        .expect("legacy logbook refresh result");
+
+        // Upstream filename/export fields remain compatible but cannot select a cache destination.
+        for result in [full.logbook, refresh.logbook] {
+            assert!(result.ok);
+            assert_eq!(result.json_text.as_deref(), Some(text));
+            assert_eq!(result.content_type.as_deref(), Some("application/json"));
+        }
+    }
 
     #[test]
     fn json_schedule_contract_crosses_webview_and_frontend_boundaries() {

@@ -355,7 +355,7 @@ pub(crate) fn build_deltava_sync_window(
             .visible(false)
             .center()
             .data_directory(webview_data_directory)
-            .on_navigation(|url| is_allowed_deltava_url(url))
+            .on_navigation(is_allowed_deltava_url)
             .on_page_load(move |webview_window, payload| {
                 let event_name = match payload.event() {
                     tauri::webview::PageLoadEvent::Started => "Started",

@@ -7,6 +7,13 @@ pub(crate) enum ProfileCacheResolveOutcome {
     Ready(DeltaLogbookPilotProfileMetadata),
     Unavailable,
     Failed {
+        #[cfg_attr(
+            not(test),
+            expect(
+                dead_code,
+                reason = "Retain cached data in the legacy refresh outcome for recovery."
+            )
+        )]
         cached: Option<DeltaLogbookPilotProfileMetadata>,
         error: String,
     },
@@ -85,6 +92,10 @@ fn is_complete(metadata: &DeltaLogbookPilotProfileMetadata, export_id: &str) -> 
         && metadata.total_block_time_minutes.is_some()
 }
 
+#[expect(
+    dead_code,
+    reason = "Retain the legacy profile refresh entry point; JSON sync currently reads the existing profile cache."
+)]
 pub(crate) async fn resolve(
     app: &AppHandle,
     export_id: Option<&str>,
