@@ -9,6 +9,7 @@ use crate::services::deltava::{
     auth::clear_auth_settings_internal,
     sync_types::{
         DeltaAccomplishmentEligibilityStore, DeltaWebLogbookRefreshResult, DeltaWebSyncResult,
+        MAX_DELTAVA_SCHEDULE_JSON_BYTES,
     },
 };
 use crate::{
@@ -307,6 +308,12 @@ fn schedule_scalar_is_present(value: Option<&Value>) -> bool {
 }
 
 fn validate_schedule_json(schedule_text: &str) -> Result<usize, String> {
+    // Enforce the same bound as the webview before parsing or persisting a bridge payload.
+    if schedule_text.len() > MAX_DELTAVA_SCHEDULE_JSON_BYTES {
+        return Err(format!(
+            "download_failed: Delta Virtual schedule JSON exceeded the {MAX_DELTAVA_SCHEDULE_JSON_BYTES} byte limit."
+        ));
+    }
     let schedule = serde_json::from_str::<Value>(schedule_text).map_err(|error| {
         format!("invalid_json: Delta Virtual schedule JSON was invalid: {error}")
     })?;
@@ -684,6 +691,19 @@ pub(crate) async fn build_delta_logbook_refresh_payload_from_web_result(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn schedule_validation_accepts_shared_json_contract_and_rejects_xml() {
+        let fixture =
+            include_str!("../../../../test-fixtures/schedules/representative-search-response.json");
+        assert_eq!(validate_schedule_json(fixture).unwrap(), 251);
+        assert!(validate_schedule_json("<SCHEDULE><FLIGHT /></SCHEDULE>").is_err());
+        assert!(
+            validate_schedule_json(&" ".repeat(MAX_DELTAVA_SCHEDULE_JSON_BYTES + 1))
+                .unwrap_err()
+                .contains("byte limit")
+        );
+    }
 
     #[test]
     fn schedule_validation_rejects_truncated_results() {

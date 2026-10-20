@@ -9,8 +9,10 @@ import {
 import {
   fetchDeltaVirtualPirepDetails,
   readDeltaVirtualLogbook,
+  refreshDeltaVirtualLogbook,
   syncScheduleFromDeltaVirtual
 } from "./deltaVirtual.client.js";
+import scheduleFixture from "../../../test-fixtures/schedules/representative-search-response.json";
 import { startSimBriefDispatch } from "./simbrief.client.js";
 
 const invokeAppCommand = vi.hoisted(() => vi.fn());
@@ -46,8 +48,8 @@ afterEach(() => {
 describe("frontend-to-Tauri command contracts", () => {
   it("starts DVA sync with normalized options and accepts snake-case results", async () => {
     invokeAppCommand.mockResolvedValue({
-      file_name: "schedule.xml",
-      schedule_text: "<SCHEDULE />",
+      file_name: "deltava-schedule.json",
+      schedule_text: JSON.stringify(scheduleFixture),
       warnings: ["fixture warning"],
       logbook_json: { fileName: "logbook.json" }
     });
@@ -55,14 +57,50 @@ describe("frontend-to-Tauri command contracts", () => {
     await expect(
       syncScheduleFromDeltaVirtual({ syncRunId: " run-1 ", debugEnabled: 1 })
     ).resolves.toEqual({
-      fileName: "schedule.xml",
-      scheduleText: "<SCHEDULE />",
+      fileName: "deltava-schedule.json",
+      scheduleText: JSON.stringify(scheduleFixture),
       warnings: ["fixture warning"],
       logbookJson: { fileName: "logbook.json" }
     });
     expect(invokeAppCommand).toHaveBeenCalledWith("start_deltava_sync", {
       syncRunId: "run-1",
       debugEnabled: true
+    });
+  });
+
+  it("accepts the Rust camel-case JSON download contract", async () => {
+    invokeAppCommand.mockResolvedValue({
+      fileName: "deltava-schedule.json",
+      scheduleText: JSON.stringify(scheduleFixture),
+      scheduleStatus: "success"
+    });
+    await expect(syncScheduleFromDeltaVirtual()).resolves.toMatchObject({
+      fileName: "deltava-schedule.json", scheduleText: JSON.stringify(scheduleFixture)
+    });
+  });
+
+  it.each([
+    { xmlText: "<SCHEDULE />" },
+    { xml_text: "<SCHEDULE />" },
+    { scheduleText: "<SCHEDULE />" },
+    { scheduleText: "null" },
+    { scheduleText: "[]" }
+  ])("rejects obsolete or non-object schedule downloads: %j", async (payload) => {
+    invokeAppCommand.mockResolvedValue({ fileName: "deltava-schedule.json", ...payload });
+    await expect(syncScheduleFromDeltaVirtual()).rejects.toMatchObject({ kind: "download_failed" });
+  });
+
+  it("reports a schedule failure while retaining the saved logbook result", async () => {
+    const payload = { fileName: null, scheduleText: null, scheduleStatus: "failed",
+      logbookJson: { fileName: "logbook.json" }, warnings: ["Schedule JSON download failed."] };
+    invokeAppCommand.mockResolvedValue(payload);
+    await expect(syncScheduleFromDeltaVirtual()).rejects.toMatchObject({ kind: "partial_success", syncResult: payload });
+  });
+
+  it("exposes scheduleStatus for a logbook-only refresh", async () => {
+    invokeAppCommand.mockResolvedValue({ scheduleStatus: "skipped", logbookStatus: "success" });
+    await expect(refreshDeltaVirtualLogbook()).resolves.toMatchObject({
+      scheduleStatus: "skipped", logbookStatus: "success"
     });
   });
 

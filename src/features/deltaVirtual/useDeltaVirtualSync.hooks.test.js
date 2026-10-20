@@ -106,8 +106,8 @@ beforeEach(() => {
     tours: [{ id: "dva:42" }]
   });
   deltaVirtual.syncScheduleFromDeltaVirtual.mockResolvedValue({
-    fileName: "schedule.xml",
-    xmlText: "<SCHEDULE />",
+    fileName: "deltava-schedule.json",
+    scheduleText: JSON.stringify({ sources: {}, results: [] }),
     logbookJson: { fileName: "logbook.json" },
     warnings: []
   });
@@ -152,8 +152,8 @@ describe("useDeltaVirtualSync", () => {
     expect(deltaVirtual.syncScheduleFromDeltaVirtual).toHaveBeenCalledTimes(1);
 
     resolveScheduleSync({
-      fileName: "schedule.xml",
-      xmlText: "<SCHEDULE />",
+      fileName: "deltava-schedule.json",
+      scheduleText: JSON.stringify({ sources: {}, results: [] }),
       logbookJson: { fileName: "logbook.json" },
       warnings: []
     });
@@ -162,7 +162,7 @@ describe("useDeltaVirtualSync", () => {
     });
 
     expect(props.processImportedSchedule).toHaveBeenCalledWith(
-      expect.objectContaining({ fileName: "schedule.xml" }),
+      expect.objectContaining({ fileName: "deltava-schedule.json" }),
       "deltava-sync"
     );
     expect(props.onScheduleSyncComplete).toHaveBeenCalledOnce();
@@ -329,8 +329,8 @@ describe("useDeltaVirtualSync", () => {
 
     await act(async () => {
       pendingSchedule.resolve({
-        fileName: "schedule.xml",
-        xmlText: "<SCHEDULE />",
+        fileName: "deltava-schedule.json",
+        scheduleText: JSON.stringify({ sources: {}, results: [] }),
         warnings: []
       });
       await syncOperation;

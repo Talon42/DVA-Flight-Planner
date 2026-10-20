@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import scheduleFixture from "../../../test-fixtures/schedules/representative-search-response.json";
 import { DateTime } from "luxon";
 import { parseScheduleImport } from "./parseSchedule.js";
 
@@ -70,6 +72,20 @@ function parseSingleFlight(options = {}) {
 }
 
 describe("parseScheduleImport", () => {
+  it("parses the shared DVA JSON contract fixture", () => {
+    const result = parseScheduleImport("deltava-schedule.json", JSON.stringify(scheduleFixture));
+    expect(result.flights).toHaveLength(251);
+    expect(result.scheduleMetadata.sources).toEqual(scheduleFixture.sources);
+    expect(result.flights[0]).toMatchObject({ from: "KATL", to: "KJFK", scheduleSource: "AVSTACK" });
+  });
+
+  it("preserves manual legacy PFPX XML file imports", () => {
+    const xml = readFileSync(new URL("../../../test-fixtures/schedules/representative-pfpxsched.xml", import.meta.url), "utf8");
+    const result = parseScheduleImport("representative-pfpxsched.xml", xml);
+    expect(result.flights.length).toBeGreaterThan(0);
+    expect(result.importSummary.sourceFileName).toBe("representative-pfpxsched.xml");
+  });
+
   it("parses /search.ws JSON and preserves schedule metadata", () => {
     const { result, flight } = parseSingleFlight({
       eqType: "B739",

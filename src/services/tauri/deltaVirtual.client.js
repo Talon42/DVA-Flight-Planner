@@ -158,12 +158,7 @@ export async function syncScheduleFromDeltaVirtual({
       debugEnabled: Boolean(debugEnabled)
     });
     const fileName = result?.fileName ?? result?.file_name;
-    // Accept the legacy XML field while exposing the merged client contract as scheduleText.
-    const scheduleText =
-      result?.scheduleText ??
-      result?.schedule_text ??
-      result?.xmlText ??
-      result?.xml_text;
+    const scheduleText = result?.scheduleText ?? result?.schedule_text;
     const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
     const logbookJson = result?.logbookJson ?? result?.logbook_json ?? null;
 
@@ -176,6 +171,17 @@ export async function syncScheduleFromDeltaVirtual({
       );
       error.syncResult = result;
       throw error;
+    }
+
+    // Downloaded schedules use JSON; XML remains supported only by manual file import.
+    let schedule;
+    try {
+      schedule = JSON.parse(scheduleText);
+    } catch {
+      throw new Error("download_failed: Delta Virtual returned an invalid schedule JSON response.");
+    }
+    if (!schedule || typeof schedule !== "object" || Array.isArray(schedule)) {
+      throw new Error("download_failed: Delta Virtual returned an invalid schedule JSON response.");
     }
 
     return { fileName, scheduleText, warnings, logbookJson };
@@ -217,7 +223,7 @@ export async function refreshDeltaVirtualLogbook({
       warnings,
       logbookJson,
       status: String(result?.status || "").trim(),
-      xmlStatus: String(result?.xmlStatus || result?.xml_status || "").trim(),
+      scheduleStatus: String(result?.scheduleStatus || result?.schedule_status || "").trim(),
       logbookStatus: String(result?.logbookStatus || result?.logbook_status || "").trim()
     };
   } catch (error) {

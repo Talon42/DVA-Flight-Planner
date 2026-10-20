@@ -7,7 +7,7 @@ use crate::services::deltava::{
     },
     sync_types::{
         MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES, MAX_DELTAVA_LOGBOOK_JSON_BYTES,
-        MAX_DELTAVA_LOGBOOK_PAGE_HTML_BYTES, MAX_DELTAVA_SCHEDULE_XML_BYTES,
+        MAX_DELTAVA_LOGBOOK_PAGE_HTML_BYTES, MAX_DELTAVA_SCHEDULE_JSON_BYTES,
     },
 };
 
@@ -22,7 +22,7 @@ struct EnabledArtifacts {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ScriptLimits {
-    schedule_xml: usize,
+    schedule_json: usize,
     logbook_page_html: usize,
     logbook_json: usize,
     accomplishment_html: usize,
@@ -115,11 +115,11 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
   };
   const fetchScheduleJson = async () => {
     const response = await fetch(config.scheduleUrl, { method: 'GET', credentials: 'include', cache: 'no-store' });
-    const scheduleText = await readBoundedText(response, config.limits.scheduleXml, 'Delta Virtual schedule JSON');
+    const scheduleText = await readBoundedText(response, config.limits.scheduleJson, 'Delta Virtual schedule JSON');
+    if (!response.ok) throw new Error(`Schedule request failed with HTTP ${response.status}.`);
     const schedule = JSON.parse(scheduleText);
     const resultCount = Array.isArray(schedule?.results) ? schedule.results.length : 0;
     emitDebug(`schedule:fetch-status:${response.status}:${resultCount}`);
-    if (!response.ok) throw new Error(`Schedule request failed with HTTP ${response.status}.`);
     if (!schedule || typeof schedule !== 'object' || Array.isArray(schedule)) {
       throw new Error('Delta Virtual returned an invalid schedule JSON response.');
     }
@@ -180,8 +180,8 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
     window[config.downloadsPostedKey] = true;
     const payload = {};
     if (config.enabledArtifacts.schedule) {
-      try { payload.xml = { ok: true, xmlText: await fetchScheduleXml() }; }
-      catch (error) { payload.xml = { ok: false, error: error?.message || 'Schedule XML download failed.' }; emitDebug(`xml:error:${payload.xml.error}`); }
+      try { payload.schedule = { ok: true, scheduleText: await fetchScheduleJson() }; }
+      catch (error) { payload.schedule = { ok: false, error: error?.message || 'Schedule JSON download failed.' }; emitDebug(`schedule:error:${payload.schedule.error}`); }
     }
     if (config.enabledArtifacts.logbook) {
       try { payload.logbook = { ok: true, ...(await fetchLogbookJsonExport()) }; }
@@ -190,10 +190,6 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
     if (config.enabledArtifacts.accomplishments) {
       try { payload.accomplishments = { ok: true, htmlText: await fetchAccomplishmentEligibilityHtml() }; }
       catch (error) { payload.accomplishments = { ok: false, error: error?.message || 'Accomplishment eligibility download failed.' }; emitDebug(`accomplishments:error:${payload.accomplishments.error}`); }
-    }
-    if (config.enabledArtifacts.schedule) {
-      try { payload.schedule = { ok: true, scheduleText: await fetchScheduleJson() }; }
-      catch (error) { payload.schedule = { ok: false, error: error?.message || 'Schedule download failed.' }; emitDebug(`schedule:error:${payload.schedule.error}`); }
     }
     postResult(payload);
     return true;
@@ -240,7 +236,7 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
 
 fn limits() -> ScriptLimits {
     ScriptLimits {
-        schedule_xml: MAX_DELTAVA_SCHEDULE_XML_BYTES,
+        schedule_json: MAX_DELTAVA_SCHEDULE_JSON_BYTES,
         logbook_page_html: MAX_DELTAVA_LOGBOOK_PAGE_HTML_BYTES,
         logbook_json: MAX_DELTAVA_LOGBOOK_JSON_BYTES,
         accomplishment_html: MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES,
@@ -337,7 +333,7 @@ mod tests {
         assert!(script.contains("https://www.deltava.org/search.ws"));
         assert!(script.contains("https://www.deltava.org/acceligibility.do"));
         assert!(script.contains(DELTAVA_SYNC_RESULT_MESSAGE_PREFIX));
-        assert!(script.contains(&MAX_DELTAVA_SCHEDULE_XML_BYTES.to_string()));
+        assert!(script.contains(&MAX_DELTAVA_SCHEDULE_JSON_BYTES.to_string()));
         assert!(script.contains("\"schedule\":true"));
         assert!(script.contains("\"accomplishments\":true"));
     }

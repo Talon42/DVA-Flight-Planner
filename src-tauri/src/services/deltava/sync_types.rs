@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub(crate) const MAX_DELTAVA_SCHEDULE_XML_BYTES: usize = 25 * 1024 * 1024;
+pub(crate) const MAX_DELTAVA_SCHEDULE_JSON_BYTES: usize = 25 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_LOGBOOK_JSON_BYTES: usize = 25 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_LOGBOOK_PAGE_HTML_BYTES: usize = 5 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_ACCOMPLISHMENT_HTML_BYTES: usize = 5 * 1024 * 1024;
@@ -8,7 +8,6 @@ pub(crate) const MAX_DELTAVA_TOUR_BRIEFING_PDF_BYTES: usize = 50 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_DEBUG_MESSAGE_BYTES: usize = 4 * 1024;
 pub(crate) const MAX_DELTAVA_SYNC_WEB_MESSAGE_BYTES: usize = 40 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_LOGBOOK_REFRESH_WEB_MESSAGE_BYTES: usize = 26 * 1024 * 1024;
-pub(crate) const MAX_DELTAVA_XML_CAPTURE_WEB_MESSAGE_BYTES: usize = 11 * 1024 * 1024;
 pub(crate) const MAX_DELTAVA_TOUR_BRIEFING_WEB_MESSAGE_BYTES: usize = 70 * 1024 * 1024;
 
 /// Shared DTOs for the Delta Virtual sync flow and its webview message bridge.
@@ -134,4 +133,51 @@ pub(crate) struct DeltaWebAccomplishmentsResult {
     pub ok: bool,
     pub html_text: Option<String>,
     pub error: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_schedule_contract_crosses_webview_and_frontend_boundaries() {
+        let schedule_text =
+            include_str!("../../../../test-fixtures/schedules/representative-search-response.json");
+        let web_result: DeltaWebSyncResult = serde_json::from_value(serde_json::json!({
+            "nonce": "fixture-nonce",
+            "schedule": { "ok": true, "scheduleText": schedule_text },
+            "logbook": { "ok": false, "error": "fixture failure" }
+        }))
+        .unwrap();
+        assert!(web_result.schedule.ok);
+        assert_eq!(web_result.nonce, "fixture-nonce");
+        let payload = DeltaSyncPayload {
+            file_name: Some("deltava-schedule.json".into()),
+            schedule_text: web_result.schedule.schedule_text,
+            schedule_status: "success".into(),
+            logbook_status: "failed".into(),
+            status: "partial".into(),
+            profile_status: "skipped".into(),
+            accomplishment_eligibility: None,
+            logbook_json: None,
+            warnings: vec!["fixture failure".into()],
+        };
+        let frontend_result = serde_json::to_value(payload).unwrap();
+        assert_eq!(frontend_result["scheduleText"], schedule_text);
+        assert_eq!(frontend_result["scheduleStatus"], "success");
+        assert!(frontend_result.get("xmlText").is_none());
+        assert!(frontend_result.get("xmlStatus").is_none());
+    }
+
+    #[test]
+    fn obsolete_xml_webview_envelope_is_not_a_schedule_result() {
+        assert!(
+            serde_json::from_value::<DeltaWebSyncResult>(serde_json::json!({
+                "nonce": "fixture-nonce",
+                "xml": { "ok": true, "xmlText": "<SCHEDULE />" },
+                "logbook": { "ok": false }
+            }))
+            .is_err()
+        );
+    }
 }
