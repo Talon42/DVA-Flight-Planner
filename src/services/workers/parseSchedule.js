@@ -61,6 +61,10 @@ const airportMap = new Map(
 
 // Parses and normalizes the authenticated Delta Virtual /search.ws schedule response.
 export function parseScheduleImport(fileName, scheduleText, debug = () => {}) {
+  if (String(scheduleText ?? "").trimStart().startsWith("<")) {
+    return parseXmlScheduleImport(fileName, scheduleText, debug);
+  }
+
   debug(`parse:start file=${fileName} chars=${scheduleText?.length || 0}`);
   const schedule = parseScheduleResponse(scheduleText);
   const entries = schedule.results;
@@ -207,6 +211,187 @@ export function parseScheduleImport(fileName, scheduleText, debug = () => {}) {
       omittedRows: 0,
       errorLogPath: importIssues.length ? "pending-write" : null
     }
+  };
+}
+
+// Keeps older saved/exported PFPX schedules readable after the live DVA source moved to JSON.
+function parseXmlScheduleImport(fileName, xmlText, debug) {
+  const flightBlocks = String(xmlText || "").match(/<FLIGHT>[\s\S]*?<\/FLIGHT>/gi) || [];
+  debug(`parse:start file=${fileName} chars=${xmlText?.length || 0}`);
+  debug(`parse:flight-blocks count=${flightBlocks.length}`);
+
+  if (!flightBlocks.length) {
+    throw new Error("The selected XML file could not be parsed.");
+  }
+
+  const importedAt = new Date().toISOString();
+  const importIssues = [];
+  const flights = [];
+
+  for (const [index, flightBlock] of flightBlocks.entries()) {
+    const rawFlight = {
+      airline: readXmlText(flightBlock, "Airline").toUpperCase(),
+      flightNumber: readXmlText(flightBlock, "FlightNumber"),
+      from: readXmlText(flightBlock, "From").toUpperCase(),
+      to: readXmlText(flightBlock, "To").toUpperCase(),
+      std: readXmlText(flightBlock, "STD"),
+      sta: readXmlText(flightBlock, "STA"),
+      mtow: parseXmlNumeric(readXmlText(flightBlock, "MTOW")),
+      mlw: parseXmlNumeric(readXmlText(flightBlock, "MLW")),
+      maxPax: parseXmlNumeric(readXmlText(flightBlock, "MaxPax")),
+      payload: parseXmlNumeric(readXmlText(flightBlock, "Payload")),
+      notes: readXmlText(flightBlock, "Notes")
+    };
+    const fromAirport = airportMap.get(rawFlight.from);
+    const toAirport = airportMap.get(rawFlight.to);
+    const missingIcaos = [rawFlight.from, rawFlight.to].filter((icao) => !airportMap.has(icao));
+    const stdZone = fromAirport?.timezone || "UTC";
+    const staZone = toAirport?.timezone || "UTC";
+    const stdResult = parseXmlTimestampOrDefault(rawFlight.std, stdZone, rawFlight.sta);
+    const staResult = parseXmlTimestampOrDefault(rawFlight.sta, staZone, rawFlight.std);
+    const stdLocal = stdResult.value;
+    const rawStaLocal = staResult.value;
+    const stdUtc = stdLocal.toUTC();
+    const rawStaUtc = rawStaLocal.toUTC();
+    const distanceNm = fromAirport && toAirport
+      ? calculateGreatCircleNm(fromAirport.latitude, fromAirport.longitude, toAirport.latitude, toAirport.longitude)
+      : null;
+    const estimatedBlockMinutes = estimateBlockMinutes(
+      distanceNm,
+      calculateScheduleGroundSpeedKts(fromAirport, toAirport)
+    );
+    const staUtc = Number.isFinite(estimatedBlockMinutes)
+      ? stdUtc.plus({ minutes: estimatedBlockMinutes })
+      : normalizeSourceArrivalDate(stdUtc, rawStaUtc);
+    const staLocal = staUtc.setZone(staZone);
+    const issuePrefix = `${rawFlight.airline}${rawFlight.flightNumber} ${rawFlight.from}-${rawFlight.to}`;
+
+    if (missingIcaos.length) {
+      importIssues.push({
+        severity: "warning",
+        kind: "missing-airport",
+        flightId: `${rawFlight.airline}|${rawFlight.flightNumber}|${rawFlight.from}|${rawFlight.to}|${index}`,
+        sourceFileName: fileName,
+        missingAirportIcaos: missingIcaos,
+        details: `${issuePrefix} imported with missing airport data for ${missingIcaos.join(", ")}. Airport does not exist in database.`,
+        loggedAt: importedAt
+      });
+    }
+
+    if (stdResult.defaulted || staResult.defaulted) {
+      importIssues.push({
+        severity: "warning",
+        kind: "invalid-time-defaulted",
+        flightId: `${rawFlight.airline}|${rawFlight.flightNumber}|${rawFlight.from}|${rawFlight.to}|${index}`,
+        sourceFileName: fileName,
+        details: `${issuePrefix} imported with invalid schedule timestamp defaulted to 00:00.`,
+        loggedAt: importedAt,
+        defaultedScheduleTimes: {
+          std: stdResult.defaulted,
+          sta: staResult.defaulted,
+          rawStd: rawFlight.std,
+          rawSta: rawFlight.sta
+        }
+      });
+    }
+
+    const airlineIcao = airlineIcaoMap.get(rawFlight.airline) || "";
+    flights.push({
+      flightId: `${rawFlight.airline}|${rawFlight.flightNumber}|${rawFlight.from}|${rawFlight.to}|${rawFlight.std}|${index}`,
+      flightCode: `${rawFlight.airline}${rawFlight.flightNumber}`,
+      flightNumber: rawFlight.flightNumber,
+      airline: rawFlight.airline,
+      airlineName: airlineMap.get(rawFlight.airline) || `${rawFlight.airline} (not in airline map)`,
+      airlineIcao,
+      callsign: `${airlineIcao || rawFlight.airline}${rawFlight.flightNumber}`,
+      from: rawFlight.from,
+      to: rawFlight.to,
+      route: `${rawFlight.from}-${rawFlight.to}`,
+      fromAirport: fromAirport?.name || `${rawFlight.from} (not in database)`,
+      toAirport: toAirport?.name || `${rawFlight.to} (not in database)`,
+      fromTimezone: stdZone,
+      toTimezone: staZone,
+      missingAirportIcaos: missingIcaos,
+      hasMissingAirportData: missingIcaos.length > 0,
+      stdLocal: stdLocal.toISO(),
+      staLocal: staLocal.toISO(),
+      stdUtc: stdUtc.toISO(),
+      staUtc: staUtc.toISO(),
+      stdUtcMillis: stdUtc.toMillis(),
+      staUtcMillis: staUtc.toMillis(),
+      localDepartureClock: stdLocal.toFormat("HH:mm"),
+      utcDepartureClock: stdUtc.toFormat("HH:mm"),
+      mtow: rawFlight.mtow,
+      mlw: rawFlight.mlw,
+      maxPax: rawFlight.maxPax,
+      payload: rawFlight.payload,
+      blockMinutes: Number.isFinite(estimatedBlockMinutes)
+        ? estimatedBlockMinutes
+        : Math.max(0, Math.round(staUtc.diff(stdUtc, "minutes").minutes)),
+      distanceNm: distanceNm,
+      compatibleEquipment: [],
+      compatibleEquipmentLabel: "None",
+      compatibleFamilies: [],
+      compatibleFamiliesLabel: "None",
+      compatibilityCount: 0,
+      compatibilityStatus: "none",
+      compatibilityReason: "No aircraft profiles fit within route range and imported schedule weight caps.",
+      selectedAircraft: "",
+      simbriefPlan: null,
+      isShortlisted: false,
+      boardSequence: null,
+      notes: rawFlight.notes
+    });
+  }
+
+  return {
+    importedAt,
+    flights,
+    importIssues,
+    importLog: buildImportLog(importedAt, fileName, importIssues),
+    importSummary: {
+      sourceFileName: fileName,
+      totalRows: flightBlocks.length,
+      importedRows: flights.length,
+      omittedRows: 0,
+      incompatibleRoutes: flights.length,
+      errorLogPath: importIssues.length ? "pending-write" : null
+    }
+  };
+}
+
+function readXmlText(flightBlock, tagName) {
+  const match = flightBlock.match(new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, "i"));
+  return decodeXmlEntities(match?.[1]?.trim() || "");
+}
+
+function decodeXmlEntities(value) {
+  return String(value)
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function parseXmlNumeric(value) {
+  const normalized = String(value || "").replace(/[^0-9-]/g, "");
+  return normalized ? Number(normalized) : null;
+}
+
+function parseXmlTimestampOrDefault(value, zone, fallbackValue) {
+  const originalValue = String(value || "").trim();
+  const parsed = DateTime.fromFormat(originalValue, "MM/dd/yyyy HH:mm", { zone });
+  if (parsed.isValid) {
+    return { value: parsed, defaulted: false, originalValue };
+  }
+
+  const fallback = DateTime.fromFormat(String(fallbackValue || "").trim(), "MM/dd/yyyy HH:mm", { zone });
+  const dateToken = fallback.isValid ? fallback.toFormat("MM/dd/yyyy") : "01/01/1970";
+  return {
+    value: DateTime.fromFormat(`${dateToken} 00:00`, "MM/dd/yyyy HH:mm", { zone }),
+    defaulted: true,
+    originalValue
   };
 }
 
@@ -472,6 +657,14 @@ function calculateGreatCircleNm(fromLatitude, fromLongitude, toLatitude, toLongi
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(earthRadiusNm * c);
+}
+
+function normalizeSourceArrivalDate(stdUtc, sourceStaUtc) {
+  let candidate = sourceStaUtc;
+  while (candidate < stdUtc) {
+    candidate = candidate.plus({ days: 1 });
+  }
+  return candidate;
 }
 
 function degreesToRadians(value) {

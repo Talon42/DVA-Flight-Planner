@@ -39,6 +39,7 @@ export default function AppSettingsContent({
   simBriefPilotIdDraft,
   simBriefUseCurrentUtcForDispatchTime,
   simBriefDispatchUnits,
+  simBriefDepartureOffsetMinutes,
   simBriefCustomAirframesDraft,
   simBriefCustomAirframeIdDraft,
   simBriefCustomAirframeNameDraft,
@@ -51,6 +52,7 @@ export default function AppSettingsContent({
   onPilotIdChange,
   onDispatchUnitsChange,
   onDispatchTimeModeChange,
+  onDepartureOffsetChange,
   onCustomAirframeDraftIdChange,
   onCustomAirframeDraftNameChange,
   onCustomAirframeDraftMatchTypeChange,
@@ -64,6 +66,7 @@ export default function AppSettingsContent({
   isDevToolsEnabled,
   onDeleteUserData,
   isDeletingUserData,
+  isUserDataDeletionBlocked = false,
   appBuildGitTag,
   hasWhatsNewCards = false,
   onOpenWhatsNew
@@ -99,6 +102,7 @@ export default function AppSettingsContent({
           pilotId={simBriefPilotIdDraft}
           useCurrentUtcForDispatchTime={simBriefUseCurrentUtcForDispatchTime}
           dispatchUnits={simBriefDispatchUnits}
+          departureOffsetMinutes={simBriefDepartureOffsetMinutes}
           customAirframes={simBriefCustomAirframesDraft}
           customAirframeDraftId={simBriefCustomAirframeIdDraft}
           customAirframeDraftName={simBriefCustomAirframeNameDraft}
@@ -111,6 +115,7 @@ export default function AppSettingsContent({
           onPilotIdChange={onPilotIdChange}
           onDispatchUnitsChange={onDispatchUnitsChange}
           onDispatchTimeModeChange={onDispatchTimeModeChange}
+          onDepartureOffsetChange={onDepartureOffsetChange}
           onCustomAirframeDraftIdChange={onCustomAirframeDraftIdChange}
           onCustomAirframeDraftNameChange={onCustomAirframeDraftNameChange}
           onCustomAirframeDraftMatchTypeChange={onCustomAirframeDraftMatchTypeChange}
@@ -162,7 +167,7 @@ export default function AppSettingsContent({
               <Button
                 variant="danger"
                 onClick={onDeleteUserData}
-                disabled={isDeletingUserData || isImporting || isSyncing || isSimBriefSaving}
+                disabled={isUserDataDeletionBlocked}
               >
                 {isDeletingUserData ? "Deleting..." : "Delete"}
               </Button>

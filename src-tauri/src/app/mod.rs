@@ -7,11 +7,13 @@ pub(crate) use logging::{
     append_sync_log, append_sync_log_debug, initialize_sync_log_path, iso_now_utc,
 };
 pub(crate) use paths::build_webview_data_directory;
-pub(crate) use state::DeltaSyncManager;
+pub(crate) use state::{DeltaSyncManager, UserDataPersistenceGate};
 pub(crate) use window_state::{persist_main_window_state, restore_main_window_state};
 
 use crate::{
-    services::deltava::draft::DraftSubmitManager, services::deltava::tours::DeltaToursSyncManager,
+    services::deltava::{
+        draft::DraftSubmitManager, http::DeltaVirtualHttpClient, tours::DeltaToursSyncManager,
+    },
     services::simbrief::dispatch::SimBriefDispatchManager,
 };
 use tauri::{Manager, WindowEvent};
@@ -20,14 +22,18 @@ use tauri::{Manager, WindowEvent};
 pub fn run() {
     tauri::Builder::default()
         .manage(DeltaSyncManager::default())
+        .manage(UserDataPersistenceGate::default())
         .manage(DeltaToursSyncManager::default())
         .manage(DraftSubmitManager::default())
         .manage(SimBriefDispatchManager::default())
         .setup(|app| {
+            let pirep_details_client =
+                DeltaVirtualHttpClient::try_new().map_err(std::io::Error::other)?;
+            app.manage(pirep_details_client);
             let app_handle = app.handle().clone();
             let _ = initialize_sync_log_path(&app_handle);
             tauri::async_runtime::spawn(async move {
-                crate::services::storage::file_store::prune_deltava_storage(
+                crate::services::webview::profile_cleanup::prune_deltava_storage(
                     &app_handle,
                     false,
                     true,

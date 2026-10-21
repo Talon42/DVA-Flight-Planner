@@ -79,6 +79,8 @@ function reconcileBoardWithSchedule(currentBoard, nextFlights) {
         simbriefPlan: normalizedEntry.simbriefPlan,
         draftNetwork: normalizedEntry.draftNetwork,
         draftReportId: normalizedEntry.draftReportId,
+        dvaDraftReportId: normalizedEntry.dvaDraftReportId,
+        draftDeleteRequiresRegenerate: normalizedEntry.draftDeleteRequiresRegenerate,
         isStale: false,
         isCompleted: normalizedEntry.isCompleted,
         completedAt: normalizedEntry.completedAt,
@@ -144,6 +146,11 @@ function buildAddonScanSummary(addonScan) {
   };
 }
 
+// Normalizes hydrated SimBrief offset values so legacy settings fall back safely.
+function normalizeLoadedDepartureOffsetMinutes(value) {
+  return value === 30 || value === 45 || value === 60 || value === 90 ? value : 0;
+}
+
 // Owns the first startup hydration pass that restores saved schedules and UI state.
 export function useAppBootstrap({
   setActiveFlightBoardId,
@@ -176,7 +183,9 @@ export function useAppBootstrap({
   setStatusMessage,
   setLogbookAirportProgress,
   setMapOptions,
+  setSimBriefDepartureOffsetMinutes,
   setSavedSimBriefDispatchUnits,
+  setSavedSimBriefDepartureOffsetMinutes,
   setSimBriefCustomAirframes,
   setSimBriefCustomAirframesDraft,
   setSimBriefDispatchUnits,
@@ -195,6 +204,7 @@ export function useAppBootstrap({
   schedule
 } = {}) {
   const [isHydrating, setIsHydrating] = useState(true);
+  const [restoredUiState, setRestoredUiState] = useState(null);
   const [shouldAwaitRestoredScheduleStartup, setShouldAwaitRestoredScheduleStartup] =
     useState(false);
   const [scheduleUiHydrated, setScheduleUiHydrated] = useState(false);
@@ -227,12 +237,20 @@ export function useAppBootstrap({
         readSavedSchedule(),
         readSavedUiState()
       ]);
+      const restoredSavedUiState =
+        uiStateResult.status === "fulfilled" && uiStateResult.value ? uiStateResult.value : null;
+
+      setRestoredUiState(restoredSavedUiState);
 
       if (cancelled) {
         return;
       }
 
       if (scheduleResult.status !== "fulfilled" || !scheduleResult.value?.flights?.length) {
+        setMapOptions?.(normalizeMapOptions(restoredSavedUiState?.mapOptions));
+        if (restoredSavedUiState?.scheduleView === "logbook") {
+          setScheduleView("logbook");
+        }
         if (scheduleResult.status === "rejected") {
           setStatusMessage(scheduleResult.reason?.message || "Unable to load saved schedule.");
           await logAppError("hydrate-failed", scheduleResult.reason, {
@@ -261,10 +279,7 @@ export function useAppBootstrap({
 
       const savedSchedule = scheduleResult.value;
       const savedBounds = buildFilterBounds(savedSchedule.flights);
-      const savedUiState =
-        uiStateResult.status === "fulfilled" && uiStateResult.value
-          ? uiStateResult.value
-          : savedSchedule.uiState || {};
+      const savedUiState = restoredSavedUiState || savedSchedule.uiState || {};
       const defaultBasicFilterSections = getDefaultBasicFilterSectionState(readViewportSize());
       setShouldAwaitRestoredScheduleStartup(true);
       setSchedule({
@@ -299,7 +314,7 @@ export function useAppBootstrap({
       );
       setPlannerMode(savedUiState.plannerMode === "duty" ? "duty" : "basic");
       setSort(normalizeScheduleSort(savedUiState.sort || DEFAULT_SORT));
-      setScheduleView("flights");
+      setScheduleView(savedUiState.scheduleView === "logbook" ? "logbook" : "flights");
       setSelectedTourPath(String(savedUiState.selectedTourPath || "").trim());
       setSelectedAccomplishmentName(String(savedUiState.selectedAccomplishmentName || "").trim());
       setSelectedTourRowId(null);
@@ -415,6 +430,9 @@ export function useAppBootstrap({
           String(simBriefResult.value?.dispatchUnits || "").trim().toUpperCase() === "KGS"
             ? "KGS"
             : "LBS";
+        const departureOffsetMinutes = normalizeLoadedDepartureOffsetMinutes(
+          Number(simBriefResult.value?.departureOffsetMinutes || 0)
+        );
         const customAirframes = Array.isArray(simBriefResult.value?.customAirframes)
           ? simBriefResult.value.customAirframes.map(normalizeSimBriefCustomAirframe).filter(Boolean)
           : [];
@@ -425,6 +443,8 @@ export function useAppBootstrap({
         setSimBriefUseCurrentUtcForDispatchTime?.(useCurrentUtcForDispatchTime);
         setSimBriefDispatchUnits?.(dispatchUnits);
         setSavedSimBriefDispatchUnits?.(dispatchUnits);
+        setSimBriefDepartureOffsetMinutes?.(departureOffsetMinutes);
+        setSavedSimBriefDepartureOffsetMinutes?.(departureOffsetMinutes);
         setSimBriefCustomAirframes?.(customAirframes);
         setSimBriefCustomAirframesDraft?.(customAirframes);
         await logAppEvent("SimBrief", "settings-loaded", {
@@ -432,6 +452,7 @@ export function useAppBootstrap({
           hasPilotId: Boolean(pilotId),
           useCurrentUtcForDispatchTime,
           dispatchUnits,
+          departureOffsetMinutes,
           customAirframeCount: customAirframes.length
         });
       } else {
@@ -463,9 +484,11 @@ export function useAppBootstrap({
     setDvaLastNameDraft,
     setIsDvaPasswordEditing,
     setSavedSimBriefDispatchUnits,
+    setSavedSimBriefDepartureOffsetMinutes,
     setSimBriefCustomAirframes,
     setSimBriefCustomAirframesDraft,
     setSimBriefDispatchUnits,
+    setSimBriefDepartureOffsetMinutes,
     setSimBriefPilotId,
     setSimBriefPilotIdDraft,
     setSimBriefUsername,
@@ -534,6 +557,7 @@ export function useAppBootstrap({
           setLogbookAirportProgress(
             logbookProgressResult.value || {
               dateIso: null,
+              lastSyncAt: null,
               visitedAirports: [],
               arrivalAirports: []
             }
@@ -630,6 +654,7 @@ export function useAppBootstrap({
     hasRestoredScheduleStartupSettled,
     isHydrating,
     isStartupReady,
+    restoredUiState,
     shouldAwaitRestoredScheduleStartup
   };
 }

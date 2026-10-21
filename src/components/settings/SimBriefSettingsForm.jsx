@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import Button from "../ui/Button";
 import Panel from "../ui/Panel";
 import { cn } from "../ui/cn";
-import { fieldInputClassName, gridClassNames, toggleButtonClassName } from "../ui/forms";
+import {
+  fieldInputClassName,
+  gridClassNames
+} from "../ui/forms";
 import { insetPanelClassName, mutedTextClassName } from "../ui/patterns";
 import SectionHeader from "../ui/SectionHeader";
 import { bodySmTextClassName, supportCopyTextClassName } from "../ui/typography";
-import { Field } from "../ui/filterFields";
+import { Field, SelectField } from "../ui/filterFields";
 import { SearchableMultiSelect } from "../ui/SearchableSelect";
 import { buildCustomAirframeMatchOptions } from "../../domain/aircraft/aircraftIdentity.js";
 
@@ -18,6 +21,7 @@ export function SimBriefSettingsForm({
   pilotId,
   useCurrentUtcForDispatchTime,
   dispatchUnits,
+  departureOffsetMinutes = 0,
   customAirframes,
   customAirframeDraftId,
   customAirframeDraftName,
@@ -25,6 +29,7 @@ export function SimBriefSettingsForm({
   isSaving,
   onDispatchUnitsChange,
   onDispatchTimeModeChange,
+  onDepartureOffsetChange,
   onCustomAirframeDraftIdChange,
   onCustomAirframeDraftNameChange,
   onCustomAirframeDraftMatchTypeChange,
@@ -35,8 +40,17 @@ export function SimBriefSettingsForm({
 }) {
   const isOnboardingMode = mode === "onboarding";
   const customAirframeMatchOptions = buildCustomAirframeMatchOptions();
-  const simBriefOptionButtonClassName = (active) =>
-    cn(toggleButtonClassName(active), "h-8 min-h-0 px-3 py-2 text-[0.9rem] leading-none");
+  const departureOffsetOptions = [
+    { label: "None", value: 0 },
+    { label: "30 Minutes", value: 30 },
+    { label: "45 Minutes", value: 45 },
+    { label: "60 Minutes", value: 60 },
+    { label: "90 Minutes", value: 90 }
+  ];
+  const dispatchTimeSourceOptions = [
+    { label: "Schedule UTC", value: "schedule-utc" },
+    { label: "Current UTC", value: "current-utc" }
+  ];
   const [usernameValue, setUsernameValue] = useState(username);
   const [pilotIdValue, setPilotIdValue] = useState(pilotId);
 
@@ -80,7 +94,7 @@ export function SimBriefSettingsForm({
         <SectionHeader
           eyebrow="SimBrief"
           title="Configure SimBrief integration"
-          description="Save your Navigraph alias, Pilot ID, dispatch units, and any custom airframes."
+          description="Save your Navigraph alias, Pilot ID, dispatch units, departure offset, and any custom airframes."
         />
       ) : (
         <div className={cn("grid gap-1", supportCopyTextClassName, compact && "gap-0.5")}>
@@ -117,44 +131,52 @@ export function SimBriefSettingsForm({
       </div>
 
       {!isOnboardingMode ? (
-        <div className={gridClassNames.twoColumn}>
-          <Field label="Dispatch Units" className="simbrief-units-toggle">
-            <div className="toggle-row flex flex-wrap gap-2">
-              <button
-                className={simBriefOptionButtonClassName(dispatchUnits === "LBS")}
-                type="button"
-                onClick={() => onDispatchUnitsChange?.("LBS")}
-              >
-                LBS
-              </button>
-              <button
-                className={simBriefOptionButtonClassName(dispatchUnits === "KGS")}
-                type="button"
-                onClick={() => onDispatchUnitsChange?.("KGS")}
-              >
-                KGS
-              </button>
-            </div>
-          </Field>
+        <div className="grid gap-3">
+          <SectionHeader title="Dispatch Defaults" />
 
-          <Field label="Dispatch Time">
-            <div className="toggle-row flex flex-wrap gap-2">
-              <button
-                className={simBriefOptionButtonClassName(!useCurrentUtcForDispatchTime)}
-                type="button"
-                onClick={() => onDispatchTimeModeChange?.("schedule-utc")}
-              >
-                Schedule UTC
-              </button>
-              <button
-                className={simBriefOptionButtonClassName(useCurrentUtcForDispatchTime)}
-                type="button"
-                onClick={() => onDispatchTimeModeChange?.("current-utc")}
-              >
-                Current UTC
-              </button>
-            </div>
-          </Field>
+          <div className="grid gap-3 bp-1024:grid-cols-3">
+            <SelectField
+              label="Dispatch Units"
+              presentation="anchored"
+              prioritizeSelectedOptions={false}
+              value={dispatchUnits}
+              onChange={(event) => onDispatchUnitsChange?.(event.target.value)}
+              disabled={isSaving}
+            >
+              <option value="LBS">LBS</option>
+              <option value="KGS">KGS</option>
+            </SelectField>
+
+            <SelectField
+              label="Dispatch Time Source"
+              presentation="anchored"
+              prioritizeSelectedOptions={false}
+              value={useCurrentUtcForDispatchTime ? "current-utc" : "schedule-utc"}
+              onChange={(event) => onDispatchTimeModeChange?.(event.target.value)}
+              disabled={isSaving}
+            >
+              {dispatchTimeSourceOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </SelectField>
+
+            <SelectField
+              label="Departure Offset"
+              presentation="anchored"
+              prioritizeSelectedOptions={false}
+              value={departureOffsetMinutes}
+              onChange={(event) => onDepartureOffsetChange?.(Number(event.target.value))}
+              disabled={isSaving}
+            >
+              {departureOffsetOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </SelectField>
+          </div>
         </div>
       ) : null}
 

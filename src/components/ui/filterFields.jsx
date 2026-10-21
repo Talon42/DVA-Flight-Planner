@@ -41,8 +41,12 @@ export function SelectField({
   className = "",
   helper = null,
   allLabel = null,
+  presentation = "popover",
   children,
-  ...props
+  value,
+  selectedValues: selectedValuesProp,
+  onChange,
+  ...selectProps
 }) {
   const selectOptions = useMemo(() => {
     const flattenedOptions = [];
@@ -86,9 +90,9 @@ export function SelectField({
     return flattenedOptions;
   }, [children]);
 
-  const selectedValue = String(props.value ?? "");
-  const selectedValues = Array.isArray(props.selectedValues)
-    ? props.selectedValues
+  const selectedValue = String(value ?? "");
+  const selectedValues = Array.isArray(selectedValuesProp)
+    ? selectedValuesProp
     : selectedValue
       ? [selectedValue]
       : [];
@@ -109,9 +113,11 @@ export function SelectField({
       showOptionMark={false}
       showPinnedSelectedBlock={false}
       showSingleSelectedLabel
+      presentation={presentation}
+      {...selectProps}
       options={selectOptions}
       selectedValues={selectedValues}
-      onChange={(values) => props.onChange?.({ target: { value: values[0] || "" } })}
+      onChange={(values) => onChange?.({ target: { value: values[0] || "" } })}
     />
   );
 }
@@ -236,6 +242,7 @@ export function RangeSlider({
 }
 
 // Smooths slider updates so filter changes are committed after the user pauses dragging.
+// eslint-disable-next-line react-refresh/only-export-components -- shared hook intentionally lives with its range field
 export function useTransientRangeSlider(lowValue, highValue, onCommit) {
   const [draftValues, setDraftValues] = useState([lowValue, highValue]);
   const commitTimeoutRef = useRef(null);
@@ -246,6 +253,10 @@ export function useTransientRangeSlider(lowValue, highValue, onCommit) {
     const nextValues = [lowValue, highValue];
     latestDraftValuesRef.current = nextValues;
     lastCommittedValuesRef.current = nextValues;
+    if (commitTimeoutRef.current) {
+      clearTimeout(commitTimeoutRef.current);
+      commitTimeoutRef.current = null;
+    }
     setDraftValues((current) =>
       current[0] === nextValues[0] && current[1] === nextValues[1] ? current : nextValues
     );
@@ -306,6 +317,7 @@ export function useTransientRangeSlider(lowValue, highValue, onCommit) {
 }
 
 // Builds an airline option with branding metadata for the shared searchable select.
+// eslint-disable-next-line react-refresh/only-export-components -- pure option builder is shared by filter consumers
 export function buildAirlineSelectOption(airline) {
   const airlineName = String(airline || "").trim();
 

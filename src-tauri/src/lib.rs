@@ -1,14 +1,22 @@
 mod app;
 mod commands;
+mod domain;
 mod models;
 mod services;
 
-pub(crate) use app::paths::{DELTAVA_LOGBOOK_FALLBACK_FILE, DELTAVA_SCHEDULE_FILE};
+pub(crate) use app::paths::{
+    DELTAVA_LOGBOOK_FILE, DELTAVA_SCHEDULE_FILE, DELTAVA_SYNC_DOWNLOAD_FILE,
+};
 pub(crate) use app::{
-    append_sync_log, append_sync_log_debug, build_webview_data_directory,
-    initialize_sync_log_path, iso_now_utc, DeltaSyncManager,
+    append_sync_log, append_sync_log_debug, build_webview_data_directory, initialize_sync_log_path,
+    iso_now_utc, DeltaSyncManager,
 };
 pub(crate) use models::{AddonAirportCache, AddonAirportScanDetail};
+pub(crate) use models::{
+    DeltaLogbookCachePayload, DeltaLogbookPilotProfileMetadata, LOGBOOK_CACHE_INVALID_CODE,
+    LOGBOOK_CACHE_INVALID_MESSAGE, LOGBOOK_STATUS_INVALID, LOGBOOK_STATUS_MISSING,
+    LOGBOOK_STATUS_READY,
+};
 pub(crate) use services::deltava::constants::{
     DELTAVA_AUTH_MESSAGE_PREFIX, DELTAVA_DEBUG_MESSAGE_PREFIX, DELTAVA_SYNC_RESULT_MESSAGE_PREFIX,
 };

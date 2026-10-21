@@ -1,0 +1,86 @@
+{
+  "fixturePurpose": "Representative sanitized DVA logbook compatibility fixture.",
+  "inputCount": 10,
+  "acceptedCount": 10,
+  "rejectedCount": 0,
+  "latestDateIso": "2026-06-14",
+  "statusCounts": {
+    "DRAFT": 1,
+    "OK": 8,
+    "REJECTED": 1
+  },
+  "canonicalMonthContract": {
+    "description": "DVA month values are zero-based.",
+    "examples": {
+      "0": "January",
+      "5": "June",
+      "11": "December"
+    }
+  },
+  "knownRows": {
+    "900001": {
+      "status": "DRAFT",
+      "airline": "VA",
+      "route": "YPDN-YMML",
+      "equipment": "A320",
+      "durationMinutes": 0,
+      "hasLandingTelemetry": false
+    },
+    "900002": {
+      "status": "OK",
+      "airline": "DL",
+      "route": "KATL-KJAX",
+      "equipment": "B757-200",
+      "hasLandingTelemetry": false
+    },
+    "900003": {
+      "status": "OK",
+      "airline": "DL",
+      "route": "KDTW-KABE",
+      "equipment": "B757-200",
+      "blockMinutes": 113,
+      "landingRateFpm": -269
+    },
+    "900004": {
+      "status": "OK",
+      "route": "KJFK-KPIT",
+      "landingRateFpm": -16
+    },
+    "900005": {
+      "status": "OK",
+      "route": "KDTW-KORD",
+      "landingRateFpm": -545
+    },
+    "900006": {
+      "status": "OK",
+      "equipment": "EMB-120",
+      "route": "KMCO-KTLH"
+    },
+    "900007": {
+      "status": "REJECTED",
+      "equipment": "B767-300ER",
+      "route": "KSFO-KLAX"
+    },
+    "900008": {
+      "status": "OK",
+      "equipment": "B767-300ER",
+      "route": "KSFO-KLAX"
+    },
+    "900009": {
+      "status": "OK",
+      "dateIso": "2015-12-05",
+      "rawMonth": 11
+    },
+    "900010": {
+      "status": "OK",
+      "airline": "AM",
+      "route": "MMHO-KPHX"
+    }
+  },
+  "privacy": {
+    "personalNamesRemoved": true,
+    "freeTextSanitized": true,
+    "sourceIdsReplaced": true,
+    "externalPlanIdentifiersRemoved": true
+  }
+}

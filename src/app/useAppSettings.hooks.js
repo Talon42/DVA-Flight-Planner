@@ -40,6 +40,9 @@ export function useAppSettings({ setIsDevWindowMenuOpen } = {}) {
     useState(false);
   const [simBriefDispatchUnits, setSimBriefDispatchUnits] = useState("LBS");
   const [savedSimBriefDispatchUnits, setSavedSimBriefDispatchUnits] = useState("LBS");
+  const [simBriefDepartureOffsetMinutes, setSimBriefDepartureOffsetMinutes] = useState(0);
+  const [savedSimBriefDepartureOffsetMinutes, setSavedSimBriefDepartureOffsetMinutes] =
+    useState(0);
   const [simBriefCustomAirframes, setSimBriefCustomAirframes] = useState([]);
   const [simBriefCustomAirframesDraft, setSimBriefCustomAirframesDraft] = useState([]);
   const [simBriefCustomAirframeIdDraft, setSimBriefCustomAirframeIdDraft] = useState("");
@@ -133,6 +136,10 @@ export function useAppSettings({ setIsDevWindowMenuOpen } = {}) {
     setSimBriefDispatchUnits,
     savedSimBriefDispatchUnits,
     setSavedSimBriefDispatchUnits,
+    simBriefDepartureOffsetMinutes,
+    setSimBriefDepartureOffsetMinutes,
+    savedSimBriefDepartureOffsetMinutes,
+    setSavedSimBriefDepartureOffsetMinutes,
     simBriefCustomAirframes,
     setSimBriefCustomAirframes,
     simBriefCustomAirframesDraft,

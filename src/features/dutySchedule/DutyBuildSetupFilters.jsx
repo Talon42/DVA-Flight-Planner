@@ -3,7 +3,11 @@ import { fieldInputClassName } from "../../components/ui/forms";
 import { cn } from "../../components/ui/cn";
 import { Field, PillSelectField } from "../../components/ui/filterFields";
 import DutyHelpIcon from "./DutyHelpIcon.jsx";
-import { DutyCompactInlineRow, DutyFilterColumn } from "./DutyFilterLayout.jsx";
+import {
+  DutyCompactChoiceGroup,
+  DutyCompactInlineRow,
+  DutyFilterColumn
+} from "./DutyFilterLayout.jsx";
 import {
   DUTY_HELP_COPY,
   DUTY_DESKTOP_FIELD_CLASS_NAME,
@@ -51,28 +55,11 @@ export default function DutyBuildSetupFilters({
             />
           }
         >
-          <div className="grid w-full grid-cols-2 gap-2">
-            {dutyBuildModeOptions.map((option) => {
-              const isActive = dutyFilters.buildMode === option.value;
-
-              return (
-                <button
-                  key={option.value}
-                  className={cn(
-                    "inline-flex min-w-0 items-center justify-center rounded-none border px-3 py-2 text-left transition-colors duration-150 ease-out",
-                    isActive
-                      ? "border-[color:var(--focus-border)] bg-[var(--delta-blue)] text-white"
-                      : "border-[color:var(--panel-border)] bg-[var(--surface-raised)] text-[var(--text-heading)] hover:bg-[var(--surface-soft)]"
-                  )}
-                  type="button"
-                  onClick={() => onDutyFilterChange("buildMode", option.value || "airline")}
-                  aria-pressed={isActive}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
+          <DutyCompactChoiceGroup
+            options={dutyBuildModeOptions}
+            value={dutyFilters.buildMode}
+            onChange={(value) => onDutyFilterChange("buildMode", value || "airline")}
+          />
         </DutyCompactInlineRow>
 
         {dutyFilters.buildMode === "airline" ? (
@@ -97,28 +84,11 @@ export default function DutyBuildSetupFilters({
         ) : (
           <>
             <DutyCompactInlineRow label="Location Type">
-              <div className="grid w-full grid-cols-2 gap-2">
-                {dutyLocationKindOptions.map((option) => {
-                  const isActive = dutyFilters.locationKind === option.value;
-
-                  return (
-                    <button
-                      key={option.value}
-                      className={cn(
-                        "inline-flex min-w-0 items-center justify-center rounded-none border px-3 py-2 text-left transition-colors duration-150 ease-out",
-                        isActive
-                          ? "border-[color:var(--focus-border)] bg-[var(--delta-blue)] text-white"
-                          : "border-[color:var(--panel-border)] bg-[var(--surface-raised)] text-[var(--text-heading)] hover:bg-[var(--surface-soft)]"
-                      )}
-                      type="button"
-                      onClick={() => onDutyFilterChange("locationKind", option.value || "country")}
-                      aria-pressed={isActive}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <DutyCompactChoiceGroup
+                options={dutyLocationKindOptions}
+                value={dutyFilters.locationKind}
+                onChange={(value) => onDutyFilterChange("locationKind", value || "country")}
+              />
             </DutyCompactInlineRow>
 
             <DutyCompactInlineRow

@@ -1,0 +1,11 @@
+[
+  { "name": "upstream error", "document": { "error": "Service unavailable" } },
+  { "name": "profile response", "document": { "profile": { "displayName": "Example Pilot" } } },
+  { "name": "null response", "document": null },
+  { "name": "scalar response", "document": "Service unavailable" },
+  { "name": "wrong collection type", "document": { "entries": {} } },
+  { "name": "error collection", "document": { "data": [{ "error": "Service unavailable" }] } },
+  { "name": "empty row", "document": [{}] },
+  { "name": "primitive rows", "document": [null, "not-a-row", 42] },
+  { "name": "mixed valid and invalid rows", "document": { "entries": [{ "logbookId": 1 }, { "error": "Truncated export" }] } }
+]

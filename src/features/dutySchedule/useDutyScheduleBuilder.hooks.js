@@ -12,7 +12,6 @@ import {
   applyDutyFilterChange,
   normalizeDutyFilters
 } from "../../logic/dutySchedule/dutyFilters";
-import { getDutyQualifyingAirlines } from "../../logic/dutySchedule/dutyAirlines";
 import { prepareDutyScheduleBuild } from "../../logic/dutySchedule/generateDutySchedule";
 
 // Owns the duty schedule build workflow so App.jsx can stay focused on shell orchestration.
@@ -47,10 +46,6 @@ export function useDutyScheduleBuilder({
     () => buildDutyOriginAirportOptions(scheduleFlights, normalizedDutyFilters),
     [normalizedDutyFilters, scheduleFlights]
   );
-  const qualifyingDutyAirlines = useMemo(
-    () => getDutyQualifyingAirlines(scheduleFlights, normalizedDutyFilters),
-    [normalizedDutyFilters, scheduleFlights]
-  );
 
   useEffect(() => {
     const selectedOriginAirport = String(normalizedDutyFilters.selectedOriginAirport || "").trim();
@@ -69,8 +64,7 @@ export function useDutyScheduleBuilder({
       String(current.selectedOriginAirport || "").trim().toUpperCase() === selectedOriginAirport
         ? {
             ...current,
-            selectedOriginAirport: "",
-            resolvedAirline: ""
+            selectedOriginAirport: ""
           }
         : current
     );
@@ -94,7 +88,6 @@ export function useDutyScheduleBuilder({
       scheduleFlights,
       dutyFilters,
       addonAirports,
-      qualifyingDutyAirlines,
       hasSchedule: Boolean(schedule),
       supportsFlightByAircraftLimits: supportsFlightByDutyEquipmentLimits,
       rng: Math.random,
@@ -107,14 +100,7 @@ export function useDutyScheduleBuilder({
     }
 
     setDutyBuildWarning(null);
-    const { effectiveDutyFilters, buildResult, shouldPersistResolvedAirline } = buildPlan;
-
-    if (shouldPersistResolvedAirline) {
-      setDutyFilters?.((current) => ({
-        ...current,
-        resolvedAirline: effectiveDutyFilters.resolvedAirline
-      }));
-    }
+    const { effectiveDutyFilters, buildResult, selectedAirline } = buildPlan;
 
     if (buildResult.status === "failure") {
       setDutyBuildWarning([buildResult.message]);
@@ -125,8 +111,7 @@ export function useDutyScheduleBuilder({
         buildMode: effectiveDutyFilters.buildMode,
         resultStatus: buildResult.status,
         reasonCodes: buildResult.reasonCodes,
-        selectedAirline: String(effectiveDutyFilters.selectedAirline || "").trim(),
-        resolvedAirline: String(effectiveDutyFilters.resolvedAirline || "").trim(),
+        selectedAirline: String(selectedAirline || effectiveDutyFilters.selectedAirline || "").trim(),
         selectedOriginAirport: String(effectiveDutyFilters.selectedOriginAirport || "").trim().toUpperCase(),
         selectedEquipment: String(effectiveDutyFilters.selectedEquipment || "").trim().toUpperCase(),
         locationKind: effectiveDutyFilters.locationKind,
@@ -151,8 +136,7 @@ export function useDutyScheduleBuilder({
     }
 
     const selectedFlights = buildResult.flights;
-    const dutyBoardAirline =
-      effectiveDutyFilters.resolvedAirline || effectiveDutyFilters.selectedAirline;
+    const dutyBoardAirline = selectedAirline || effectiveDutyFilters.selectedAirline;
     const dutyBoardName = normalizeFlightBoardName(
       String(dutyBoardAirline || "").trim() || "Duty",
       DEFAULT_FLIGHT_BOARD_NAME
@@ -176,9 +160,6 @@ export function useDutyScheduleBuilder({
     setScheduleView?.("map");
     setPlannerControlsCollapsed?.(true);
 
-    const resolvedAirlineLabel =
-      effectiveDutyFilters.resolvedAirline || effectiveDutyFilters.selectedAirline;
-
     setStatusMessage?.(buildResult.message);
 
     await logAppEvent("duty-schedule-built", {
@@ -187,7 +168,7 @@ export function useDutyScheduleBuilder({
       resultStatus: buildResult.status,
       reasonCodes: buildResult.reasonCodes,
       buildMode: effectiveDutyFilters.buildMode,
-      resolvedAirline: resolvedAirlineLabel,
+      selectedAirline: selectedAirline || effectiveDutyFilters.selectedAirline,
       selectedOriginAirport: effectiveDutyFilters.selectedOriginAirport,
       locationKind: effectiveDutyFilters.locationKind,
       selectedCountry: effectiveDutyFilters.selectedCountry,
@@ -230,7 +211,6 @@ export function useDutyScheduleBuilder({
     dutyFilters: normalizedDutyFilters,
     dutyEquipmentOptions,
     dutyOriginAirportOptions,
-    qualifyingDutyAirlines,
     dutyBuildWarning,
     clearDutyBuildWarning,
     handleDutyFilterChange,

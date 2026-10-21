@@ -1,10 +1,12 @@
 import ScheduleWorkspacePanel from "../components/ScheduleWorkspacePanel";
 import AppFooter from "../components/layout/AppFooter";
+import { cn } from "../components/ui/cn";
 
 // Renders the main two-column workspace and the footer beneath it.
 export default function AppMainWorkspace({
   schedule,
   scheduleView,
+  logbookProps,
   theme,
   flightBoard,
   selectedFlightId,
@@ -59,7 +61,6 @@ export default function AppMainWorkspace({
   availableUpdate,
   appBuildGitTag,
   selectedDevWindowPreset,
-  currentWindowSizeLabel,
   devWindowMenuRef,
   isDevWindowMenuOpen,
   onToggleDevWindowMenu,
@@ -68,12 +69,23 @@ export default function AppMainWorkspace({
   onSelectDevWindowWidth,
   onOpenReleasePage
 }) {
+  const isPilotStatsWorkspace = scheduleView === "logbook" && logbookProps?.selectedTab === "pilot-stats";
+
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="grid min-h-0 flex-1 gap-4 [grid-template-columns:minmax(0,1.42fr)_minmax(224px,0.9fr)] bp-1024:gap-3 bp-1024:[grid-template-columns:minmax(0,1.48fr)_minmax(248px,0.9fr)] bp-1400:[grid-template-columns:minmax(0,1.55fr)_minmax(260px,0.92fr)]">
+      {/* Uses a single column for Logbook Pilot Stats; all other views keep the standard two-column split. */}
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-4 bp-1024:gap-3",
+          isPilotStatsWorkspace
+            ? "[grid-template-columns:minmax(0,1fr)]"
+            : "[grid-template-columns:minmax(0,3fr)_minmax(260px,2fr)] min-[1920px]:[grid-template-columns:minmax(0,1fr)_768px]"
+        )}
+      >
         <ScheduleWorkspacePanel
           scheduleExists={Boolean(schedule)}
           scheduleView={scheduleView}
+          logbookProps={logbookProps}
           theme={theme}
           activeFlightBoardEntries={flightBoard}
           selectedFlightId={selectedFlightId}
@@ -132,7 +144,7 @@ export default function AppMainWorkspace({
           onClearDutyBuildWarning={onClearDutyBuildWarning}
         />
 
-        {rightColumnContent}
+        {isPilotStatsWorkspace ? null : rightColumnContent}
       </div>
 
       <AppFooter
@@ -143,7 +155,6 @@ export default function AppMainWorkspace({
         hasUpdateAvailable={Boolean(isDesktopAddonScanAvailable && availableUpdate?.updateAvailable)}
         appBuildGitTag={appBuildGitTag}
         selectedDevWindowPreset={selectedDevWindowPreset}
-        currentWindowSizeLabel={currentWindowSizeLabel}
         devWindowMenuRef={devWindowMenuRef}
         isDevWindowMenuOpen={isDevWindowMenuOpen}
         onToggleDevWindowMenu={onToggleDevWindowMenu}

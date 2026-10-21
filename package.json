@@ -3,15 +3,33 @@
   "private": true,
   "version": "0.8.5-beta",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 1420",
     "build:vatsim-boundaries": "node scripts/build-vatsim-boundary-catalog.mjs",
+    "audit:data": "node scripts/audit-aircraft-data.mjs",
+    "audit:aircraft": "node scripts/audit-aircraft-data.mjs",
     "lint:airports": "node scripts/audit-airport-timezone-labels.mjs",
     "build": "vite build",
     "lint": "eslint . --cache --cache-location .eslintcache",
+    "lint:ci": "eslint . --max-warnings=0",
+    "lint:files": "eslint --max-warnings=0",
     "test:schedule": "vitest run src/domain/schedule/scheduleDate.test.js src/services/workers/parseSchedule.test.js src/features/schedule/scheduleFilters.selectors.test.js src/components/tables/flightTableDefinition.test.jsx src/features/details/detailsFlightBoardCardSummary.model.test.js src/features/flightBoard/flightBoard.model.test.js src/features/simbrief/simBriefDispatchTime.model.test.js src/logic/dutySchedule/buildDutySchedule.test.js src/app/useAppBootstrap.hooks.test.js",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "format:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
+    "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml --locked",
+    "clippy:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings",
+    "validate:frontend": "npm run lint:ci && npm run test:run",
+    "validate:rust": "npm run format:rust && npm run clippy:rust && npm run test:rust",
+    "validate:fast": "npm run validate:frontend && npm run audit:data && npm run lint:airports",
+    "validate": "npm run validate:fast && npm run build && npm run validate:rust"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
@@ -21,7 +39,6 @@
     "@turf/union": "^7.3.5",
     "luxon": "^3.5.0",
     "maplibre-gl": "^5.23.0",
-    "papaparse": "^5.5.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-map-gl": "^8.1.1",
@@ -34,13 +51,17 @@
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/cli": "^2.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.4.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.2.2",
-    "vite": "^5.4.10",
-    "vitest": "^2.1.9"
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
   }
 }

@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, SecondsFormat, TimeZone, Utc};
+use chrono::{SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -10,6 +10,7 @@ use std::{
 use tauri::{AppHandle, Manager};
 
 use crate::append_sync_log;
+use crate::services::deltava::logbook::{extract_dva_logbook_date, normalize_logbook_entries};
 
 const DELTAVA_TOUR_PROGRESS_FILE: &str = "dva-tour-progress.json";
 const DELTAVA_TOURS_CACHE_FILE: &str = "dva-tours-cache.json";
@@ -122,41 +123,6 @@ fn read_json_value(path: &Path) -> Option<Value> {
     serde_json::from_str::<Value>(&text).ok()
 }
 
-fn find_logbook_entries(json: &Value) -> Option<&Vec<Value>> {
-    json.as_array()
-        .or_else(|| json.get("flights").and_then(Value::as_array))
-}
-
-fn normalize_logbook_month(raw_month: u32) -> Option<u32> {
-    if raw_month <= 11 {
-        Some(raw_month + 1)
-    } else {
-        None
-    }
-}
-
-fn extract_logbook_date_parts(entry: &Value) -> Option<(i32, u32, u32)> {
-    let date = entry.get("date")?;
-    let year = date
-        .get("y")
-        .and_then(Value::as_i64)
-        .and_then(|number| i32::try_from(number).ok())?;
-    let month = date
-        .get("m")
-        .and_then(Value::as_i64)
-        .and_then(|number| u32::try_from(number).ok())?;
-    let day = date
-        .get("d")
-        .and_then(Value::as_i64)
-        .and_then(|number| u32::try_from(number).ok())?;
-
-    if day < 1 {
-        return None;
-    }
-
-    Some((year, month, day))
-}
-
 fn epoch_seconds_to_iso(epoch_seconds: i64) -> Option<String> {
     Utc.timestamp_opt(epoch_seconds, 0)
         .single()
@@ -182,9 +148,7 @@ fn extract_logbook_entry_epoch_seconds(entry: &Value) -> Option<i64> {
         }
     }
 
-    let (year, raw_month, day) = extract_logbook_date_parts(entry)?;
-    let month = normalize_logbook_month(raw_month)?;
-    let date = NaiveDate::from_ymd_opt(year, month, day)?;
+    let date = extract_dva_logbook_date(entry)?;
     date.and_hms_opt(0, 0, 0)
         .map(|datetime| Utc.from_utc_datetime(&datetime).timestamp())
 }
@@ -370,13 +334,8 @@ fn extract_logbook_status(value: &Value) -> Option<String> {
 }
 
 fn is_eligible_logbook_status(status: Option<&str>) -> bool {
-    match status {
-        None => true,
-        Some(value) => matches!(
-            value.trim().to_ascii_lowercase().as_str(),
-            "ok" | "accepted" | "submitted" | "approved" | "completed" | "complete"
-        ),
-    }
+    crate::domain::deltava::logbook_status::LogbookStatus::from_raw(status)
+        .include_in_tour_eligibility()
 }
 
 fn extract_logbook_airport_code(value: &Value, key: &str) -> Option<String> {
@@ -558,6 +517,7 @@ fn extract_airport_code(value: &Value, keys: &[&str]) -> Option<String> {
 
 fn extract_tour_path(tour: &Value) -> Option<String> {
     extract_string_field(tour, &["tourPath", "path", "id"])
+        .map(|value| normalize_tour_identifier(&value))
 }
 
 fn extract_tour_rows(tour: &Value) -> Vec<Value> {
@@ -569,13 +529,24 @@ fn extract_tour_rows(tour: &Value) -> Vec<Value> {
 }
 
 fn extract_tour_row_id(tour_path: &str, row: &Value, index: usize) -> String {
-    extract_string_field(row, &["tourRowId", "flightId", "sourceId", "id"]).unwrap_or_else(|| {
-        let tour_row_number = row
-            .get("leg")
-            .and_then(Value::as_i64)
-            .unwrap_or((index + 1) as i64);
-        format!("{tour_path}:leg-{tour_row_number}")
-    })
+    extract_string_field(row, &["tourRowId", "flightId", "sourceId", "id"])
+        .map(|value| normalize_tour_identifier(&value))
+        .unwrap_or_else(|| {
+            let tour_row_number = row
+                .get("leg")
+                .and_then(Value::as_i64)
+                .unwrap_or((index + 1) as i64);
+            format!("{tour_path}:leg-{tour_row_number}")
+        })
+}
+
+// Reads legacy double-prefixed caches while all newly derived progress uses one `dva:` prefix.
+fn normalize_tour_identifier(value: &str) -> String {
+    let mut normalized = value.trim().to_string();
+    while normalized.starts_with("dva:dva:") {
+        normalized = normalized.replacen("dva:dva:", "dva:", 1);
+    }
+    normalized
 }
 
 #[derive(Default)]
@@ -603,12 +574,8 @@ fn build_logbook_tour_credit_scan_from_values(
     let mut seen_serializations = HashSet::new();
 
     for json in logbook_jsons {
-        let Some(raw_entries) = find_logbook_entries(json) else {
-            continue;
-        };
-
-        for entry in raw_entries {
-            let Ok(serialized) = serde_json::to_string(entry) else {
+        for entry in normalize_logbook_entries(json) {
+            let Ok(serialized) = serde_json::to_string(&entry) else {
                 continue;
             };
 
@@ -618,12 +585,12 @@ fn build_logbook_tour_credit_scan_from_values(
 
             result.total_logbook_entries_considered += 1;
 
-            let epoch_seconds = extract_logbook_entry_epoch_seconds(entry);
-            let completed_at = build_logbook_entry_completed_at(entry);
-            let logbook_status = extract_logbook_status(entry);
-            let logbook_departure = extract_logbook_airport_code(entry, "airportD");
-            let logbook_arrival = extract_logbook_airport_code(entry, "airportA");
-            let logbook_entry_id = extract_logbook_entry_id(entry);
+            let epoch_seconds = extract_logbook_entry_epoch_seconds(&entry);
+            let completed_at = build_logbook_entry_completed_at(&entry);
+            let logbook_status = extract_logbook_status(&entry);
+            let logbook_departure = extract_logbook_airport_code(&entry, "airportD");
+            let logbook_arrival = extract_logbook_airport_code(&entry, "airportA");
+            let logbook_entry_id = extract_logbook_entry_id(&entry);
             let entry_index = result.total_logbook_entries_considered.saturating_sub(1);
             let mut entry_has_system_update = false;
 
@@ -668,6 +635,7 @@ fn build_logbook_tour_credit_scan_from_values(
     result
 }
 
+#[allow(clippy::too_many_arguments)] // Reconciliation diagnostics are explicit for deterministic tests.
 fn build_tour_progress_rows_with_debug(
     credits: &[LogbookTourCreditCandidate],
     tour_rows: &[Value],
@@ -1217,7 +1185,10 @@ fn write_tour_progress_cache(
     fs::write(&path, serialized).map_err(|error| {
         format!("download_failed: Unable to write Delta Virtual tour progress cache: {error}")
     })?;
-    crate::append_sync_log_debug(debug_enabled, &format!("tour-progress:write {}", path.display()));
+    crate::append_sync_log_debug(
+        debug_enabled,
+        &format!("tour-progress:write {}", path.display()),
+    );
     Ok(())
 }
 
@@ -1411,6 +1382,7 @@ pub fn normalize_epoch_seconds(value: &Value) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::NaiveDate;
     use serde_json::json;
 
     fn build_tours_json(rows: Vec<Value>, name: &str) -> Value {
@@ -1454,10 +1426,11 @@ mod tests {
     }
 
     fn completed_row_id(cache: &DeltaTourProgressCache, tour_key: &str, row_id: &str) -> bool {
+        let normalized_row_id = normalize_tour_identifier(row_id);
         cache
             .tour_progress
             .get(tour_key)
-            .and_then(|tour| tour.rows.get(row_id))
+            .and_then(|tour| tour.rows.get(&normalized_row_id))
             .is_some_and(|row| row.completed)
     }
 
@@ -1535,6 +1508,13 @@ mod tests {
         );
 
         let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(cache
+            .tour_progress
+            .get("dva:16")
+            .expect("tour progress should exist")
+            .rows
+            .keys()
+            .all(|row_id| !row_id.contains("dva:dva:")));
         assert!(completed_row_id(
             &cache,
             "dva:16",
@@ -1843,6 +1823,43 @@ mod tests {
             "flights": [
                 {
                     "status": "REJECTED",
+                    "date": { "y": 2023, "m": 10, "d": 25 },
+                    "airportD": { "icao": "KBUR", "iata": "BUR" },
+                    "airportA": { "icao": "KSAN", "iata": "SAN" },
+                    "updates": [
+                        { "type": "SYSTEM", "msg": "Leg 1 in Flight Tour Example Tour" }
+                    ]
+                }
+            ]
+        });
+        let tours_json = build_tours_json(
+            vec![json!({
+                "tourRowId": "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN",
+                "from": "KBUR",
+                "to": "KSAN",
+                "airline": "AA",
+                "tourFlightNumber": "100",
+                "matchLeg": true,
+                "matchEQ": false,
+                "leg": 1
+            })],
+            "Example Tour",
+        );
+
+        let cache = build_dva_tour_completion_from_logbook(&logbook_json, &tours_json);
+        assert!(!completed_row_id(
+            &cache,
+            "dva:16",
+            "dva:dva:16:airline-AA:flight-100:leg-1:dep-KBUR:arr-KSAN"
+        ));
+    }
+
+    #[test]
+    fn draft_status_does_not_complete() {
+        let logbook_json = json!({
+            "flights": [
+                {
+                    "status": "DRAFT",
                     "date": { "y": 2023, "m": 10, "d": 25 },
                     "airportD": { "icao": "KBUR", "iata": "BUR" },
                     "airportA": { "icao": "KSAN", "iata": "SAN" },

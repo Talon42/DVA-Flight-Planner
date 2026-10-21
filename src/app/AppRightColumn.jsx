@@ -1,9 +1,12 @@
+import { useEffect, useState } from "react";
 import FilterBar from "../components/FilterBar";
 import DetailsPanel from "../components/DetailsPanel";
 import { cn } from "../components/ui/cn";
-import { normalizeFilters } from "../features/schedule/scheduleFilters.model";
+import LogbookFiltersPanel from "../features/logbook/LogbookFiltersPanel.jsx";
+import LogbookDetailsCard from "../features/logbook/LogbookDetailsCard.jsx";
 import AccomplishmentSelectorPanel from "../features/accomplishments/AccomplishmentSelectorPanel.jsx";
 import TourSelectorPanel from "../features/tours/TourSelectorPanel.jsx";
+import { normalizeFilters } from "../features/schedule/scheduleFilters.model";
 import AirportInfoTray from "../features/details/AirportInfoTray.jsx";
 
 // Renders the right-hand workspace column without owning any planner state.
@@ -14,6 +17,7 @@ export default function AppRightColumn({
   filterUiVersion,
   filters,
   filterBounds,
+  logbookWorkspace,
   airlines,
   airportOptions,
   geoOptions,
@@ -67,12 +71,22 @@ export default function AppRightColumn({
   onDeleteDeltaVirtualDraftReport,
   onCompleteTourFlight
 }) {
+  const [logbookFiltersCollapsed, setLogbookFiltersCollapsed] = useState(false);
+  const selectedLogbookFlight = logbookWorkspace?.selectedLogbookFlight || null;
+
+  useEffect(() => {
+    if (scheduleView === "logbook" && selectedLogbookFlight) {
+      setLogbookFiltersCollapsed(true);
+    }
+  }, [scheduleView, selectedLogbookFlight]);
+
   const isAccomplishmentsView = scheduleView === "accomplishments";
   const isToursView = scheduleView === "tours";
   const isFlightsView = scheduleView === "flights";
   const showAirportInfo = Boolean(selectedAirportInfo) && (isFlightsView || isToursView || isAccomplishmentsView);
   const showAccomplishmentFlightBoard = isAccomplishmentsView && isAccomplishmentSelectorCollapsed;
   const showTourFlightBoard = isToursView && isTourSelectorCollapsed;
+
   const detailsPanel = (
     <DetailsPanel
       shortlist={shortlist}
@@ -112,6 +126,37 @@ export default function AppRightColumn({
 
   if (plannerMode === "duty") {
     return detailsPanel;
+  }
+
+  if (scheduleView === "logbook") {
+    return (
+      <div
+        className={cn(
+          "grid h-full min-h-0 w-full min-w-0 gap-3 bp-1024:gap-2.5",
+          logbookFiltersCollapsed
+            ? "[grid-template-rows:auto_minmax(0,1fr)]"
+            : "grid-rows-[minmax(0,1fr)]"
+        )}
+      >
+        <LogbookFiltersPanel
+          filters={logbookWorkspace?.filters}
+          filterBounds={logbookWorkspace?.filterBounds}
+          filterOptions={logbookWorkspace?.filterOptions}
+          collapsed={logbookFiltersCollapsed}
+          onToggleCollapsed={() => setLogbookFiltersCollapsed((current) => !current)}
+          onFilterChange={logbookWorkspace?.onFilterChange}
+          onReset={logbookWorkspace?.onResetFilters}
+        />
+        {logbookFiltersCollapsed ? (
+          <LogbookDetailsCard
+            selectedLogbookFlight={selectedLogbookFlight}
+            pirepDetails={logbookWorkspace?.pirepDetails}
+            pirepDetailsLoading={logbookWorkspace?.pirepDetailsLoading}
+            pirepDetailsError={logbookWorkspace?.pirepDetailsError}
+          />
+        ) : null}
+      </div>
+    );
   }
 
   if (scheduleView === "accomplishments") {

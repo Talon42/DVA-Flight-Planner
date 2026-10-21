@@ -1,15 +1,11 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 // Owns the low-risk app modals so App.jsx can keep workflow logic focused elsewhere.
 export function useAppModals() {
   const [isReadmeOpen, setIsReadmeOpen] = useState(false);
-  const [isDeleteUserDataConfirmOpen, setIsDeleteUserDataConfirmOpen] = useState(false);
-  const [isDutyBoardOverwriteConfirmOpen, setIsDutyBoardOverwriteConfirmOpen] = useState(false);
   const [isSimBriefDispatchBlockedOpen, setIsSimBriefDispatchBlockedOpen] = useState(false);
   const [isStaleScheduleBlockedOpen, setIsStaleScheduleBlockedOpen] = useState(false);
   const [simBriefDispatchBlockedMessage, setSimBriefDispatchBlockedMessage] = useState("");
-  const deleteUserDataConfirmResolverRef = useRef(null);
-  const dutyBoardOverwriteConfirmResolverRef = useRef(null);
 
   function handleOpenReadme() {
     setIsReadmeOpen(true);
@@ -21,22 +17,6 @@ export function useAppModals() {
 
   function handleCloseReadme() {
     setIsReadmeOpen(false);
-  }
-
-  function handleOpenDeleteUserDataConfirm() {
-    setIsDeleteUserDataConfirmOpen(true);
-  }
-
-  function handleCloseDeleteUserDataConfirm() {
-    setIsDeleteUserDataConfirmOpen(false);
-  }
-
-  function handleOpenDutyBoardOverwriteConfirm() {
-    setIsDutyBoardOverwriteConfirmOpen(true);
-  }
-
-  function handleCloseDutyBoardOverwriteConfirm() {
-    setIsDutyBoardOverwriteConfirmOpen(false);
   }
 
   function handleOpenSimBriefDispatchBlocked(message) {
@@ -64,14 +44,6 @@ export function useAppModals() {
     handleOpenReadme,
     handleToggleReadme,
     handleCloseReadme,
-    isDeleteUserDataConfirmOpen,
-    setIsDeleteUserDataConfirmOpen,
-    handleOpenDeleteUserDataConfirm,
-    handleCloseDeleteUserDataConfirm,
-    isDutyBoardOverwriteConfirmOpen,
-    setIsDutyBoardOverwriteConfirmOpen,
-    handleOpenDutyBoardOverwriteConfirm,
-    handleCloseDutyBoardOverwriteConfirm,
     isSimBriefDispatchBlockedOpen,
     setIsSimBriefDispatchBlockedOpen,
     simBriefDispatchBlockedMessage,
@@ -81,8 +53,6 @@ export function useAppModals() {
     isStaleScheduleBlockedOpen,
     setIsStaleScheduleBlockedOpen,
     handleOpenStaleScheduleBlocked,
-    handleCloseStaleScheduleBlocked,
-    deleteUserDataConfirmResolverRef,
-    dutyBoardOverwriteConfirmResolverRef
+    handleCloseStaleScheduleBlocked
   };
 }

@@ -91,6 +91,8 @@ function reconcileBoardWithSchedule(currentBoard, nextFlights) {
         simbriefPlan: normalizedEntry.simbriefPlan,
         draftNetwork: normalizedEntry.draftNetwork,
         draftReportId: normalizedEntry.draftReportId,
+        dvaDraftReportId: normalizedEntry.dvaDraftReportId,
+        draftDeleteRequiresRegenerate: normalizedEntry.draftDeleteRequiresRegenerate,
         isStale: false,
         isCompleted: normalizedEntry.isCompleted,
         completedAt: normalizedEntry.completedAt,
@@ -329,8 +331,8 @@ export function useScheduleImport({
         setStatusMessage?.(
           persistedSuccessfully
             ? staleBoardEntries
-              ? `Imported ${formatNumber(imported.flights.length)} flights from ${scheduleFile.fileName}. ${formatNumber(staleBoardEntries)} board flights need repair.`
-              : `Imported ${formatNumber(imported.flights.length)} flights from ${scheduleFile.fileName}.`
+              ? `Imported ${formatNumber(imported.flights.length)} legs from ${scheduleFile.fileName}. ${formatNumber(staleBoardEntries)} board flights need repair.`
+              : `Imported ${formatNumber(imported.flights.length)} legs from ${scheduleFile.fileName}.`
             : "Imported schedule, but it could not be saved for next launch. Check the app log."
         );
         await logAppEvent("import-success", {
@@ -341,6 +343,7 @@ export function useScheduleImport({
           durationMs: Date.now() - startedAtMs
         });
         onScheduleImported?.(imported, nextSchedule);
+        return { ok: true, imported, schedule: nextSchedule };
       } catch (error) {
         setStatusMessage?.(error.message || "Import failed.");
         await logAppError("import-failed", error, {
@@ -348,6 +351,7 @@ export function useScheduleImport({
           file: scheduleFile.fileName,
           durationMs: Date.now() - startedAtMs
         });
+        return { ok: false, error };
       } finally {
         try {
           const sessionEndedAt = new Date().toISOString();

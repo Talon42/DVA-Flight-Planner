@@ -9,31 +9,30 @@ import {
 } from "react";
 import AppShell from "./AppShell.jsx";
 import {
-  DEV_TOOLS_STORAGE_KEY,
-  DEV_WINDOW_WIDTH_STORAGE_KEY,
   THEME_STORAGE_KEY,
   isTauriRuntime,
-  isWindowsRuntime,
   readSavedTheme
 } from "./appRuntime.js";
 import {
-  getDefaultBasicFilterSectionState,
-  getDefaultPlannerControlsCollapsed,
   useAppLayout
 } from "./useAppLayout.hooks.js";
 import { useAppBootstrap } from "./useAppBootstrap.hooks.js";
-import { useDebouncedEffect } from "./useDebouncedEffect.hooks.js";
+import { useAppUiStatePersistence } from "./useAppUiStatePersistence.hooks.js";
+import { useExternalFlightActions } from "./useExternalFlightActions.hooks.js";
+import { useFlightActivation } from "./useFlightActivation.hooks.js";
 import { useAddonAirports } from "../features/addons/useAddonAirports.hooks.js";
 import { useAppModals } from "./useAppModals.hooks.js";
+import { useAppConfirmations } from "./useAppConfirmations.hooks.js";
 import { useAppUpdates } from "./useAppUpdates.hooks.js";
 import { useDeltaVirtualDraftReport } from "../features/deltaVirtual/useDeltaVirtualDraftReport.hooks.js";
-import { useDeltaVirtualSync } from "../features/deltaVirtual/useDeltaVirtualSync.hooks.js";
+import { useSyncOrchestration } from "./useSyncOrchestration.hooks.js";
 import { useWhatsNew } from "../features/whatsNew/useWhatsNew.hooks.js";
 import { useSimBriefDispatch } from "../features/simbrief/useSimBriefDispatch.hooks.js";
 import { useScheduleImport } from "../features/schedule/useScheduleImport.hooks.js";
 import { useAppDevTools } from "./useAppDevTools.hooks.js";
 import { useAppSettings } from "./useAppSettings.hooks.js";
 import { useAppSettingsPersistence } from "./useAppSettingsPersistence.hooks.js";
+import { useUserDataLifecycle } from "./useUserDataLifecycle.hooks.js";
 import AppSettingsContent from "./AppSettingsContent.jsx";
 import AppRightColumn from "./AppRightColumn.jsx";
 import { useFlightBoards } from "../features/flightBoard/useFlightBoards.hooks.js";
@@ -43,6 +42,7 @@ import {
 import { useTourSelection } from "../features/tours/useTourSelection.hooks.js";
 import { useDutyScheduleBuilder } from "../features/dutySchedule/useDutyScheduleBuilder.hooks.js";
 import { useVatsimCoverage } from "../features/vatsim/useVatsimCoverage.hooks.js";
+import { useLogbookWorkspace } from "../features/logbook/useLogbookWorkspace.hooks.js";
 import { DEFAULT_FILTERS, DEFAULT_SORT } from "../features/schedule/schedule.constants.js";
 import { DEFAULT_DUTY_FILTERS } from "../logic/dutySchedule/dutySchedule.constants.js";
 import { buildDefaultDutyFilters } from "../logic/dutySchedule/dutyFilters";
@@ -62,39 +62,20 @@ import {
   selectScheduleAirlines,
   selectScheduleEquipmentOptions
 } from "../features/schedule/scheduleOptions.selectors";
-import {
-  createEmptyAddonAirportScan
-} from "../services/tauri/addonAirportScan.client.js";
 import { formatNumber } from "../domain/formatting/formatters.js";
 import {
   logAppError,
   logAppEvent,
-  logSystemError,
-  logSystemEvent,
   getAppSessionId,
-  setDebugLoggingEnabled,
   openAppLogFile
 } from "../services/logging/appLog.client.js";
+import { writeGettingStartedState } from "../services/storage/storage.js";
 import {
-  deleteStoredUserData,
-  writeGettingStartedState,
-  writeSavedUiState
-} from "../services/storage/storage.js";
-import {
-  DEFAULT_FLIGHT_BOARD_NAME,
-  createFlightBoard,
-  normalizeBoardEntry,
-  normalizeDraftNetwork,
+  createFlightBoard
 } from "../features/flightBoard/flightBoard.model";
 import {
   DEFAULT_MAP_OPTIONS,
 } from "../components/map/mapOptions.model.js";
-import {
-  getAircraftDisplayName,
-  findCustomAirframeByInternalId,
-  getSelectedAircraftForFlight,
-  resolveSimBriefDispatchAircraft
-} from "../domain/aircraft/aircraftIdentity.js";
 import { DEFAULT_DERIVED_TOUR_PROGRESS } from "../features/tours/tours.constants";
 import {
   buildFooterDateLabel,
@@ -141,6 +122,10 @@ export default function App() {
     });
   const [mapOptions, setMapOptions] = useState(DEFAULT_MAP_OPTIONS);
   const [theme, setTheme] = useState(readSavedTheme);
+  const setMapOptionsThroughPersistenceRef = useRef(null);
+  const handleSetMapOptions = useCallback((updater) => {
+    setMapOptionsThroughPersistenceRef.current?.(updater);
+  }, []);
   const {
     viewportSize,
     plannerControlsCollapsed,
@@ -151,16 +136,15 @@ export default function App() {
     setBasicAddonFiltersOpen,
     isPlannerControlsInlineCollapsed,
     topbarTitle,
-    syncButtonLabel,
-    currentWindowSizeLabel
+    syncButtonLabel
   } = useAppLayout();
   const [gettingStartedState, setGettingStartedState] = useState(DEFAULT_GETTING_STARTED_STATE);
   const [hasLoadedGettingStartedState, setHasLoadedGettingStartedState] = useState(false);
   const [shouldRunDeferredStartupDvaSync, setShouldRunDeferredStartupDvaSync] = useState(false);
-  const [isDeletingUserData, setIsDeletingUserData] = useState(false);
   const [, setStatusMessage] = useState("Ready");
   const [logbookAirportProgress, setLogbookAirportProgress] = useState({
     dateIso: null,
+    lastSyncAt: null,
     visitedAirports: [],
     arrivalAirports: []
   });
@@ -170,7 +154,11 @@ export default function App() {
     message: ""
   });
   const clearSimBriefDispatchStateRef = useRef(null);
+  const logbookSyncCompleteRef = useRef(() => {});
   const isDesktopAddonScanAvailable = isTauriRuntime();
+  const { handleOpenSimBriefFlight } = useExternalFlightActions({
+    isDesktop: isDesktopAddonScanAvailable
+  });
   const appDevTools = useAppDevTools({
     isDesktopAddonScanAvailable,
     setStatusMessage
@@ -183,10 +171,16 @@ export default function App() {
   });
   const appModals = useAppModals();
   const {
+    isDeleteUserDataConfirmOpen,
+    confirmDeleteUserDataInApp,
+    resolveDeleteUserDataConfirmation,
+    isDutyBoardOverwriteConfirmOpen,
+    confirmDutyBoardOverwriteInApp,
+    resolveDutyBoardOverwriteConfirmation
+  } = useAppConfirmations();
+  const {
     isDevToolsEnabled,
-    setIsDevToolsEnabled,
     devWindowWidth,
-    setDevWindowWidth,
     isDevWindowMenuOpen,
     setIsDevWindowMenuOpen,
     isDevContextMenuOpen,
@@ -197,8 +191,6 @@ export default function App() {
     devWindowWidthPresets,
     handleToggleDevTools,
     handleToggleDevWindowMenu,
-    handleOpenDevContextMenu,
-    handleCloseDevContextMenu,
     handleOpenMainDevtools,
     handleSelectDevWindowWidth
   } = appDevTools;
@@ -216,21 +208,13 @@ export default function App() {
     isReadmeOpen,
     handleToggleReadme,
     handleCloseReadme,
-    isDeleteUserDataConfirmOpen,
-    handleOpenDeleteUserDataConfirm,
-    handleCloseDeleteUserDataConfirm,
-    isDutyBoardOverwriteConfirmOpen,
-    handleOpenDutyBoardOverwriteConfirm,
-    handleCloseDutyBoardOverwriteConfirm,
     isSimBriefDispatchBlockedOpen,
     simBriefDispatchBlockedMessage,
     handleOpenSimBriefDispatchBlocked,
     handleCloseSimBriefDispatchBlocked,
     isStaleScheduleBlockedOpen,
     handleOpenStaleScheduleBlocked,
-    handleCloseStaleScheduleBlocked,
-    deleteUserDataConfirmResolverRef,
-    dutyBoardOverwriteConfirmResolverRef
+    handleCloseStaleScheduleBlocked
   } = appModals;
   const appSettings = useAppSettings({ setIsDevWindowMenuOpen });
   const {
@@ -276,6 +260,10 @@ export default function App() {
     setSimBriefDispatchUnits,
     savedSimBriefDispatchUnits,
     setSavedSimBriefDispatchUnits,
+    simBriefDepartureOffsetMinutes,
+    setSimBriefDepartureOffsetMinutes,
+    savedSimBriefDepartureOffsetMinutes,
+    setSavedSimBriefDepartureOffsetMinutes,
     simBriefCustomAirframes,
     setSimBriefCustomAirframes,
     simBriefCustomAirframesDraft,
@@ -301,6 +289,7 @@ export default function App() {
     isDvaCredentialsSaving,
     isSimBriefSaving,
     savedSimBriefDispatchUnits,
+    savedSimBriefDepartureOffsetMinutes,
     simBriefCustomAirframes,
     simBriefCustomAirframeIdDraft,
     simBriefCustomAirframeMatchTypeDraft,
@@ -312,6 +301,7 @@ export default function App() {
     simBriefUsername,
     simBriefUsernameDraft,
     simBriefUseCurrentUtcForDispatchTime,
+    simBriefDepartureOffsetMinutes,
     setDvaFirstName,
     setDvaFirstNameDraft,
     setDvaHasPassword,
@@ -322,6 +312,7 @@ export default function App() {
     setIsDvaPasswordEditing,
     setIsSimBriefSaving,
     setSavedSimBriefDispatchUnits,
+    setSavedSimBriefDepartureOffsetMinutes,
     setSimBriefCustomAirframeIdDraft,
     setSimBriefCustomAirframeMatchTypeDraft,
     setSimBriefCustomAirframeNameDraft,
@@ -333,6 +324,7 @@ export default function App() {
     setSimBriefUsername,
     setSimBriefUsernameDraft,
     setSimBriefUseCurrentUtcForDispatchTime,
+    setSimBriefDepartureOffsetMinutes,
     setStatusMessage
   });
   const {
@@ -341,12 +333,13 @@ export default function App() {
     handleSaveSimBriefCredentials,
     handleSimBriefDispatchUnitsChange,
     handleSimBriefDispatchTimeModeChange,
+    handleSimBriefDepartureOffsetChange,
     handleAddCustomAirframeDraft,
     handleRemoveCustomAirframeDraft
   } = appSettingsPersistence;
   const deferredFilters = useDeferredValue(filters);
   const deferredDutyFilters = useDeferredValue(dutyFilters);
-  const { isHydrating, isStartupReady } = useAppBootstrap({
+  const { isHydrating, isStartupReady, restoredUiState } = useAppBootstrap({
     activeFlightBoardId,
     deferredDutyFilters,
     deferredFilters,
@@ -381,13 +374,15 @@ export default function App() {
     setSelectedTourPath,
     setSelectedTourRowId,
     setLogbookAirportProgress,
-    setMapOptions,
+    setMapOptions: handleSetMapOptions,
     setSavedSimBriefDispatchUnits,
+    setSavedSimBriefDepartureOffsetMinutes,
     setSort,
     setStatusMessage,
     setSimBriefCustomAirframes,
     setSimBriefCustomAirframesDraft,
     setSimBriefDispatchUnits,
+    setSimBriefDepartureOffsetMinutes,
     setSimBriefPilotId,
     setSimBriefPilotIdDraft,
     setSimBriefUsername,
@@ -404,7 +399,7 @@ export default function App() {
   });
   const isScheduleOutOfDate = Boolean(schedule?.flights?.length) && scheduleDateInfo.isCurrent === false;
   const scheduleDateLabel = scheduleDateInfo.label;
-  const logbookDateLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
+  const logbookLastReportLabel = buildFooterDateLabel(logbookAirportProgress.dateIso);
   // Tracks which rows are already assigned to any board so the schedule tables only show available work.
   const boardedFlightIds = useMemo(
     () =>
@@ -438,10 +433,10 @@ export default function App() {
         },
         {
           kind: "stat",
-          label: "Imported Flights",
+          label: "Imported Legs",
           value: formatNumber(schedule.importSummary.importedRows ?? 0)
         },
-        { kind: "stat", label: "Logbook (Last Flight Report)", value: logbookDateLabel }
+        { kind: "stat", label: "Last Flight Report", value: logbookLastReportLabel }
       ]
     : [];
   const tourSelection = useTourSelection({
@@ -487,6 +482,8 @@ export default function App() {
     flightBoards,
     isDevToolsEnabled,
     isScheduleCurrent: !isScheduleOutOfDate,
+    onCloseSimBriefDispatchBlocked: handleCloseSimBriefDispatchBlocked,
+    onOpenSimBriefDispatchBlocked: handleOpenSimBriefDispatchBlocked,
     schedule,
     scheduleView,
     onOpenStaleScheduleBlocked: handleOpenStaleScheduleBlocked,
@@ -496,6 +493,7 @@ export default function App() {
     setPlannerControlsCollapsed,
     setStatusMessage,
     setTourProgress,
+    simBriefCustomAirframes,
     simBriefDispatchStateRef,
     tourFlightsByKey
   });
@@ -504,7 +502,9 @@ export default function App() {
     flightBoard,
     shortlist,
     selectedShortlistFlight,
+    repairPrompt,
     updateActiveFlightBoardEntries,
+    applySimBriefPlanToBoardEntry,
     replaceFlightBoard,
     handleToggleBoardFlight,
     handleAddToFlightBoard,
@@ -512,10 +512,13 @@ export default function App() {
     handleRemoveFromFlightBoard,
     handleReorderFlightBoard,
     handleRepairFlightBoardEntry,
+    handleResolveRepairPrompt,
     handleSelectFlightBoard,
     handleCreateFlightBoard,
     handleRenameFlightBoard,
-    handleDeleteFlightBoard
+    handleDeleteFlightBoard,
+    handleSimBriefTypeChange,
+    handleDraftNetworkChange
   } = boardState;
   const handleToggleAccomplishmentSelectorCollapsed = useCallback((nextCollapsed) => {
     setIsAccomplishmentSelectorCollapsed(nextCollapsed);
@@ -555,26 +558,13 @@ export default function App() {
     setSelectedAirportInfo(null);
   }, []);
 
-  const handleActivateRow = useCallback(
-    (row) => {
-      const didAddRow = handleAddToFlightBoard(row);
-
-      // Collapse the active selector panel only after a successful add so duplicate clicks do not hide context.
-      if (didAddRow) {
-        if (scheduleView === "accomplishments") {
-          setIsAccomplishmentSelectorCollapsed(true);
-        } else if (scheduleView === "tours") {
-          setIsTourSelectorCollapsed(true);
-        }
-      }
-    },
-    [
-      handleAddToFlightBoard,
-      scheduleView,
-      setIsAccomplishmentSelectorCollapsed,
-      setIsTourSelectorCollapsed
-    ]
-  );
+  const handleActivateRow = useFlightActivation({
+    handleAddToFlightBoard,
+    scheduleView,
+    setIsAccomplishmentSelectorCollapsed,
+    setIsTourSelectorCollapsed,
+    setPlannerControlsCollapsed
+  });
   useEffect(() => {
     // Accomplishments should always open expanded when the tab becomes active.
     if (scheduleView === "accomplishments") {
@@ -644,7 +634,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isSettingsOpen]);
+  }, [isSettingsOpen, setIsSettingsOpen]);
 
   useEffect(() => {
     if (!isDvaSyncWarningOpen) {
@@ -664,125 +654,10 @@ export default function App() {
   }, [isDvaSyncWarningOpen, setDvaSyncWarning]);
 
   useEffect(() => {
-    if (!isDeleteUserDataConfirmOpen) {
-      return undefined;
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        resolveDeleteUserDataConfirmation(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isDeleteUserDataConfirmOpen]);
-
-  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
-
-  useEffect(() => {
-    window.localStorage.setItem(DEV_TOOLS_STORAGE_KEY, isDevToolsEnabled ? "true" : "false");
-  }, [isDevToolsEnabled]);
-
-  useEffect(() => {
-    if (devWindowWidth === null) {
-      window.localStorage.removeItem(DEV_WINDOW_WIDTH_STORAGE_KEY);
-      return;
-    }
-
-    window.localStorage.setItem(DEV_WINDOW_WIDTH_STORAGE_KEY, String(devWindowWidth));
-  }, [devWindowWidth]);
-
-  useEffect(() => {
-    if (!isDevWindowMenuOpen && !isDevContextMenuOpen) {
-      return undefined;
-    }
-
-    function handlePointerDown(event) {
-      if (
-        !devWindowMenuRef.current?.contains(event.target) &&
-        !devContextMenuRef.current?.contains(event.target)
-      ) {
-        handleCloseDevContextMenu();
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        handleCloseDevContextMenu();
-      }
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [
-    devContextMenuRef,
-    devWindowMenuRef,
-    handleCloseDevContextMenu,
-    isDevContextMenuOpen,
-    isDevWindowMenuOpen
-  ]);
-
-  useEffect(() => {
-    // Dev mode swaps the browser's default right-click menu for a menu that can open Dev Tools.
-    function handleContextMenu(event) {
-      event.preventDefault();
-      handleOpenDevContextMenu(event);
-    }
-
-    window.addEventListener("contextmenu", handleContextMenu);
-    return () => {
-      window.removeEventListener("contextmenu", handleContextMenu);
-    };
-  }, [handleOpenDevContextMenu]);
-
-  useEffect(() => {
-    if (!isDevToolsEnabled) {
-      handleCloseDevContextMenu();
-    }
-  }, [handleCloseDevContextMenu, isDevToolsEnabled]);
-
-  useEffect(() => {
-    if (!isDesktopAddonScanAvailable || !isWindowsRuntime()) {
-      return;
-    }
-
-    let cancelled = false;
-
-    // Keep the desktop window pinned above others while dev tools are enabled on Windows.
-    const syncAlwaysOnTop = async () => {
-      try {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        if (cancelled) {
-          return;
-        }
-
-        await getCurrentWindow().setAlwaysOnTop(isDevToolsEnabled);
-      } catch (error) {
-        await logAppError("window-always-on-top-sync-failed", error);
-      }
-    };
-
-    syncAlwaysOnTop();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isDevToolsEnabled, isDesktopAddonScanAvailable]);
-
-  useEffect(() => {
-    setDebugLoggingEnabled(isDevToolsEnabled);
-  }, [isDevToolsEnabled]);
 
   useEffect(() => {
     logAppEvent("start", {
@@ -791,56 +666,6 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
-  useDebouncedEffect(
-    () => {
-      if (!schedule || isHydrating) {
-        return;
-      }
-
-      writeSavedUiState({
-        plannerMode,
-        filters,
-        dutyFilters,
-        flightBoards,
-        activeFlightBoardId,
-        flightBoard,
-        plannerControlsCollapsed,
-        basicAdvancedFiltersOpen,
-        basicAddonFiltersOpen,
-        sort,
-        selectedFlightId,
-        scheduleView,
-        selectedTourPath,
-        selectedAccomplishmentName,
-        mapOptions,
-        tourProgress
-      }).catch((error) => {
-        setStatusMessage(error.message || "Unable to persist the current planner state.");
-        logAppError("persist-ui-state-failed", error).catch(() => {});
-      });
-    },
-    [
-      schedule,
-      plannerMode,
-      filters,
-      dutyFilters,
-      flightBoards,
-      activeFlightBoardId,
-      flightBoard,
-      plannerControlsCollapsed,
-      basicAdvancedFiltersOpen,
-      basicAddonFiltersOpen,
-      sort,
-      selectedFlightId,
-      scheduleView,
-      selectedTourPath,
-      selectedAccomplishmentName,
-      mapOptions,
-      tourProgress,
-      isHydrating
-    ],
-    350
-  );
   const airlines = useMemo(
     () => selectScheduleAirlines({ flights: scheduleFlights }),
     [scheduleFlights]
@@ -957,33 +782,6 @@ export default function App() {
   const handleVatsimScheduleSyncComplete = useCallback(() => {
     setVatsimRefreshVersion((current) => current + 1);
   }, []);
-  const {
-    handleCloseDvaSyncWarning,
-    handleDeltaVirtualSync,
-    handleResetDeltaVirtualSyncSession,
-    isSyncing
-  } = useDeltaVirtualSync({
-    dvaFirstName,
-    dvaHasPassword,
-    dvaLastName,
-    isDevToolsEnabled,
-    processImportedSchedule,
-    onScheduleSyncComplete: handleVatsimScheduleSyncComplete,
-    setDerivedTourProgress,
-    setDeltaVirtualAccomplishmentEligibility,
-    setDeltaVirtualToursCache,
-    setDvaHasPassword,
-    setDvaSyncWarning,
-    setLogbookAirportProgress,
-    setStatusMessage
-  });
-  const appDeltaVirtualDraftReport = useDeltaVirtualDraftReport({
-    flightBoard,
-    isDevToolsEnabled,
-    simBriefCustomAirframes,
-    setStatusMessage,
-    updateActiveFlightBoardEntries
-  });
   const shouldShowGettingStarted =
     hasLoadedGettingStartedState &&
     !isHydrating &&
@@ -1003,6 +801,117 @@ export default function App() {
     isGettingStartedOpen: shouldShowGettingStarted
   });
   const isStartupGateComplete = !shouldShowGettingStarted && !shouldShowWhatsNew;
+  const {
+    handleCloseDvaSyncWarning,
+    handleDeltaVirtualSync,
+    handleRefreshDeltaVirtualLogbook,
+    handleResetDeltaVirtualSyncSession,
+    isSyncing,
+    isRefreshingLogbook
+  } = useSyncOrchestration({
+    deltaVirtualOptions: {
+      dvaFirstName,
+      dvaHasPassword,
+      dvaLastName,
+      isDevToolsEnabled,
+      onLogbookSyncComplete: () => logbookSyncCompleteRef.current?.(),
+      processImportedSchedule,
+      onScheduleSyncComplete: handleVatsimScheduleSyncComplete,
+      setDerivedTourProgress,
+      setDeltaVirtualAccomplishmentEligibility,
+      setDeltaVirtualToursCache,
+      setDvaHasPassword,
+      setDvaSyncWarning,
+      setLogbookAirportProgress,
+      setStatusMessage
+    },
+    shouldRunDeferredStartupSync: shouldRunDeferredStartupDvaSync,
+    setShouldRunDeferredStartupSync: setShouldRunDeferredStartupDvaSync,
+    isStartupGateComplete
+  });
+  const logbookWorkspace = useLogbookWorkspace({
+    persistedUiState: restoredUiState,
+    scheduleView,
+    viewportWidth: viewportSize.width,
+    isSyncing,
+    isRefreshingLogbook,
+    onRefreshLogbook: handleRefreshDeltaVirtualLogbook
+  });
+  const isUserDataWriterBusy =
+    isImporting ||
+    isSyncing ||
+    isRefreshingLogbook ||
+    isSimBriefSaving ||
+    isDvaCredentialsSaving ||
+    isAddonScanBusy;
+  const {
+    isDeletingUserData,
+    clearFailure: userDataClearFailure,
+    handleDeleteUserData,
+    retryUserDataClear,
+    reloadAfterUserDataClearFailure
+  } = useUserDataLifecycle({
+    confirmDelete: confirmDeleteUserDataInApp,
+    isDeleteBlocked: isUserDataWriterBusy,
+    prepareForUserDataClear: logbookWorkspace.prepareForUserDataClear
+  });
+  const isUserDataDeletionBlocked = isDeletingUserData || isUserDataWriterBusy;
+  logbookSyncCompleteRef.current = logbookWorkspace.handleSyncComplete;
+  const uiStateSnapshot = useMemo(() => ({
+      plannerMode,
+      filters,
+      dutyFilters,
+      flightBoards,
+      activeFlightBoardId,
+      flightBoard,
+      plannerControlsCollapsed,
+      basicAdvancedFiltersOpen,
+      basicAddonFiltersOpen,
+      sort,
+      selectedFlightId,
+      scheduleView,
+      selectedTourPath,
+      selectedAccomplishmentName,
+      mapOptions,
+      ...logbookWorkspace.persistedUiState,
+      tourProgress
+    }), [
+      activeFlightBoardId,
+      basicAddonFiltersOpen,
+      basicAdvancedFiltersOpen,
+      dutyFilters,
+      filters,
+      flightBoard,
+      flightBoards,
+      logbookWorkspace.persistedUiState,
+      mapOptions,
+      plannerControlsCollapsed,
+      plannerMode,
+      scheduleView,
+      selectedAccomplishmentName,
+      selectedFlightId,
+      selectedTourPath,
+      sort,
+      tourProgress
+    ]);
+  const handleUiStatePersistenceError = useCallback((error) => {
+    setStatusMessage(error instanceof Error ? error.message : "Unable to persist the current planner state.");
+  }, []);
+  const appUiStatePersistence = useAppUiStatePersistence({
+    snapshot: uiStateSnapshot,
+    isHydrating,
+    flightBoards,
+    setMapOptions,
+    onError: handleUiStatePersistenceError
+  });
+  setMapOptionsThroughPersistenceRef.current = appUiStatePersistence.handleSetMapOptions;
+  const appDeltaVirtualDraftReport = useDeltaVirtualDraftReport({
+    flightBoard,
+    isDevToolsEnabled,
+    simBriefCustomAirframes,
+    setStatusMessage,
+    updateActiveFlightBoardEntries
+  });
   const appUpdates = useAppUpdates({
     isDesktopAddonScanAvailable,
     isDevToolsEnabled,
@@ -1018,49 +927,6 @@ export default function App() {
     handleCloseUpdatePrompt,
     handleDownloadUpdate
   } = appUpdates;
-
-  useEffect(() => {
-    if (!shouldRunDeferredStartupDvaSync || !isStartupGateComplete) {
-      return;
-    }
-
-    setShouldRunDeferredStartupDvaSync(false);
-    void handleDeltaVirtualSync().catch(async (error) => {
-      setStatusMessage(error.message || "Unable to sync from Delta Virtual.");
-      await logAppError("getting-started-sync-failed", error);
-    });
-  }, [handleDeltaVirtualSync, isStartupGateComplete, shouldRunDeferredStartupDvaSync]);
-
-  function resolveDeleteUserDataConfirmation(confirmed) {
-    handleCloseDeleteUserDataConfirm();
-    if (deleteUserDataConfirmResolverRef.current) {
-      deleteUserDataConfirmResolverRef.current(confirmed);
-      deleteUserDataConfirmResolverRef.current = null;
-    }
-  }
-
-  async function confirmDeleteUserDataInApp() {
-    return new Promise((resolve) => {
-      deleteUserDataConfirmResolverRef.current = resolve;
-      handleOpenDeleteUserDataConfirm();
-    });
-  }
-
-  // Duty Schedule overwrite uses the shared modal so Generate can ask before replacing a full set of boards.
-  function resolveDutyBoardOverwriteConfirmation(confirmed) {
-    handleCloseDutyBoardOverwriteConfirm();
-    if (dutyBoardOverwriteConfirmResolverRef.current) {
-      dutyBoardOverwriteConfirmResolverRef.current(confirmed);
-      dutyBoardOverwriteConfirmResolverRef.current = null;
-    }
-  }
-
-  async function confirmDutyBoardOverwriteInApp() {
-    return new Promise((resolve) => {
-      dutyBoardOverwriteConfirmResolverRef.current = resolve;
-      handleOpenDutyBoardOverwriteConfirm();
-    });
-  }
 
   function handleFilterChange(key, value) {
     if (
@@ -1191,6 +1057,8 @@ export default function App() {
 
     if (nextView === "map") {
       nextScheduleView = "map";
+    } else if (nextView === "logbook") {
+      nextScheduleView = "logbook";
     } else if (nextView === "tours") {
       nextScheduleView = "tours";
     } else if (nextView === "accomplishments") {
@@ -1253,211 +1121,6 @@ export default function App() {
     return normalizedState;
   }
 
-  function handleSimBriefTypeChange(boardEntryId, nextType) {
-    const rawSelection = String(nextType || "").trim();
-    const selectedCustomAirframe = findCustomAirframeByInternalId(
-      rawSelection,
-      simBriefCustomAirframes
-    );
-    const selectedAircraft = selectedCustomAirframe?.internalId
-      ? rawSelection
-      : getAircraftDisplayName(rawSelection);
-    const nextFlightBoard = flightBoard.map((entry) =>
-      entry.boardEntryId === boardEntryId
-        ? {
-            ...entry,
-            selectedAircraft,
-            simbriefSelectedType: ""
-          }
-        : entry
-    );
-    updateActiveFlightBoardEntries(nextFlightBoard);
-
-    const updatedEntry =
-      nextFlightBoard.find((entry) => entry.boardEntryId === boardEntryId) || null;
-    if (!updatedEntry || !selectedAircraft) {
-      handleCloseSimBriefDispatchBlocked();
-      return;
-    }
-
-    const dispatchResolution = resolveSimBriefDispatchAircraft(
-      {
-        ...updatedEntry,
-        selectedAircraft
-      },
-      simBriefCustomAirframes
-    );
-
-    if (dispatchResolution.ok) {
-      handleCloseSimBriefDispatchBlocked();
-      return;
-    }
-
-    handleOpenSimBriefDispatchBlocked(dispatchResolution.reason);
-  }
-
-  // Updates the board entry's draft network without disturbing the aircraft selection.
-  function handleDraftNetworkChange(boardEntryId, nextNetwork) {
-    const normalizedDraftNetwork = normalizeDraftNetwork(nextNetwork);
-
-    updateActiveFlightBoardEntries((currentEntries) =>
-      currentEntries.map((entry) =>
-        entry.boardEntryId === boardEntryId
-          ? {
-              ...entry,
-              draftNetwork: normalizedDraftNetwork
-            }
-          : entry
-      )
-    );
-  }
-
-  function normalizeSimBriefPlanForBoardEntry(plan, fallbackStaticId = "") {
-    if (!plan || typeof plan !== "object") {
-      return null;
-    }
-
-    const routePointsSource = Array.isArray(plan.routePoints)
-      ? plan.routePoints
-      : Array.isArray(plan.route_points)
-        ? plan.route_points
-        : [];
-    const routePoints = routePointsSource
-      .map((point) => {
-        if (!point || typeof point !== "object") {
-          return null;
-        }
-
-        const latitude = Number(point.latitude);
-        const longitude = Number(point.longitude);
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-          return null;
-        }
-
-        return {
-          ident: String(point.ident || "").trim(),
-          latitude,
-          longitude
-        };
-      })
-      .filter(Boolean);
-    const aircraftType = String(
-      plan.aircraftType ||
-        plan.aircraft_type ||
-        plan.aircraft?.icao ||
-        plan.aircraft?.type ||
-        plan.aircraft?.code ||
-        plan.aircraft?.name ||
-        plan.aircraft ||
-        ""
-    )
-      .trim()
-      .toUpperCase();
-    const staticId = String(plan.staticId || plan.static_id || fallbackStaticId || "").trim();
-    const ofpXmlId = String(plan.ofpXmlId || plan.ofp_xml_id || plan.dvaSimBriefId || "").trim().toUpperCase();
-    const aircraft =
-      plan.aircraft && typeof plan.aircraft === "object"
-        ? { ...plan.aircraft }
-        : aircraftType
-          ? {
-              code: aircraftType,
-              icao: aircraftType,
-              type: aircraftType,
-              name: aircraftType
-            }
-          : null;
-
-    return {
-      status: String(plan.status || "").trim(),
-      generatedAtUtc: String(plan.generatedAtUtc || plan.generated_at_utc || "").trim(),
-      generated_at_utc: String(plan.generatedAtUtc || plan.generated_at_utc || "").trim(),
-      staticId,
-      static_id: staticId,
-      ofpXmlId,
-      ofp_xml_id: ofpXmlId,
-      aircraftType,
-      aircraft_type: aircraftType,
-      aircraft,
-      callsign: String(plan.callsign || "").trim(),
-      route: String(plan.route || "").trim(),
-      cruiseAltitude: String(plan.cruiseAltitude || plan.cruise_altitude || "").trim(),
-      alternate: String(plan.alternate || "").trim(),
-      ete: String(plan.ete || "").trim(),
-      blockFuel: String(plan.blockFuel || plan.block_fuel || "").trim(),
-      pax: Number.isInteger(plan.pax) ? plan.pax : Number.isInteger(Number(plan.pax)) ? Number(plan.pax) : null,
-      ofpUrl: String(plan.ofpUrl || plan.ofp_url || "").trim(),
-      pdfUrl: String(plan.pdfUrl || plan.pdf_url || "").trim(),
-      routePoints,
-      route_points: routePoints
-    };
-  }
-
-  // Builds the board-entry shape used by both the live board state and the draft submit payload.
-  function buildBoardEntryWithSimBriefPlan(boardEntry, simBriefPlan) {
-    const normalizedBoardEntry = normalizeBoardEntry(boardEntry);
-    if (!normalizedBoardEntry) {
-      return null;
-    }
-
-    const normalizedPlan = normalizeSimBriefPlanForBoardEntry(
-      simBriefPlan,
-      normalizedBoardEntry.simbriefPlan?.staticId || normalizedBoardEntry.simbriefPlan?.static_id || ""
-    );
-    const existingSelectedAircraft =
-      getSelectedAircraftForFlight(normalizedBoardEntry, simBriefCustomAirframes) || "";
-    const refreshedSelectedAircraft =
-      getAircraftDisplayName(normalizedPlan?.aircraftType) ||
-      String(normalizedPlan?.aircraftType || "").trim();
-    // Always sync the stored selection to the aircraft that SimBrief returned for the plan.
-    const resolvedSelectedAircraft = refreshedSelectedAircraft || existingSelectedAircraft;
-    const resolvedPlan = normalizedPlan
-      ? {
-          ...normalizedPlan,
-          aircraftType: resolvedSelectedAircraft,
-          aircraft_type: resolvedSelectedAircraft,
-          aircraft: resolvedSelectedAircraft
-            ? normalizedPlan.aircraft ||
-              {
-                code: resolvedSelectedAircraft,
-                icao: resolvedSelectedAircraft,
-                type: resolvedSelectedAircraft,
-                name: resolvedSelectedAircraft
-              }
-            : null
-        }
-      : null;
-
-    return {
-      ...normalizedBoardEntry,
-      simbriefPlan: resolvedPlan,
-      selectedAircraft: resolvedSelectedAircraft,
-      simbriefSelectedType: ""
-    };
-  }
-
-  // Keeps the stored aircraft selection aligned with the latest imported SimBrief plan.
-  function applySimBriefPlanToBoardEntry(boardEntryId, simBriefPlan) {
-    const currentBoardEntry =
-      flightBoard.find((entry) => entry.boardEntryId === boardEntryId) ||
-      selectedShortlistFlight ||
-      null;
-    const nextBoardEntry = buildBoardEntryWithSimBriefPlan(currentBoardEntry, simBriefPlan);
-
-    if (!nextBoardEntry) {
-      return null;
-    }
-
-    updateActiveFlightBoardEntries((currentEntries) =>
-      currentEntries.map((entry) =>
-        entry.boardEntryId === boardEntryId
-          ? nextBoardEntry
-          : entry
-      )
-    );
-
-    return nextBoardEntry;
-  }
-
   const {
     deltaDraftSubmitState,
     deltaDraftDeleteState,
@@ -1478,6 +1141,7 @@ export default function App() {
     setStatusMessage,
     simBriefCustomAirframes,
     simBriefDispatchUnits,
+    simBriefDepartureOffsetMinutes,
     simBriefPilotId,
     simBriefUsername,
     simBriefUseCurrentUtcForDispatchTime,
@@ -1515,76 +1179,6 @@ export default function App() {
   const simBriefDispatchOptions = simBriefDispatchOptionsFromHook;
   const handleDispatchWorkflow = handleStartSimBriefDispatch;
   const handleRegenerateDispatchWorkflow = handleRegenerateSimBriefDispatch;
-
-  async function handleDeleteUserData() {
-    const confirmed = await confirmDeleteUserDataInApp();
-    if (!confirmed) {
-      return;
-    }
-
-    setIsDeletingUserData(true);
-
-    try {
-      await deleteStoredUserData();
-      setGettingStartedState(DEFAULT_GETTING_STARTED_STATE);
-      setShouldRunDeferredStartupDvaSync(false);
-      setSchedule(null);
-      const defaultBoard = createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, []);
-      setFlightBoards([defaultBoard]);
-      setActiveFlightBoardId(defaultBoard.id);
-      setSelectedFlightId(null);
-      setSelectedAirportInfo(null);
-      setExpandedBoardFlightId(null);
-      setPlannerMode("basic");
-      setFilters(DEFAULT_FILTERS);
-      setDutyFilters(DEFAULT_DUTY_FILTERS);
-      setFilterUiVersion((current) => current + 1);
-      setSort(DEFAULT_SORT);
-      setTheme("light");
-      setIsDevToolsEnabled(false);
-      setDevWindowWidth(null);
-      setIsDevWindowMenuOpen(false);
-      setPlannerControlsCollapsed(getDefaultPlannerControlsCollapsed());
-      setBasicAdvancedFiltersOpen(
-        getDefaultBasicFilterSectionState(viewportSize).basicAdvancedFiltersOpen
-      );
-      setBasicAddonFiltersOpen(
-        getDefaultBasicFilterSectionState(viewportSize).basicAddonFiltersOpen
-      );
-      setAddonScan(createEmptyAddonAirportScan());
-      setDvaFirstName("");
-      setDvaFirstNameDraft("");
-      setDvaLastName("");
-      setDvaLastNameDraft("");
-      setDvaHasPassword(false);
-      setSimBriefUsername("");
-      setSimBriefUsernameDraft("");
-      setSimBriefPilotId("");
-      setSimBriefPilotIdDraft("");
-      setSimBriefUseCurrentUtcForDispatchTime(false);
-      setSimBriefDispatchUnits("LBS");
-      setSavedSimBriefDispatchUnits("LBS");
-      setSimBriefCustomAirframes([]);
-      setSimBriefCustomAirframesDraft([]);
-      setSimBriefCustomAirframeIdDraft("");
-      setSimBriefCustomAirframeMatchTypeDraft("");
-      setLogbookAirportProgress({ dateIso: null, visitedAirports: [], arrivalAirports: [] });
-      setDeltaVirtualAccomplishmentEligibility({ lastSyncAt: null, sourceUrl: null, rows: [] });
-      setMapOptions(DEFAULT_MAP_OPTIONS);
-      setSimBriefDispatchState({
-        flightId: "",
-        isDispatching: false,
-        message: ""
-      });
-      setStatusMessage("Deleted saved user info from this device.");
-      setIsSettingsOpen(false);
-    } catch (error) {
-      setStatusMessage(error.message || "Unable to delete saved user info.");
-      await logAppError("delete-user-data-failed", error);
-    } finally {
-      setIsDeletingUserData(false);
-    }
-  }
 
   function handleToggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
@@ -1635,34 +1229,6 @@ export default function App() {
     }
   }
 
-  async function handleOpenSimBriefFlight(staticId) {
-    const normalizedStaticId = String(staticId || "").trim();
-    if (!normalizedStaticId) {
-      return;
-    }
-
-    const simBriefUrl = `https://dispatch.simbrief.com/briefing/latest?static_id=${encodeURIComponent(normalizedStaticId)}`;
-
-    try {
-      if (isDesktopAddonScanAvailable) {
-        const { openUrl } = await import("@tauri-apps/plugin-opener");
-        await openUrl(simBriefUrl);
-      } else {
-        window.open(simBriefUrl, "_blank", "noopener,noreferrer");
-      }
-
-      await logSystemEvent("SimBrief", "flight-opened", {
-        staticId: normalizedStaticId,
-        url: simBriefUrl
-      });
-    } catch (error) {
-      await logSystemError("SimBrief", "flight-open-failed", error, {
-        staticId: normalizedStaticId,
-        url: simBriefUrl
-      });
-    }
-  }
-
   const settingsTabContent = (
     <AppSettingsContent
       settingsTab={settingsTab}
@@ -1680,7 +1246,7 @@ export default function App() {
       dvaHasPassword={dvaHasPassword}
       isDvaCredentialsSaving={isDvaCredentialsSaving}
       isImporting={isImporting}
-      isSyncing={isSyncing}
+      isSyncing={isSyncing || isRefreshingLogbook}
       hasDvaCredentialChanges={hasDvaCredentialChanges}
       onFirstNameChange={setDvaFirstNameDraft}
       onLastNameChange={setDvaLastNameDraft}
@@ -1700,6 +1266,7 @@ export default function App() {
       simBriefPilotIdDraft={simBriefPilotIdDraft}
       simBriefUseCurrentUtcForDispatchTime={simBriefUseCurrentUtcForDispatchTime}
       simBriefDispatchUnits={simBriefDispatchUnits}
+      simBriefDepartureOffsetMinutes={simBriefDepartureOffsetMinutes}
       simBriefCustomAirframesDraft={simBriefCustomAirframesDraft}
       simBriefCustomAirframeIdDraft={simBriefCustomAirframeIdDraft}
       simBriefCustomAirframeNameDraft={simBriefCustomAirframeNameDraft}
@@ -1712,6 +1279,7 @@ export default function App() {
       onPilotIdChange={setSimBriefPilotIdDraft}
       onDispatchUnitsChange={handleSimBriefDispatchUnitsChange}
       onDispatchTimeModeChange={handleSimBriefDispatchTimeModeChange}
+      onDepartureOffsetChange={handleSimBriefDepartureOffsetChange}
       onCustomAirframeDraftIdChange={setSimBriefCustomAirframeIdDraft}
       onCustomAirframeDraftNameChange={setSimBriefCustomAirframeNameDraft}
       onCustomAirframeDraftMatchTypeChange={setSimBriefCustomAirframeMatchTypeDraft}
@@ -1725,6 +1293,7 @@ export default function App() {
       isDevToolsEnabled={isDevToolsEnabled}
       onDeleteUserData={handleDeleteUserData}
       isDeletingUserData={isDeletingUserData}
+      isUserDataDeletionBlocked={isUserDataDeletionBlocked}
       appBuildGitTag={APP_BUILD_GIT_TAG}
       hasWhatsNewCards={hasWhatsNewCards}
       onOpenWhatsNew={handleOpenWhatsNewFromSettings}
@@ -1739,6 +1308,7 @@ export default function App() {
       filterUiVersion={filterUiVersion}
       filters={filters}
       filterBounds={filterBounds}
+      logbookWorkspace={logbookWorkspace.rightPanelProps}
       airlines={airlines}
       airportOptions={airportOptions}
       geoOptions={geoOptions}
@@ -1801,15 +1371,18 @@ export default function App() {
   const appShellProps = {
     schedule,
     scheduleView,
+    logbookProps: logbookWorkspace.mainProps,
     theme,
     flightBoard,
     activeFlightBoard,
+    repairPrompt,
+    onResolveRepairPrompt: handleResolveRepairPrompt,
     selectedFlightId,
     expandedBoardFlightId,
     pendingMapFlightPathViewMode,
     pendingMapFitToRoute,
     onConsumePendingMapFitToRoute: () => setPendingMapFitToRoute(false),
-    setMapOptions,
+    setMapOptions: handleSetMapOptions,
     availableTours,
     selectedTourPath,
     selectedTour,
@@ -1856,12 +1429,11 @@ export default function App() {
     availableUpdate,
     appBuildGitTag: APP_BUILD_GIT_TAG,
     selectedDevWindowPreset,
-    topbarTitle,
-    syncButtonLabel,
-    currentWindowSizeLabel,
-    devWindowMenuRef,
-    isDevWindowMenuOpen,
-    onToggleDevWindowMenu: handleToggleDevWindowMenu,
+      topbarTitle,
+      syncButtonLabel,
+      devWindowMenuRef,
+      isDevWindowMenuOpen,
+      onToggleDevWindowMenu: handleToggleDevWindowMenu,
     devWindowWidth,
     devWindowWidthPresets,
     onSelectDevWindowWidth: handleSelectDevWindowWidth,
@@ -1898,6 +1470,7 @@ export default function App() {
     isDvaCredentialsSaving,
     isImporting,
     isSyncing,
+    isRefreshingLogbook,
     hasDvaCredentialChanges,
     onDvaFirstNameDraftChange: setDvaFirstNameDraft,
     onDvaLastNameDraftChange: setDvaLastNameDraft,
@@ -1910,6 +1483,7 @@ export default function App() {
     simBriefPilotIdDraft,
     simBriefUseCurrentUtcForDispatchTime,
     simBriefDispatchUnits,
+    simBriefDepartureOffsetMinutes,
     simBriefCustomAirframesDraft,
     simBriefCustomAirframeIdDraft,
     simBriefCustomAirframeNameDraft,
@@ -1922,6 +1496,7 @@ export default function App() {
     onSimBriefPilotIdDraftChange: setSimBriefPilotIdDraft,
     onSimBriefDispatchUnitsChange: handleSimBriefDispatchUnitsChange,
     onSimBriefDispatchTimeModeChange: handleSimBriefDispatchTimeModeChange,
+    onSimBriefDepartureOffsetChange: handleSimBriefDepartureOffsetChange,
     onSimBriefCustomAirframeIdDraftChange: setSimBriefCustomAirframeIdDraft,
     onSimBriefCustomAirframeNameDraftChange: setSimBriefCustomAirframeNameDraft,
     onSimBriefCustomAirframeMatchTypeDraftChange: setSimBriefCustomAirframeMatchTypeDraft,
@@ -1936,7 +1511,11 @@ export default function App() {
     onRemoveAddonRoot: handleRemoveAddonRoot,
     onSkipAddonSetup: handleSkipAddonSetup,
     isDeleteUserDataConfirmOpen,
+    isUserDataDeletionBlocked,
     onResolveDeleteUserDataConfirmation: resolveDeleteUserDataConfirmation,
+    userDataClearFailure,
+    onRetryUserDataClear: retryUserDataClear,
+    onReloadAfterUserDataClearFailure: reloadAfterUserDataClearFailure,
     isDutyBoardOverwriteConfirmOpen,
     onResolveDutyBoardOverwriteConfirmation: resolveDutyBoardOverwriteConfirmation,
     isSimBriefDispatchBlockedOpen,

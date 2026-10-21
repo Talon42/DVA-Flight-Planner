@@ -1,0 +1,103 @@
+{
+  "baseStdUtc": "2026-07-21T12:00:00Z",
+  "staleEntry": {
+    "airline": "DVA",
+    "flightCode": "DVA5770",
+    "flightNumber": "5770",
+    "from": "KLGA",
+    "to": "KDCA"
+  },
+  "cases": [
+    {
+      "name": "same airline and number outrank a closer different number",
+      "flights": [
+        { "flightId": "different-number-close", "airline": "DVA", "flightNumber": "2200", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 5 },
+        { "flightId": "same-number-far", "airline": "DVA", "flightNumber": "5770", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 180 }
+      ],
+      "expected": { "outcome": "direct", "flightId": "same-number-far" }
+    },
+    {
+      "name": "same airline with missing number falls back to closest STD",
+      "flights": [
+        { "flightId": "replacement-later", "airline": "DVA", "flightNumber": "4100", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 240 },
+        { "flightId": "replacement-closest", "airline": "DVA", "flightNumber": "2200", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 30 }
+      ],
+      "expected": { "outcome": "direct", "flightId": "replacement-closest" }
+    },
+    {
+      "name": "same airline different number outranks alternate airline same number",
+      "flights": [
+        { "flightId": "alternate-same-number", "airline": "AAL", "flightNumber": "5770", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 5 },
+        { "flightId": "same-airline-different-number", "airline": "DVA", "flightNumber": "2200", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 90 }
+      ],
+      "expected": { "outcome": "direct", "flightId": "same-airline-different-number" }
+    },
+    {
+      "name": "matching number under another airline requires confirmation",
+      "flights": [
+        { "flightId": "alternate-same-number", "airline": "AAL", "flightNumber": "5770", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 20 }
+      ],
+      "expected": { "outcome": "alternate-airline", "flightId": "alternate-same-number" }
+    },
+    {
+      "name": "alternate airline selection ignores number and uses closest STD",
+      "flights": [
+        { "flightId": "alternate-same-number-far", "airline": "ASA", "flightNumber": "5770", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 180 },
+        { "flightId": "alternate-different-number-close", "airline": "AAL", "flightNumber": "200", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 15 }
+      ],
+      "expected": { "outcome": "alternate-airline", "flightId": "alternate-different-number-close" }
+    },
+    {
+      "name": "duplicate same-number flights use closest STD",
+      "flights": [
+        { "flightId": "same-number-later", "airline": "DVA", "flightNumber": "5770", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 150 },
+        { "flightId": "same-number-closest", "airline": "DVA", "flightNumber": "5770", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 45 }
+      ],
+      "expected": { "outcome": "direct", "flightId": "same-number-closest" }
+    },
+    {
+      "name": "equal STD differences use stable flight ID ordering",
+      "flights": [
+        { "flightId": "z-flight", "airline": "DVA", "flightNumber": "2200", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 30 },
+        { "flightId": "a-flight", "airline": "DVA", "flightNumber": "3300", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": -30 }
+      ],
+      "expected": { "outcome": "direct", "flightId": "a-flight" }
+    },
+    {
+      "name": "airline and number on another route do not qualify",
+      "flights": [
+        { "flightId": "wrong-route", "airline": "DVA", "flightNumber": "5770", "from": "KLGA", "to": "KBOS", "stdOffsetMinutes": 0 }
+      ],
+      "expected": { "outcome": "missing-route" }
+    },
+    {
+      "name": "reversed route does not qualify",
+      "flights": [
+        { "flightId": "reversed-route", "airline": "DVA", "flightNumber": "5770", "from": "KDCA", "to": "KLGA", "stdOffsetMinutes": 0 }
+      ],
+      "expected": { "outcome": "missing-route" }
+    },
+    {
+      "name": "empty schedule reports a missing route",
+      "flights": [],
+      "expected": { "outcome": "missing-route" }
+    },
+    {
+      "name": "identity matching trims whitespace and ignores case",
+      "entryOverrides": { "airline": " dva ", "flightNumber": " ab12 ", "flightCode": "DVAAB12", "from": " klga ", "to": " kdca " },
+      "flights": [
+        { "flightId": "normalized-match", "airline": "DVA", "flightNumber": "AB12", "from": " klga ", "to": "kdca ", "stdOffsetMinutes": 60 }
+      ],
+      "expected": { "outcome": "direct", "flightId": "normalized-match" }
+    },
+    {
+      "name": "leading-zero flight numbers remain distinct",
+      "entryOverrides": { "flightNumber": "05770", "flightCode": "DVA05770" },
+      "flights": [
+        { "flightId": "numeric-lookalike-far", "airline": "DVA", "flightNumber": "5770", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 120 },
+        { "flightId": "different-number-close", "airline": "DVA", "flightNumber": "2200", "from": "KLGA", "to": "KDCA", "stdOffsetMinutes": 10 }
+      ],
+      "expected": { "outcome": "direct", "flightId": "different-number-close" }
+    }
+  ]
+}

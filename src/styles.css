@@ -58,16 +58,26 @@
   --line-strong: rgba(16, 33, 54, 0.14);
   --surface: rgba(246, 250, 253, 0.98);
   --surface-border: rgba(150, 171, 195, 0.42);
-  --surface-raised: rgba(238, 245, 251, 0.99);
+  --surface-raised: #eef5fb;
   --surface-soft: rgba(232, 240, 248, 0.98);
   --surface-panel: rgba(226, 236, 246, 0.99);
   --surface-table-row: rgba(248, 251, 254, 0.94);
   --surface-table-row-alt: rgba(238, 244, 249, 0.98);
+  --surface-table-row-hover: #E8EEF5;
   --surface-table-row-selected:
     linear-gradient(90deg, rgba(0, 58, 112, 0.18), rgba(11, 31, 54, 0.08)),
     rgba(255, 255, 255, 0.84);
-  --surface-option: rgba(226, 235, 245, 0.99);
-  --surface-option-selected: rgba(0, 58, 112, 0.14);
+  --logbook-row-selected-bg: #0064bf;
+  --logbook-row-selected-hover-bg: #0057a8;
+  --logbook-row-selected-text: #ffffff;
+  --logbook-row-status-rejected-bg: rgba(200, 16, 46, 0.52);
+  --logbook-row-status-rejected-hover-bg: rgba(200, 16, 46, 0.6);
+  --logbook-row-status-rejected-text: #ffffff;
+  --logbook-row-status-pending-bg: rgba(246, 197, 109, 0.34);
+  --logbook-row-status-pending-hover-bg: rgba(246, 197, 109, 0.48);
+  --logbook-row-status-pending-text: var(--delta-blue-deep);
+  --surface-option: #e2ebf5;
+  --surface-option-selected: #d8e6f4;
   --input-bg: rgba(230, 238, 247, 0.99);
   --modal-shell-bg: var(--surface-raised);
   --modal-backdrop-bg: rgba(8, 20, 36, 0.42);
@@ -117,16 +127,26 @@
   --line-strong: rgba(221, 233, 245, 0.12);
   --surface: rgba(10, 24, 43, 0.96);
   --surface-border: rgba(186, 209, 234, 0.10);
-  --surface-raised: rgba(12, 28, 47, 0.98);
+  --surface-raised: #0c1c2f;
   --surface-soft: rgba(13, 29, 49, 0.98);
   --surface-panel: rgba(15, 33, 54, 0.99);
-  --surface-table-row: rgba(10, 24, 43, 0.96);
-  --surface-table-row-alt: rgba(13, 29, 49, 0.99);
+  --surface-table-row: rgba(10, 24, 43, 0.94);
+  --surface-table-row-alt: rgba(16, 36, 58, 0.96);
+  --surface-table-row-hover: #172f4c;
   --surface-table-row-selected:
     linear-gradient(90deg, rgba(200, 16, 46, 0.3), rgba(0, 58, 112, 0.2)),
     rgba(10, 24, 43, 0.9);
-  --surface-option: rgba(13, 29, 48, 0.99);
-  --surface-option-selected: rgba(0, 58, 112, 0.22);
+  --logbook-row-selected-bg: #1f466e;
+  --logbook-row-selected-hover-bg: #27547f;
+  --logbook-row-selected-text: #ffffff;
+  --logbook-row-status-rejected-bg: rgba(200, 16, 46, 0.2);
+  --logbook-row-status-rejected-hover-bg: rgba(200, 16, 46, 0.24);
+  --logbook-row-status-rejected-text: #ffffff;
+  --logbook-row-status-pending-bg: rgba(248, 187, 72, 0.25);
+  --logbook-row-status-pending-hover-bg: rgba(246, 197, 109, 0.35);
+  --logbook-row-status-pending-text: #ffffff;
+  --surface-option: #0d1d30;
+  --surface-option-selected: #1a3556;
   --input-bg: #081424;
   --modal-shell-bg: #10243B;
   --modal-backdrop-bg: rgba(3, 8, 15, 0.74);
@@ -237,6 +257,114 @@
   .app-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
+
+  /* Logbook row classes set the background and cell text token together. */
+  .logbook-row-status-rejected {
+    background: var(--logbook-row-status-rejected-bg) !important;
+    --table-row-text: var(--logbook-row-status-rejected-text);
+  }
+
+  .logbook-row-status-rejected:nth-child(even) {
+    background: var(--logbook-row-status-rejected-bg) !important;
+  }
+
+  .logbook-row-status-rejected:hover {
+    background: var(--logbook-row-status-rejected-hover-bg) !important;
+  }
+
+  .logbook-row-status-pending {
+    background: var(--logbook-row-status-pending-bg) !important;
+    --table-row-text: var(--logbook-row-status-pending-text);
+  }
+
+  .logbook-row-status-pending:nth-child(even) {
+    background: var(--logbook-row-status-pending-bg) !important;
+  }
+
+  .logbook-row-status-pending:hover {
+    background: var(--logbook-row-status-pending-hover-bg) !important;
+  }
+
+  .logbook-row-selected {
+    background: var(--logbook-row-selected-bg) !important;
+    --table-row-text: var(--logbook-row-selected-text);
+  }
+
+  .logbook-row-selected:nth-child(even) {
+    background: var(--logbook-row-selected-bg) !important;
+  }
+
+  .logbook-row-selected:hover {
+    background: var(--logbook-row-selected-hover-bg) !important;
+  }
+
+  .logbook-pilot-stats__layout-compact {
+    display: none;
+  }
+
+  /* Compact logbook layout switches on by width only and keeps the standard hero untouched above 1400px. */
+  @media (max-width: 1399px) {
+    .logbook-pilot-stats {
+      gap: 0.5rem !important;
+      padding-top: 0 !important;
+      padding-bottom: 0.25rem !important;
+    }
+
+    .logbook-pilot-stats__layout-standard {
+      display: none !important;
+    }
+
+    .logbook-pilot-stats__layout-compact {
+      display: grid !important;
+      gap: 0.6rem !important;
+    }
+
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-hero {
+      padding: 0.65rem !important;
+    }
+
+  .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-hero-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.65fr);
+      gap: 0.6rem;
+      align-items: stretch;
+    }
+
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-airline {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      min-width: 0;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--line);
+      background: var(--surface-raised);
+    }
+
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-airline-logo {
+      width: 3.25rem;
+      height: 3.25rem;
+      flex: 0 0 auto;
+    }
+
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-airline-copy {
+      min-width: 0;
+      display: grid;
+      gap: 0.15rem;
+    }
+
+    .logbook-pilot-stats__layout-standard .logbook-pilot-stats__standard-panel-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__compact-panel-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .logbook-pilot-stats__layout-compact .logbook-pilot-stats__summary-heading {
+      display: none !important;
+    }
+  }
+
 }
 
 .range-input {
@@ -263,7 +391,7 @@
   background: var(--range-thumb-max);
 }
 
-@media (max-width: 1399px) and (max-height: 850px) {
+@media (max-width: 1399px) {
   .duty-schedule-filters--compactable {
     gap: 0.5rem;
   }
@@ -298,12 +426,6 @@
   }
 
   .duty-status-card--compact-collapsed .duty-status-card__body {
-    display: none;
-  }
-}
-
-@media (max-height: 899px) {
-  .duty-status-card {
     display: none;
   }
 }

@@ -1,6 +1,6 @@
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
-import { cardFrameClassName } from "../../components/ui/patterns";
+import { nestedPanelStrongFrameClassName } from "../../components/ui/patterns";
 import { labelTextClassName } from "../../components/ui/typography";
 import { toggleButtonClassName } from "../../components/ui/forms";
 
@@ -56,7 +56,7 @@ export function DutyFilterColumn({
       padding="none"
       className={cn(
         "duty-filter-card flex h-full min-h-0 flex-col rounded-none",
-        cardFrameClassName,
+        nestedPanelStrongFrameClassName,
         className
       )}
     >

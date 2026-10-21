@@ -104,7 +104,9 @@ impl DraftSubmitManager {
         })?;
 
         if active.is_some() {
-            return Err("submit_failed: A Delta Virtual draft operation is already in progress.".into());
+            return Err(
+                "submit_failed: A Delta Virtual draft operation is already in progress.".into(),
+            );
         }
 
         *active = Some(ActiveDraftSubmit { label, sender });
@@ -198,25 +200,25 @@ fn truncate_log_text(value: &str, limit: usize) -> String {
 }
 
 fn redact_app_log_key(key: &str) -> bool {
-  let normalized = key
-    .trim()
-    .to_ascii_lowercase()
-    .chars()
+    let normalized = key
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
         .filter(|character| character.is_ascii_alphanumeric())
-    .collect::<String>();
+        .collect::<String>();
 
-  matches!(
-    normalized.as_str(),
-    value if value.contains("password")
-        || value.contains("cookie")
-        || value.contains("token")
-        || value.contains("auth")
-        || value.contains("apikey")
-        || value.contains("authorization")
-        || value.contains("setcookie")
-        || value.contains("credential")
-        || value.contains("secret")
-  )
+    matches!(
+      normalized.as_str(),
+      value if value.contains("password")
+          || value.contains("cookie")
+          || value.contains("token")
+          || value.contains("auth")
+          || value.contains("apikey")
+          || value.contains("authorization")
+          || value.contains("setcookie")
+          || value.contains("credential")
+          || value.contains("secret")
+    )
 }
 
 fn sanitize_app_log_value(value: &Value) -> Value {
@@ -242,17 +244,17 @@ fn sanitize_app_log_value(value: &Value) -> Value {
 }
 
 fn format_app_log_value(value: &Value) -> String {
-  match value {
-    Value::Null => "null".to_string(),
+    match value {
+        Value::Null => "null".to_string(),
         Value::Bool(boolean) => boolean.to_string(),
         Value::Number(number) => number.to_string(),
         Value::String(text) => {
-            let normalized = text.trim().replace('\r', " ").replace('\n', " ");
+            let normalized = text.trim().replace(['\r', '\n'], " ");
             let truncated = truncate_log_text(&normalized, 160);
             if is_simple_log_token(&truncated) {
                 truncated
             } else {
-                serde_json::to_string(&truncated).unwrap_or_else(|_| truncated)
+                serde_json::to_string(&truncated).unwrap_or(truncated)
             }
         }
         other => serde_json::to_string(&sanitize_app_log_value(other))
@@ -290,8 +292,8 @@ fn format_app_log_data(data: Option<&Value>) -> String {
 }
 
 fn append_draft_app_log_event(app: &AppHandle, event: &str, data: Option<&Value>) {
-  let message = format!("{event}{}", format_app_log_data(data));
-  crate::app::logging::append_app_log(app, "DVA Draft", &message);
+    let message = format!("{event}{}", format_app_log_data(data));
+    crate::app::logging::append_app_log(app, "DVA Draft", &message);
 }
 
 fn append_draft_debug_log_event(
@@ -568,8 +570,7 @@ fn build_deltava_draft_delete_script(
     let draft_report_id_value = draft_report_id.to_string();
     let draft_id_hex = format!("{:x}", draft_report_id);
     let draft_report_id = draft_report_id_value;
-    let draft_id_hex = serde_json::to_string(&draft_id_hex)
-        .unwrap_or_else(|_| "\"0\"".to_string());
+    let draft_id_hex = serde_json::to_string(&draft_id_hex).unwrap_or_else(|_| "\"0\"".to_string());
     let app_log_prefix = serde_json::to_string(app_log_prefix)
         .unwrap_or_else(|_| "\"__FLIGHT_PLANNER_DVA_DRAFT_APP_LOG__\"".to_string());
     let result_prefix = serde_json::to_string(DVA_DRAFT_RESULT_MESSAGE_PREFIX)
@@ -782,6 +783,7 @@ async fn inject_deltava_draft_submit_script_after_delay(
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Parameters mirror the DVA form and window lifecycle contract.
 fn schedule_deltava_draft_submit_script(
     window: tauri::WebviewWindow,
     app: AppHandle,
@@ -943,7 +945,7 @@ async fn run_deltava_draft_submission_attempt(
     .visible(false)
     .center()
     .data_directory(webview_data_directory)
-    .on_navigation(|url| is_allowed_deltava_draft_url(url))
+    .on_navigation(is_allowed_deltava_draft_url)
     .on_page_load(move |webview_window, payload| {
         if payload.event() != tauri::webview::PageLoadEvent::Finished
             || !is_allowed_deltava_draft_url(payload.url())
@@ -1170,6 +1172,7 @@ async fn run_deltava_draft_submission_attempt(
 }
 
 #[cfg(windows)]
+#[allow(clippy::too_many_arguments)] // Handler inputs are explicit ownership boundaries for one draft run.
 fn attach_windows_draft_message_handler(
     window: &tauri::WebviewWindow,
     draft_window: tauri::WebviewWindow,
@@ -1759,7 +1762,7 @@ pub async fn delete_deltava_draft_flight_report(
     .visible(false)
     .center()
     .data_directory(webview_data_directory)
-    .on_navigation(|url| is_allowed_deltava_draft_url(url))
+    .on_navigation(is_allowed_deltava_draft_url)
     .on_page_load(move |webview_window, payload| {
         if payload.event() != tauri::webview::PageLoadEvent::Finished
             || !is_allowed_deltava_draft_url(payload.url())

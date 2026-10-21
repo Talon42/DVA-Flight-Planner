@@ -16,6 +16,16 @@ function toPointCoordinates(point) {
 
 function isPointOnSegment(point, segmentStart, segmentEnd) {
   const epsilon = 1e-10;
+  const squaredLength =
+    (segmentEnd.lon - segmentStart.lon) ** 2 + (segmentEnd.lat - segmentStart.lat) ** 2;
+
+  // Closed GeoJSON rings repeat their first point; that zero-length segment only contains that point.
+  if (squaredLength <= epsilon) {
+    return (
+      (point.lon - segmentStart.lon) ** 2 + (point.lat - segmentStart.lat) ** 2 <= epsilon
+    );
+  }
+
   const crossProduct =
     (point.lat - segmentStart.lat) * (segmentEnd.lon - segmentStart.lon) -
     (point.lon - segmentStart.lon) * (segmentEnd.lat - segmentStart.lat);
@@ -30,8 +40,6 @@ function isPointOnSegment(point, segmentStart, segmentEnd) {
     return false;
   }
 
-  const squaredLength =
-    (segmentEnd.lon - segmentStart.lon) ** 2 + (segmentEnd.lat - segmentStart.lat) ** 2;
   return dotProduct <= squaredLength + epsilon;
 }
 

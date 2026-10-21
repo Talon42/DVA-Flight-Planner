@@ -6,6 +6,7 @@ import {
   bodySmTextClassName,
   labelTextClassName
 } from "./ui/typography";
+import { nestedPanelStrongFrameClassName } from "./ui/patterns";
 import FlightsTable from "./tables/FlightsTable";
 import CompletedStatusCard from "./CompletedStatusCard";
 
@@ -18,9 +19,11 @@ function AccomplishmentChecklistRow({ row, requirement, onShowFlights, isAltRow,
   return (
     <div
       className={cn(
-        "relative grid min-h-[3.15rem] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] px-3.5 py-2.5",
-        showColumnSeparator && "border-l border-[color:var(--line)]",
-        isAltRow ? "bg-[var(--surface-table-row-alt)]" : "bg-[var(--surface-table-row)]"
+        "relative grid min-h-[3.15rem] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-[color:var(--line)] px-3.5 py-2.5 dark:border-[color:var(--line-strong)]",
+        showColumnSeparator && "border-l border-[color:var(--line)] dark:border-[color:var(--line-strong)]",
+        isAltRow
+          ? "bg-[var(--surface-table-row-alt)]"
+          : "bg-[var(--surface-table-row)]"
       )}
     >
       <span
@@ -63,7 +66,7 @@ function EmbeddedFlightSearchEmptyState({ isSearchActive, airport, viewportWidth
       : "Click an airplane icon to show matching flights here.";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)]">
+    <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", nestedPanelStrongFrameClassName)}>
       <div className="app-scrollbar flex h-full min-h-0 items-center justify-center px-6 py-8 text-center">
         <p className={cn("m-0 max-w-xl text-[var(--text-muted)]", bodyMdTextClassName)}>
           {message}
@@ -145,7 +148,21 @@ export default function AccomplishmentsPanel({
             </span>
           </div>
 
-          <div className="app-scrollbar min-h-0 overflow-x-hidden overflow-y-auto border-2 border-[color:var(--panel-border)] bg-[var(--surface-table-row)]">
+          <div
+            className={cn(
+              "app-scrollbar min-h-0 overflow-x-hidden overflow-y-auto",
+              nestedPanelStrongFrameClassName
+            )}
+          >
+            <div
+              className={cn(
+                "border-b border-[color:var(--line)] bg-[var(--surface-soft)] px-3.5 py-2 dark:border-[color:var(--line-strong)] dark:bg-[var(--surface-raised)]",
+                labelTextClassName,
+                "text-[var(--eyebrow)]"
+              )}
+            >
+              Remaining Requirements
+            </div>
             <div className="grid min-w-0 grid-cols-2 overflow-hidden bp-1400:grid-cols-3">
               {rows.map((row, index) => (
                 <AccomplishmentChecklistRow

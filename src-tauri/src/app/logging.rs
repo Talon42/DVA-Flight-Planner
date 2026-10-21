@@ -202,7 +202,11 @@ pub(crate) fn iso_now_utc() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     fn temp_log_path(label: &str) -> PathBuf {
         let unique = SystemTime::now()
@@ -267,7 +271,10 @@ mod tests {
         let contents = read_log_text(&path);
         assert!(contents.len() <= 20);
         assert!(contents.ends_with('\n'));
-        assert!(contents.trim_end_matches('\n').chars().all(|character| character == 'X'));
+        assert!(contents
+            .trim_end_matches('\n')
+            .chars()
+            .all(|character| character == 'X'));
 
         let _ = fs::remove_file(path);
     }

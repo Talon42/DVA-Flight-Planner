@@ -1,5 +1,12 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  findCustomAirframeByInternalId,
+  getAircraftDisplayName,
+  getSelectedAircraftForFlight,
+  resolveSimBriefDispatchAircraft
+} from "../../domain/aircraft/aircraftIdentity.js";
 import { buildTourFlightLookupKey } from "../tours/tourIds.model.js";
+import { deriveFlightNumber } from "../../domain/flights/flightIdentity.js";
 import { logAppEvent } from "../../services/logging/appLog.client.js";
 import {
   DEFAULT_FLIGHT_BOARD_NAME,
@@ -7,53 +14,93 @@ import {
   buildBoardEntryFromFlight,
   buildBoardEntryFromTourFlight,
   createFlightBoard,
-  normalizeUtcMillis,
   normalizeBoardEntry,
+  normalizeDraftNetwork,
   normalizeFlightBoardName
 } from "./flightBoard.model.js";
 
-// Rebuilds stale board entries against the live schedule so repair actions can stay targeted.
-function repairBoardEntryAgainstSchedule(entry, flights = []) {
+function normalizeRepairMatchValue(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function findClosestDeparture(flights, departureMillis) {
+  return (
+    [...flights].sort((left, right) => {
+      const leftDelta = Math.abs((Number(left.stdUtcMillis) || 0) - departureMillis);
+      const rightDelta = Math.abs((Number(right.stdUtcMillis) || 0) - departureMillis);
+      return (
+        leftDelta - rightDelta ||
+        String(left.flightId || "").localeCompare(String(right.flightId || ""))
+      );
+    })[0] || null
+  );
+}
+
+// Resolves the repair hierarchy without applying alternate-airline matches automatically.
+function findRepairMatch(entry, flights = []) {
   const normalizedEntry = normalizeBoardEntry(entry);
   if (!normalizedEntry) {
-    return null;
+    return { type: "missing-route", entry: null, flight: null };
   }
 
-  const matches = flights.filter(
+  const routeMatches = flights.filter(
     (flight) =>
-      String(flight.airline || "").trim() === normalizedEntry.airline &&
-      String(flight.from || "").trim().toUpperCase() === normalizedEntry.from &&
-      String(flight.to || "").trim().toUpperCase() === normalizedEntry.to
+      normalizeRepairMatchValue(flight.from) === normalizedEntry.from &&
+      normalizeRepairMatchValue(flight.to) === normalizedEntry.to
   );
 
-  if (!matches.length) {
-    return null;
+  if (!routeMatches.length) {
+    return { type: "missing-route", entry: normalizedEntry, flight: null };
   }
 
-  const currentDepartureMillis = normalizeUtcMillis(normalizedEntry.stdUtcMillis);
-  const repairedFlight = [...matches].sort((left, right) => {
-    const leftMillis = normalizeUtcMillis(left.stdUtcMillis);
-    const rightMillis = normalizeUtcMillis(right.stdUtcMillis);
-    const leftDelta =
-      currentDepartureMillis === null || leftMillis === null
-        ? Number.POSITIVE_INFINITY
-        : Math.abs(leftMillis - currentDepartureMillis);
-    const rightDelta =
-      currentDepartureMillis === null || rightMillis === null
-        ? Number.POSITIVE_INFINITY
-        : Math.abs(rightMillis - currentDepartureMillis);
-    return leftDelta - rightDelta || left.flightId.localeCompare(right.flightId);
-  })[0];
+  const departureMillis = Number(normalizedEntry.stdUtcMillis) || 0;
+  const airlineMatches = routeMatches.filter(
+    (flight) =>
+      normalizeRepairMatchValue(flight.airline) ===
+      normalizeRepairMatchValue(normalizedEntry.airline)
+  );
+  if (!airlineMatches.length) {
+    return {
+      type: "alternate-airline",
+      entry: normalizedEntry,
+      flight: findClosestDeparture(routeMatches, departureMillis)
+    };
+  }
+
+  const flightNumber = normalizeRepairMatchValue(deriveFlightNumber(normalizedEntry));
+  const numberMatches = airlineMatches.filter(
+    (flight) => normalizeRepairMatchValue(deriveFlightNumber(flight)) === flightNumber
+  );
+  return {
+    type: "direct",
+    entry: normalizedEntry,
+    flight: findClosestDeparture(numberMatches.length ? numberMatches : airlineMatches, departureMillis)
+  };
+}
+
+function buildRepairedBoardEntry(entry, repairedFlight) {
+  const normalizedEntry = normalizeBoardEntry(entry);
+  if (!normalizedEntry || !repairedFlight) return null;
 
   return buildBoardEntryFromFlight(repairedFlight, {
     boardEntryId: normalizedEntry.boardEntryId,
     selectedAircraft: normalizedEntry.selectedAircraft,
-    simbriefPlan: null,
+    simbriefPlan: normalizedEntry.simbriefPlan,
     draftNetwork: normalizedEntry.draftNetwork,
     draftReportId: normalizedEntry.draftReportId,
+    dvaDraftReportId: normalizedEntry.dvaDraftReportId,
     draftDeleteRequiresRegenerate: normalizedEntry.draftDeleteRequiresRegenerate,
+    isCompleted: normalizedEntry.isCompleted,
+    completedAt: normalizedEntry.completedAt,
+    completionOrder: normalizedEntry.completionOrder,
     isStale: false
   });
+}
+
+function getRepairDepartureLabel(flight) {
+  return String(
+    flight?.departureTimeLabel || flight?.stdLocal || flight?.stdUtc || "the scheduled departure"
+  ).trim();
 }
 
 // Owns the active flight-board derivations and mutations without pulling SimBrief workflow logic in with it.
@@ -65,17 +112,21 @@ export function useFlightBoards({
   flightBoards = [],
   isDevToolsEnabled = false,
   isScheduleCurrent = true,
+  onCloseSimBriefDispatchBlocked = null,
   schedule = null,
   scheduleView = "flights",
+  onOpenSimBriefDispatchBlocked = null,
   onOpenStaleScheduleBlocked = null,
   setActiveFlightBoardId,
   setExpandedBoardFlightId,
   setFlightBoards,
   setStatusMessage,
   setTourProgress,
+  simBriefCustomAirframes = [],
   simBriefDispatchStateRef = null,
   tourFlightsByKey = new Map()
 } = {}) {
+  const [repairPrompt, setRepairPrompt] = useState(null);
   const activeFlightBoard = useMemo(() => {
     if (!flightBoards.length) {
       return null;
@@ -87,7 +138,7 @@ export function useFlightBoards({
       null
     );
   }, [activeFlightBoardId, flightBoards]);
-  const flightBoard = activeFlightBoard?.entries || [];
+  const flightBoard = useMemo(() => activeFlightBoard?.entries || [], [activeFlightBoard]);
 
   const shortlist = useMemo(
     () =>
@@ -109,8 +160,11 @@ export function useFlightBoards({
           simbriefPlan: entry.simbriefPlan,
           draftNetwork: entry.draftNetwork,
           draftReportId: entry.draftReportId,
-          isCompleted: sourceFlight.isCompleted,
-          completionOrder: sourceFlight.completionOrder
+          dvaDraftReportId: entry.dvaDraftReportId,
+          draftDeleteRequiresRegenerate: entry.draftDeleteRequiresRegenerate,
+          isCompleted: entry.isCompleted,
+          completedAt: entry.completedAt,
+          completionOrder: entry.completionOrder
         });
       }),
     [flightBoard, tourFlightsByKey]
@@ -174,6 +228,222 @@ export function useFlightBoards({
       });
     });
     return resolvedEntries;
+  }
+
+  function handleSimBriefTypeChange(boardEntryId, nextType) {
+    const rawSelection = String(nextType || "").trim();
+    const selectedCustomAirframe = findCustomAirframeByInternalId(
+      rawSelection,
+      simBriefCustomAirframes
+    );
+    const selectedAircraft = selectedCustomAirframe?.internalId
+      ? rawSelection
+      : getAircraftDisplayName(rawSelection);
+    const nextFlightBoard = flightBoard.map((entry) =>
+      entry.boardEntryId === boardEntryId
+        ? {
+            ...entry,
+            selectedAircraft,
+            simbriefSelectedType: ""
+          }
+        : entry
+    );
+    updateActiveFlightBoardEntries(nextFlightBoard);
+
+    const updatedEntry =
+      nextFlightBoard.find((entry) => entry.boardEntryId === boardEntryId) || null;
+    if (!updatedEntry || !selectedAircraft) {
+      onCloseSimBriefDispatchBlocked?.();
+      return;
+    }
+
+    const dispatchResolution = resolveSimBriefDispatchAircraft(
+      {
+        ...updatedEntry,
+        selectedAircraft
+      },
+      simBriefCustomAirframes
+    );
+
+    if (dispatchResolution.ok) {
+      onCloseSimBriefDispatchBlocked?.();
+      return;
+    }
+
+    onOpenSimBriefDispatchBlocked?.(dispatchResolution.reason);
+  }
+
+  // Updates the board entry's draft network without disturbing the aircraft selection.
+  function handleDraftNetworkChange(boardEntryId, nextNetwork) {
+    const normalizedDraftNetwork = normalizeDraftNetwork(nextNetwork);
+
+    updateActiveFlightBoardEntries((currentEntries) =>
+      currentEntries.map((entry) =>
+        entry.boardEntryId === boardEntryId
+          ? {
+              ...entry,
+              draftNetwork: normalizedDraftNetwork
+            }
+          : entry
+      )
+    );
+  }
+
+  function normalizeSimBriefPlanForBoardEntry(plan, fallbackStaticId = "") {
+    if (!plan || typeof plan !== "object") {
+      return null;
+    }
+
+    const routePointsSource = Array.isArray(plan.routePoints)
+      ? plan.routePoints
+      : Array.isArray(plan.route_points)
+        ? plan.route_points
+        : [];
+    const routePoints = routePointsSource
+      .map((point) => {
+        if (!point || typeof point !== "object") {
+          return null;
+        }
+
+        const latitude = Number(point.latitude);
+        const longitude = Number(point.longitude);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          return null;
+        }
+
+        return {
+          ident: String(point.ident || "").trim(),
+          latitude,
+          longitude
+        };
+      })
+      .filter(Boolean);
+    const aircraftType = String(
+      plan.aircraftType ||
+        plan.aircraft_type ||
+        plan.aircraft?.icao ||
+        plan.aircraft?.type ||
+        plan.aircraft?.code ||
+        plan.aircraft?.name ||
+        plan.aircraft ||
+        ""
+    )
+      .trim()
+      .toUpperCase();
+    const staticId = String(plan.staticId || plan.static_id || fallbackStaticId || "").trim();
+    const ofpXmlId = String(plan.ofpXmlId || plan.ofp_xml_id || plan.dvaSimBriefId || "")
+      .trim()
+      .toUpperCase();
+    const aircraft =
+      plan.aircraft && typeof plan.aircraft === "object"
+        ? { ...plan.aircraft }
+        : aircraftType
+          ? {
+              code: aircraftType,
+              icao: aircraftType,
+              type: aircraftType,
+              name: aircraftType
+            }
+          : null;
+
+    return {
+      status: String(plan.status || "").trim(),
+      generatedAtUtc: String(plan.generatedAtUtc || plan.generated_at_utc || "").trim(),
+      generated_at_utc: String(plan.generatedAtUtc || plan.generated_at_utc || "").trim(),
+      staticId,
+      static_id: staticId,
+      ofpXmlId,
+      ofp_xml_id: ofpXmlId,
+      aircraftType,
+      aircraft_type: aircraftType,
+      aircraft,
+      callsign: String(plan.callsign || "").trim(),
+      route: String(plan.route || "").trim(),
+      cruiseAltitude: String(plan.cruiseAltitude || plan.cruise_altitude || "").trim(),
+      alternate: String(plan.alternate || "").trim(),
+      ete: String(plan.ete || "").trim(),
+      blockFuel: String(plan.blockFuel || plan.block_fuel || "").trim(),
+      pax: Number.isInteger(plan.pax)
+        ? plan.pax
+        : Number.isInteger(Number(plan.pax))
+          ? Number(plan.pax)
+          : null,
+      ofpUrl: String(plan.ofpUrl || plan.ofp_url || "").trim(),
+      pdfUrl: String(plan.pdfUrl || plan.pdf_url || "").trim(),
+      routePoints,
+      route_points: routePoints
+    };
+  }
+
+  // Builds the board-entry shape used by both the live board state and the draft submit payload.
+  function buildBoardEntryWithSimBriefPlan(boardEntry, simBriefPlan) {
+    const normalizedBoardEntry = normalizeBoardEntry(boardEntry);
+    if (!normalizedBoardEntry) {
+      return null;
+    }
+
+    const normalizedPlan = normalizeSimBriefPlanForBoardEntry(
+      simBriefPlan,
+      normalizedBoardEntry.simbriefPlan?.staticId ||
+        normalizedBoardEntry.simbriefPlan?.static_id ||
+        ""
+    );
+    const existingSelectedAircraft =
+      getSelectedAircraftForFlight(normalizedBoardEntry, simBriefCustomAirframes) || "";
+    const selectedCustomAirframe = findCustomAirframeByInternalId(
+      normalizedBoardEntry.selectedAircraft,
+      simBriefCustomAirframes
+    );
+    const refreshedSelectedAircraft =
+      getAircraftDisplayName(normalizedPlan?.aircraftType) ||
+      String(normalizedPlan?.aircraftType || "").trim();
+    // Always sync the stored selection to the aircraft that SimBrief returned for the plan.
+    const resolvedSelectedAircraft = refreshedSelectedAircraft || existingSelectedAircraft;
+    const resolvedPlan = normalizedPlan
+      ? {
+          ...normalizedPlan,
+          aircraftType: resolvedSelectedAircraft,
+          aircraft_type: resolvedSelectedAircraft,
+          aircraft: resolvedSelectedAircraft
+            ? normalizedPlan.aircraft ||
+              {
+                code: resolvedSelectedAircraft,
+                icao: resolvedSelectedAircraft,
+                type: resolvedSelectedAircraft,
+                name: resolvedSelectedAircraft
+              }
+            : null
+        }
+      : null;
+
+    return {
+      ...normalizedBoardEntry,
+      simbriefPlan: resolvedPlan,
+      // Keep the custom ID so its explicit DVA equipment link survives SimBrief's returned name.
+      selectedAircraft: selectedCustomAirframe?.internalId || resolvedSelectedAircraft,
+      simbriefSelectedType: ""
+    };
+  }
+
+  // Keeps the stored aircraft selection aligned with the latest imported SimBrief plan.
+  function applySimBriefPlanToBoardEntry(boardEntryId, simBriefPlan) {
+    const currentBoardEntry =
+      flightBoard.find((entry) => entry.boardEntryId === boardEntryId) ||
+      selectedShortlistFlight ||
+      null;
+    const nextBoardEntry = buildBoardEntryWithSimBriefPlan(currentBoardEntry, simBriefPlan);
+
+    if (!nextBoardEntry) {
+      return null;
+    }
+
+    updateActiveFlightBoardEntries((currentEntries) =>
+      currentEntries.map((entry) =>
+        entry.boardEntryId === boardEntryId ? nextBoardEntry : entry
+      )
+    );
+
+    return nextBoardEntry;
   }
 
   function replaceFlightBoard(flightIds, boardName = DEFAULT_FLIGHT_BOARD_NAME, options = {}) {
@@ -510,17 +780,38 @@ export function useFlightBoards({
     });
   }
 
+  async function applyRepairMatch(boardEntryId, repairedFlight) {
+    const currentEntry = flightBoard.find((item) => item.boardEntryId === boardEntryId);
+    const repairedEntry = buildRepairedBoardEntry(currentEntry, repairedFlight);
+    if (!repairedEntry) return;
+
+    updateActiveFlightBoardEntries((currentEntries) =>
+      currentEntries.map((item) => (item.boardEntryId === boardEntryId ? repairedEntry : item))
+    );
+
+    setStatusMessage?.(
+      `Repaired ${repairedEntry.flightCode} ${repairedEntry.from}-${repairedEntry.to} from the current schedule.`
+    );
+    await logAppEvent("flight-board-repaired", {
+      boardEntryId,
+      linkedFlightId: repairedEntry.linkedFlightId,
+      flightCode: repairedEntry.flightCode
+    });
+  }
+
   async function handleRepairFlightBoardEntry(boardEntryId) {
     const entry = flightBoard.find((item) => item.boardEntryId === boardEntryId);
-    if (!entry || !schedule?.flights?.length) {
-      return;
-    }
+    if (!entry) return;
 
-    const repairedEntry = repairBoardEntryAgainstSchedule(entry, schedule.flights);
-    if (!repairedEntry) {
-      setStatusMessage?.(
-        `No matching flight was found for ${entry.airline} ${entry.from}-${entry.to} in the current schedule.`
-      );
+    const match = findRepairMatch(entry, schedule?.flights || []);
+    if (match.type === "missing-route") {
+      setRepairPrompt({
+        type: "missing-route",
+        boardEntryId,
+        airline: entry.airline,
+        from: entry.from,
+        to: entry.to
+      });
       await logAppEvent("flight-board-repair-missed", {
         boardEntryId,
         airline: entry.airline,
@@ -530,18 +821,48 @@ export function useFlightBoards({
       return;
     }
 
-    const nextFlightBoard = flightBoard.map((item) =>
-      item.boardEntryId === boardEntryId ? repairedEntry : item
-    );
-    updateActiveFlightBoardEntries(nextFlightBoard);
-    setStatusMessage?.(
-      `Repaired ${repairedEntry.flightCode} ${repairedEntry.from}-${repairedEntry.to} from the current schedule.`
-    );
-    await logAppEvent("flight-board-repaired", {
-      boardEntryId,
-      linkedFlightId: repairedEntry.linkedFlightId,
-      flightCode: repairedEntry.flightCode
-    });
+    if (match.type === "alternate-airline") {
+      setRepairPrompt({
+        type: "alternate-airline",
+        boardEntryId,
+        airline: entry.airline,
+        from: entry.from,
+        to: entry.to,
+        candidateFlight: match.flight,
+        candidateAirline: String(match.flight?.airline || "").trim(),
+        candidateFlightCode: String(match.flight?.flightCode || "").trim(),
+        candidateDepartureLabel: getRepairDepartureLabel(match.flight)
+      });
+      await logAppEvent("flight-board-repair-alternate-airline-prompted", {
+        boardEntryId,
+        airline: entry.airline,
+        alternateAirline: match.flight?.airline,
+        from: entry.from,
+        to: entry.to
+      });
+      return;
+    }
+
+    await applyRepairMatch(boardEntryId, match.flight);
+  }
+
+  async function handleResolveRepairPrompt(confirmed) {
+    const prompt = repairPrompt;
+    setRepairPrompt(null);
+    if (!prompt || prompt.type !== "alternate-airline") return;
+
+    if (!confirmed) {
+      await logAppEvent("flight-board-repair-alternate-airline-declined", {
+        boardEntryId: prompt.boardEntryId,
+        airline: prompt.airline,
+        alternateAirline: prompt.candidateAirline,
+        from: prompt.from,
+        to: prompt.to
+      });
+      return;
+    }
+
+    await applyRepairMatch(prompt.boardEntryId, prompt.candidateFlight);
   }
 
   function handleSelectFlightBoard(boardId) {
@@ -643,7 +964,9 @@ export function useFlightBoards({
     flightBoard,
     shortlist,
     selectedShortlistFlight,
+    repairPrompt,
     updateActiveFlightBoardEntries,
+    applySimBriefPlanToBoardEntry,
     replaceFlightBoard,
     handleToggleBoardFlight,
     handleAddToFlightBoard,
@@ -651,9 +974,12 @@ export function useFlightBoards({
     handleRemoveFromFlightBoard,
     handleReorderFlightBoard,
     handleRepairFlightBoardEntry,
+    handleResolveRepairPrompt,
     handleSelectFlightBoard,
     handleCreateFlightBoard,
     handleRenameFlightBoard,
-    handleDeleteFlightBoard
+    handleDeleteFlightBoard,
+    handleSimBriefTypeChange,
+    handleDraftNetworkChange
   };
 }

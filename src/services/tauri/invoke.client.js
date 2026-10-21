@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+
 function isTauriRuntime() {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -129,7 +131,6 @@ async function appendBoundaryLogLine(line) {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
     await invoke("append_app_log_text", { text: line });
   } catch {
     // Best-effort boundary logging only.
@@ -142,9 +143,11 @@ export async function invokeAppCommand(commandName, args = {}, options = {}) {
   }
 
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
     return await invoke(commandName, args);
   } catch (error) {
+    if (typeof options.isExpectedError === "function" && options.isExpectedError(error)) {
+      throw error;
+    }
     const line = buildLogLine(
       options.subsystem || "Tauri",
       options.event || "command-failed",

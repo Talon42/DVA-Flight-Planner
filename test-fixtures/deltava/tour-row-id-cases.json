@@ -1,0 +1,17 @@
+{
+  "tourId": "42",
+  "row": {
+    "airline": "DL",
+    "flightNumber": "123",
+    "leg": 1,
+    "from": "KATL",
+    "to": "KJFK",
+    "departureTime": "08:00",
+    "arrivalTime": "10:00",
+    "equipment": "B737-800"
+  },
+  "canonicalRowId": "dva:42:airline-DL:flight-123:LEG-1:dep-KATL:arr-KJFK:dpt-08-00:arrt-10-00:eq-B737-800",
+  "legacyCanonicalRowId": "dva:dva:42:airline-DL:flight-123:LEG-1:dep-KATL:arr-KJFK:dpt-08-00:arrt-10-00:eq-B737-800",
+  "derivedProgressRowId": "dva:42:airline-DL:flight-123:leg-1:dep-KATL:arr-KJFK:dpt-08-00:arrt-10-00:eq-B737-800",
+  "legacyDerivedProgressRowId": "dva:dva:42:airline-DL:flight-123:leg-1:dep-KATL:arr-KJFK:dpt-08-00:arrt-10-00:eq-B737-800"
+}

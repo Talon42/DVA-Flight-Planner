@@ -12,6 +12,8 @@ export function matchesSearch(flight, query) {
     flight.flightCode,
     flight.airlineName,
     flight.equipmentType,
+    flight.compatibleEquipmentLabel,
+    flight.compatibleFamiliesLabel,
     flight.from,
     flight.to,
     flight.route,

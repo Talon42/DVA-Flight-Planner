@@ -1,3 +1,4 @@
+import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
 import { invokeAppCommand } from "./invoke.client.js";
 
 function isTauriRuntime() {
@@ -29,6 +30,91 @@ export async function fetchDeltaVirtualTourBriefing(briefingUrl) {
   );
 }
 
+// Loads the selected Delta Virtual PIREP detail page and returns the scraped payload, route, and runway fields.
+export async function fetchDeltaVirtualPirepDetails(pirepId) {
+  if (!isTauriRuntime()) {
+    throw new Error("Delta Virtual PIREP detail requests are only available in the desktop app.");
+  }
+
+  const normalizedPirepId = buildDvaPirepId(pirepId);
+  if (!normalizedPirepId) {
+    throw new Error("validation_failed: Delta Virtual PIREP id was missing or invalid.");
+  }
+
+  try {
+    const result = await invokeAppCommand(
+      "fetch_delta_virtual_pirep_details",
+      {
+        request: {
+          pirepId: normalizedPirepId
+        }
+      },
+      {
+        subsystem: "DVA PIREP",
+        event: "pirep-details-failed",
+        metadata: {
+          hasPirepId: Boolean(normalizedPirepId)
+        }
+      }
+    );
+
+    return {
+      id: String(result?.id || normalizedPirepId).trim(),
+      numericId: Number(result?.numericId ?? result?.numeric_id ?? 0) || null,
+      sourceUrl: String(result?.sourceUrl ?? result?.source_url ?? "").trim(),
+      payloadPassengers: String(
+        result?.payloadPassengers ?? result?.payload_passengers ?? ""
+      ).trim(),
+      payloadCargo: String(result?.payloadCargo ?? result?.payload_cargo ?? "").trim(),
+      payloadRaw: String(result?.payloadRaw ?? result?.payload_raw ?? "").trim(),
+      departureRoute: String(result?.departureRoute ?? result?.departure_route ?? "").trim(),
+      flightRoute: String(result?.flightRoute ?? result?.flight_route ?? "").trim(),
+      arrivalRoute: String(result?.arrivalRoute ?? result?.arrival_route ?? "").trim(),
+      routeSummary: String(result?.routeSummary ?? result?.route_summary ?? "").trim(),
+      departureRunway: String(result?.departureRunway ?? result?.departure_runway ?? "").trim(),
+      departureRunwayLength: String(
+        result?.departureRunwayLength ?? result?.departure_runway_length ?? ""
+      ).trim(),
+      departureRunwayDisplay: String(
+        result?.departureRunwayDisplay ?? result?.departure_runway_display ?? ""
+      ).trim(),
+      departureRunwayRaw: String(
+        result?.departureRunwayRaw ?? result?.departure_runway_raw ?? ""
+      ).trim(),
+      arrivalRunway: String(result?.arrivalRunway ?? result?.arrival_runway ?? "").trim(),
+      arrivalRunwayLength: String(result?.arrivalRunwayLength ?? result?.arrival_runway_length ?? "").trim(),
+      arrivalRunwayDisplay: String(
+        result?.arrivalRunwayDisplay ?? result?.arrival_runway_display ?? ""
+      ).trim(),
+      arrivalRunwayThresholdDistance: String(
+        result?.arrivalRunwayThresholdDistance ?? result?.arrival_runway_threshold_distance ?? ""
+      ).trim(),
+      arrivalRunwayRaw: String(result?.arrivalRunwayRaw ?? result?.arrival_runway_raw ?? "").trim(),
+      fetchedAt: String(result?.fetchedAt ?? result?.fetched_at ?? "").trim()
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      const normalized = normalizePirepDetailsError(error.message);
+      normalized.kind = error.kind || normalized.kind;
+      throw normalized;
+    }
+
+    throw normalizePirepDetailsError(String(error));
+  }
+}
+
+function normalizePirepDetailsError(message) {
+  if (!message) {
+    return new Error("Delta Virtual PIREP details failed.");
+  }
+
+  const [kind, ...rest] = String(message).split(":");
+  const normalizedMessage = rest.length ? rest.join(":").trim() : String(message);
+  const error = new Error(normalizedMessage || "Delta Virtual PIREP details failed.");
+  error.kind = rest.length ? kind : "download_failed";
+  return error;
+}
+
 function normalizeSyncError(message) {
   if (!message) {
     return new Error("Delta Virtual sync failed.");
@@ -39,6 +125,23 @@ function normalizeSyncError(message) {
   const error = new Error(normalizedMessage || "Delta Virtual sync failed.");
   error.kind = rest.length ? kind : "download_failed";
   return error;
+}
+
+const SAFE_LOGBOOK_ERROR = "Unable to load the Delta Virtual logbook.";
+
+function buildSafeLogbookResult({ status = "missing", errorCode = null, error = "" } = {}) {
+  return {
+    status,
+    errorCode,
+    dateIso: null,
+    lastSyncAt: null,
+    profileMetadata: null,
+    entries: [],
+    entryCount: 0,
+    acceptedEntryCount: 0,
+    rejectedEntryCount: 0,
+    error: String(error || "").trim()
+  };
 }
 
 export async function syncScheduleFromDeltaVirtual({
@@ -70,7 +173,59 @@ export async function syncScheduleFromDeltaVirtual({
       throw error;
     }
 
+    // Downloaded schedules use JSON; XML remains supported only by manual file import.
+    let schedule;
+    try {
+      schedule = JSON.parse(scheduleText);
+    } catch {
+      throw new Error("download_failed: Delta Virtual returned an invalid schedule JSON response.");
+    }
+    if (!schedule || typeof schedule !== "object" || Array.isArray(schedule)) {
+      throw new Error("download_failed: Delta Virtual returned an invalid schedule JSON response.");
+    }
+
     return { fileName, scheduleText, warnings, logbookJson };
+  } catch (error) {
+    if (error instanceof Error) {
+      const normalized = normalizeSyncError(error.message);
+      normalized.syncResult = error.syncResult;
+      throw normalized;
+    }
+
+    throw normalizeSyncError(String(error));
+  }
+}
+
+export async function refreshDeltaVirtualLogbook({
+  syncRunId = "",
+  debugEnabled = false
+} = {}) {
+  if (!isTauriRuntime()) {
+    throw new Error("Delta Virtual logbook refresh is only available in the desktop app.");
+  }
+
+  try {
+    const result = await invokeAppCommand("refresh_deltava_logbook", {
+      syncRunId: String(syncRunId || "").trim(),
+      debugEnabled: Boolean(debugEnabled)
+    });
+    const fileName =
+      result?.fileName ??
+      result?.file_name ??
+      result?.logbookJson?.fileName ??
+      result?.logbook_json?.file_name ??
+      null;
+    const warnings = Array.isArray(result?.warnings) ? result.warnings : [];
+    const logbookJson = result?.logbookJson ?? result?.logbook_json ?? null;
+
+    return {
+      fileName,
+      warnings,
+      logbookJson,
+      status: String(result?.status || "").trim(),
+      scheduleStatus: String(result?.scheduleStatus || result?.schedule_status || "").trim(),
+      logbookStatus: String(result?.logbookStatus || result?.logbook_status || "").trim()
+    };
   } catch (error) {
     if (error instanceof Error) {
       const normalized = normalizeSyncError(error.message);
@@ -165,13 +320,14 @@ export async function readDeltaVirtualLogbookMetadata() {
 
 export async function readDeltaVirtualLogbookProgress() {
   if (!isTauriRuntime()) {
-    return { dateIso: null, visitedAirports: [], arrivalAirports: [] };
+    return { dateIso: null, lastSyncAt: null, visitedAirports: [], arrivalAirports: [] };
   }
 
   try {
     const result = await invokeAppCommand("read_deltava_logbook_progress");
     return {
       dateIso: result?.dateIso ?? result?.date_iso ?? null,
+      lastSyncAt: result?.lastSyncAt ?? result?.last_sync_at ?? null,
       visitedAirports: Array.isArray(result?.visitedAirports ?? result?.visited_airports)
         ? result?.visitedAirports ?? result?.visited_airports
         : [],
@@ -180,7 +336,41 @@ export async function readDeltaVirtualLogbookProgress() {
         : []
     };
   } catch {
-    return { dateIso: null, visitedAirports: [], arrivalAirports: [] };
+    return { dateIso: null, lastSyncAt: null, visitedAirports: [], arrivalAirports: [] };
+  }
+}
+
+export async function readDeltaVirtualLogbook() {
+  if (!isTauriRuntime()) {
+    return buildSafeLogbookResult();
+  }
+
+  try {
+    const result = await invokeAppCommand("read_deltava_logbook");
+    const entries = Array.isArray(result?.entries) ? result.entries : [];
+    const status = String(result?.status || "ready").trim().toLowerCase();
+    const errorCode = result?.errorCode ?? result?.error_code ?? null;
+    const isInvalid = status === "invalid";
+
+    return {
+      status: status === "missing" ? "missing" : isInvalid ? "invalid" : "ready",
+      errorCode,
+      dateIso: result?.dateIso ?? result?.date_iso ?? null,
+      lastSyncAt: result?.lastSyncAt ?? result?.last_sync_at ?? null,
+      profileMetadata: result?.profileMetadata ?? result?.profile_metadata ?? null,
+      entries,
+      entryCount: Number(result?.entryCount ?? result?.entry_count ?? entries.length) || 0,
+      acceptedEntryCount:
+        Number(result?.acceptedEntryCount ?? result?.accepted_entry_count ?? entries.length) || 0,
+      rejectedEntryCount: Number(result?.rejectedEntryCount ?? result?.rejected_entry_count ?? 0) || 0,
+      error: isInvalid ? SAFE_LOGBOOK_ERROR : String(result?.error || "").trim()
+    };
+  } catch {
+    return buildSafeLogbookResult({
+      status: "invalid",
+      errorCode: "logbook_read_failed",
+      error: SAFE_LOGBOOK_ERROR
+    });
   }
 }
 

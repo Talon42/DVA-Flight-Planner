@@ -103,6 +103,15 @@ export function buildBoardEntryFromFlight(flight, overrides = {}) {
     staUtcMillis: normalizeUtcMillis(flight?.staUtcMillis),
     blockMinutes: Number.isFinite(flight?.blockMinutes) ? flight.blockMinutes : null,
     distanceNm: Number.isFinite(flight?.distanceNm) ? flight.distanceNm : null,
+    compatibleEquipment: Array.isArray(flight?.compatibleEquipment)
+      ? [...flight.compatibleEquipment]
+      : [],
+    compatibleEquipmentLabel: String(flight?.compatibleEquipmentLabel || "").trim(),
+    compatibleFamilies: Array.isArray(flight?.compatibleFamilies) ? [...flight.compatibleFamilies] : [],
+    compatibleFamiliesLabel: String(flight?.compatibleFamiliesLabel || "").trim(),
+    compatibilityCount: Number.isFinite(flight?.compatibilityCount) ? flight.compatibilityCount : 0,
+    compatibilityStatus: String(flight?.compatibilityStatus || "").trim(),
+    compatibilityReason: String(flight?.compatibilityReason || "").trim(),
     leg: String(flight?.leg || "").trim(),
     effectiveDate: String(flight?.effectiveDate || "").trim(),
     equipmentType: String(flight?.equipmentType || "").trim(),

@@ -7,6 +7,7 @@ import {
   bodySmTextClassName,
   labelTextClassName
 } from "../../components/ui/typography";
+import { nestedPanelStrongFrameClassName } from "../../components/ui/patterns";
 import { formatNumber } from "../../domain/formatting/formatters.js";
 import { getAirportByIcao } from "../../domain/airports/airportCatalog.js";
 
@@ -232,7 +233,12 @@ export default function AirportInfoTray({ selection, onClose }) {
   const runwayRows = buildUniqueRunwayRows(airport);
 
   return (
-    <Panel className="flex h-full min-h-0 flex-col rounded-none border-2 border-[rgba(160,180,202,0.52)] p-4 bp-1024:p-4 dark:border-[color:var(--surface-border)]">
+    <Panel
+      className={cn(
+        "flex h-full min-h-0 flex-col rounded-none p-4 bp-1024:p-4",
+        nestedPanelStrongFrameClassName
+      )}
+    >
       <SectionHeader
         eyebrow="AIRPORT INFO"
         title={title}

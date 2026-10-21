@@ -18,6 +18,7 @@ import {
   resolveSimBriefAircraftCompatibility,
   startSimBriefDispatch
 } from "../../services/tauri/simbrief.client.js";
+import { normalizeSimBriefDepartureOffsetMinutes } from "../../services/storage/storage.js";
 import { resolveDraftSimBriefId } from "../../domain/deltaVirtual/draftReport.js";
 
 function normalizeSimBriefAircraftTypeOption(value) {
@@ -131,6 +132,7 @@ export function useSimBriefDispatch({
   setStatusMessage,
   simBriefCustomAirframes = [],
   simBriefDispatchUnits,
+  simBriefDepartureOffsetMinutes = 0,
   simBriefPilotId,
   simBriefUsername,
   simBriefUseCurrentUtcForDispatchTime = false,
@@ -146,6 +148,7 @@ export function useSimBriefDispatch({
   const [isSimBriefAircraftTypesLoading, setIsSimBriefAircraftTypesLoading] = useState(false);
   const [simBriefAircraftTypesError, setSimBriefAircraftTypesError] = useState("");
   const loadRequestIdRef = useRef(0);
+  const dispatchInFlightRef = useRef(false);
   const simBriefDispatchOptions = buildDvaAircraftOptionsWithCustomAirframes(
     simBriefCustomAirframes
   );
@@ -244,7 +247,7 @@ export function useSimBriefDispatch({
   }, [handleFetchSimBriefAircraftTypes, isDesktopSimBriefAvailable]);
 
   const runSimBriefDispatchWorkflow = useCallback(async ({ forceNewDispatch = false } = {}) => {
-    if (!selectedShortlistFlight) {
+    if (!selectedShortlistFlight || dispatchInFlightRef.current) {
       return;
     }
 
@@ -286,6 +289,9 @@ export function useSimBriefDispatch({
     const hasSimBriefPlan = Boolean(existingStaticId);
     const username = String(simBriefUsername || "").trim();
     const pilotId = String(simBriefPilotId || "").trim();
+    const departureOffsetMinutes = normalizeSimBriefDepartureOffsetMinutes(
+      simBriefDepartureOffsetMinutes
+    );
     const dispatchMode = forceNewDispatch ? "regenerate" : hasSimBriefPlan ? "refresh" : "generate";
     if (!username && !pilotId) {
       const message =
@@ -301,6 +307,8 @@ export function useSimBriefDispatch({
       return;
     }
 
+    // A ref closes the same-render gap where two clicks can start duplicate desktop workflows.
+    dispatchInFlightRef.current = true;
     setSimBriefDispatchState({
       flightId,
       isDispatching: true,
@@ -397,7 +405,8 @@ export function useSimBriefDispatch({
         const callsign = deriveCallsign(dispatchFlight);
         const { departureTimeUtc, departureDate } = deriveSimBriefDepartureDateTimeUtc(
           dispatchFlight,
-          simBriefUseCurrentUtcForDispatchTime
+          simBriefUseCurrentUtcForDispatchTime,
+          departureOffsetMinutes
         );
 
         if (!departureTimeUtc || !departureDate) {
@@ -437,7 +446,8 @@ export function useSimBriefDispatch({
             destination: selectedShortlistFlight.to,
             departureDate,
             departureTimeUtc,
-            useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime
+            useCurrentUtcForDispatchTime: simBriefUseCurrentUtcForDispatchTime,
+            departureOffsetMinutes
           }
         );
         await logSystemDebug("SimBrief", "dispatch-debug", {
@@ -552,6 +562,37 @@ export function useSimBriefDispatch({
         return;
       }
 
+      const matchedBoardEntry =
+        flightBoard.find((entry) => entry.boardEntryId === boardEntryId) || null;
+      const beforeStaticId = String(
+        matchedBoardEntry?.simbriefPlan?.staticId || matchedBoardEntry?.simbriefPlan?.static_id || ""
+      ).trim();
+      const afterStaticId = String(
+        normalizedBoardEntry?.simbriefPlan?.staticId ||
+          normalizedBoardEntry?.simbriefPlan?.static_id ||
+          ""
+      ).trim();
+      await logSystemDebug("SimBrief", "dispatch-board-cache-update", {
+        dispatchRunId,
+        requestedBoardEntryId: boardEntryId,
+        returnedStaticId,
+        matchedBoardEntry: Boolean(matchedBoardEntry),
+        beforeStaticId,
+        afterStaticId
+      });
+      if (!matchedBoardEntry) {
+        await logSystemError(
+          "SimBrief",
+          "dispatch-board-cache-missed",
+          new Error("SimBrief board entry was not found for cache persistence."),
+          {
+            dispatchRunId,
+            requestedBoardEntryId: boardEntryId,
+            returnedStaticId
+          }
+        );
+      }
+
       setSimBriefDispatchState({
         flightId,
         isDispatching: false,
@@ -654,12 +695,27 @@ export function useSimBriefDispatch({
       });
     } finally {
       setPendingMapFlightPathViewMode?.(null);
-      await closeSimBriefDispatchWindow();
+      try {
+        await closeSimBriefDispatchWindow();
+      } catch (cleanupError) {
+        try {
+          await logSystemError("SimBrief", "dispatch-window-close-failed", cleanupError, {
+            dispatchRunId,
+            dispatchMode,
+            stage: "cleanup-window"
+          });
+        } catch {
+          // Cleanup logging must not keep dispatch locked or replace its primary result.
+        }
+      } finally {
+        dispatchInFlightRef.current = false;
+      }
     }
   }, [
     applySimBriefPlanToBoardEntry,
     flightBoard,
     isDesktopSimBriefAvailable,
+    isDevToolsEnabled,
     selectedShortlistFlight,
     setExpandedBoardFlightId,
     setPendingMapFlightPathViewMode,
@@ -667,6 +723,7 @@ export function useSimBriefDispatch({
     setStatusMessage,
     simBriefCustomAirframes,
     simBriefDispatchUnits,
+    simBriefDepartureOffsetMinutes,
     simBriefPilotId,
     simBriefUsername,
     simBriefUseCurrentUtcForDispatchTime,

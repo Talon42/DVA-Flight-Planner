@@ -5,6 +5,17 @@ let airportCatalog = null;
 let airportByIcao = null;
 let airportByIata = null;
 
+// Removes the redundant trailing type from official airport names used for display.
+export function formatAirportDisplayName(value) {
+  const normalizedName = String(value || "").trim();
+  if (!normalizedName) {
+    return "";
+  }
+
+  const shortenedName = normalizedName.replace(/\s+airport$/i, "").trim();
+  return shortenedName || normalizedName;
+}
+
 function parseCoordinate(value) {
   const parsed = Number.parseFloat(String(value ?? "").trim());
   return Number.isFinite(parsed) ? parsed : null;
@@ -66,7 +77,7 @@ function ensureAirportCatalogLoaded() {
       icao: String(row.icao || "").trim().toUpperCase(),
       iata: String(row.iata || "").trim().toUpperCase(),
       name: String(row.name || "").trim(),
-      actualName: String(row.actualName || "").trim(),
+      actualName: formatAirportDisplayName(row.actualName),
       country: String(row.countryName || "").trim(),
       state: String(row.stateTerritory || "").trim(),
       altitude: parseNumeric(row.alt ?? row.altitude ?? row.elevation),

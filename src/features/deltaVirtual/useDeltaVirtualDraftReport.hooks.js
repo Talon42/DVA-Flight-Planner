@@ -247,6 +247,11 @@ export function useDeltaVirtualDraftReport({
         if (result.ok) {
           const returnedId = normalizePositiveDraftReportId(result.id);
           const returnedIdPresent = returnedId !== null;
+          const matchedBoardEntry =
+            flightBoard.find((entry) => entry.boardEntryId === normalizedBoardEntryId) || null;
+          const beforeDraftReportId = normalizePositiveDraftReportId(
+            matchedBoardEntry?.draftReportId ?? matchedBoardEntry?.dvaDraftReportId
+          );
           if (returnedIdPresent) {
             const draftReportUrl = buildDraftReportUrl(returnedId);
             setDeltaDraftReportUrlState({
@@ -267,6 +272,30 @@ export function useDeltaVirtualDraftReport({
                   : entry
               )
             );
+            await logSystemDebug("DVA Draft", "submit-board-cache-update", {
+              draftRunId,
+              requestedBoardEntryId: normalizedBoardEntryId,
+              returnedDraftReportId: returnedId,
+              matchedBoardEntry: Boolean(matchedBoardEntry),
+              beforeDraftReportId,
+              afterDraftReportId: returnedId,
+              afterDvaDraftReportId: returnedId,
+              draftDeleteRequiresRegenerate: clearDraftDeleteLock
+                ? false
+                : Boolean(matchedBoardEntry?.draftDeleteRequiresRegenerate)
+            });
+            if (!matchedBoardEntry) {
+              await logSystemError(
+                "DVA Draft",
+                "submit-board-cache-missed",
+                new Error("Draft board entry was not found for cache persistence."),
+                {
+                  draftRunId,
+                  requestedBoardEntryId: normalizedBoardEntryId,
+                  returnedDraftReportId: returnedId
+                }
+              );
+            }
           } else {
             setDeltaDraftReportUrlState({
               boardEntryId: normalizedBoardEntryId,

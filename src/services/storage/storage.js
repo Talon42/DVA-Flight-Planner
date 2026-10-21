@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import {
   IMPORT_LOG_FILE,
   GETTING_STARTED_STATE_FILE,
@@ -5,8 +6,13 @@ import {
   SAVED_SCHEDULE_FILE,
   SIMBRIEF_SETTINGS_FILE,
   UI_STATE_FILE,
+  USER_DATA_BROWSER_STORAGE_KEYS,
   WHATS_NEW_STATE_FILE
 } from "./storage.constants.js";
+import {
+  openDesktopPath,
+  revealDesktopPath
+} from "../tauri/desktopShell.client.js";
 import {
   deriveCallsign,
   deriveFlightNumber
@@ -15,15 +21,22 @@ import {
   getSelectedAircraftForFlight,
   normalizeAircraftCustomAirframe
 } from "../../domain/aircraft/aircraftIdentity.js";
+import {
+  ensureAppLogFile,
+  clearUserData,
+  quarantineAppStorageFile,
+  readAppStorageFile,
+  writeAppStorageFile
+} from "../tauri/storage.client.js";
 
 const LEGACY_PERSISTED_SCHEDULE_VERSION = 2;
 const PERSISTED_SCHEDULE_VERSION = 4;
 const PERSISTED_SCHEDULE_ENCODING_GZIP = "gzip-base64";
 const PERSISTED_SCHEDULE_ENCODING_PLAIN = "plain-json";
 const BROWSER_LOG_SIZE_LIMIT_BYTES = 1024 * 1024;
-const DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
 const DELTAVA_TOURS_CACHE_STORAGE_KEY = "flight-planner.deltava-tours-cache";
 const DELTAVA_TOUR_PROGRESS_STORAGE_KEY = "flight-planner.deltava-tour-progress";
+const DELTAVA_LOGBOOK_JSON_STORAGE_KEY = "flight-planner.deltava-logbook-json";
 const GETTING_STARTED_STORAGE_KEY = "flight-planner.getting-started";
 const WHATS_NEW_LAST_SEEN_RELEASE_STORAGE_KEY = "flight-planner.whats-new.last-seen-release-id";
 const DELTAVA_LOGBOOK_STORAGE_DIR = "flight-planner/deltava-sync/logbook";
@@ -57,24 +70,16 @@ async function loadFsModule() {
   return import("@tauri-apps/plugin-fs");
 }
 
-async function ensureAppDataRoot() {
-  const { appDataDir } = await import("@tauri-apps/api/path");
-  const { mkdir } = await loadFsModule();
-  await mkdir(await appDataDir(), {
-    recursive: true
-  });
-}
-
-function buildCorruptStorageFileName(fileName) {
-  const normalizedFileName = String(fileName || "").trim();
-  const lastDotIndex = normalizedFileName.lastIndexOf(".");
-
-  if (lastDotIndex <= 0) {
-    return `${normalizedFileName}.corrupt.${Date.now()}`;
-  }
-
-  return `${normalizedFileName.slice(0, lastDotIndex)}.corrupt.${Date.now()}${normalizedFileName.slice(lastDotIndex)}`;
-}
+const APP_STORAGE_KEYS_BY_FILE = {
+  [SAVED_SCHEDULE_FILE]: "savedSchedule",
+  [UI_STATE_FILE]: "uiState",
+  [DEV_TOOLS_STATE_FILE]: "devToolsState",
+  [SIMBRIEF_SETTINGS_FILE]: "simbriefSettings",
+  [GETTING_STARTED_STATE_FILE]: "gettingStarted",
+  [DELTAVA_TOURS_CACHE_FILE]: "deltavaToursCache",
+  [DELTAVA_TOUR_PROGRESS_FILE]: "deltavaTourProgress",
+  [WHATS_NEW_STATE_FILE]: "whatsNewState"
+};
 
 function logCorruptStorageFileOnce(storageLabel, fileName, error) {
   const warningKey = `${storageLabel}:${fileName}`;
@@ -91,13 +96,7 @@ function logCorruptStorageFileOnce(storageLabel, fileName, error) {
 
 async function quarantineCorruptStorageFile(fileName, storageLabel) {
   try {
-    const { rename, BaseDirectory } = await loadFsModule();
-    const corruptFileName = buildCorruptStorageFileName(fileName);
-
-    await rename(fileName, corruptFileName, {
-      oldPathBaseDir: BaseDirectory.AppData,
-      newPathBaseDir: BaseDirectory.AppData
-    });
+    await quarantineAppStorageFile(APP_STORAGE_KEYS_BY_FILE[fileName]);
   } catch (error) {
     logCorruptStorageFileOnce(storageLabel, fileName, error);
   }
@@ -109,7 +108,32 @@ function getDefaultSimBriefSettings() {
     pilotId: "",
     useCurrentUtcForDispatchTime: false,
     dispatchUnits: "LBS",
+    departureOffsetMinutes: 0,
     customAirframes: []
+  };
+}
+
+// Normalizes the saved SimBrief departure offset to the allowed discrete values.
+export function normalizeSimBriefDepartureOffsetMinutes(value) {
+  const normalizedValue = Number(value);
+  return normalizedValue === 30 || normalizedValue === 45 || normalizedValue === 60 || normalizedValue === 90
+    ? normalizedValue
+    : 0;
+}
+
+// Produces the complete canonical snapshot accepted by the ordered SimBrief writer.
+export function normalizeSimBriefSettingsSnapshot(settings) {
+  return {
+    username: String(settings?.username || "").trim(),
+    pilotId: String(settings?.pilotId || "").trim(),
+    useCurrentUtcForDispatchTime: Boolean(settings?.useCurrentUtcForDispatchTime),
+    dispatchUnits: String(settings?.dispatchUnits || "LBS").trim().toUpperCase() === "KGS"
+      ? "KGS"
+      : "LBS",
+    departureOffsetMinutes: normalizeSimBriefDepartureOffsetMinutes(settings?.departureOffsetMinutes),
+    customAirframes: Array.isArray(settings?.customAirframes)
+      ? settings.customAirframes.map(normalizeAircraftCustomAirframe).filter(Boolean)
+      : []
   };
 }
 
@@ -396,6 +420,8 @@ function base64ToUint8Array(value) {
   return bytes;
 }
 
+// Kept for compatibility with compressed schedules even though new writes are currently plain JSON.
+// eslint-disable-next-line no-unused-vars
 async function compressPersistedPayload(text) {
   if (typeof CompressionStream === "undefined") {
     return {
@@ -594,18 +620,8 @@ async function serializeSavedSchedule(savedSchedule) {
 
 export async function readSavedSchedule() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(SAVED_SCHEDULE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return null;
-    }
-
-    const text = await readTextFile(SAVED_SCHEDULE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
+    const text = await readAppStorageFile("savedSchedule");
+    if (!text) return null;
 
     try {
       return await parseSavedScheduleText(text);
@@ -633,13 +649,7 @@ export async function writeSavedSchedule(savedSchedule) {
   const serializedSchedule = await serializeSavedSchedule(savedSchedule);
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(
-      SAVED_SCHEDULE_FILE,
-      serializedSchedule,
-      { baseDir: BaseDirectory.AppData }
-    );
+    await writeAppStorageFile("savedSchedule", serializedSchedule);
     return;
   }
 
@@ -648,18 +658,7 @@ export async function writeSavedSchedule(savedSchedule) {
 
 export async function readSavedUiState() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(UI_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return null;
-    }
-
-    const text = await readTextFile(UI_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
+    const text = await readAppStorageFile("uiState");
     if (!text) {
       return null;
     }
@@ -686,35 +685,11 @@ export async function readSavedUiState() {
   }
 }
 
-export async function writeSavedUiState(uiState) {
-  const serialized = JSON.stringify(uiState || {});
-
-  if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(UI_STATE_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
-    return;
-  }
-
-  window.localStorage.setItem("flight-planner.ui-state", serialized);
-}
+export { saveUiState as writeSavedUiState } from "./uiState.storage.js";
 
 export async function readSavedDevToolsEnabled() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(DEV_TOOLS_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return null;
-    }
-
-    const text = await readTextFile(DEV_TOOLS_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
+    const text = await readAppStorageFile("devToolsState");
     if (!text) {
       return null;
     }
@@ -744,11 +719,7 @@ export async function writeSavedDevToolsEnabled(enabled) {
   const serialized = JSON.stringify({ enabled: Boolean(enabled) });
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(DEV_TOOLS_STATE_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("devToolsState", serialized);
     return;
   }
 
@@ -756,44 +727,16 @@ export async function writeSavedDevToolsEnabled(enabled) {
 }
 
 export async function readSimBriefSettings() {
-  function normalizeCustomAirframe(entry) {
-    return normalizeAircraftCustomAirframe(entry);
-  }
-
-  function normalizeSettings(parsed) {
-    const dispatchUnits = String(parsed?.dispatchUnits || "").trim().toUpperCase();
-    return {
-      username: String(parsed?.username || "").trim(),
-      pilotId: String(parsed?.pilotId || "").trim(),
-      useCurrentUtcForDispatchTime: Boolean(parsed?.useCurrentUtcForDispatchTime),
-      dispatchUnits: dispatchUnits === "KGS" ? "KGS" : "LBS",
-      customAirframes: Array.isArray(parsed?.customAirframes)
-        ? parsed.customAirframes.map(normalizeCustomAirframe).filter(Boolean)
-        : []
-    };
-  }
-
   const defaultSettings = getDefaultSimBriefSettings();
 
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(SIMBRIEF_SETTINGS_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return defaultSettings;
-    }
-
-    const text = await readTextFile(SIMBRIEF_SETTINGS_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
+    const text = await readAppStorageFile("simbriefSettings");
     if (!text) {
       return defaultSettings;
     }
 
     try {
-      return normalizeSettings(JSON.parse(text));
+      return normalizeSimBriefSettingsSnapshot(JSON.parse(text));
     } catch (error) {
       await quarantineCorruptStorageFile(SIMBRIEF_SETTINGS_FILE, "simbrief settings");
       logCorruptStorageFileOnce("simbrief settings", SIMBRIEF_SETTINGS_FILE, error);
@@ -807,7 +750,7 @@ export async function readSimBriefSettings() {
   }
 
   try {
-    return normalizeSettings(JSON.parse(text));
+    return normalizeSimBriefSettingsSnapshot(JSON.parse(text));
   } catch (error) {
     logCorruptStorageFileOnce("simbrief settings", "flight-planner.simbrief-settings", error);
     return defaultSettings;
@@ -815,26 +758,10 @@ export async function readSimBriefSettings() {
 }
 
 export async function writeSimBriefSettings(settings) {
-  const serialized = JSON.stringify({
-    username: String(settings?.username || "").trim(),
-    pilotId: String(settings?.pilotId || "").trim(),
-    useCurrentUtcForDispatchTime: Boolean(settings?.useCurrentUtcForDispatchTime),
-    dispatchUnits: String(settings?.dispatchUnits || "LBS").trim().toUpperCase() === "KGS"
-      ? "KGS"
-      : "LBS",
-    customAirframes: Array.isArray(settings?.customAirframes)
-      ? settings.customAirframes
-          .map(normalizeAircraftCustomAirframe)
-          .filter(Boolean)
-      : []
-  });
+  const serialized = JSON.stringify(normalizeSimBriefSettingsSnapshot(settings));
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(SIMBRIEF_SETTINGS_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("simbriefSettings", serialized);
     return;
   }
 
@@ -843,19 +770,8 @@ export async function writeSimBriefSettings(settings) {
 
 export async function readGettingStartedState() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(GETTING_STARTED_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return getDefaultGettingStartedState();
-    }
-
     try {
-      const text = await readTextFile(GETTING_STARTED_STATE_FILE, {
-        baseDir: BaseDirectory.AppData
-      });
+      const text = await readAppStorageFile("gettingStarted");
       return normalizeGettingStartedState(text ? JSON.parse(text) : null);
     } catch {
       return getDefaultGettingStartedState();
@@ -878,19 +794,8 @@ export async function readDeltaVirtualToursCache() {
   const defaultCache = getDefaultDeltaVirtualToursCache();
 
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(DELTAVA_TOURS_CACHE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return defaultCache;
-    }
-
     try {
-      const text = await readTextFile(DELTAVA_TOURS_CACHE_FILE, {
-        baseDir: BaseDirectory.AppData
-      });
+      const text = await readAppStorageFile("deltavaToursCache");
       return normalizeDeltaVirtualToursCache(text ? JSON.parse(text) : null);
     } catch {
       return defaultCache;
@@ -913,11 +818,7 @@ export async function writeDeltaVirtualToursCache(cache) {
   const serialized = JSON.stringify(normalizeDeltaVirtualToursCache(cache));
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(DELTAVA_TOURS_CACHE_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("deltavaToursCache", serialized);
     return;
   }
 
@@ -928,19 +829,8 @@ export async function readDeltaVirtualTourProgress() {
   const defaultProgress = getDefaultDeltaVirtualTourProgress();
 
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(DELTAVA_TOUR_PROGRESS_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return defaultProgress;
-    }
-
     try {
-      const text = await readTextFile(DELTAVA_TOUR_PROGRESS_FILE, {
-        baseDir: BaseDirectory.AppData
-      });
+      const text = await readAppStorageFile("deltavaTourProgress");
       return normalizeDeltaVirtualTourProgress(text ? JSON.parse(text) : null);
     } catch {
       return defaultProgress;
@@ -963,11 +853,7 @@ export async function writeDeltaVirtualTourProgress(progress) {
   const serialized = JSON.stringify(normalizeDeltaVirtualTourProgress(progress));
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(DELTAVA_TOUR_PROGRESS_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("deltavaTourProgress", serialized);
     return;
   }
 
@@ -978,11 +864,7 @@ export async function writeGettingStartedState(state) {
   const serialized = JSON.stringify(normalizeGettingStartedState(state));
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(GETTING_STARTED_STATE_FILE, serialized, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("gettingStarted", serialized);
     return;
   }
 
@@ -991,19 +873,8 @@ export async function writeGettingStartedState(state) {
 
 export async function readLastSeenWhatsNewReleaseId() {
   if (isTauriRuntime()) {
-    const { exists, readTextFile, BaseDirectory } = await loadFsModule();
-    const hasFile = await exists(WHATS_NEW_STATE_FILE, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      return "";
-    }
-
     try {
-      const text = await readTextFile(WHATS_NEW_STATE_FILE, {
-        baseDir: BaseDirectory.AppData
-      });
+      const text = await readAppStorageFile("whatsNewState");
       return normalizeWhatsNewReleaseId(text);
     } catch {
       return "";
@@ -1019,11 +890,7 @@ export async function saveLastSeenWhatsNewReleaseId(version) {
   const normalizedVersion = normalizeWhatsNewReleaseId(version);
 
   if (isTauriRuntime()) {
-    const { writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    await writeTextFile(WHATS_NEW_STATE_FILE, normalizedVersion, {
-      baseDir: BaseDirectory.AppData
-    });
+    await writeAppStorageFile("whatsNewState", normalizedVersion);
     return;
   }
 
@@ -1047,7 +914,6 @@ async function appendLogFile(relativePath, storageKey, logText) {
     }
 
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const normalized = normalizeLogEntryText(logText);
       if (!normalized) {
         return null;
@@ -1071,19 +937,8 @@ async function ensureLogFile(relativePath, storageKey) {
   const header = `[${new Date().toISOString()}] [App] log-file-created`;
 
   if (isTauriRuntime()) {
-    const { exists, writeTextFile, BaseDirectory } = await loadFsModule();
-    await ensureAppDataRoot();
-    const hasFile = await exists(relativePath, {
-      baseDir: BaseDirectory.AppData
-    });
-
-    if (!hasFile) {
-      await writeTextFile(relativePath, `${header}\n`, {
-        baseDir: BaseDirectory.AppData
-      });
-    }
-
-    return resolveAppDataPath(relativePath);
+    if (relativePath !== IMPORT_LOG_FILE) return null;
+    return ensureAppLogFile(`${header}\n`);
   }
 
   const existing = window.localStorage.getItem(storageKey);
@@ -1095,19 +950,18 @@ async function ensureLogFile(relativePath, storageKey) {
 
 async function openLogFile(relativePath, storageKey) {
   if (isTauriRuntime()) {
-    const { openPath, revealItemInDir } = await import("@tauri-apps/plugin-opener");
     const fullPath = await ensureLogFile(relativePath, storageKey);
     try {
-      await openPath(fullPath);
+      await openDesktopPath(fullPath);
       return;
     } catch (error) {
       try {
-        await revealItemInDir(fullPath);
+        await revealDesktopPath(fullPath);
       } catch {
         // no-op: we'll throw the original open error below
       }
       const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(`Unable to open log file: ${fullPath} (${reason})`);
+      throw new Error(`Unable to open log file: ${fullPath} (${reason})`, { cause: error });
     }
   }
 
@@ -1161,27 +1015,21 @@ export async function confirmDeleteUserData() {
 }
 
 export async function deleteStoredUserData() {
+  let result = {
+    ok: true,
+    clearedTargets: [],
+    missingTargets: [],
+    failures: []
+  };
   if (isTauriRuntime()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("clear_user_data");
+    result = await clearUserData();
   }
 
-  for (const key of [
-    "flight-planner.saved-schedule",
-    "flight-planner.ui-state",
-    "flight-planner.simbrief-settings",
-    "flight-planner.deltava-auth",
-    GETTING_STARTED_STORAGE_KEY,
-    "flight-planner.import-log",
-    DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
-    DELTAVA_TOUR_PROGRESS_STORAGE_KEY,
-    WHATS_NEW_LAST_SEEN_RELEASE_STORAGE_KEY,
-    "flight-planner.theme",
-    "flight-planner.dev-tools-enabled",
-    "flight-planner.dev-window-width"
-  ]) {
+  // Legacy browser cleanup only; canonical DVA logbook storage is Rust-backed.
+  for (const key of USER_DATA_BROWSER_STORAGE_KEYS) {
     window.localStorage.removeItem(key);
   }
+  return result;
 }
 
 async function pickTextFile({ accept, filterName, extensions }) {
@@ -1287,7 +1135,10 @@ export async function storeDeltaVirtualLogbookJson(fileName, jsonText) {
   try {
     JSON.parse(trimmed);
   } catch (error) {
-    throw new Error(`Logbook JSON was invalid: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Logbook JSON was invalid: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
+    );
   }
 
   const normalizedFileName = sanitizeLogbookFilename(fileName);
@@ -1298,7 +1149,6 @@ export async function storeDeltaVirtualLogbookJson(fileName, jsonText) {
       baseDir: BaseDirectory.AppLocalData,
       recursive: true
     });
-
     await writeTextFile(`${DELTAVA_LOGBOOK_STORAGE_DIR}/${normalizedFileName}`, trimmed, {
       baseDir: BaseDirectory.AppLocalData
     });
@@ -1307,9 +1157,6 @@ export async function storeDeltaVirtualLogbookJson(fileName, jsonText) {
 
   window.localStorage.setItem(
     DELTAVA_LOGBOOK_JSON_STORAGE_KEY,
-    JSON.stringify({
-      fileName: normalizedFileName,
-      jsonText: trimmed
-    })
+    JSON.stringify({ fileName: normalizedFileName, jsonText: trimmed })
   );
 }

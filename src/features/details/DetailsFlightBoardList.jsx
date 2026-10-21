@@ -2,7 +2,7 @@ import DetailsFlightBoardCardSummary from "./DetailsFlightBoardCardSummary.jsx";
 import DetailsFlightBoardRepairPanel from "./DetailsFlightBoardRepairPanel.jsx";
 import SimBriefInlinePanel from "./DetailsSimBriefInlinePanel.jsx";
 import { cn } from "../../components/ui/cn";
-import { mutedTextClassName } from "../../components/ui/patterns";
+import { mutedTextClassName, nestedPanelStrongFrameClassName } from "../../components/ui/patterns";
 
 // Renders the flight-board list and the active drag overlay without owning drag state.
 export default function DetailsFlightBoardList({
@@ -65,7 +65,8 @@ export default function DetailsFlightBoardList({
               key={flight.boardEntryId}
               ref={(node) => setItemRef(flight.boardEntryId, node)}
               className={cn(
-                "shortlist-item relative grid min-w-0 gap-1.5 rounded-none border-2 border-[rgba(160,180,202,0.52)] bg-[var(--surface-raised)] px-2 py-1.5 text-[var(--text-primary)] transition-[transform,opacity,filter,background] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1.12)] dark:border-[color:var(--surface-border)] bp-1024:gap-1 bp-1024:px-1.5 bp-1024:py-1.25 dark:bg-[var(--surface-raised)]",
+                "shortlist-item relative grid min-w-0 gap-1.5 rounded-none px-2 py-1.5 text-[var(--text-primary)] transition-[transform,opacity,filter,background] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1.12)] bp-1024:gap-1 bp-1024:px-1.5 bp-1024:py-1.25",
+                nestedPanelStrongFrameClassName,
                 expandedBoardFlightId === flight.boardEntryId && "z-20 bg-[var(--surface-soft)]",
                 flight.isStale && "bg-[color:rgba(200,16,46,0.08)]",
                 draggedBoardEntryId && "opacity-70 saturate-[0.82]"
@@ -165,7 +166,12 @@ export default function DetailsFlightBoardList({
           }}
           aria-hidden="true"
         >
-          <div className="relative rounded-none border border-[color:transparent] bg-[var(--surface-raised)] px-2 py-1.5 text-[var(--text-primary)] shadow-none ring-0 [transform:scale(1.02)] dark:bg-[var(--surface-raised)] dark:text-white">
+          <div
+            className={cn(
+              "relative rounded-none px-2 py-1.5 text-[var(--text-primary)] shadow-none ring-0 [transform:scale(1.02)]",
+              nestedPanelStrongFrameClassName
+            )}
+          >
             <div className="pointer-events-none absolute left-1/2 top-0 z-10 flex h-5 w-12 -translate-x-1/2 -translate-y-px items-end justify-center rounded-none border-x border-b border-[color:transparent] bg-[var(--surface-soft)] pb-1 text-[var(--text-muted)] opacity-85 dark:bg-[var(--surface-soft)] dark:text-[var(--route-banner-muted)]">
               <span className="grid gap-0.5">
                 <span className="block h-0.5 w-4 rounded-none bg-current/80" />

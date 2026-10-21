@@ -1,4 +1,4 @@
-import { Component } from "react";
+import { Component, useEffect } from "react";
 import Button from "../components/ui/Button";
 import Panel from "../components/ui/Panel";
 import ModalBackdrop from "../components/layout/ModalBackdrop";
@@ -24,6 +24,70 @@ const SETTINGS_TABS = [
   { id: "advanced", label: "Advanced" },
   { id: "about", label: "About" }
 ];
+
+function FlightBoardRepairModal({ prompt, onResolve }) {
+  useEffect(() => {
+    const previouslyFocusedElement = document.activeElement;
+    document.getElementById("flight-board-repair-dialog")?.querySelector("button")?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onResolve(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocusedElement instanceof HTMLElement) previouslyFocusedElement.focus();
+    };
+  }, [onResolve]);
+
+  return (
+    <ModalBackdrop onClick={() => onResolve(false)}>
+      <Panel
+        id="flight-board-repair-dialog"
+        as="section"
+        padding="lg"
+        className={cn(modalPanelClassName, "!w-[min(620px,100%)]")}
+        role="dialog"
+        aria-modal="true"
+        aria-label={
+          prompt.type === "alternate-airline"
+            ? "Use alternate airline for flight repair"
+            : "Flight not on today's schedule"
+        }
+        onClick={(event) => event.stopPropagation()}
+      >
+        <SectionHeader
+          eyebrow="Flight Board Repair"
+          title={
+            prompt.type === "alternate-airline"
+              ? "Use an Alternate Airline?"
+              : "Flight Not on Today’s Schedule"
+          }
+        />
+
+        {prompt.type === "alternate-airline" ? (
+          <p className={mutedTextClassName}>
+            {prompt.airline || "The original airline"} does not operate {prompt.from}-{prompt.to}{" "}
+            on today’s schedule. Use {prompt.candidateFlightCode || prompt.candidateAirline}{" "}
+            departing at {prompt.candidateDepartureLabel} instead?
+          </p>
+        ) : (
+          <p className={mutedTextClassName}>
+            No flight from {prompt.from} to {prompt.to} exists on today’s schedule.
+          </p>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => onResolve(false)}>
+            {prompt.type === "alternate-airline" ? "No" : "Close"}
+          </Button>
+          {prompt.type === "alternate-airline" ? (
+            <Button onClick={() => onResolve(true)}>Yes</Button>
+          ) : null}
+        </div>
+      </Panel>
+    </ModalBackdrop>
+  );
+}
 
 class SettingsModalBoundary extends Component {
   constructor(innerProps) {
@@ -112,6 +176,7 @@ export default function AppOverlayHost({
   simBriefUsernameDraft,
   simBriefPilotIdDraft,
   simBriefDispatchUnits,
+  simBriefDepartureOffsetMinutes,
   simBriefCustomAirframesDraft,
   simBriefCustomAirframeIdDraft,
   simBriefCustomAirframeNameDraft,
@@ -123,6 +188,7 @@ export default function AppOverlayHost({
   onSimBriefUsernameDraftChange,
   onSimBriefPilotIdDraftChange,
   onSimBriefDispatchUnitsChange,
+  onSimBriefDepartureOffsetChange,
   onSimBriefCustomAirframeIdDraftChange,
   onSimBriefCustomAirframeNameDraftChange,
   onSimBriefCustomAirframeMatchTypeDraftChange,
@@ -137,9 +203,15 @@ export default function AppOverlayHost({
   onRemoveAddonRoot,
   onSkipAddonSetup,
   isDeleteUserDataConfirmOpen,
+  isUserDataDeletionBlocked,
   onResolveDeleteUserDataConfirmation,
+  userDataClearFailure,
+  onRetryUserDataClear,
+  onReloadAfterUserDataClearFailure,
   isDutyBoardOverwriteConfirmOpen,
   onResolveDutyBoardOverwriteConfirmation,
+  repairPrompt,
+  onResolveRepairPrompt,
   isSimBriefDispatchBlockedOpen,
   simBriefDispatchBlockedMessage,
   onCloseSimBriefDispatchBlocked,
@@ -152,6 +224,7 @@ export default function AppOverlayHost({
   availableUpdate,
   onDownloadUpdate,
   isAddonAutoScanning,
+  isRefreshingLogbook,
   dvaSyncWarning,
   isDvaSyncWarningOpen,
   onCloseDvaSyncWarning,
@@ -263,8 +336,8 @@ export default function AppOverlayHost({
             hasSavedPassword: dvaHasPassword,
             isSaving: isDvaCredentialsSaving,
             isSaveDisabled:
-              isDvaCredentialsSaving || isImporting || isSyncing || !hasDvaCredentialChanges,
-            isClearDisabled: isDvaCredentialsSaving || isImporting || isSyncing,
+            isDvaCredentialsSaving || isImporting || isSyncing || isRefreshingLogbook || !hasDvaCredentialChanges,
+            isClearDisabled: isDvaCredentialsSaving || isImporting || isSyncing || isRefreshingLogbook,
             onFirstNameChange: onDvaFirstNameDraftChange,
             onLastNameChange: onDvaLastNameDraftChange,
             onPasswordChange: onDvaPasswordDraftChange,
@@ -282,6 +355,7 @@ export default function AppOverlayHost({
             username: simBriefUsernameDraft,
             pilotId: simBriefPilotIdDraft,
             dispatchUnits: simBriefDispatchUnits,
+            departureOffsetMinutes: simBriefDepartureOffsetMinutes,
             customAirframes: simBriefCustomAirframesDraft,
             customAirframeDraftId: simBriefCustomAirframeIdDraft,
             customAirframeDraftName: simBriefCustomAirframeNameDraft,
@@ -293,6 +367,7 @@ export default function AppOverlayHost({
             onUsernameChange: onSimBriefUsernameDraftChange,
             onPilotIdChange: onSimBriefPilotIdDraftChange,
             onDispatchUnitsChange: onSimBriefDispatchUnitsChange,
+            onDepartureOffsetChange: onSimBriefDepartureOffsetChange,
             onCustomAirframeDraftIdChange: onSimBriefCustomAirframeIdDraftChange,
             onCustomAirframeDraftNameChange: onSimBriefCustomAirframeNameDraftChange,
             onCustomAirframeDraftMatchTypeChange: onSimBriefCustomAirframeMatchTypeDraftChange,
@@ -345,7 +420,11 @@ export default function AppOverlayHost({
               <Button variant="ghost" onClick={() => onResolveDeleteUserDataConfirmation(false)}>
                 Cancel
               </Button>
-              <Button variant="danger" onClick={() => onResolveDeleteUserDataConfirmation(true)}>
+              <Button
+                variant="danger"
+                disabled={isUserDataDeletionBlocked}
+                onClick={() => onResolveDeleteUserDataConfirmation(true)}
+              >
                 Delete
               </Button>
             </div>
@@ -384,6 +463,10 @@ export default function AppOverlayHost({
             </div>
           </Panel>
         </ModalBackdrop>
+      ) : null}
+
+      {repairPrompt ? (
+        <FlightBoardRepairModal prompt={repairPrompt} onResolve={onResolveRepairPrompt} />
       ) : null}
 
       {isSimBriefDispatchBlockedOpen ? (
@@ -524,6 +607,13 @@ export default function AppOverlayHost({
           description="Refreshing your schedule and logbook data."
           ariaLabel="Delta Virtual sync in progress"
         />
+      ) : isRefreshingLogbook ? (
+        <SpinnerStatusModal
+          eyebrow="Delta Virtual Logbook"
+          title="Refreshing Logbook"
+          description="Refreshing your Delta Virtual logbook data."
+          ariaLabel="Delta Virtual logbook refresh in progress"
+        />
       ) : null}
 
       {isAddonAutoScanning ? (
@@ -565,6 +655,38 @@ export default function AppOverlayHost({
                   {dvaSyncWarning.primaryLabel || "Open Delta Virtual Settings"}
                 </Button>
               ) : null}
+            </div>
+          </Panel>
+        </ModalBackdrop>
+      ) : null}
+
+      {userDataClearFailure ? (
+        <ModalBackdrop onClick={() => {}}>
+          <Panel
+            as="section"
+            padding="lg"
+            className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="User data deletion incomplete"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <SectionHeader eyebrow="User Data" title="Deletion could not be completed" />
+            <div className={mutedTextStackClassName}>
+              <p className="m-0">
+                Some app data could not be removed. Persistence remains paused so deleted data is not recreated.
+              </p>
+              <p className="m-0">
+                Close other app windows and retry, or reload the app before continuing.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={onReloadAfterUserDataClearFailure}>
+                Reload App
+              </Button>
+              <Button variant="danger" onClick={onRetryUserDataClear}>
+                Retry Delete
+              </Button>
             </div>
           </Panel>
         </ModalBackdrop>

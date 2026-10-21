@@ -1,6 +1,8 @@
 pub(crate) mod addon_airports;
 pub(crate) mod deltava_auth;
 pub(crate) mod deltava_draft;
+pub(crate) mod deltava_logbook;
+pub(crate) mod deltava_pirep_details;
 pub(crate) mod deltava_sync;
 pub(crate) mod deltava_tours;
 pub(crate) mod simbrief;
@@ -11,7 +13,15 @@ pub(crate) fn app_invoke_handler(
 ) -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
         self::storage::append_app_log_text,
+        self::storage::write_ui_state,
+        self::storage::read_app_storage_file,
+        self::storage::write_app_storage_file,
+        self::storage::quarantine_app_storage_file,
+        self::storage::ensure_app_log_file,
+        self::deltava_logbook::read_deltava_logbook,
+        self::deltava_pirep_details::fetch_delta_virtual_pirep_details,
         self::deltava_sync::start_deltava_sync,
+        self::deltava_sync::refresh_deltava_logbook,
         self::deltava_sync::reset_deltava_sync_session,
         self::deltava_tours::sync_delta_virtual_tours,
         self::deltava_sync::close_deltava_sync_window,

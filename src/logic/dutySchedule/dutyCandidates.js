@@ -56,13 +56,13 @@ function buildDutyFlightPoolState(flights, dutyFilters = {}, addonAirports = new
     typeof options.supportsFlightByAircraftLimits === "function"
       ? options.supportsFlightByAircraftLimits
       : supportsFlightByDutyEquipmentLimits;
-  const dutyAirline = getActiveDutyAirline(normalizedFilters);
+  const dutyAirline = String(options.airlineOverride || getActiveDutyAirline(normalizedFilters)).trim();
   const hasLocationSelection = hasActiveDutyLocationSelection(normalizedFilters);
   const sourceFlights = Array.isArray(flights) ? flights : [];
   const counts = {
     initialScheduleFlights: sourceFlights.length,
     origin: sourceFlights.length,
-    airlineOrResolvedAirline: sourceFlights.length,
+    airline: sourceFlights.length,
     location: sourceFlights.length,
     equipment: sourceFlights.length,
     flightLength: sourceFlights.length,
@@ -83,7 +83,7 @@ function buildDutyFlightPoolState(flights, dutyFilters = {}, addonAirports = new
   if (dutyAirline) {
     nextFlights = nextFlights.filter((flight) => String(flight?.airlineName || "").trim() === dutyAirline);
   }
-  counts.airlineOrResolvedAirline = nextFlights.length;
+  counts.airline = nextFlights.length;
 
   if (normalizedFilters.buildMode === "location" && hasLocationSelection) {
     nextFlights = nextFlights.filter((flight) => flightTouchesLocation(flight, normalizedFilters));

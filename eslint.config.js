@@ -7,6 +7,7 @@ export default [
   {
     ignores: [
       "dist/**",
+      "coverage/**",
       "node_modules/**",
       "simbrief/**",
       "src-tauri/**",

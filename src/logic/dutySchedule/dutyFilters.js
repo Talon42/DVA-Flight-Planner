@@ -1,7 +1,6 @@
 // Duty filter normalization keeps App.jsx from owning Duty Schedule defaulting rules.
 import { DEFAULT_DUTY_FILTERS } from "./dutySchedule.constants.js";
 import { buildDutyOriginAirportOptions } from "./dutyLocation";
-import { resolveDutyAirlineForLocation } from "./dutyAirlines";
 
 function clampRange(value, min, max, fallback) {
   if (!Number.isFinite(value)) {
@@ -32,7 +31,7 @@ export function getActiveDutyAirline(dutyFilters) {
     return String(dutyFilters?.selectedAirline || "").trim();
   }
 
-  return String(dutyFilters?.resolvedAirline || "").trim();
+  return "";
 }
 
 // Returns true when the current duty location selection has enough detail to filter flights.
@@ -52,6 +51,8 @@ export function normalizeDutyFilters(savedFilters, bounds = { maxBlockMinutes: 0
     ...DEFAULT_DUTY_FILTERS,
     ...(savedFilters || {})
   };
+  // Ignore the legacy generated-airline field so saved UI state cannot reintroduce stale filtering.
+  delete nextFilters.resolvedAirline;
 
   nextFilters.buildMode = nextFilters.buildMode === "location" ? "location" : "airline";
   nextFilters.selectedAirline = normalizeBlankSelection(nextFilters.selectedAirline);
@@ -78,7 +79,6 @@ export function normalizeDutyFilters(savedFilters, bounds = { maxBlockMinutes: 0
     ? Math.max(0, Math.round(requestedMinTurnMinutes))
     : 60;
   nextFilters.dutyTargetMode = nextFilters.dutyTargetMode === "flexible" ? "flexible" : "strict";
-  nextFilters.resolvedAirline = String(nextFilters.resolvedAirline || "").trim();
 
   const defaultFlightLengthMax = bounds.maxBlockMinutes;
   const defaultDistanceMax = bounds.maxDistanceNm;
@@ -140,18 +140,6 @@ export function applyDutyFilterChange(
     [key]: value
   };
 
-  if (key === "buildMode") {
-    nextFilters.resolvedAirline = "";
-  }
-
-  if (key === "locationKind") {
-    nextFilters.resolvedAirline = "";
-  }
-
-  if (key === "selectedCountry" || key === "selectedRegion") {
-    nextFilters.resolvedAirline = "";
-  }
-
   if (key === "selectedAirline") {
     nextFilters.selectedAirline = String(value || "").trim();
   }
@@ -161,7 +149,6 @@ export function applyDutyFilterChange(
       .toUpperCase()
       .replace(/[^A-Z]/g, "")
       .slice(0, 4);
-    nextFilters.resolvedAirline = "";
   }
 
   if (key === "selectedEquipment") {
@@ -195,8 +182,7 @@ export function applyDutyFilterChange(
   ) {
     return {
       ...normalizedNextFilters,
-      selectedOriginAirport: "",
-      resolvedAirline: ""
+      selectedOriginAirport: ""
     };
   }
 
@@ -210,24 +196,7 @@ export function applyDutyFilterChange(
       : Boolean(normalizedNextFilters.selectedCountry);
 
   if (!hasLocationTarget) {
-    return {
-      ...normalizedNextFilters,
-      resolvedAirline: ""
-    };
-  }
-
-  if (
-    key === "buildMode" ||
-    key === "locationKind" ||
-    key === "selectedCountry" ||
-    key === "selectedRegion"
-  ) {
-    const { resolvedAirline } = resolveDutyAirlineForLocation(scheduleFlights, normalizedNextFilters);
-
-    return {
-      ...normalizedNextFilters,
-      resolvedAirline
-    };
+    return normalizedNextFilters;
   }
 
   return normalizedNextFilters;

@@ -6,6 +6,7 @@ import { modalBackdropClassName } from "./ui/patterns";
 import SectionHeader from "./ui/SectionHeader";
 import { bodySmTextClassName, supportCopyTextClassName } from "./ui/typography";
 import { fetchDeltaVirtualTourBriefing } from "../services/tauri/deltaVirtual.client.js";
+import { openDesktopUrl } from "../services/tauri/desktopShell.client.js";
 
 function decodeBase64ToBlobUrl(base64, contentType) {
   const normalizedBase64 = String(base64 || "").trim();
@@ -47,7 +48,7 @@ function applyEmbeddedPdfSizing(iframe, attempt = 0) {
     }
   };
 
-  let embeddedDocument = null;
+  let embeddedDocument;
   try {
     embeddedDocument = iframe.contentDocument || iframe.contentWindow?.document || null;
   } catch {
@@ -105,6 +106,8 @@ function applyEmbeddedPdfSizing(iframe, attempt = 0) {
   pdfEmbed.setAttribute("height", "100%");
 }
 
+// This helper is intentionally colocated with the modal and covered independently.
+// eslint-disable-next-line react-refresh/only-export-components
 export function isAllowedDvaTourBriefingUrl(value) {
   const normalized = String(value || "").trim();
   if (!normalized) {
@@ -134,8 +137,7 @@ async function openBriefingInBrowser(briefingUrl) {
   }
 
   try {
-    const { openUrl } = await import("@tauri-apps/plugin-opener");
-    await openUrl(normalizedUrl);
+    await openDesktopUrl(normalizedUrl);
   } catch {
     window.open(normalizedUrl, "_blank", "noopener,noreferrer");
   }
@@ -146,7 +148,6 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [pdfUrl, setPdfUrl] = useState("");
-  const [pdfFilename, setPdfFilename] = useState("");
   const pdfUrlRef = useRef("");
 
   useEffect(() => {
@@ -158,7 +159,6 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
       setIsLoading(false);
       setError("");
       setPdfUrl("");
-      setPdfFilename("");
       return undefined;
     }
 
@@ -167,7 +167,6 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
       setError("This briefing URL could not be validated.");
       setIsLoading(false);
       setPdfUrl("");
-      setPdfFilename("");
       return undefined;
     }
 
@@ -196,7 +195,6 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
 
         pdfUrlRef.current = nextBlobUrl;
         setPdfUrl(nextBlobUrl);
-        setPdfFilename(String(result?.filename || "").trim());
         setIsLoading(false);
       } catch (loadError) {
         if (cancelled) {
@@ -206,7 +204,6 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
         setError(loadError?.message || "The briefing PDF could not be loaded.");
         setIsLoading(false);
         setPdfUrl("");
-        setPdfFilename("");
       }
     }
 

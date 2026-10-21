@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow};
 
 use super::paths::main_window_state_path;
+use super::state::UserDataPersistenceGate;
 
 const MAIN_WINDOW_MIN_WIDTH: u32 = 1024;
 const MAIN_WINDOW_MIN_HEIGHT: u32 = 768;
@@ -39,7 +40,7 @@ fn capture_main_window_state(
     let maximized = window.is_maximized().ok().unwrap_or(false);
 
     if maximized && preserve_bounds_if_maximized {
-        let mut state = read_saved_main_window_state(&app).unwrap_or_default();
+        let mut state = read_saved_main_window_state(app).unwrap_or_default();
         state.maximized = true;
         return Some(state);
     }
@@ -59,15 +60,24 @@ fn capture_main_window_state(
     })
 }
 
+fn should_persist_main_window_state(gate: &UserDataPersistenceGate) -> bool {
+    !gate.writes_are_suppressed()
+}
+
 pub(crate) fn persist_main_window_state(
     window: &WebviewWindow,
     preserve_bounds_if_maximized: bool,
 ) {
+    let gate = window.app_handle().state::<UserDataPersistenceGate>();
+    if !should_persist_main_window_state(&gate) {
+        return;
+    }
+
     let Some(state) = capture_main_window_state(window, preserve_bounds_if_maximized) else {
         return;
     };
 
-    let _ = write_saved_main_window_state(&window.app_handle(), &state);
+    let _ = write_saved_main_window_state(window.app_handle(), &state);
 }
 
 fn window_state_intersects_monitor(
@@ -144,7 +154,7 @@ fn sanitize_saved_main_window_state(
 }
 
 pub(crate) fn restore_main_window_state(window: &WebviewWindow) {
-    let Some(saved_state) = read_saved_main_window_state(&window.app_handle()) else {
+    let Some(saved_state) = read_saved_main_window_state(window.app_handle()) else {
         return;
     };
     let mut state = sanitize_saved_main_window_state(window, saved_state);
@@ -167,5 +177,20 @@ pub(crate) fn restore_main_window_state(window: &WebviewWindow) {
         let _ = window.maximize();
     }
 
-    let _ = write_saved_main_window_state(&window.app_handle(), &state);
+    let _ = write_saved_main_window_state(window.app_handle(), &state);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{should_persist_main_window_state, UserDataPersistenceGate};
+
+    #[tokio::test]
+    async fn window_state_is_not_persisted_after_clear_starts() {
+        let gate = UserDataPersistenceGate::default();
+        assert!(should_persist_main_window_state(&gate));
+
+        let clear_guard = gate.begin_clear().await;
+        assert!(!should_persist_main_window_state(&gate));
+        drop(clear_guard);
+    }
 }

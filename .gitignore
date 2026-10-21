@@ -1,8 +1,18 @@
+/.agents/
+/.codex/
 /node_modules/
 /dist/
 /src-tauri/target/
 /src-tauri/target-temp/
 *.log
+
+# Local environment files and operating-system metadata.
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+Desktop.ini
 
 /test-data/
 /deltava-pfpxsched-*.xml
@@ -15,10 +25,10 @@
 /release.ps1
 /Flight Planner App.code-workspace
 /skills-lock.json
-/.agents
 /.npm-cache
 /.eslintcache
-/docs/instructions
+/coverage/
+/docs/instructions/
 /tmp/
 /.codex/
 /.agents/
