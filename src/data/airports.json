@@ -3,7 +3,7 @@
   "source": "dva",
   "endpoint": "/airports.ws?useSched=true",
   "exportedAt": "2026-11-05T15:39:32.383Z",
-  "count": 1472,
+  "count": 1475,
   "airports": [
     {
       "icao": "AGGH",
@@ -1538,6 +1538,37 @@
       ],
       "landingRunways": [
         "Runway 16, (5,995 feet) - Heading 181° 143 arrivals (82%)"
+      ],
+      "otherRunways": []
+    },
+    {
+      "icao": "CYYG",
+      "iata": "YYG",
+      "name": "Charlottetown PE Canada",
+      "actualName": "Charlottetown Airport",
+      "country": "CA",
+      "lat": 46.288911,
+      "lng": -63.125174,
+      "alt": 160,
+      "hasUSPFI": false,
+      "isSchengen": false,
+      "utcOffset": -14400,
+      "stateTerritory": "Prince Edward Island",
+      "runwayLength": 7002,
+      "countryName": "Canada",
+      "timezone": "America/Halifax",
+      "timezoneLabel": "AT",
+      "takeoffRunways": [
+        "Runway 03, (7,002 feet) - Heading 26°",
+        "Runway 21, (7,002 feet) - Heading 206°",
+        "Runway 10, (7,000 feet) - Heading 96°",
+        "Runway 28, (7,000 feet) - Heading 276°"
+      ],
+      "landingRunways": [
+        "Runway 03, (7,002 feet) - Heading 26°",
+        "Runway 21, (7,002 feet) - Heading 206°",
+        "Runway 10, (7,000 feet) - Heading 96°",
+        "Runway 28, (7,000 feet) - Heading 276°"
       ],
       "otherRunways": []
     },
@@ -5539,6 +5570,37 @@
       "landingRunways": [
         "Runway 11, (10,168 feet) - Heading 99° 471 arrivals (77%)",
         "Runway 29, (10,168 feet) - Heading 279° 134 arrivals (22%)"
+      ],
+      "otherRunways": []
+    },
+    {
+      "icao": "FNBJ",
+      "iata": "NBJ",
+      "name": "Luanda Angola",
+      "actualName": "Dr. António Agostinho Neto International Airport",
+      "country": "AO",
+      "lat": -9.050734,
+      "lng": 13.499078,
+      "alt": 550,
+      "hasUSPFI": false,
+      "isSchengen": false,
+      "utcOffset": 3600,
+      "stateTerritory": "Ícolo e Bengo",
+      "runwayLength": 13123,
+      "countryName": "Angola",
+      "timezone": "Africa/Luanda",
+      "timezoneLabel": "WAT",
+      "takeoffRunways": [
+        "Runway 06L, (12,467 feet) - Heading 54°",
+        "Runway 24R, (12,467 feet) - Heading 234°",
+        "Runway 06R, (13,123 feet) - Heading 54°",
+        "Runway 24L, (13,123 feet) - Heading 234°"
+      ],
+      "landingRunways": [
+        "Runway 06L, (12,467 feet) - Heading 54°",
+        "Runway 24R, (12,467 feet) - Heading 234°",
+        "Runway 06R, (13,123 feet) - Heading 54°",
+        "Runway 24L, (13,123 feet) - Heading 234°"
       ],
       "otherRunways": []
     },
@@ -31523,6 +31585,33 @@
       "landingRunways": [
         "Runway 31, (5,906 feet) - Heading 291° 5 arrivals (62%)",
         "Runway 13, (5,906 feet) - Heading 111° 3 arrivals (37%)"
+      ],
+      "otherRunways": []
+    },
+    {
+      "icao": "SBKG",
+      "iata": "CPV",
+      "name": "Campina Grande Brazil",
+      "actualName": "Presidente João Suassuna Airport",
+      "country": "BR",
+      "lat": -7.269167,
+      "lng": -35.895,
+      "alt": 1647,
+      "hasUSPFI": false,
+      "isSchengen": false,
+      "utcOffset": -10800,
+      "stateTerritory": "Paraíba",
+      "runwayLength": 5135,
+      "countryName": "Brazil",
+      "timezone": "America/Fortaleza",
+      "timezoneLabel": "BRT",
+      "takeoffRunways": [
+        "Runway 15, (5,135 feet, displaced 295 feet) - Heading 146°",
+        "Runway 33, (5,135 feet) - Heading 326°"
+      ],
+      "landingRunways": [
+        "Runway 15, (5,135 feet, displaced 295 feet) - Heading 146°",
+        "Runway 33, (5,135 feet) - Heading 326°"
       ],
       "otherRunways": []
     },
