@@ -1,7 +1,8 @@
 import { getVersion } from "@tauri-apps/api/app";
 
-export const GITHUB_LATEST_RELEASE_API_URL =
-  "https://api.github.com/repos/Talon42/DVA-Flight-Planner/releases/latest";
+export const GITHUB_RELEASES_API_URL =
+  "https://api.github.com/repos/Talon42/DVA-Flight-Planner/releases";
+export const GITHUB_LATEST_RELEASE_API_URL = `${GITHUB_RELEASES_API_URL}/latest`;
 export const GITHUB_RELEASES_PAGE_URL =
   "https://github.com/Talon42/DVA-Flight-Planner/releases/latest";
 export const GITHUB_LATEST_EXE_DOWNLOAD_URL =

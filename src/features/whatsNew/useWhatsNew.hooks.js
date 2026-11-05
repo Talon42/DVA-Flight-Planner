@@ -6,14 +6,35 @@ import {
 import {
   WHATS_NEW_APP_VERSION,
   WHATS_NEW_ENABLED,
-  whatsNewCards
+  whatsNewCards as featureCards
 } from "./whatsNewContent.js";
+import { fetchReleaseHistory } from "../../services/updates/releaseHistory.client.js";
+import { buildCardsWithReleaseHistory } from "./releaseHistory.model.js";
 
 // Owns release-scoped What's New gating and manual-open behavior for app-level orchestration.
 export function useWhatsNew({ isGettingStartedOpen = false } = {}) {
   const [lastSeenReleaseId, setLastSeenReleaseId] = useState("");
   const [hasLoadedLastSeenReleaseId, setHasLoadedLastSeenReleaseId] = useState(false);
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [releaseHistory, setReleaseHistory] = useState({ status: "loading", releases: [] });
+  const [loadRevision, setLoadRevision] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchReleaseHistory({ signal: controller.signal }).then(
+      (releases) => {
+        if (!controller.signal.aborted) setReleaseHistory({ status: "ready", releases });
+      },
+      () => {
+        if (!controller.signal.aborted) setReleaseHistory({ status: "error", releases: [] });
+      }
+    );
+    return () => controller.abort();
+  }, [loadRevision]);
+
+  const whatsNewCards = useMemo(
+    () => buildCardsWithReleaseHistory(featureCards, releaseHistory), [releaseHistory]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +65,7 @@ export function useWhatsNew({ isGettingStartedOpen = false } = {}) {
   const shouldShowWhatsNew =
     WHATS_NEW_ENABLED &&
     hasWhatsNewCards &&
+    (featureCards.length > 0 || (releaseHistory.status === "ready" && releaseHistory.releases.length > 0)) &&
     !isGettingStartedOpen &&
     hasLoadedLastSeenReleaseId &&
     !isCurrentVersionSeen;
@@ -60,7 +82,12 @@ export function useWhatsNew({ isGettingStartedOpen = false } = {}) {
     }
 
     setIsManualOpen(true);
-  }, [hasWhatsNewCards]);
+    // Manual reopen retries failures while preserving the installed version's seen state.
+    if (releaseHistory.status === "error") {
+      setReleaseHistory({ status: "loading", releases: [] });
+      setLoadRevision((revision) => revision + 1);
+    }
+  }, [hasWhatsNewCards, releaseHistory.status]);
 
   const closeManualWhatsNew = useCallback(() => {
     setIsManualOpen(false);

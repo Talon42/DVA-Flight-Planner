@@ -1,5 +1,19 @@
 # What's New Content
 
+Release History is a permanent final card populated automatically from the public
+GitHub releases for `Talon42/DVA-Flight-Planner`. It needs no local Markdown or PNG.
+Only published standard releases appear; drafts and prereleases are excluded.
+All pages are loaded and releases are sorted by publication date, newest first.
+The history uses the shared sanitized GitHub-flavored Markdown renderer.
+Each release has a separate bordered section with a sticky version/date header
+and a latest/previous label to make release boundaries clear while scrolling.
+Loading, empty, and unavailable states remain accessible manually. Reopening
+What's New retries a failed request; failed or empty history never blocks startup.
+
+The files below are optional feature cards for the upcoming release. They always
+appear before Release History. Remove cards from previous releases when preparing
+the next release. Automatic display still uses the installed version's seen setting.
+
 Use `NewContent##.md` for every card.
 
 Add `NewContent##.png` only for image cards.

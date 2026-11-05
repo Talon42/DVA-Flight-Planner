@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import MarkdownHelpContent from "../../components/help/MarkdownHelpContent";
+import ReleaseHistoryContent from "./ReleaseHistoryContent.jsx";
 import ModalBackdrop from "../../components/layout/ModalBackdrop";
 import Button from "../../components/ui/Button";
 import Panel from "../../components/ui/Panel";
@@ -224,7 +226,13 @@ export default function WhatsNewModal({
                 <h3 className={cn("m-0", sectionTitleTextClassName)}>{activeCard.title}</h3>
                 <div className="min-h-0 overflow-y-auto pr-1">
                   {activeCard.description ? (
-                    <div className="grid gap-3">{renderTextCardDescription(activeCard.description)}</div>
+                    activeCard.releases?.length ? (
+                      <ReleaseHistoryContent releases={activeCard.releases} />
+                    ) : activeCard.markdown ? (
+                      <MarkdownHelpContent markdown={activeCard.description} />
+                    ) : (
+                      <div className="grid gap-3">{renderTextCardDescription(activeCard.description)}</div>
+                    )
                   ) : null}
                 </div>
               </div>
