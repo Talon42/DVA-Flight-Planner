@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Component, lazy, Suspense, useEffect, useMemo, useState } from "react";
 import Panel from "./ui/Panel";
 import Button from "./ui/Button";
 import SectionHeader from "./ui/SectionHeader";
@@ -12,7 +12,6 @@ import {
 import CompletedStatusCard from "./CompletedStatusCard";
 import AccomplishmentsPanel from "./AccomplishmentsPanel";
 import DutySchedulePanel from "./dutySchedule/DutySchedulePanel";
-import FlightMapPanel from "./map/FlightMapPanel";
 import FlightsTable from "./tables/FlightsTable";
 import ToursTable from "./tables/ToursTable";
 import TourBriefingModal, { isAllowedDvaTourBriefingUrl } from "./TourBriefingModal";
@@ -26,6 +25,28 @@ const WORKSPACE_META = {
   map: { eyebrow: "MAP" },
   logbook: { eyebrow: "LOGBOOK" }
 };
+
+class MapPanelErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+function createLazyFlightMapPanel() {
+  return lazy(() => import("./map/FlightMapPanel"));
+}
 
 function formatTourDateLabel(epochSeconds) {
   const normalizedEpochSeconds = Number(epochSeconds);
@@ -120,6 +141,19 @@ export default function ScheduleTablePanel({
     selectedTourCompletion && selectedTourCompletion.totalRows > 0
       ? `Completed ${selectedTourCompletion.completedRows}/${selectedTourCompletion.totalRows}`
       : "";
+  const [hasOpenedMap, setHasOpenedMap] = useState(false);
+  const [mapLoadAttempt, setMapLoadAttempt] = useState(0);
+  const LazyFlightMapPanel = useMemo(
+    createLazyFlightMapPanel,
+    [mapLoadAttempt]
+  );
+  const shouldMountMap = hasOpenedMap || scheduleView === "map";
+
+  useEffect(() => {
+    if (scheduleView === "map") {
+      setHasOpenedMap(true);
+    }
+  }, [scheduleView]);
 
   if (isDutyMode) {
     return (
@@ -233,26 +267,55 @@ export default function ScheduleTablePanel({
       ) : null}
 
       <div className={cn("relative min-h-0 flex-1")}>
-        <div
-          aria-hidden={scheduleView !== "map"}
-          inert={scheduleView === "map" ? undefined : ""}
-          className={cn(
-            "absolute inset-0 flex min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4",
-            scheduleView === "map" ? "opacity-100" : "pointer-events-none opacity-0"
-          )}
-        >
-          <FlightMapPanel
-            theme={theme}
-            activeFlightBoardEntries={activeFlightBoardEntries}
-            expandedBoardFlightId={expandedBoardFlightId}
-            vatsimNetwork={vatsimNetwork}
-            initialFlightPathViewMode={pendingMapFlightPathViewMode || "all"}
-            initialFitToRoute={pendingMapFitToRoute}
-            onConsumeInitialFitToRoute={onConsumePendingMapFitToRoute}
-            mapOptions={mapOptions}
-            setMapOptions={setMapOptions}
-          />
-        </div>
+        {shouldMountMap ? (
+          <div
+            aria-hidden={scheduleView !== "map"}
+            inert={scheduleView === "map" ? undefined : ""}
+            className={cn(
+              "absolute inset-0 flex min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4",
+              scheduleView === "map" ? "opacity-100" : "pointer-events-none opacity-0"
+            )}
+          >
+            <MapPanelErrorBoundary
+              key={mapLoadAttempt}
+              fallback={(
+                <div className="flex h-full min-h-0 w-full items-center justify-center border border-[color:var(--line)] bg-[var(--surface)]">
+                  <div className="grid justify-items-center gap-3 text-center">
+                    <p className={cn("m-0 text-[var(--text-muted)]", supportCopyTextClassName)}>
+                      The map could not be loaded.
+                    </p>
+                    <Button variant="primary" size="sm" onClick={() => setMapLoadAttempt((value) => value + 1)}>
+                      Retry Map
+                    </Button>
+                  </div>
+                </div>
+              )}
+            >
+              <Suspense
+                fallback={(
+                  <div className="flex h-full min-h-0 w-full items-center justify-center border border-[color:var(--line)] bg-[var(--surface)]">
+                    <p role="status" className={cn("m-0 text-[var(--text-muted)]", supportCopyTextClassName)}>
+                      Loading map…
+                    </p>
+                  </div>
+                )}
+              >
+                <LazyFlightMapPanel
+                  theme={theme}
+                  activeFlightBoardEntries={activeFlightBoardEntries}
+                  expandedBoardFlightId={expandedBoardFlightId}
+                  vatsimNetwork={vatsimNetwork}
+                  initialFlightPathViewMode={pendingMapFlightPathViewMode || "all"}
+                  initialFitToRoute={pendingMapFitToRoute}
+                  onConsumeInitialFitToRoute={onConsumePendingMapFitToRoute}
+                  mapOptions={mapOptions}
+                  setMapOptions={setMapOptions}
+                  isActive={scheduleView === "map"}
+                />
+              </Suspense>
+            </MapPanelErrorBoundary>
+          </div>
+        ) : null}
 
         {scheduleView === "map" ? null : scheduleView === "accomplishments" ? (
           <div className="flex h-full min-h-0 px-2.5 pb-2 pt-0 bp-1024:px-3 bp-1024:pb-2">

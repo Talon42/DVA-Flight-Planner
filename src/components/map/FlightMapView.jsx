@@ -850,6 +850,7 @@ function LayerToggleRow({ label, enabled, isDarkTheme, onClick }) {
 
 // Renders the MapLibre scene, route overlays, and live airport/regional ATC layers.
 export default function FlightMapView({
+  isActive = true,
   mapStyle,
   projection,
   flightPathGeoJson,
@@ -962,6 +963,15 @@ export default function FlightMapView({
 
     map.resize();
   }, []);
+
+  useEffect(() => {
+    if (!isActive || typeof window === "undefined") {
+      return undefined;
+    }
+
+    const frame = window.requestAnimationFrame(resizeMap);
+    return () => window.cancelAnimationFrame(frame);
+  }, [isActive, resizeMap]);
 
   const lockNorthUp = useCallback(() => {
     const map = mapRef.current?.getMap?.();

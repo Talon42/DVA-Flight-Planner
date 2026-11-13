@@ -40,25 +40,31 @@ function baseProps(scheduleView) {
 describe("ScheduleTablePanel map lifecycle", () => {
   afterEach(cleanup);
 
-  it("warms one fully transparent map instance while another workspace tab is visible", () => {
+  it("loads Map on first use and keeps it mounted when switching tabs", async () => {
     const { rerender } = render(<ScheduleTablePanel {...baseProps("flights")} />);
-    const mapPanel = screen.getByTestId("flight-map-panel");
-    const mapHost = mapPanel.parentElement;
-
     expect(screen.getByTestId("flights-table")).toBeTruthy();
+    expect(screen.queryByTestId("flight-map-panel")).toBeNull();
+
+    rerender(<ScheduleTablePanel {...baseProps("map")} />);
+    expect(screen.getByRole("status").textContent).toBe("Loading map…");
+    const mapPanel = await screen.findByTestId("flight-map-panel");
+    const mapHost = mapPanel.parentElement;
+    expect(mapHost?.getAttribute("aria-hidden")).toBe("false");
+    expect(mapHost?.hasAttribute("inert")).toBe(false);
+    expect(mapHost?.classList.contains("opacity-100")).toBe(true);
+    expect(screen.getByTestId("map-attribution").style.visibility).toBe("visible");
+
+    rerender(<ScheduleTablePanel {...baseProps("flights")} />);
+
+    expect(screen.getByTestId("flight-map-panel")).toBe(mapPanel);
     expect(mapHost?.getAttribute("aria-hidden")).toBe("true");
     expect(mapHost?.hasAttribute("inert")).toBe(true);
     expect(mapHost?.classList.contains("opacity-0")).toBe(true);
-    expect(mapHost?.classList.contains("invisible")).toBe(false);
-    expect(screen.getByTestId("map-attribution").style.visibility).toBe("visible");
+    expect(screen.getByTestId("flights-table")).toBeTruthy();
 
     rerender(<ScheduleTablePanel {...baseProps("map")} />);
-
     expect(screen.getByTestId("flight-map-panel")).toBe(mapPanel);
     expect(mapHost?.getAttribute("aria-hidden")).toBe("false");
     expect(mapHost?.hasAttribute("inert")).toBe(false);
-    expect(mapHost?.classList.contains("opacity-0")).toBe(false);
-    expect(mapHost?.classList.contains("opacity-100")).toBe(true);
-    expect(screen.queryByTestId("flights-table")).toBeNull();
   });
 });

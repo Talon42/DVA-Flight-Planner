@@ -280,7 +280,8 @@ export default function FlightMapPanel({
   initialFitToRoute = false,
   onConsumeInitialFitToRoute,
   mapOptions,
-  setMapOptions
+  setMapOptions,
+  isActive = true
 }) {
   const [mapMode, setMapMode] = useState("standard");
   const [flightPathViewMode, setFlightPathViewMode] = useState(
@@ -513,6 +514,7 @@ export default function FlightMapPanel({
       </div>
 
       <FlightMapView
+        isActive={isActive}
         mapStyle={mapConfig.mapStyle}
         projection={mapConfig.projection}
         flightPathGeoJson={flightPathGeoJson}
