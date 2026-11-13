@@ -6,7 +6,6 @@ import { buildDefaultDutyFilters } from "../../logic/dutySchedule/dutyFilters.js
 import { logAppError, logAppEvent } from "../../services/logging/appLog.client.js";
 import {
   appendImportLog,
-  readSavedSchedule,
   writeSavedSchedule
 } from "../../services/storage/storage.js";
 import { runScheduleImport } from "../../services/workers/import.client.js";
@@ -189,18 +188,6 @@ export function useScheduleImport({
       try {
         await writeSavedSchedule(savedSchedule);
 
-        const persistedSchedule = await readSavedSchedule();
-        if (!persistedSchedule?.flights?.length) {
-          setStatusMessage?.(
-            "Imported schedule, but it could not be saved for next launch. Check the app log."
-          );
-          await logAppError("persist-schedule-verify-failed", new Error("Saved schedule read-back missing flights."), {
-            flightCount: Array.isArray(savedSchedule?.flights) ? savedSchedule.flights.length : 0,
-            sourceFileName: savedSchedule?.sourceFileName || null
-          });
-          return false;
-        }
-
         await logAppEvent("persist-schedule-succeeded", {
           flightCount: Array.isArray(savedSchedule?.flights) ? savedSchedule.flights.length : 0,
           sourceFileName: savedSchedule?.sourceFileName || null
@@ -299,23 +286,6 @@ export function useScheduleImport({
           }
         };
 
-        startTransition(() => {
-          setSchedule?.(nextSchedule);
-          setFlightBoards?.(nextFlightBoards);
-          if (effectiveActiveBoardId) {
-            setActiveFlightBoardId?.(effectiveActiveBoardId);
-          }
-          setPlannerMode?.("basic");
-          setFilters?.(normalizeFilters(DEFAULT_FILTERS, nextBounds));
-          setDutyFilters?.(buildDefaultDutyFilters(nextBounds));
-          setSort?.(DEFAULT_SORT);
-          setSelectedFlightId?.(imported.flights[0]?.flightId || null);
-          setExpandedBoardFlightId?.((current) =>
-            nextFlightBoard.some((entry) => entry.boardEntryId === current) ? current : null
-          );
-          setFilterUiVersion?.((current) => current + 1);
-        });
-
         const persistedSuccessfully = await persistScheduleSnapshot(nextSchedule, {
           plannerMode: "basic",
           filters: normalizeFilters(DEFAULT_FILTERS, nextBounds),
@@ -326,6 +296,25 @@ export function useScheduleImport({
           sort: DEFAULT_SORT,
           selectedFlightId: imported.flights[0]?.flightId || null
         });
+
+        if (persistedSuccessfully) {
+          startTransition(() => {
+            setSchedule?.(nextSchedule);
+            setFlightBoards?.(nextFlightBoards);
+            if (effectiveActiveBoardId) {
+              setActiveFlightBoardId?.(effectiveActiveBoardId);
+            }
+            setPlannerMode?.("basic");
+            setFilters?.(normalizeFilters(DEFAULT_FILTERS, nextBounds));
+            setDutyFilters?.(buildDefaultDutyFilters(nextBounds));
+            setSort?.(DEFAULT_SORT);
+            setSelectedFlightId?.(imported.flights[0]?.flightId || null);
+            setExpandedBoardFlightId?.((current) =>
+              nextFlightBoard.some((entry) => entry.boardEntryId === current) ? current : null
+            );
+            setFilterUiVersion?.((current) => current + 1);
+          });
+        }
 
         const staleBoardEntries = nextFlightBoard.filter((entry) => entry.isStale).length;
         setStatusMessage?.(

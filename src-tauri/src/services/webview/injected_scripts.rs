@@ -178,18 +178,30 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
     if (window[config.downloadsPostedKey]) { emitDebug('state:downloads-already-posted'); return true; }
     window[config.downloadsPostedKey] = true;
     const payload = {};
-    if (config.enabledArtifacts.schedule) {
-      try { payload.schedule = { ok: true, scheduleText: await fetchScheduleJson() }; }
-      catch (error) { payload.schedule = { ok: false, error: error?.message || 'Schedule JSON download failed.' }; emitDebug(`schedule:error:${payload.schedule.error}`); }
-    }
-    if (config.enabledArtifacts.logbook) {
-      try { payload.logbook = { ok: true, ...(await fetchLogbookJsonExport()) }; }
-      catch (error) { payload.logbook = { ok: false, error: error?.message || 'Logbook JSON download failed.' }; emitDebug(`logbook:error:${payload.logbook.error}`); }
-    }
-    if (config.enabledArtifacts.accomplishments) {
-      try { payload.accomplishments = { ok: true, htmlText: await fetchAccomplishmentEligibilityHtml() }; }
-      catch (error) { payload.accomplishments = { ok: false, error: error?.message || 'Accomplishment eligibility download failed.' }; emitDebug(`accomplishments:error:${payload.accomplishments.error}`); }
-    }
+    const tasks = [];
+    if (config.enabledArtifacts.schedule) tasks.push(['schedule', fetchScheduleJson()]);
+    if (config.enabledArtifacts.logbook) tasks.push(['logbook', fetchLogbookJsonExport()]);
+    if (config.enabledArtifacts.accomplishments) tasks.push(['accomplishments', fetchAccomplishmentEligibilityHtml()]);
+    const results = await Promise.allSettled(tasks.map(([, request]) => request));
+    results.forEach((result, index) => {
+      const [name] = tasks[index];
+      if (result.status === 'fulfilled') {
+        payload[name] = name === 'schedule'
+          ? { ok: true, scheduleText: result.value }
+          : name === 'logbook'
+            ? { ok: true, ...result.value }
+            : { ok: true, htmlText: result.value };
+      } else {
+        const error = result.reason;
+        const fallback = name === 'schedule'
+          ? 'Schedule JSON download failed.'
+          : name === 'logbook'
+            ? 'Logbook JSON download failed.'
+            : 'Accomplishment eligibility download failed.';
+        payload[name] = { ok: false, error: error?.message || fallback };
+        emitDebug(`${name}:error:${payload[name].error}`);
+      }
+    });
     postResult(payload);
     return true;
   };
