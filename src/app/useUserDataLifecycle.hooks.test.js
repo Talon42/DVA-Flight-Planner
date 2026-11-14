@@ -30,6 +30,23 @@ function deferred() {
 }
 
 describe("user data lifecycle", () => {
+  it("restarts the backend when recovering from a partial clear", async () => {
+    const restartApp = vi.fn().mockResolvedValue(undefined);
+    const reloadPage = vi.fn();
+    const { result } = renderHook(() => useUserDataLifecycle({
+      confirmDelete: async () => true,
+      deleteUserData: async () => ({ ok: false, failures: [{ target: "uiState", reasonCode: "in_use" }] }),
+      restartApp,
+      reloadPage
+    }));
+
+    await act(() => result.current.handleDeleteUserData());
+    await act(() => result.current.reloadAfterUserDataClearFailure());
+
+    expect(restartApp).toHaveBeenCalledOnce();
+    expect(reloadPage).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     for (const mock of Object.values(persistence)) mock.mockReset();
     persistence.flushUiStateWrites.mockResolvedValue(undefined);

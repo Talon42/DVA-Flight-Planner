@@ -36,6 +36,7 @@ pub(crate) fn app_invoke_handler(
         self::deltava_draft::delete_deltava_draft_flight_report,
         self::deltava_tours::fetch_delta_virtual_tour_briefing,
         self::storage::clear_user_data,
+        self::storage::restart_after_user_data_clear,
         self::storage::open_main_devtools,
         self::simbrief::start_simbrief_dispatch,
         self::simbrief::refresh_simbrief_dispatch,

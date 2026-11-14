@@ -587,6 +587,7 @@ fn append_simbrief_debug_log(app: &AppHandle, debug_enabled: bool, message: &str
 
 fn spawn_simbrief_background_fetch(
     app: AppHandle,
+    window: tauri::WebviewWindow,
     payload: SimBriefDispatchPayload,
     static_id: String,
     session_id: u64,
@@ -635,7 +636,8 @@ fn spawn_simbrief_background_fetch(
         }
 
         tokio::time::sleep(Duration::from_millis(SIMBRIEF_CALLBACK_PAGE_CLOSE_DELAY_MS)).await;
-        close_simbrief_dispatch_window_internal(&app);
+        // Retain the original dispatcher; the label may already belong to a newer dispatch.
+        let _ = window.close();
     });
 }
 
@@ -1799,6 +1801,7 @@ pub async fn start_simbrief_dispatch(
 
     spawn_simbrief_background_fetch(
         app.clone(),
+        window.clone(),
         normalized_payload.clone(),
         static_id.clone(),
         session_id,
@@ -1836,7 +1839,7 @@ pub async fn start_simbrief_dispatch(
                         .into(),
                 ),
             );
-            close_simbrief_dispatch_window_internal(&app_for_timeout);
+            let _ = window.close();
             Err(
                 "auth_failed: Timed out waiting for SimBrief login or flight plan generation."
                     .into(),

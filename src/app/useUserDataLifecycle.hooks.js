@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { deleteStoredUserData } from "../services/storage/storage.js";
+import { deleteStoredUserData, restartAfterUserDataClearFailure } from "../services/storage/storage.js";
 import {
   flushUiStateWrites,
   suspendUiStateWrites
@@ -17,6 +17,7 @@ export function useUserDataLifecycle({
   isDeleteBlocked = false,
   prepareForUserDataClear,
   deleteUserData = deleteStoredUserData,
+  restartApp = restartAfterUserDataClearFailure,
   reloadPage = () => window.location.reload()
 } = {}) {
   const [isDeletingUserData, setIsDeletingUserData] = useState(false);
@@ -91,6 +92,12 @@ export function useUserDataLifecycle({
     clearFailure,
     handleDeleteUserData,
     retryUserDataClear: runClear,
-    reloadAfterUserDataClearFailure: reloadPage
+    reloadAfterUserDataClearFailure: async () => {
+      try {
+        await restartApp();
+      } catch (error) {
+        await logAppError("user-data-restart-failed", error);
+      }
+    }
   };
 }

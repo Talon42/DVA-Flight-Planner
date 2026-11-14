@@ -115,6 +115,12 @@ pub(crate) async fn clear_user_data(
 }
 
 #[tauri::command]
+pub(crate) fn restart_after_user_data_clear(app: AppHandle) {
+    // Page reloads retain the permanently suppressed backend persistence gate.
+    app.restart();
+}
+
+#[tauri::command]
 pub(crate) fn open_main_devtools(app: AppHandle) -> Result<(), String> {
     crate::services::storage::file_store::open_main_devtools(app)
 }

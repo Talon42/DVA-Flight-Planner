@@ -25,6 +25,7 @@ import {
 import {
   ensureAppLogFile,
   clearUserData,
+  restartAfterUserDataClear,
   quarantineAppStorageFile,
   readAppStorageFile,
   writeAppStorageFile
@@ -1035,6 +1036,15 @@ export async function deleteStoredUserData() {
     window.localStorage.removeItem(key);
   }
   return result;
+}
+
+// Desktop recovery needs a new backend process; browser recovery needs a fresh page.
+export async function restartAfterUserDataClearFailure() {
+  if (isTauriRuntime()) {
+    await restartAfterUserDataClear();
+    return;
+  }
+  window.location.reload();
 }
 
 async function pickTextFile({ accept, filterName, extensions }) {

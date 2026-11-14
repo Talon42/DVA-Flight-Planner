@@ -682,7 +682,7 @@ export default function AppOverlayHost({
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={onReloadAfterUserDataClearFailure}>
-                Reload App
+                Restart App
               </Button>
               <Button variant="danger" onClick={onRetryUserDataClear}>
                 Retry Delete

@@ -81,3 +81,11 @@ export async function clearUserData() {
     event: "user-data-clear-failed"
   });
 }
+
+// Restarts the backend too, releasing the process-wide post-deletion write block.
+export async function restartAfterUserDataClear() {
+  return invokeAppCommand("restart_after_user_data_clear", {}, {
+    subsystem: "App Storage",
+    event: "user-data-restart-failed"
+  });
+}
