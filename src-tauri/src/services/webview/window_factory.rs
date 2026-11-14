@@ -123,6 +123,7 @@ fn attach_windows_message_handler(
 
     let registration_error = Arc::new(StdMutex::new(None::<String>));
     let registration_error_for_closure = registration_error.clone();
+    let sync_window = window.clone();
 
     window
         .with_webview(move |platform| unsafe {
@@ -171,6 +172,7 @@ fn attach_windows_message_handler(
 
                             if let Some(payload_text) = message.strip_prefix(crate::DELTAVA_AUTH_MESSAGE_PREFIX) {
                                 let payload_text = payload_text.to_string();
+                                let window_for_failure = sync_window.clone();
                                 let app_handle = app_handle.clone();
                                 let sync_nonce = sync_nonce.clone();
 
@@ -209,7 +211,10 @@ fn attach_windows_message_handler(
                                                     if outcome != DeltaSyncFinishOutcome::Completed {
                                                         log_ignored_finish("web-result", outcome);
                                                     }
-                                                    close_deltava_sync_window(&app_handle);
+                                                    // Late failure messages from an old attempt must not close its replacement.
+                                                    if matches!(outcome, DeltaSyncFinishOutcome::Completed | DeltaSyncFinishOutcome::ReceiverDropped) {
+                                                        let _ = window_for_failure.close();
+                                                    }
                                                 }
                                             }
                                         }
@@ -328,17 +333,36 @@ fn attach_windows_message_handler(
     Ok(())
 }
 
+/// Keeps login mode and injected scripts together for the manual sync window.
+pub(crate) struct SyncWindowScripts {
+    pub(crate) login: String,
+    pub(crate) download: String,
+    pub(crate) prepared_session: bool,
+}
+
 /// Builds the dedicated Delta Virtual sync window and wires all webview handlers.
 pub(crate) fn build_deltava_sync_window(
     app: AppHandle,
     webview_data_directory: PathBuf,
     sync_nonce: String,
     debug_enabled: bool,
-    login_automation_script: String,
-    auto_sync_script: String,
+    scripts: SyncWindowScripts,
     focus_lost_at: Arc<Mutex<Option<Instant>>>,
 ) -> Result<WebviewWindow, String> {
-    let login_url = DELTAVA_LOGIN_URL
+    // Reuse only a freshly prepared session; expired preparation uses the normal login page.
+    let initial_url = if scripts.prepared_session {
+        "https://www.deltava.org/home.do"
+    } else {
+        DELTAVA_LOGIN_URL
+    };
+    let login_automation_script = scripts.login;
+    let auto_sync_script = if scripts.prepared_session {
+        // This is a manual sync action, even though no login form was submitted in this window.
+        format!("window.__flightPlannerDeltaSyncRequested = true; try {{ sessionStorage.setItem('flightPlannerDeltaSyncRequested', '1'); }} catch (_) {{}};\n{}", scripts.download)
+    } else {
+        scripts.download
+    };
+    let login_url = initial_url
         .parse()
         .map_err(|error| format!("download_failed: Invalid Delta Virtual login URL: {error}"))?;
 
@@ -357,6 +381,12 @@ pub(crate) fn build_deltava_sync_window(
             .data_directory(webview_data_directory)
             .on_navigation(is_allowed_deltava_url)
             .on_page_load(move |webview_window, payload| {
+                // TEMP-DVA-TRACE: page milestones reveal login/navigation delays.
+                append_sync_log(&format!(
+                    "TEMP-DVA-TRACE stage=sync-page event={:?} page={}",
+                    payload.event(),
+                    payload.url().path()
+                ));
                 let event_name = match payload.event() {
                     tauri::webview::PageLoadEvent::Started => "Started",
                     tauri::webview::PageLoadEvent::Finished => "Finished",

@@ -107,6 +107,7 @@ pub fn save_auth_settings_internal(
     last_name: String,
     password: Option<String>,
 ) -> Result<DeltaVirtualAuthSettings, String> {
+    super::session_prepare::invalidate(app);
     let mut settings = DeltaVirtualAuthSettings {
         first_name: normalize_text(&first_name),
         last_name: normalize_text(&last_name),
@@ -124,6 +125,7 @@ pub fn save_auth_settings_internal(
 }
 
 pub fn clear_auth_settings_internal(app: &AppHandle) -> Result<(), String> {
+    super::session_prepare::invalidate(app);
     let path = auth_settings_path(app)?;
     let file_result = if path.exists() {
         fs::remove_file(&path)

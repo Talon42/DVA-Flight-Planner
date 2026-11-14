@@ -225,7 +225,9 @@ export function useScheduleImport({
   );
 
   const processImportedSchedule = useCallback(
-    async (scheduleFile, sourceLabel) => {
+    async (scheduleFile, sourceLabel, temporaryTrace = null) => {
+      // TEMP-DVA-TRACE: optional observer leaves manual imports unchanged.
+      const time = (stage, operation) => temporaryTrace ? temporaryTrace.time(stage, operation) : operation();
       const logStartedAt = new Date().toISOString();
       const startedAtMs = Date.now();
       let importIssuesText = "";
@@ -250,43 +252,47 @@ export function useScheduleImport({
       });
 
       try {
-        const imported = await runScheduleImport(
+        const imported = await time("schedule-worker-parse", () => runScheduleImport(
           scheduleFile.fileName,
           scheduleFile.scheduleText,
           appendDebug
-        );
+        ));
         importIssuesText = imported.importLog || "";
-        const nextBounds = buildFilterBounds(imported.flights);
-        const nextFlightBoard = reconcileBoardWithSchedule(flightBoard, imported.flights);
-        const effectiveActiveBoardId =
-          activeFlightBoardId && flightBoards.some((board) => board.id === activeFlightBoardId)
-            ? activeFlightBoardId
-            : flightBoards[0]?.id;
-        const baseFlightBoards = flightBoards.length
-          ? flightBoards
-          : [createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, [])];
-        const nextFlightBoards = baseFlightBoards.map((board) =>
-          board.id === effectiveActiveBoardId
-            ? {
-                ...board,
-                entries: nextFlightBoard
-              }
-            : {
-                ...board,
-                entries: reconcileBoardWithSchedule(board.entries || [], imported.flights)
-              }
-        );
-        const nextSchedule = {
-          importedAt: imported.importedAt,
-          scheduleMetadata: imported.scheduleMetadata,
-          flights: imported.flights,
-          importSummary: {
-            ...imported.importSummary,
-            source: sourceLabel
-          }
-        };
+        const { nextBounds, nextFlightBoard, effectiveActiveBoardId, nextFlightBoards, nextSchedule } = await time("schedule-board-reconciliation", () => {
+          const nextBounds = buildFilterBounds(imported.flights);
+          const nextFlightBoard = reconcileBoardWithSchedule(flightBoard, imported.flights);
+          const effectiveActiveBoardId =
+            activeFlightBoardId && flightBoards.some((board) => board.id === activeFlightBoardId)
+              ? activeFlightBoardId
+              : flightBoards[0]?.id;
+          const baseFlightBoards = flightBoards.length
+            ? flightBoards
+            : [createFlightBoard(DEFAULT_FLIGHT_BOARD_NAME, [])];
+          const nextFlightBoards = baseFlightBoards.map((board) =>
+            board.id === effectiveActiveBoardId
+              ? {
+                  ...board,
+                  entries: nextFlightBoard
+                }
+              : {
+                  ...board,
+                  entries: reconcileBoardWithSchedule(board.entries || [], imported.flights)
+                }
+          );
+          const nextSchedule = {
+            importedAt: imported.importedAt,
+            scheduleMetadata: imported.scheduleMetadata,
+            flights: imported.flights,
+            importSummary: {
+              ...imported.importSummary,
+              source: sourceLabel
+            }
+          };
 
-        const persistedSuccessfully = await persistScheduleSnapshot(nextSchedule, {
+          return { nextBounds, nextFlightBoard, effectiveActiveBoardId, nextFlightBoards, nextSchedule };
+        });
+
+        const persistedSuccessfully = await time("schedule-persist", () => persistScheduleSnapshot(nextSchedule, {
           plannerMode: "basic",
           filters: normalizeFilters(DEFAULT_FILTERS, nextBounds),
           dutyFilters: buildDefaultDutyFilters(nextBounds),
@@ -295,7 +301,7 @@ export function useScheduleImport({
           flightBoard: nextFlightBoard,
           sort: DEFAULT_SORT,
           selectedFlightId: imported.flights[0]?.flightId || null
-        });
+        }));
 
         if (persistedSuccessfully) {
           startTransition(() => {

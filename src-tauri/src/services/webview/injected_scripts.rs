@@ -59,6 +59,20 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
       window.chrome.webview.postMessage(config.debugPrefix + JSON.stringify({ nonce, message }));
     }
   };
+  // TEMP-DVA-TRACE: remove this helper and its wrappers after profiling.
+  const temporaryTime = async (stage, operation) => {
+    const startedAt = performance.now();
+    const log = (event) => emitDebug(`TEMP-DVA-TRACE stage=${stage} event=${event} durationMs=${Math.round(performance.now() - startedAt)} syncNonce=${nonce}`);
+    log('started');
+    try {
+      const result = await operation();
+      log('finished');
+      return result;
+    } catch (error) {
+      log('failed');
+      throw error;
+    }
+  };
   const ensureSyncOverlay = () => {
     let overlay = document.getElementById('flight-planner-sync-overlay');
     if (overlay) return overlay;
@@ -114,22 +128,31 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
     return new TextDecoder().decode(bytes);
   };
   const fetchScheduleJson = async () => {
-    const response = await fetch(config.scheduleUrl, { method: 'GET', credentials: 'include', cache: 'no-store' });
-    const scheduleText = await readBoundedText(response, config.limits.scheduleJson, 'Delta Virtual schedule JSON');
-    if (!response.ok) throw new Error(`Schedule request failed with HTTP ${response.status}.`);
-    const schedule = JSON.parse(scheduleText);
-    const resultCount = Array.isArray(schedule?.results) ? schedule.results.length : 0;
-    emitDebug(`schedule:fetch-status:${response.status}:${resultCount}`);
-    if (!schedule || typeof schedule !== 'object' || Array.isArray(schedule)) {
-      throw new Error('Delta Virtual returned an invalid schedule JSON response.');
-    }
-    if (!schedule.sources || typeof schedule.sources !== 'object' || !Array.isArray(schedule.results)) {
-      throw new Error('Delta Virtual returned an incomplete schedule JSON response.');
-    }
-    if (schedule.results.length <= 250) {
-      throw new Error(`Delta Virtual returned only ${schedule.results.length} schedule rows; the schedule service may be truncated.`);
-    }
-    return scheduleText;
+    return temporaryTime("schedule-download-and-validate", async () => {
+      // TEMP-DVA-TRACE: fetch resolves at response headers; body reading and JSON validation follow separately.
+      const response = await temporaryTime('schedule-response-wait', () =>
+        fetch(config.scheduleUrl, { method: 'GET', credentials: 'include', cache: 'no-store' })
+      );
+      const scheduleText = await temporaryTime('schedule-body-download', () =>
+        readBoundedText(response, config.limits.scheduleJson, 'Delta Virtual schedule JSON')
+      );
+      return temporaryTime('schedule-json-validation', () => {
+        if (!response.ok) throw new Error(`Schedule request failed with HTTP ${response.status}.`);
+        const schedule = JSON.parse(scheduleText);
+        const resultCount = Array.isArray(schedule?.results) ? schedule.results.length : 0;
+        emitDebug(`schedule:fetch-status:${response.status}:${resultCount}`);
+        if (!schedule || typeof schedule !== 'object' || Array.isArray(schedule)) {
+          throw new Error('Delta Virtual returned an invalid schedule JSON response.');
+        }
+        if (!schedule.sources || typeof schedule.sources !== 'object' || !Array.isArray(schedule.results)) {
+          throw new Error('Delta Virtual returned an incomplete schedule JSON response.');
+        }
+        if (schedule.results.length <= 250) {
+          throw new Error(`Delta Virtual returned only ${schedule.results.length} schedule rows; the schedule service may be truncated.`);
+        }
+        return scheduleText;
+      });
+    });
   };
   const parseLogbookExportIdFromUrl = (url) => {
     try { return new URL(url).searchParams.get('id') || ''; } catch (_) { return ''; }
@@ -139,9 +162,13 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
     return doc.querySelector('input[name="id"]')?.value || '';
   };
   const fetchLogbookJsonExport = async () => {
-    emitDebug('logbook:page-fetch-start');
-    const pageResponse = await fetch(config.logbookPageUrl, { method: 'GET', credentials: 'include', cache: 'no-store' });
-    const pageHtml = await readBoundedText(pageResponse, config.limits.logbookPageHtml, 'Delta Virtual logbook page HTML');
+    return temporaryTime("logbook-page-and-export", async () => {
+      emitDebug('logbook:page-fetch-start');
+      const { pageResponse, pageHtml } = await temporaryTime('logbook-page', async () => {
+        const pageResponse = await fetch(config.logbookPageUrl, { method: 'GET', credentials: 'include', cache: 'no-store' });
+        const pageHtml = await readBoundedText(pageResponse, config.limits.logbookPageHtml, 'Delta Virtual logbook page HTML');
+        return { pageResponse, pageHtml };
+    });
     emitDebug(`logbook:page-status:${pageResponse.status}:${pageResponse.url}`);
     if (!pageResponse.ok) throw new Error(`Logbook page request failed with HTTP ${pageResponse.status}.`);
     let exportId = parseLogbookExportIdFromUrl(pageResponse.url);
@@ -149,6 +176,7 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
     else { exportId = parseLogbookExportIdFromHtml(pageHtml); emitDebug(exportId ? 'logbook:id-source:hidden-input' : 'logbook:id-missing'); }
     if (!exportId) throw new Error('Unable to find Delta Virtual logbook export id.');
     emitDebug(`logbook:id-parsed:${exportId}`);
+    const { exportResponse, contentType, jsonText } = await temporaryTime('logbook-export', async () => {
     const exportResponse = await fetch(config.logbookExportUrl, {
       method: 'POST', credentials: 'include', cache: 'no-store',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -156,20 +184,25 @@ const DELTAVA_SYNC_SCRIPT: &str = r#"
     });
     const contentType = exportResponse.headers.get('Content-Type') || '';
     const jsonText = await readBoundedText(exportResponse, config.limits.logbookJson, 'Delta Virtual logbook JSON export');
+    return { exportResponse, contentType, jsonText };
+    });
     emitDebug(`logbook:export-status:${exportResponse.status}:${jsonText.length}`);
     if (!exportResponse.ok) throw new Error(`Logbook JSON export failed with HTTP ${exportResponse.status}.`);
     return { jsonText, contentType, exportId };
+    });
   };
   const fetchAccomplishmentEligibilityHtml = async () => {
-    emitDebug('accomplishments:fetch-start');
-    const response = await fetch(config.accomplishmentUrl, { method: 'GET', credentials: 'include', cache: 'no-store' });
-    const htmlText = await readBoundedText(response, config.limits.accomplishmentHtml, 'Delta Virtual accomplishment eligibility HTML');
-    emitDebug(`accomplishments:fetch-status:${response.status}:${htmlText.length}`);
-    if (!response.ok) throw new Error(`Accomplishment eligibility request failed with HTTP ${response.status}.`);
-    const normalizedText = String(htmlText || '').toUpperCase();
-    if (!normalizedText.includes('ACCOMPLISHMENT ELIGIBILITY')) throw new Error('Delta Virtual returned an unexpected accomplishment eligibility response.');
-    if (normalizedText.includes('SECURITY VIOLATION') || normalizedText.includes('LOGIN')) throw new Error('Delta Virtual returned an authenticated accomplishment eligibility page.');
-    return htmlText;
+    return temporaryTime("accomplishments-download-and-validate", async () => {
+      emitDebug('accomplishments:fetch-start');
+      const response = await fetch(config.accomplishmentUrl, { method: 'GET', credentials: 'include', cache: 'no-store' });
+      const htmlText = await readBoundedText(response, config.limits.accomplishmentHtml, 'Delta Virtual accomplishment eligibility HTML');
+      emitDebug(`accomplishments:fetch-status:${response.status}:${htmlText.length}`);
+      if (!response.ok) throw new Error(`Accomplishment eligibility request failed with HTTP ${response.status}.`);
+      const normalizedText = String(htmlText || '').toUpperCase();
+      if (!normalizedText.includes('ACCOMPLISHMENT ELIGIBILITY')) throw new Error('Delta Virtual returned an unexpected accomplishment eligibility response.');
+      if (normalizedText.includes('SECURITY VIOLATION') || normalizedText.includes('LOGIN')) throw new Error('Delta Virtual returned an authenticated accomplishment eligibility page.');
+      return htmlText;
+    });
   };
   const postResult = (payload) => {
     if (window.chrome?.webview?.postMessage) window.chrome.webview.postMessage(config.resultPrefix + JSON.stringify({ nonce, ...payload }));

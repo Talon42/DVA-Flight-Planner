@@ -49,7 +49,44 @@ pub(crate) async fn start_deltava_sync(
     sync_run_id: String,
     debug_enabled: bool,
 ) -> Result<DeltaSyncPayload, String> {
+    let prepared = super::session_prepare::take_for_manual_sync(&app).await;
+    let result = run_deltava_sync(
+        app.clone(),
+        &sync_manager,
+        sync_run_id.clone(),
+        debug_enabled,
+        prepared,
+    )
+    .await;
+    super::session_prepare::close_consumed_window(&app);
+    if should_retry_prepared(prepared, &result) {
+        // An expired/background session must never replace the normal interactive failure flow.
+        append_sync_log("session-prepare:fallback-to-manual-login");
+        close_deltava_sync_window(app.clone());
+        return run_deltava_sync(app, &sync_manager, sync_run_id, debug_enabled, false).await;
+    }
+    result
+}
+
+fn should_retry_prepared(prepared: bool, result: &Result<DeltaSyncPayload, String>) -> bool {
+    prepared
+        && match result {
+            Ok(payload) => payload.file_name.is_none() || payload.logbook_json.is_none(),
+            Err(error) => {
+                !error.starts_with("cancelled:") && !error.contains("already in progress")
+            }
+        }
+}
+
+async fn run_deltava_sync(
+    app: AppHandle,
+    sync_manager: &crate::DeltaSyncManager,
+    sync_run_id: String,
+    debug_enabled: bool,
+    prepared: bool,
+) -> Result<DeltaSyncPayload, String> {
     let _ = initialize_sync_log_path(&app);
+    let _temporary_trace = crate::app::logging::TemporaryDvaTrace::start("backend-sync-total"); // TEMP-DVA-TRACE
     let sync_nonce = new_dva_nonce();
     let sync_run_id = {
         let normalized = sync_run_id.trim();
@@ -116,8 +153,11 @@ pub(crate) async fn start_deltava_sync(
         webview_data_directory,
         sync_nonce.clone(),
         debug_enabled,
-        login_automation_script,
-        auto_sync_script,
+        window_factory::SyncWindowScripts {
+            login: login_automation_script,
+            download: auto_sync_script,
+            prepared_session: prepared,
+        },
         focus_lost_at.clone(),
     ) {
         Ok(window) => window,
@@ -143,11 +183,14 @@ pub(crate) async fn start_deltava_sync(
     {
         Ok(Ok(result)) => {
             append_sync_log("sync-result-delivered");
-            window_factory::spawn_deltava_sync_focus_return_cleanup(
-                app.clone(),
-                focus_lost_at.clone(),
-                debug_enabled,
-            );
+            // A fallback will replace this window; its cleanup must not close the replacement.
+            if !should_retry_prepared(prepared, &result) {
+                window_factory::spawn_deltava_sync_focus_return_cleanup(
+                    app.clone(),
+                    focus_lost_at.clone(),
+                    debug_enabled,
+                );
+            }
             result
         }
         Ok(Err(_)) => {
@@ -190,6 +233,8 @@ pub(crate) async fn refresh_deltava_logbook(
     sync_run_id: String,
     debug_enabled: bool,
 ) -> Result<DeltaSyncPayload, String> {
+    super::session_prepare::invalidate(&app);
+    let _ = super::session_prepare::take_for_manual_sync(&app).await;
     let _ = initialize_sync_log_path(&app);
     let sync_nonce = new_dva_nonce();
     let sync_run_id = {
@@ -256,8 +301,11 @@ pub(crate) async fn refresh_deltava_logbook(
         webview_data_directory,
         sync_nonce.clone(),
         debug_enabled,
-        login_automation_script,
-        refresh_script,
+        window_factory::SyncWindowScripts {
+            login: login_automation_script,
+            download: refresh_script,
+            prepared_session: false,
+        },
         focus_lost_at.clone(),
     ) {
         Ok(window) => window,
@@ -321,6 +369,7 @@ pub(crate) async fn refresh_deltava_logbook(
 
 /// Resets only the active Delta Virtual sync session and its local webview/session data.
 pub(crate) fn reset_deltava_sync_session(app: AppHandle) -> Result<(), String> {
+    super::session_prepare::invalidate(&app);
     append_sync_log("reset-session:requested");
     let outcome = app.state::<crate::DeltaSyncManager>().finish_any(
         window_factory::DELTAVA_SYNC_LABEL,
@@ -333,4 +382,53 @@ pub(crate) fn reset_deltava_sync_session(app: AppHandle) -> Result<(), String> {
     crate::services::webview::profile_cleanup::reset_deltava_sync_session_storage(&app)?;
     append_sync_log("reset-session:succeeded");
     Ok(())
+}
+
+#[cfg(test)]
+mod preparation_fallback_tests {
+    use super::*;
+
+    #[test]
+    fn failed_prepared_session_falls_back_but_cancellation_and_busy_sessions_do_not() {
+        assert!(should_retry_prepared(
+            true,
+            &Err("auth_failed: Session expired".into())
+        ));
+        assert!(!should_retry_prepared(
+            false,
+            &Err("auth_failed: Wrong password".into())
+        ));
+        assert!(!should_retry_prepared(
+            true,
+            &Err("cancelled: Window closed".into())
+        ));
+        assert!(!should_retry_prepared(
+            true,
+            &Err("download_failed: A Delta Virtual sync is already in progress.".into())
+        ));
+    }
+
+    #[test]
+    fn partial_download_retries_only_for_prepared_sessions() {
+        let mut payload = DeltaSyncPayload {
+            file_name: Some("schedule.json".into()),
+            schedule_text: Some("{}".into()),
+            status: "partial".into(),
+            schedule_status: "success".into(),
+            logbook_status: "failed".into(),
+            profile_status: "skipped".into(),
+            accomplishment_eligibility: None,
+            logbook_json: None,
+            warnings: Vec::new(),
+        };
+        assert!(should_retry_prepared(true, &Ok(payload.clone())));
+        assert!(!should_retry_prepared(false, &Ok(payload.clone())));
+        payload.logbook_json = Some(crate::services::deltava::sync_types::DeltaLogbookArtifact {
+            file_name: "logbook.json".into(),
+            path: "fixture".into(),
+            bytes: 2,
+            content_type: None,
+        });
+        assert!(!should_retry_prepared(true, &Ok(payload)));
+    }
 }

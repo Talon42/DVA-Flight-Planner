@@ -182,11 +182,49 @@ pub(crate) fn append_sync_log(message: &str) {
 }
 
 pub(crate) fn append_sync_log_debug(debug_enabled: bool, message: &str) {
-    if !debug_enabled {
+    // TEMP-DVA-TRACE: persist only timing messages even when developer logging is off.
+    if !debug_enabled && !message.starts_with("webview:TEMP-DVA-TRACE ") {
         return;
     }
 
     append_sync_log(message);
+}
+
+// TEMP-DVA-TRACE: removable scope timer; Drop also records early returns and failures.
+pub(crate) struct TemporaryDvaTrace {
+    stage: &'static str,
+    started_at: std::time::Instant,
+    checkpoint_at: std::time::Instant,
+}
+
+impl TemporaryDvaTrace {
+    pub(crate) fn start(stage: &'static str) -> Self {
+        append_sync_log(&format!("TEMP-DVA-TRACE stage={stage} event=started"));
+        let now = std::time::Instant::now();
+        Self {
+            stage,
+            started_at: now,
+            checkpoint_at: now,
+        }
+    }
+
+    pub(crate) fn checkpoint(&mut self, stage: &str) {
+        append_sync_log(&format!(
+            "TEMP-DVA-TRACE stage={stage} event=checkpoint durationMs={}",
+            self.checkpoint_at.elapsed().as_millis()
+        ));
+        self.checkpoint_at = std::time::Instant::now();
+    }
+}
+
+impl Drop for TemporaryDvaTrace {
+    fn drop(&mut self) {
+        append_sync_log(&format!(
+            "TEMP-DVA-TRACE stage={} event=scope-ended durationMs={}",
+            self.stage,
+            self.started_at.elapsed().as_millis()
+        ));
+    }
 }
 
 pub(crate) fn append_app_log_text(app: &AppHandle, text: &str) -> Result<(), String> {

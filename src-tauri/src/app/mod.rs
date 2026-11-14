@@ -22,6 +22,7 @@ use tauri::{Manager, WindowEvent};
 pub fn run() {
     tauri::Builder::default()
         .manage(DeltaSyncManager::default())
+        .manage(crate::services::deltava::session_prepare::SessionPreparation::default())
         .manage(UserDataPersistenceGate::default())
         .manage(DeltaToursSyncManager::default())
         .manage(DraftSubmitManager::default())
@@ -38,6 +39,7 @@ pub fn run() {
                     false,
                     true,
                 );
+                crate::services::deltava::session_prepare::storage_cleanup_finished(&app_handle);
             });
 
             if let Some(main_window) = app.get_webview_window("main") {
@@ -49,12 +51,27 @@ pub fn run() {
                         persist_main_window_state(&main_window_for_events, true);
                     }
                     WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed => {
+                        crate::services::deltava::session_prepare::invalidate(
+                            main_window_for_events.app_handle(),
+                        );
                         persist_main_window_state(&main_window_for_events, true);
                     }
                     _ => {}
                 });
             }
             Ok(())
+        })
+        .on_page_load(|webview, payload| {
+            if webview.label() == "main"
+                && payload.event() == tauri::webview::PageLoadEvent::Finished
+            {
+                let app = webview.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Let the main UI render before starting best-effort authentication.
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    crate::services::deltava::session_prepare::prepare(app).await;
+                });
+            }
         })
         .invoke_handler(super::app_invoke_handler())
         .plugin(tauri_plugin_dialog::init())

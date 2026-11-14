@@ -120,6 +120,7 @@ where
 
 /// Clears only explicitly allowlisted user-owned artifacts and reports every attempted category.
 pub(crate) fn clear_user_data(app: &AppHandle) -> UserDataClearResult {
+    crate::services::deltava::session_prepare::invalidate(app);
     let app_data_dir = app.path().app_data_dir();
     let local_data_dir = app.path().app_local_data_dir();
     let mut result = UserDataClearResult {
