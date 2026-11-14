@@ -14,7 +14,7 @@ describe("What's New release history", () => {
     expect(screen.getByRole("heading", { name: card.title })).toBeTruthy();
     expect(screen.getByRole("img", { name: card.imageAlt }).getAttribute("src")).toBe(card.imageSrc);
     expect(screen.queryByText("Screenshot unavailable for this release card.")).toBeNull();
-    expect(screen.getByText(/Open Settings > SimBrief > Airline Overrides/).textContent)
+    expect(screen.getByText(/Airline Overrides customize your next dispatch/).textContent)
       .toContain("Default (DLC), Delta (DAL), Endeavor (EDV), Skywest (SKW), Republic (RPA), or Random");
   });
 
