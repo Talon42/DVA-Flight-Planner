@@ -381,12 +381,6 @@ pub(crate) fn build_deltava_sync_window(
             .data_directory(webview_data_directory)
             .on_navigation(is_allowed_deltava_url)
             .on_page_load(move |webview_window, payload| {
-                // TEMP-DVA-TRACE: page milestones reveal login/navigation delays.
-                append_sync_log(&format!(
-                    "TEMP-DVA-TRACE stage=sync-page event={:?} page={}",
-                    payload.event(),
-                    payload.url().path()
-                ));
                 let event_name = match payload.event() {
                     tauri::webview::PageLoadEvent::Started => "Started",
                     tauri::webview::PageLoadEvent::Finished => "Finished",

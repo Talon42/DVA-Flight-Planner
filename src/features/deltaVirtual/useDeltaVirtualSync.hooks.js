@@ -1,4 +1,3 @@
-import { createTemporaryDvaTrace } from "../../services/logging/temporaryDvaTrace.client.js";
 import { useCallback, useRef, useState } from "react";
 import { DEFAULT_DERIVED_TOUR_PROGRESS } from "../tours/tours.constants.js";
 import {
@@ -52,11 +51,9 @@ function showDeltaVirtualStaleScheduleWarning(setStatusMessage, setDvaSyncWarnin
 }
 
 // Cleanup must never keep a completed DVA operation locked or hide its primary result.
-async function cleanupDeltaVirtualOperation({ category, removeDownloadedSchedule, syncRunId, temporaryTrace }) {
-  // TEMP-DVA-TRACE: keep logbook-only cleanup compatible while profiling full sync.
-  const time = (stage, operation) => temporaryTrace ? temporaryTrace.time(stage, operation) : operation();
+async function cleanupDeltaVirtualOperation({ category, removeDownloadedSchedule, syncRunId }) {
   try {
-    await time("cleanup-close-window", () => closeDeltaVirtualSyncWindow());
+    await closeDeltaVirtualSyncWindow();
   } catch (error) {
     try {
       await logSystemError(category, "cleanup-window-close-failed", error, {
@@ -69,7 +66,7 @@ async function cleanupDeltaVirtualOperation({ category, removeDownloadedSchedule
   }
 
   try {
-    await time("cleanup-prune-storage", () => pruneDeltaVirtualStorage(removeDownloadedSchedule));
+    await pruneDeltaVirtualStorage(removeDownloadedSchedule);
   } catch (error) {
     try {
       await logSystemError(category, "cleanup-storage-prune-failed", error, {
@@ -199,18 +196,16 @@ export function useDeltaVirtualSync({
     setIsSyncing(true);
     setStatusMessage?.("Syncing data from Delta Virtual.");
     let shouldRemoveDownloadedSchedule = false;
-    const trace = createTemporaryDvaTrace(syncRunId); // TEMP-DVA-TRACE
-    let traceOutcome = "failed";
 
     try {
       await logSystemEvent("DVA Sync", "started", {
         syncRunId
       });
       setStatusMessage?.("Syncing data from Delta Virtual.");
-      const syncedFile = await trace.time("download-and-backend-processing", () => syncScheduleFromDeltaVirtual({
+      const syncedFile = await syncScheduleFromDeltaVirtual({
         syncRunId,
         debugEnabled: isDevToolsEnabled
-      }));
+      });
       await logSystemEvent("DVA Sync", "succeeded", {
         syncRunId,
         file: syncedFile.fileName,
@@ -226,7 +221,7 @@ export function useDeltaVirtualSync({
         )
       });
       setStatusMessage?.("Processing Delta Virtual schedule...");
-      const importResult = await trace.time("schedule-import-and-save", () => processImportedSchedule?.(syncedFile, "deltava-sync", trace));
+      const importResult = await processImportedSchedule?.(syncedFile, "deltava-sync");
       if (importResult?.ok === false) {
         showDeltaVirtualSyncFailureWarning(
           setStatusMessage,
@@ -261,22 +256,20 @@ export function useDeltaVirtualSync({
         );
       }
       onScheduleSyncComplete?.();
-      setLogbookAirportProgress?.(await trace.time("reload-logbook-progress", () => readDeltaVirtualLogbookProgress()));
+      setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());
       onLogbookSyncComplete?.();
-      await trace.time("reload-accomplishments", () => reloadAccomplishmentEligibility());
-      await trace.time("refresh-saved-settings", () => refreshSavedCredentials());
+      await reloadAccomplishmentEligibility();
+      await refreshSavedCredentials();
       if (syncedFile.warnings?.length) {
         setStatusMessage?.(`Delta Virtual schedule synced with warning: ${syncedFile.warnings[0]}`);
       }
       setStatusMessage?.("Syncing Delta Virtual tours...");
       try {
-        const tourSyncResult = await trace.time("tours-download-and-backend-processing", () => syncDeltaVirtualTours({
+        const tourSyncResult = await syncDeltaVirtualTours({
           syncRunId,
           debugEnabled: isDevToolsEnabled
-        }));
+        });
         setDeltaVirtualToursCache?.(tourSyncResult);
-        traceOutcome = tourSyncResult.ok && !syncedFile.warnings?.length && !tourSyncResult.failedTourIds.length
-          ? "succeeded" : "partial";
 
         if (tourSyncResult.ok) {
           await logSystemEvent("DVA Tours Sync", "succeeded", {
@@ -320,10 +313,9 @@ export function useDeltaVirtualSync({
         });
       }
 
-      await trace.time("reload-tour-progress", () => reloadTourProgress());
+      await reloadTourProgress();
       shouldRemoveDownloadedSchedule = true;
     } catch (error) {
-      traceOutcome = error?.kind === "cancelled" ? "cancelled" : error?.kind === "partial_success" ? "partial" : "failed";
       if (error?.kind === "cancelled") {
         setStatusMessage?.("Delta Virtual sync canceled.");
         await logSystemEvent("DVA Sync", "failed", {
@@ -338,10 +330,10 @@ export function useDeltaVirtualSync({
           stage: "auth"
         });
       } else if (error?.kind === "partial_success") {
-        setLogbookAirportProgress?.(await trace.time("reload-logbook-progress", () => readDeltaVirtualLogbookProgress()));
+        setLogbookAirportProgress?.(await readDeltaVirtualLogbookProgress());
         onLogbookSyncComplete?.();
-        await trace.time("reload-accomplishments", () => reloadAccomplishmentEligibility());
-        await trace.time("refresh-saved-settings", () => refreshSavedCredentials());
+        await reloadAccomplishmentEligibility();
+        await refreshSavedCredentials();
         showDeltaVirtualSyncFailureWarning(
           setStatusMessage,
           setDvaSyncWarning,
@@ -373,16 +365,14 @@ export function useDeltaVirtualSync({
       }
     } finally {
       try {
-        await trace.time("cleanup", () => cleanupDeltaVirtualOperation({
+        await cleanupDeltaVirtualOperation({
           category: "DVA Sync",
           removeDownloadedSchedule: shouldRemoveDownloadedSchedule,
-          syncRunId,
-          temporaryTrace: trace
-        }));
+          syncRunId
+        });
       } finally {
         setIsSyncing(false);
         isSyncingRef.current = false;
-        await trace.finish(traceOutcome); // TEMP-DVA-TRACE
       }
     }
   }, [

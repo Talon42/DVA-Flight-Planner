@@ -86,7 +86,6 @@ async fn run_deltava_sync(
     prepared: bool,
 ) -> Result<DeltaSyncPayload, String> {
     let _ = initialize_sync_log_path(&app);
-    let _temporary_trace = crate::app::logging::TemporaryDvaTrace::start("backend-sync-total"); // TEMP-DVA-TRACE
     let sync_nonce = new_dva_nonce();
     let sync_run_id = {
         let normalized = sync_run_id.trim();

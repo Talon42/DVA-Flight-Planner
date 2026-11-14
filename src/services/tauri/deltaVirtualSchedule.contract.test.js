@@ -8,7 +8,7 @@ const rustSource = readFileSync(new URL("../../../src-tauri/src/services/webview
 const template = rustSource.match(/const DELTAVA_SYNC_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1];
 
 // Execute the actual injected JavaScript with local HTTP and browser substitutes.
-async function runDownloads({ schedule = JSON.stringify(scheduleFixture), status = 200, logbookOnly = false, failureStage = "" } = {}) {
+async function runDownloads({ schedule = JSON.stringify(scheduleFixture), status = 200, logbookOnly = false, failure = "" } = {}) {
   const messages = [];
   const callbacks = [];
   const config = {
@@ -23,8 +23,8 @@ async function runDownloads({ schedule = JSON.stringify(scheduleFixture), status
   };
   const fetch = vi.fn(async (url) => {
     if (url === config.scheduleUrl) {
-      if (failureStage === "schedule-response-wait") throw new Error("Fixture request failed");
-      if (failureStage === "schedule-body-download") return {
+      if (failure === "request") throw new Error("Fixture request failed");
+      if (failure === "body") return {
         headers: new Headers(),
         text: async () => { throw new Error("Fixture body failed"); }
       };
@@ -42,7 +42,7 @@ async function runDownloads({ schedule = JSON.stringify(scheduleFixture), status
     setTimeout: (callback) => callbacks.push(callback)
   };
   const context = {
-    window, fetch, performance, URL, URLSearchParams, TextEncoder, TextDecoder, Uint8Array,
+    window, fetch, URL, URLSearchParams, TextEncoder, TextDecoder, Uint8Array,
     document: { getElementById: () => null, createElement: element, documentElement: element(), addEventListener() {} }
   };
   const script = template.replace("__CONFIG__", JSON.stringify(config)).replace("__NONCE__", '"fixture-nonce"');
@@ -52,24 +52,12 @@ async function runDownloads({ schedule = JSON.stringify(scheduleFixture), status
   runInNewContext(script, context);
   const results = messages.filter((message) => message.startsWith(config.resultPrefix));
   expect(results).toHaveLength(1);
-  return { result: JSON.parse(results[0].slice(config.resultPrefix.length)), fetch, messages };
+  return { result: JSON.parse(results[0].slice(config.resultPrefix.length)), fetch };
 }
 
 describe("DVA injected schedule JSON contract", () => {
   it("posts one JSON schedule and logbook result without an XML fetch", async () => {
-    const { result, fetch, messages } = await runDownloads();
-    const timings = messages.filter((message) => message.includes("TEMP-DVA-TRACE"));
-    expect(timings.some((message) => message.includes("stage=schedule-download-and-validate event=finished"))).toBe(true);
-    expect(timings.some((message) => message.includes("stage=logbook-export event=finished"))).toBe(true);
-    const schedulePhases = timings
-      .map((message) => JSON.parse(message.slice("debug:".length)).message)
-      .filter((message) => /stage=schedule-(response-wait|body-download|json-validation) /.test(message))
-      .map((message) => message.match(/stage=(\S+) event=(\S+)/).slice(1));
-    expect(schedulePhases).toEqual([
-      ["schedule-response-wait", "started"], ["schedule-response-wait", "finished"],
-      ["schedule-body-download", "started"], ["schedule-body-download", "finished"],
-      ["schedule-json-validation", "started"], ["schedule-json-validation", "finished"]
-    ]);
+    const { result, fetch } = await runDownloads();
     expect(result).toMatchObject({ nonce: "fixture-nonce", schedule: { ok: true, scheduleText: JSON.stringify(scheduleFixture) }, logbook: { ok: true } });
     expect(result).not.toHaveProperty("xml");
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([
@@ -83,32 +71,21 @@ describe("DVA injected schedule JSON contract", () => {
     ["truncated JSON", JSON.stringify({ sources: {}, results: [] }), 200, "only 0"],
     ["oversized JSON", "x".repeat(25 * 1024 * 1024 + 1), 200, "byte limit"]
   ])("retains the logbook and posts a terminal result after %s", async (_name, schedule, status, error) => {
-    const { result, messages } = await runDownloads({ schedule, status });
-    expect(messages.some((message) => message.includes("stage=schedule-download-and-validate event=failed"))).toBe(true);
+    const { result } = await runDownloads({ schedule, status });
     expect(result.schedule).toMatchObject({ ok: false, error: expect.stringContaining(error) });
     expect(result.logbook.ok).toBe(true);
   });
 
   it("does not request a schedule during logbook-only refresh", async () => {
-    const { result, fetch, messages } = await runDownloads({ logbookOnly: true });
-    expect(messages.some((message) => /stage=schedule-(response-wait|body-download|json-validation)/.test(message))).toBe(false);
+    const { result, fetch } = await runDownloads({ logbookOnly: true });
     expect(result).not.toHaveProperty("schedule");
     expect(result.logbook.ok).toBe(true);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["schedule-response-wait", "schedule-body-download"])("records %s failures while retaining the logbook", async (failureStage) => {
-    const { result, messages } = await runDownloads({ failureStage });
+  it.each(["request", "body"])("returns a terminal result for %s failures while retaining the logbook", async (failure) => {
+    const { result } = await runDownloads({ failure });
     expect(result.schedule.ok).toBe(false);
     expect(result.logbook.ok).toBe(true);
-    expect(messages.some((message) => message.includes(`stage=${failureStage} event=failed`))).toBe(true);
-    expect(messages.some((message) => message.includes("stage=schedule-json-validation"))).toBe(false);
-  });
-
-  it("attributes malformed JSON to validation after completing the download", async () => {
-    const { result, messages } = await runDownloads({ schedule: "not JSON" });
-    expect(result.schedule.ok).toBe(false);
-    expect(messages.some((message) => message.includes("stage=schedule-body-download event=finished"))).toBe(true);
-    expect(messages.some((message) => message.includes("stage=schedule-json-validation event=failed"))).toBe(true);
   });
 });

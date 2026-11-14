@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { expect, it, vi } from "vitest";
 
-// TEMP-DVA-TRACE: execute the actual tours script to catch instrumentation failures.
-it.each([200, 503])("tours tracing preserves terminal results for HTTP %s", async (status) => {
+// Execute the injected tours script with offline responses to verify terminal results.
+it.each([200, 503])("tours sync returns one terminal result for HTTP %s", async (status) => {
   const source = readFileSync(new URL("../../../src-tauri/src/services/deltava/tours.rs", import.meta.url), "utf8");
   const script = source.match(/const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"([\s\S]*?)"#;/)[1]
     .replace("__NONCE__", '"fixture-nonce"')
@@ -22,11 +22,9 @@ it.each([200, 503])("tours tracing preserves terminal results for HTTP %s", asyn
     } } }
   };
   runInNewContext(script, {
-    window, performance, URL, document: { querySelector: () => null },
+    window, URL, document: { querySelector: () => null },
     fetch: vi.fn(async () => new Response("[]", { status, headers: { "Content-Type": "application/json" } }))
   });
   expect(await terminal).toMatchObject({ nonce: "fixture-nonce", ok: status === 200, tours: [] });
-  expect(messages.some((message) => message.includes("stage=tours-list event=finished"))).toBe(true);
-  // HTTP failures return a structured result; "finished" indicates a completed request, not success.
   expect(messages.filter((message) => message.startsWith("result:"))).toHaveLength(1);
 });

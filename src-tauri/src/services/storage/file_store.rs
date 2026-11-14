@@ -199,9 +199,6 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
     result: DeltaWebSyncResult,
     debug_enabled: bool,
 ) -> Result<crate::DeltaSyncPayload, String> {
-    let mut temporary_trace =
-        crate::app::logging::TemporaryDvaTrace::start("backend-artifact-processing"); // TEMP-DVA-TRACE
-
     let mut warnings = Vec::new();
 
     let schedule_text = if result.schedule.ok {
@@ -235,7 +232,6 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         None
     };
 
-    temporary_trace.checkpoint("backend-schedule-validate-and-save"); // TEMP-DVA-TRACE
     let logbook_json = if result.logbook.ok {
         let json_text = result.logbook.json_text.unwrap_or_default();
         append_sync_log_debug(debug_enabled, "logbook-fetch");
@@ -256,7 +252,6 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         None
     };
 
-    temporary_trace.checkpoint("backend-logbook-validate-and-save"); // TEMP-DVA-TRACE
     let accomplishment_eligibility = if let Some(accomplishments) = result.accomplishments {
         if accomplishments.ok {
             let html_text = accomplishments.html_text.unwrap_or_default();
@@ -283,7 +278,6 @@ pub(crate) async fn build_delta_sync_payload_from_web_result(
         None
     };
 
-    temporary_trace.checkpoint("backend-accomplishments-parse-and-save"); // TEMP-DVA-TRACE
     let schedule_status = if schedule_text.is_some() {
         "success"
     } else {

@@ -22,8 +22,7 @@ Preparation uses the existing DVA WebView profile and login automation. A succes
 login keeps its hidden window alive to preserve session cookies until manual sync
 finishes or the unused preparation expires after five minutes. Failure, cancellation,
 credential changes, and app closure close it immediately. Nonces and credential-change generations
-reject late messages. These operational logs remain after temporary sync timing
-instrumentation is removed.
+reject late messages. Preparation writes compact operational summaries to the app log.
 
 Offline tests cover missing credentials, one-attempt behavior, invalidation,
 expiry, cancellation/fallback decisions, and late results. Actual DVA authentication,

@@ -36,20 +36,6 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
   const resultPrefix = __RESULT_PREFIX__;
   const debugPrefix = __DEBUG_PREFIX__;
   const cachedBriefings = __CACHED_BRIEFINGS__;
-  // TEMP-DVA-TRACE: remove this helper and its wrappers after profiling.
-  const temporaryTime = async (stage, operation) => {
-    const startedAt = performance.now();
-    const log = (event) => emitDebug(`TEMP-DVA-TRACE stage=${stage} event=${event} durationMs=${Math.round(performance.now() - startedAt)} syncNonce=${nonce}`);
-    log('started');
-    try {
-      const result = await operation();
-      log('finished');
-      return result;
-    } catch (error) {
-      log('failed');
-      throw error;
-    }
-  };
   const toursListUrl = 'https://www.deltava.org/tours.ws';
   const tourDetailBaseUrl = 'https://www.deltava.org/tour.ws?id=';
 
@@ -216,11 +202,10 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
     document.querySelector('input[name="firstName"], input[name="lastName"], input[name="pwd"]')
   );
   const fetchEndpoint = async (endpoint) => {
-    return temporaryTime(endpoint === toursListUrl ? 'tours-list' : 'tour-detail-' + normalizeId(new URL(endpoint).searchParams.get('id')), async () => {
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        credentials: 'include',
-        cache: 'no-store'
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
     });
     const responseText = await response.text();
     const contentType = String(response.headers.get('Content-Type') || '').trim();
@@ -252,7 +237,6 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
         )
       };
     }
-    });
   };
   const fetchJsonArray = async (endpoint) => {
     const result = await fetchEndpoint(endpoint);
@@ -433,7 +417,7 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
       briefingAvailable = true;
     }
     if (!briefingAvailable && briefingUrl) {
-      const probe = await temporaryTime('tour-briefing-probe-' + tourId, () => probeBriefingAvailability(briefingUrl));
+      const probe = await probeBriefingAvailability(briefingUrl);
       briefingAvailable = probe.available;
       inferredContentType = probe.contentType;
     }
@@ -621,48 +605,46 @@ const DELTAVA_TOURS_SYNC_SCRIPT_TEMPLATE: &str = r#"
       })}`
     );
     const hydrateTour = async (candidateTour) => {
-      return temporaryTime('tour-hydrate-' + normalizeId(candidateTour.id || candidateTour.sourceId), async () => {
-        const tourId = normalizeId(candidateTour.id || candidateTour.sourceId);
-        const detailEndpoint = `${tourDetailBaseUrl}${encodeURIComponent(tourId)}`;
-        try {
-        const detailResponse = await fetchEndpoint(detailEndpoint);
+      const tourId = normalizeId(candidateTour.id || candidateTour.sourceId);
+      const detailEndpoint = `${tourDetailBaseUrl}${encodeURIComponent(tourId)}`;
+      try {
+      const detailResponse = await fetchEndpoint(detailEndpoint);
 
-        if (!detailResponse.ok) {
-          return { tourId, failure: { ...detailResponse.error, tourId } };
-        }
+      if (!detailResponse.ok) {
+        return { tourId, failure: { ...detailResponse.error, tourId } };
+      }
 
-        const detailTour = detailResponse.json && typeof detailResponse.json === 'object'
-          ? detailResponse.json.tour && typeof detailResponse.json.tour === 'object'
-            ? detailResponse.json.tour
-            : detailResponse.json
-          : null;
-        const detailFlights = Array.isArray(detailTour?.flights) ? detailTour.flights : [];
+      const detailTour = detailResponse.json && typeof detailResponse.json === 'object'
+        ? detailResponse.json.tour && typeof detailResponse.json.tour === 'object'
+          ? detailResponse.json.tour
+          : detailResponse.json
+        : null;
+      const detailFlights = Array.isArray(detailTour?.flights) ? detailTour.flights : [];
 
-        if (!detailFlights.length) {
-          const contentType = String(detailResponse.contentType || '').trim();
-          return { tourId, failure: {
-            endpoint: detailEndpoint,
-            status: Number.isFinite(detailResponse.response?.status) ? detailResponse.response.status : null,
-            contentType,
-            preview: isJsonContentType(contentType) ? '' : buildPreview(detailResponse.responseText),
-            message: 'Delta Virtual tour detail response did not include flights.',
-            tourId
-          } };
-        }
+      if (!detailFlights.length) {
+        const contentType = String(detailResponse.contentType || '').trim();
+        return { tourId, failure: {
+          endpoint: detailEndpoint,
+          status: Number.isFinite(detailResponse.response?.status) ? detailResponse.response.status : null,
+          contentType,
+          preview: isJsonContentType(contentType) ? '' : buildPreview(detailResponse.responseText),
+          message: 'Delta Virtual tour detail response did not include flights.',
+          tourId
+        } };
+      }
 
-        const briefingMeta = await extractTourBriefingMetadata(candidateTour, detailTour, tourId);
-        return { tourId, tour: cloneTour(normalizeTour(detailTour, detailFlights, briefingMeta, nowSeconds)) };
-        } catch (error) {
-          return { tourId, failure: {
-            endpoint: detailEndpoint,
-            status: null,
-            contentType: '',
-            preview: '',
-            message: error?.message || 'Delta Virtual tour detail request failed.',
-            tourId
-          } };
-        }
-      });
+      const briefingMeta = await extractTourBriefingMetadata(candidateTour, detailTour, tourId);
+      return { tourId, tour: cloneTour(normalizeTour(detailTour, detailFlights, briefingMeta, nowSeconds)) };
+      } catch (error) {
+        return { tourId, failure: {
+          endpoint: detailEndpoint,
+          status: null,
+          contentType: '',
+          preview: '',
+          message: error?.message || 'Delta Virtual tour detail request failed.',
+          tourId
+        } };
+      }
     };
     const hydrationResults = new Array(candidateTours.length);
     let nextCandidateIndex = 0;
@@ -1076,9 +1058,6 @@ async fn build_tours_sync_payload_from_web_result(
     mut result: DeltaToursSyncPayload,
     debug_enabled: bool,
 ) -> Result<DeltaToursSyncPayload, String> {
-    let mut temporary_trace =
-        crate::app::logging::TemporaryDvaTrace::start("backend-tours-processing"); // TEMP-DVA-TRACE
-
     let cached_payload = read_delta_virtual_tours_cache_internal(app);
     normalize_tour_payload_identifiers(&mut result);
 
@@ -1111,9 +1090,7 @@ async fn build_tours_sync_payload_from_web_result(
         log_delta_virtual_tours_failure(failure);
     }
 
-    temporary_trace.checkpoint("backend-tours-normalize-and-merge"); // TEMP-DVA-TRACE
     write_delta_virtual_tours_cache_internal(app, &result)?;
-    temporary_trace.checkpoint("backend-tours-cache-write"); // TEMP-DVA-TRACE
     if let Err(error) =
         crate::services::deltava::tour_progress::reconcile_deltava_tour_progress_internal(
             app,
@@ -1123,7 +1100,6 @@ async fn build_tours_sync_payload_from_web_result(
         append_sync_log(&format!("tour-progress:reconcile-failed {error}"));
     }
 
-    temporary_trace.checkpoint("backend-tour-progress-reconcile"); // TEMP-DVA-TRACE
     Ok(result)
 }
 
@@ -1364,12 +1340,6 @@ pub async fn sync_delta_virtual_tours(
     .data_directory(webview_data_directory)
     .on_navigation(is_allowed_deltava_url)
     .on_page_load(move |webview_window, payload| {
-        // TEMP-DVA-TRACE: page milestones reveal login/navigation delays.
-        append_sync_log(&format!(
-            "TEMP-DVA-TRACE stage=tours-page event={:?} page={}",
-            payload.event(),
-            payload.url().path()
-        ));
         if payload.event() == tauri::webview::PageLoadEvent::Finished
             && should_probe_for_schedule(payload.url())
         {

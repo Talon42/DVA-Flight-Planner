@@ -164,8 +164,7 @@ describe("useDeltaVirtualSync", () => {
 
     expect(props.processImportedSchedule).toHaveBeenCalledWith(
       expect.objectContaining({ fileName: "deltava-schedule.json" }),
-      "deltava-sync",
-      expect.objectContaining({ time: expect.any(Function), finish: expect.any(Function) })
+      "deltava-sync"
     );
     expect(props.onScheduleSyncComplete).toHaveBeenCalledOnce();
     expect(props.onLogbookSyncComplete).toHaveBeenCalledOnce();
