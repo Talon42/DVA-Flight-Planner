@@ -5,7 +5,10 @@ use serde_json::Value;
 use std::{
     collections::HashSet,
     fs,
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
@@ -24,6 +27,7 @@ const SIMBRIEF_CALLBACK_URL_BASE: &str = "http://127.0.0.1:43123/simbrief-callba
 const SIMBRIEF_SIGNING_SERVICE_URL: &str =
     "https://dva-simbrief-signer.foxtwomodels.workers.dev/simbrief/dispatch-url";
 const SIMBRIEF_FETCH_URL: &str = "https://www.simbrief.com/api/xml.fetcher.php";
+static NEXT_DISPATCH_SESSION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -132,6 +136,7 @@ pub struct SimBriefDispatchManager {
 
 struct ActiveSimBriefDispatch {
     label: String,
+    session_id: u64,
     sender: oneshot::Sender<Result<SimBriefPlanSummary, String>>,
     close_on_completion: bool,
 }
@@ -140,6 +145,7 @@ impl SimBriefDispatchManager {
     fn begin(
         &self,
         label: String,
+        session_id: u64,
         sender: oneshot::Sender<Result<SimBriefPlanSummary, String>>,
     ) -> Result<(), String> {
         let mut active = self
@@ -153,42 +159,53 @@ impl SimBriefDispatchManager {
 
         *active = Some(ActiveSimBriefDispatch {
             label,
+            session_id,
             sender,
             close_on_completion: false,
         });
         Ok(())
     }
 
-    fn mark_close_on_completion(&self, label: &str) {
+    fn mark_close_on_completion(&self, label: &str, session_id: u64) {
         if let Ok(mut active) = self.active.lock() {
             if let Some(session) = active.as_mut() {
-                if session.label == label {
+                if session.label == label && session.session_id == session_id {
                     session.close_on_completion = true;
                 }
             }
         }
     }
 
-    fn should_treat_close_as_cancel(&self, label: &str) -> bool {
+    fn should_treat_close_as_cancel(&self, label: &str, session_id: u64) -> bool {
         self.active
             .lock()
             .ok()
             .and_then(|active| {
-                active
-                    .as_ref()
-                    .map(|session| (session.label == label, session.close_on_completion))
+                active.as_ref().map(|session| {
+                    (
+                        session.label == label && session.session_id == session_id,
+                        session.close_on_completion,
+                    )
+                })
             })
             .map(|(matches_label, close_on_completion)| matches_label && !close_on_completion)
             .unwrap_or(false)
     }
 
-    fn finish(&self, label: &str, result: Result<SimBriefPlanSummary, String>) {
+    fn finish(
+        &self,
+        label: &str,
+        session_id: u64,
+        result: Result<SimBriefPlanSummary, String>,
+    ) -> bool {
         let sender = self
             .active
             .lock()
             .ok()
             .and_then(|mut active| match active.take() {
-                Some(session) if session.label == label => Some(session.sender),
+                Some(session) if session.label == label && session.session_id == session_id => {
+                    Some(session.sender)
+                }
                 Some(session) => {
                     *active = Some(session);
                     None
@@ -198,6 +215,9 @@ impl SimBriefDispatchManager {
 
         if let Some(sender) = sender {
             let _ = sender.send(result);
+            true
+        } else {
+            false
         }
     }
 }
@@ -569,6 +589,7 @@ fn spawn_simbrief_background_fetch(
     app: AppHandle,
     payload: SimBriefDispatchPayload,
     static_id: String,
+    session_id: u64,
     debug_enabled: bool,
 ) {
     tauri::async_runtime::spawn(async move {
@@ -591,13 +612,16 @@ fn spawn_simbrief_background_fetch(
 
         if fetch_succeeded {
             app.state::<SimBriefDispatchManager>()
-                .mark_close_on_completion(SIMBRIEF_DISPATCH_LABEL);
+                .mark_close_on_completion(SIMBRIEF_DISPATCH_LABEL, session_id);
         }
 
-        app.state::<SimBriefDispatchManager>()
-            .finish(SIMBRIEF_DISPATCH_LABEL, result);
+        let delivered = app.state::<SimBriefDispatchManager>().finish(
+            SIMBRIEF_DISPATCH_LABEL,
+            session_id,
+            result,
+        );
 
-        if !fetch_succeeded {
+        if !fetch_succeeded || !delivered {
             if let Some(error) = dispatch_error {
                 append_simbrief_log(
                     &app,
@@ -1736,7 +1760,8 @@ pub async fn start_simbrief_dispatch(
     let webview_data_directory = build_webview_data_directory(&app)?;
 
     let (sender, receiver) = oneshot::channel();
-    manager.begin(SIMBRIEF_DISPATCH_LABEL.to_string(), sender)?;
+    let session_id = NEXT_DISPATCH_SESSION.fetch_add(1, Ordering::Relaxed);
+    manager.begin(SIMBRIEF_DISPATCH_LABEL.to_string(), session_id, sender)?;
 
     let app_for_close = app.clone();
     let app_for_timeout = app.clone();
@@ -1764,8 +1789,11 @@ pub async fn start_simbrief_dispatch(
     .map_err(|error| {
         // Once the manager is active, any startup failure must clear it before returning.
         let message = format!("dispatch_failed: Unable to open SimBrief dispatch window: {error}");
-        app.state::<SimBriefDispatchManager>()
-            .finish(SIMBRIEF_DISPATCH_LABEL, Err(message.clone()));
+        app.state::<SimBriefDispatchManager>().finish(
+            SIMBRIEF_DISPATCH_LABEL,
+            session_id,
+            Err(message.clone()),
+        );
         message
     })?;
 
@@ -1773,6 +1801,7 @@ pub async fn start_simbrief_dispatch(
         app.clone(),
         normalized_payload.clone(),
         static_id.clone(),
+        session_id,
         debug_enabled,
     );
 
@@ -1780,10 +1809,11 @@ pub async fn start_simbrief_dispatch(
         if matches!(event, WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed)
             && app_for_close
                 .state::<SimBriefDispatchManager>()
-                .should_treat_close_as_cancel(SIMBRIEF_DISPATCH_LABEL)
+                .should_treat_close_as_cancel(SIMBRIEF_DISPATCH_LABEL, session_id)
         {
             app_for_close.state::<SimBriefDispatchManager>().finish(
                 SIMBRIEF_DISPATCH_LABEL,
+                session_id,
                 Err("cancelled: SimBrief dispatch window was closed before the flight plan returned.".into()),
             );
         }
@@ -1800,6 +1830,7 @@ pub async fn start_simbrief_dispatch(
         Err(_) => {
             app_for_timeout.state::<SimBriefDispatchManager>().finish(
                 SIMBRIEF_DISPATCH_LABEL,
+                session_id,
                 Err(
                     "auth_failed: Timed out waiting for SimBrief login or flight plan generation."
                         .into(),

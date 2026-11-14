@@ -43,6 +43,21 @@ fn verify_json_file(path: &Path, expected: &Value) -> Result<(), String> {
     Ok(())
 }
 
+// Restores the prior complete value before application bootstrap can write defaults.
+pub(crate) fn recover_json_backup(final_path: &Path) -> Result<(), String> {
+    let backup_path = sibling_path(final_path, ".bak")?;
+    if final_path.exists() || !backup_path.exists() {
+        return Ok(());
+    }
+
+    let backup_text = fs::read_to_string(&backup_path)
+        .map_err(|error| format!("Unable to read JSON recovery backup: {error}"))?;
+    serde_json::from_str::<Value>(&backup_text)
+        .map_err(|error| format!("JSON recovery backup failed validation: {error}"))?;
+    fs::rename(&backup_path, final_path)
+        .map_err(|error| format!("Unable to restore JSON recovery backup: {error}"))
+}
+
 fn atomic_write_json_internal(
     final_path: &Path,
     json: &str,
@@ -60,11 +75,9 @@ fn atomic_write_json_internal(
     let backup_path = sibling_path(final_path, ".bak")?;
     let _ = fs::remove_file(&temp_path);
 
-    // Recover an interrupted prior replacement before starting a new one.
-    if !final_path.exists() && backup_path.exists() {
-        fs::rename(&backup_path, final_path)
-            .map_err(|error| format!("Unable to recover previous JSON backup: {error}"))?;
-    } else if backup_path.exists() {
+    // Also invoked by reads so startup hydrates the previous state before autosave.
+    recover_json_backup(final_path)?;
+    if backup_path.exists() {
         fs::remove_file(&backup_path)
             .map_err(|error| format!("Unable to remove stale JSON backup: {error}"))?;
     }
@@ -217,6 +230,24 @@ mod tests {
         assert_eq!(fs::read_to_string(&path).unwrap(), r#"{"revision":1}"#);
         assert!(!sibling_path(&path, ".tmp").unwrap().exists());
         assert!(!sibling_path(&path, ".bak").unwrap().exists());
+        cleanup(&directory);
+    }
+
+    #[test]
+    fn read_recovery_restores_valid_backup_before_new_state_can_be_written() {
+        let directory = test_directory("read-recovery");
+        let path = directory.join("ui-state.json");
+        let backup = sibling_path(&path, ".bak").unwrap();
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(&backup, r#"{"flightBoards":[{"name":"Saved work"}]}"#).unwrap();
+
+        recover_json_backup(&path).expect("valid recovery backup should be restored");
+
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            r#"{"flightBoards":[{"name":"Saved work"}]}"#
+        );
+        assert!(!backup.exists());
         cleanup(&directory);
     }
 }

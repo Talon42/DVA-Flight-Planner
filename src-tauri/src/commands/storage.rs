@@ -105,7 +105,13 @@ pub(crate) async fn clear_user_data(
     gate: State<'_, UserDataPersistenceGate>,
 ) -> Result<crate::services::storage::user_data::UserDataClearResult, String> {
     let _guard = gate.begin_clear().await;
-    Ok(crate::services::storage::user_data::clear_user_data(&app))
+    let result = crate::services::storage::user_data::clear_user_data(&app);
+    if result.is_ok() {
+        drop(_guard);
+        // The persistence gate is process-wide, so a successful clear must relaunch Tauri.
+        app.restart();
+    }
+    Ok(result)
 }
 
 #[tauri::command]

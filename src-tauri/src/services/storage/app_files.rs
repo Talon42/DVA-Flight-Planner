@@ -68,6 +68,14 @@ fn path(app: &AppHandle, file: AppFile) -> Result<PathBuf, String> {
     Ok(crate::app::paths::app_storage_dir(app)?.join(file.file_name()))
 }
 
+fn recover_backup(file: AppFile, path: &std::path::Path) -> Result<(), String> {
+    if file.requires_json() {
+        super::atomic_json::recover_json_backup(path)
+    } else {
+        Ok(())
+    }
+}
+
 fn validate_size(file: AppFile, byte_count: u64) -> Result<(), String> {
     if byte_count > file.max_bytes() {
         return Err(format!(
@@ -82,6 +90,7 @@ fn validate_size(file: AppFile, byte_count: u64) -> Result<(), String> {
 pub(crate) fn read(app: &AppHandle, key: &str) -> Result<Option<String>, String> {
     let file = AppFile::parse(key)?;
     let path = path(app, file)?;
+    recover_backup(file, &path)?;
     if !path.is_file() {
         return Ok(None);
     }
