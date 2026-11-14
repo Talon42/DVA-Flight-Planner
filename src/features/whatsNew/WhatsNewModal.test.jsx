@@ -2,10 +2,22 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import WhatsNewModal from "./WhatsNewModal.jsx";
+import { whatsNewCards } from "./whatsNewContent.js";
 
 afterEach(cleanup);
 
 describe("What's New release history", () => {
+  it("loads the SimBrief airline overrides card with its screenshot and dispatch guidance", () => {
+    const card = whatsNewCards.find((entry) => entry.title === "Choose your airline identity");
+    expect(card?.imageSrc).toBeTruthy();
+    render(<WhatsNewModal isOpen mode="manual" cards={[card]} />);
+    expect(screen.getByRole("heading", { name: card.title })).toBeTruthy();
+    expect(screen.getByRole("img", { name: card.imageAlt }).getAttribute("src")).toBe(card.imageSrc);
+    expect(screen.queryByText("Screenshot unavailable for this release card.")).toBeNull();
+    expect(screen.getByText(/Open Settings > SimBrief > Airline Overrides/).textContent)
+      .toContain("Default (DLC), Delta (DAL), Endeavor (EDV), Skywest (SKW), Republic (RPA), or Random");
+  });
+
   it("gives each release its own region, version, date and latest/previous label", () => {
     render(<WhatsNewModal isOpen mode="manual" cards={[{
       id: "release-history", layout: "text", title: "Release History", description: "Release notes",

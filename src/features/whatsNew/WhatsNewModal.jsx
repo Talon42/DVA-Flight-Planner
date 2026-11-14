@@ -240,7 +240,7 @@ export default function WhatsNewModal({
               <img
                 src={activeCard.imageSrc}
                 alt={activeCard.imageAlt}
-                className="block h-full w-full object-cover object-center"
+                className="block h-full w-full object-contain object-center"
               />
             ) : (
               <div
