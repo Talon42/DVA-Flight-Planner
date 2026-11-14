@@ -25,6 +25,11 @@
     "ICAO": "ARG"
   },
   {
+    "IATA": "BT",
+    "Airline": "Air Baltic",
+    "ICAO": "BTI"
+  },
+  {
     "IATA": "UX",
     "Airline": "Air Europa",
     "ICAO": "AEA"
@@ -83,6 +88,11 @@
     "IATA": "CZH",
     "Airline": "China Southern Historical",
     "ICAO": "CSN"
+  },
+  {
+    "IATA": "VG",
+    "Airline": "CityJet",
+    "ICAO": "BCY"
   },
   {
     "IATA": "OK",
@@ -158,6 +168,11 @@
     "IATA": "KEH",
     "Airline": "Korean Air Lines Historic",
     "ICAO": "KAL"
+  },
+  {
+    "IATA": "LA",
+    "Airline": "LATAM Airlines",
+    "ICAO": "LAN"
   },
   {
     "IATA": "ME",

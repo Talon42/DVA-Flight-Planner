@@ -72,6 +72,15 @@ function parseSingleFlight(options = {}) {
 }
 
 describe("parseScheduleImport", () => {
+  it.each([
+    ["LA", "LATAM Airlines", "LAN"],
+    ["BT", "Air Baltic", "BTI"],
+    ["VG", "CityJet", "BCY"]
+  ])("resolves %s to its airline name and dispatch ICAO identity", (airline, airlineName, airlineIcao) => {
+    const { flight } = parseSingleFlight({ airline });
+    expect(flight).toMatchObject({ airline, airlineName, airlineIcao, callsign: `${airlineIcao}103` });
+  });
+
   it("parses the shared DVA JSON contract fixture", () => {
     const result = parseScheduleImport("deltava-schedule.json", JSON.stringify(scheduleFixture));
     expect(result.flights).toHaveLength(251);
