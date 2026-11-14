@@ -47,9 +47,9 @@ fn native_level(message: &str) -> &'static str {
     } else if message.contains("failed") || message.contains("error=") || message.contains("panic")
     {
         "ERROR"
-    } else if message.contains("warning")
-        || message.contains("invalid")
-        || message.contains("timeout")
+    } else if message
+        .split(|character: char| !character.is_ascii_alphanumeric())
+        .any(|word| matches!(word, "warning" | "warnings" | "invalid" | "timeout"))
     {
         "WARN"
     } else {
@@ -317,6 +317,17 @@ mod tests {
 
     fn read_log_text(path: &Path) -> String {
         fs::read_to_string(path).expect("read log")
+    }
+
+    #[test]
+    fn normal_session_invalidation_is_not_a_warning() {
+        assert_eq!(native_level("session-prepare:invalidated"), "INFO");
+        assert_eq!(native_level("logbook:invalid-json"), "WARN");
+        assert_eq!(
+            native_level("session-prepare:failed error=login-rejected"),
+            "ERROR"
+        );
+        assert_eq!(native_level("session-prepare:timeout"), "WARN");
     }
 
     #[test]

@@ -23,6 +23,10 @@ const DELTAVA_FOCUS_LOSS_RECENT_WINDOW_MILLIS: u64 = 3000;
 const DELTAVA_CLOSE_AFTER_PROMPT_WAIT_SECONDS: u64 = 30;
 
 fn log_ignored_finish(source: &str, outcome: DeltaSyncFinishOutcome) {
+    // Successful delivery removes the session before CloseRequested/Destroyed cleanup runs.
+    if source == "window-close" && outcome == DeltaSyncFinishOutcome::NoActiveSession {
+        return;
+    }
     append_sync_log(&format!(
         "DVA sync finish ignored: source={source} outcome={outcome:?}"
     ));

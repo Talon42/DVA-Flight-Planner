@@ -60,13 +60,16 @@ impl PreparationState {
         }
     }
 
-    fn invalidate(&mut self) {
+    // Repeated close events still invalidate late work, but only the first state change is logged.
+    fn invalidate(&mut self) -> bool {
+        let changed = !self.attempted || self.ready_at.is_some() || self.active.is_some();
         self.generation += 1;
         self.attempted = true;
         self.ready_at = None;
         if let Some((_, sender)) = self.active.take() {
             let _ = sender.send(false);
         }
+        changed
     }
 
     fn complete(&mut self, nonce: &str, generation: u64, success: bool) -> bool {
@@ -150,11 +153,15 @@ pub(crate) fn close_consumed_window(app: &AppHandle) {
 /// Clears an in-flight or prepared login before credentials or session data change.
 pub(crate) fn invalidate(app: &AppHandle) {
     if let Some(manager) = app.try_state::<SessionPreparation>() {
-        if let Ok(mut state) = manager.state.lock() {
-            state.invalidate();
-        }
+        let changed = manager
+            .state
+            .lock()
+            .map(|mut state| state.invalidate())
+            .unwrap_or(false);
         close_window(app);
-        log(app, "session-prepare:invalidated");
+        if changed {
+            log(app, "session-prepare:invalidated");
+        }
     }
 }
 
@@ -471,7 +478,8 @@ mod tests {
         let mut state = PreparationState::default();
         let (sender, mut receiver) = oneshot::channel();
         let generation = state.begin("old".into(), sender).unwrap();
-        state.invalidate();
+        assert!(state.invalidate());
+        assert!(!state.invalidate());
         state.finish("old", true);
         assert_eq!(receiver.try_recv(), Ok(false));
         assert!(!state.complete("old", generation, true));

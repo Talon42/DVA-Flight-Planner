@@ -107,17 +107,6 @@ fn tours_cache_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_storage_dir(app)?.join(DELTAVA_TOURS_CACHE_FILE))
 }
 
-fn build_logbook_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let base_dir = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|error| format!("Unable to resolve logbook storage path: {error}"))?;
-    let logbook_dir = base_dir.join("deltava-sync").join("logbook");
-    fs::create_dir_all(&logbook_dir)
-        .map_err(|error| format!("Unable to create logbook storage: {error}"))?;
-    Ok(logbook_dir)
-}
-
 fn read_json_value(path: &Path) -> Option<Value> {
     let text = fs::read_to_string(path).ok()?;
     serde_json::from_str::<Value>(&text).ok()
@@ -1200,35 +1189,21 @@ fn read_tours_cache_json(app: &AppHandle) -> Value {
     read_json_value(&path).unwrap_or(Value::Null)
 }
 
-fn resolve_existing_logbook_json_paths(app: &AppHandle) -> Vec<PathBuf> {
-    let Ok(logbook_dir) = build_logbook_dir(app) else {
-        return Vec::new();
-    };
-
-    let mut paths = fs::read_dir(logbook_dir)
-        .ok()
-        .into_iter()
-        .flat_map(|entries| entries.flatten())
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.is_file()
-                && path
-                    .extension()
-                    .and_then(|extension| extension.to_str())
-                    .map(|extension| extension.eq_ignore_ascii_case("json"))
-                    .unwrap_or(false)
+// Match the logbook view's canonical-first policy; archived exports and profile JSON are not inputs.
+fn read_logbook_json_values_in_dir(logbook_dir: &Path) -> Vec<Value> {
+    crate::app::paths::resolve_logbook_json_path_in_dir(logbook_dir)
+        .and_then(|source| match source {
+            crate::app::paths::ExistingLogbookJsonPath::Canonical(path)
+            | crate::app::paths::ExistingLogbookJsonPath::Legacy(path) => read_json_value(&path),
         })
-        .collect::<Vec<_>>();
-
-    paths.sort();
-    paths
+        .into_iter()
+        .collect()
 }
 
 fn read_logbook_json_values(app: &AppHandle) -> Vec<Value> {
-    resolve_existing_logbook_json_paths(app)
-        .into_iter()
-        .filter_map(|path| read_json_value(&path))
-        .collect()
+    crate::app::paths::build_logbook_dir(app)
+        .map(|directory| read_logbook_json_values_in_dir(&directory))
+        .unwrap_or_default()
 }
 
 pub(crate) fn reconcile_deltava_tour_progress_internal(
@@ -1432,6 +1407,59 @@ mod tests {
             .get(tour_key)
             .and_then(|tour| tour.rows.get(&normalized_row_id))
             .is_some_and(|row| row.completed)
+    }
+
+    #[test]
+    fn tour_reconciliation_ignores_archived_logbooks_and_preserves_canonical_precedence() {
+        let directory =
+            std::env::temp_dir().join(format!("dva-tour-logbook-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&directory).unwrap();
+        let canonical = directory.join(crate::app::paths::DELTAVA_LOGBOOK_FILE);
+        let legacy = directory.join(crate::app::paths::DELTAVA_LOGBOOK_FALLBACK_FILE);
+        let profile = directory.join(crate::app::paths::DELTAVA_LOGBOOK_PROFILE_FILE);
+        let archived = directory.join("logbook_123456.json");
+        let mut current_entry =
+            system_credit_entry("Example Tour", 1, "KATL", "KJFK", json!([2026, 10, 1]));
+        current_entry["status"] = json!("REJECTED");
+        let old_entry =
+            system_credit_entry("Example Tour", 1, "KATL", "KJFK", json!([2026, 10, 1]));
+        let old_document = json!({ "flights": [old_entry] });
+        let current_document = json!({ "flights": [current_entry] });
+        for path in [&legacy, &profile, &archived] {
+            fs::write(path, old_document.to_string()).unwrap();
+        }
+        fs::write(&canonical, current_document.to_string()).unwrap();
+        let documents = read_logbook_json_values_in_dir(&directory);
+        assert_eq!(documents, vec![current_document]);
+        assert_eq!(
+            build_logbook_tour_credit_scan_from_values(&documents).total_logbook_entries_considered,
+            1
+        );
+        let tours = build_tours_json(
+            vec![json!({"id": "1", "leg": 1, "from": "KATL", "to": "KJFK"})],
+            "Example Tour",
+        );
+        assert!(build_tour_progress_from_values(&tours, &documents)
+            .tour_progress
+            .is_empty());
+
+        // An empty or damaged current export must never resurrect credits from an older snapshot.
+        fs::write(&canonical, r#"{"flights":[]}"#).unwrap();
+        assert_eq!(
+            read_logbook_json_values_in_dir(&directory),
+            vec![json!({"flights": []})]
+        );
+        fs::write(&canonical, "invalid-json").unwrap();
+        assert!(read_logbook_json_values_in_dir(&directory).is_empty());
+        fs::remove_file(&canonical).unwrap();
+        let legacy_documents = read_logbook_json_values_in_dir(&directory);
+        assert_eq!(legacy_documents, vec![old_document]);
+        assert!(!build_tour_progress_from_values(&tours, &legacy_documents)
+            .tour_progress
+            .is_empty());
+        fs::remove_file(&legacy).unwrap();
+        assert!(read_logbook_json_values_in_dir(&directory).is_empty());
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
