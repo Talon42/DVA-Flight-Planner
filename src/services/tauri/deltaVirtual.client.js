@@ -1,3 +1,4 @@
+import { logSystemDebug } from "../logging/appLog.client.js";
 import { buildDvaPirepId } from "../../domain/logbook/logbook.model.js";
 import { invokeAppCommand } from "./invoke.client.js";
 
@@ -58,6 +59,7 @@ export async function fetchDeltaVirtualPirepDetails(pirepId) {
       }
     );
 
+    void logSystemDebug("DVA PIREP", "pirep-details-fetched", { pirepId: normalizedPirepId }).catch(() => {});
     return {
       id: String(result?.id || normalizedPirepId).trim(),
       numericId: Number(result?.numericId ?? result?.numeric_id ?? 0) || null,

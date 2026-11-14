@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     app::state::DeltaSyncFinishOutcome,
-    append_sync_log, build_webview_data_directory, initialize_sync_log_path,
+    append_sync_log, append_sync_log_debug, build_webview_data_directory, initialize_sync_log_path,
     services::{
         deltava::auth::{read_auth_context_internal, DeltaVirtualAuthContext},
         webview::{
@@ -181,7 +181,7 @@ async fn run_deltava_sync(
     .await
     {
         Ok(Ok(result)) => {
-            append_sync_log("sync-result-delivered");
+            append_sync_log_debug(debug_enabled, "sync-result-delivered");
             // A fallback will replace this window; its cleanup must not close the replacement.
             if !should_retry_prepared(prepared, &result) {
                 window_factory::spawn_deltava_sync_focus_return_cleanup(
@@ -328,7 +328,7 @@ pub(crate) async fn refresh_deltava_logbook(
     .await
     {
         Ok(Ok(result)) => {
-            append_sync_log("logbook-refresh-result-delivered");
+            append_sync_log_debug(debug_enabled, "logbook-refresh-result-delivered");
             window_factory::spawn_deltava_sync_focus_return_cleanup(
                 app.clone(),
                 focus_lost_at.clone(),

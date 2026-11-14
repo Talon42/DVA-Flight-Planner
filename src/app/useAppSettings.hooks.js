@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { logAppEvent } from "../services/logging/appLog.client.js";
+import { logAppDebug } from "../services/logging/appLog.client.js";
 
 const DVA_PASSWORD_MASK = "********";
 const DVA_PASSWORD_PROMPT = "Enter Password";
@@ -60,7 +60,7 @@ export function useAppSettings({ setIsDevWindowMenuOpen } = {}) {
     setIsDevWindowMenuOpen?.(false);
     setIsSettingsOpen((current) => {
       const nextValue = !current;
-      logAppEvent(nextValue ? "settings-opened" : "settings-closed", {
+      logAppDebug(nextValue ? "settings-opened" : "settings-closed", {
         section: "addon-airports"
       }).catch(() => {});
       return nextValue;
@@ -70,7 +70,7 @@ export function useAppSettings({ setIsDevWindowMenuOpen } = {}) {
   function handleCloseSettings() {
     setIsDevWindowMenuOpen?.(false);
     setIsSettingsOpen(false);
-    logAppEvent("settings-closed", {
+    logAppDebug("settings-closed", {
       section: "addon-airports"
     }).catch(() => {});
   }
@@ -80,7 +80,7 @@ export function useAppSettings({ setIsDevWindowMenuOpen } = {}) {
     setIsDevWindowMenuOpen?.(false);
     setSettingsTab("delta-virtual");
     setIsSettingsOpen(true);
-    logAppEvent("settings-opened", {
+    logAppDebug("settings-opened", {
       section: "delta-virtual"
     }).catch(() => {});
   }

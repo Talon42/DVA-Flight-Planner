@@ -1,3 +1,4 @@
+import { logRepeatedFailure } from "../../services/logging/repeatedLog.client.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { Layer, NavigationControl, Source } from "react-map-gl/maplibre";
 import Button from "../ui/Button";
@@ -1368,8 +1369,9 @@ export default function FlightMapView({
           },
           routeOverlayBeforeId
         );
-        } catch {
-          console.warn("RainViewer radar overlay unavailable");
+        } catch (error) {
+          if (syncGeneration !== syncGenerationRef.current) return;
+          logRepeatedFailure("WARN", "Map", "radar-unavailable", error, { stage: "radar-overlay" }, "radar");
         }
       }
     },
@@ -1633,6 +1635,7 @@ export default function FlightMapView({
       className="relative min-h-[24rem] flex-1 overflow-hidden rounded-none border border-[color:var(--line)] bg-[var(--surface)]"
     >
       <Map
+        onError={(event) => logRepeatedFailure("WARN", "Map", "resource-failed", event?.error || "Unknown map error", { sourceId: event?.sourceId || null }, "map-resources")}
         ref={mapRef}
         initialViewState={INITIAL_VIEW_STATE}
         mapStyle={mapStyle}

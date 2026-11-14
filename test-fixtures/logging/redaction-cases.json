@@ -1,0 +1,8 @@
+[
+  { "input": "request failed token=private-token", "secrets": ["private-token"] },
+  { "input": "https://user:private-password@host/path?key=private-query#private-fragment", "secrets": ["private-password", "private-query", "private-fragment"] },
+  { "input": "Authorization: Bearer private-auth", "secrets": ["private-auth"] },
+  { "input": "Cookie: session=private-cookie", "secrets": ["private-cookie"] },
+  { "input": "failed {\"password\":\"private-password with spaces\"}", "secrets": ["private-password"] },
+  { "input": "Bearer private-bearer", "secrets": ["private-bearer"] }
+]

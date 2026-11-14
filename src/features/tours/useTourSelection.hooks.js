@@ -10,7 +10,7 @@ import { buildFilterBounds, normalizeFilters } from "../schedule/scheduleFilters
 import { selectFilteredScheduleFlights } from "../schedule/scheduleFilters.selectors.js";
 import { selectSortedScheduleFlights } from "../schedule/scheduleSort.selectors.js";
 import { buildRangeDefaults } from "../../logic/dutySchedule/dutyFilters.js";
-import { logAppEvent } from "../../services/logging/appLog.client.js";
+import { logAppDebug } from "../../services/logging/appLog.client.js";
 import { buildTourFlightLookupKey, normalizeDvaTourId } from "./tourIds.model.js";
 import { mergeTourProgressSources } from "./tourProgress.selectors.js";
 import { selectAvailableTours } from "./tours.selectors.js";
@@ -67,7 +67,7 @@ export function useTourSelection({
     const derivedRows = derivedTourProgress?.tourProgress?.[normalizedTourKey]?.rows || {};
     const mergedRows = resolvedTourProgress?.[normalizedTourKey]?.rows || {};
 
-    logAppEvent("tour-selection-updated", {
+    logAppDebug("tour-selection-updated", {
       selectedTourName: selectedTour.name || selectedTour.label || "",
       selectedTourNormalizedId: String(selectedTour.id || "").trim(),
       selectedTourRawPath: String(selectedTour.path || "").trim(),
@@ -292,7 +292,7 @@ export function useTourSelection({
     const clickedTour = availableTours.find((tour) => tour.selectionId === nextSelectionId) || null;
 
     if (isDevToolsEnabled) {
-      logAppEvent("tour-selection-changed", {
+      logAppDebug("tour-selection-changed", {
         clickedTourId: clickedTour?.selectionId || nextSelectionId,
         clickedTourName: clickedTour?.label || clickedTour?.name || "",
         previousSelectedId: selectedTourPath || "",

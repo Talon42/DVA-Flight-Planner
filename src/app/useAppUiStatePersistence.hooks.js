@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { normalizeMapOptions } from "../components/map/mapOptions.model.js";
-import { logAppEvent } from "../services/logging/appLog.client.js";
+import { logAppDebug } from "../services/logging/appLog.client.js";
 import { saveUiState, saveUiStateImmediate } from "../services/storage/uiState.storage.js";
 import { useDebouncedEffect } from "./useDebouncedEffect.hooks.js";
 
@@ -48,7 +48,7 @@ export function useAppUiStatePersistence({
     );
     snapshotRef.current = { ...snapshotRef.current, mapOptions: nextMapOptions };
     setMapOptions(nextMapOptions);
-    void logAppEvent("map-options-changed", { previousMapOptions, nextMapOptions }).catch(() => {});
+    void logAppDebug("map-options-changed", { previousMapOptions, nextMapOptions }).catch(() => {});
     void saveUiStateImmediate(buildCurrentPayload({ mapOptions: nextMapOptions })).catch(onError);
   }, [buildCurrentPayload, onError, setMapOptions]);
 
@@ -64,7 +64,7 @@ export function useAppUiStatePersistence({
     const entries = (Array.isArray(flightBoards) ? flightBoards : []).flatMap((board) =>
       Array.isArray(board?.entries) ? board.entries : []
     );
-    void logAppEvent("persist-flight-board-cache-started", {
+    void logAppDebug("persist-flight-board-cache-started", {
       reason: "flight-board-cache",
       boardCount: flightBoards.length,
       entryCount: entries.length,

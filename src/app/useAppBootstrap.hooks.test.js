@@ -342,7 +342,7 @@ describe("useAppBootstrap", () => {
     expect(setters.setHasLoadedGettingStartedState).toHaveBeenCalledWith(true);
     expect(setters.setDeltaVirtualToursCache).toHaveBeenCalledWith(null);
     expect(logging.logAppError).toHaveBeenCalled();
-    expect(logging.logSystemError).toHaveBeenCalled();
+    expect(logging.logSystemError).toHaveBeenCalledWith("SimBrief", "settings-hydrate-failed", expect.objectContaining({ message: "settings unavailable" }));
   });
 
   it("hydrates coherent state and reconciles stale boards with an invalid active-board ID", async () => {

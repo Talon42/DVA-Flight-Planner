@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const invoke = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("@tauri-apps/api/path", () => ({ appDataDir: vi.fn(async () => "C:/AppData"), join: vi.fn(async (...parts) => parts.join("/")) }));
+
 const appStorage = vi.hoisted(() => ({
   clearUserData: vi.fn(),
   ensureAppLogFile: vi.fn(),
@@ -19,6 +23,7 @@ async function loadStorage() {
 describe("storage runtime boundaries", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    invoke.mockReset().mockResolvedValue(undefined);
     delete window.__TAURI_INTERNALS__;
     for (const mock of Object.values(appStorage)) mock.mockReset();
   });
@@ -48,6 +53,19 @@ describe("storage runtime boundaries", () => {
 
     await expect(storage.readSavedSchedule()).resolves.toBeNull();
     expect(appStorage.quarantineAppStorageFile).toHaveBeenCalledWith("savedSchedule");
+    expect(invoke).toHaveBeenCalledWith("append_app_log_text", { text: expect.stringContaining("recovery=quarantined-defaults-used") });
+    expect(invoke.mock.calls[0][1].text).toContain("[WARN] [App Storage] corrupt-file-recovered");
+  });
+
+  it("records failed quarantine once while preserving the safe fallback", async () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
+    appStorage.readAppStorageFile.mockResolvedValue("not-json");
+    appStorage.quarantineAppStorageFile.mockRejectedValue(new Error("access denied"));
+    const storage = await loadStorage();
+    await expect(storage.readSavedSchedule()).resolves.toBeNull();
+    await expect(storage.readSavedSchedule()).resolves.toBeNull();
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke.mock.calls[0][1].text).toContain("recovery=quarantine-failed-defaults-used");
   });
 
   it("writes fixed desktop settings without frontend filesystem access", async () => {

@@ -17,6 +17,7 @@ const APP_DATA_TARGETS: &[(&str, &str)] = &[
     ("deltavaToursCache", "dva-tours-cache.json"),
     ("deltavaTourProgress", "dva-tour-progress.json"),
     ("appLog", "log.txt"),
+    ("appLogTemporary", "log.txt.tmp"),
 ];
 
 const LOCAL_DATA_TARGETS: &[(&str, &str)] = &[

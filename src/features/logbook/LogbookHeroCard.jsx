@@ -1,3 +1,4 @@
+import { logAppError } from "../../services/logging/appLog.client.js";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { bodyMdTextClassName, bodySmTextClassName, labelTextClassName } from "../../components/ui/typography";
@@ -80,7 +81,7 @@ function HeroFlightLabel({ flight, className = "" }) {
     try {
       await openDesktopUrl(dvaPirepUrl);
     } catch (error) {
-      console.error("Unable to open DVA PIREP page.", error);
+      void logAppError("logbook-pirep-open-failed", error, { source: "pilot-stats", pirepId: dvaPirepId }).catch(() => {});
     }
   }
 

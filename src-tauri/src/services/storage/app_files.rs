@@ -85,12 +85,12 @@ pub(crate) fn read(app: &AppHandle, key: &str) -> Result<Option<String>, String>
     if !path.is_file() {
         return Ok(None);
     }
-    let metadata =
-        fs::metadata(&path).map_err(|_| "Unable to read app storage metadata.".to_string())?;
+    let metadata = fs::metadata(&path)
+        .map_err(|error| format!("Unable to read app storage metadata: {error}"))?;
     validate_size(file, metadata.len())?;
     fs::read_to_string(path)
         .map(Some)
-        .map_err(|_| "Unable to read app storage file.".to_string())
+        .map_err(|error| format!("Unable to read app storage file: {error}"))
 }
 
 // Atomically writes one allowlisted app-owned file after size and JSON validation.
@@ -100,7 +100,7 @@ pub(crate) fn write(app: &AppHandle, key: &str, contents: &str) -> Result<(), St
     let path = path(app, file)?;
     if file.requires_json() {
         return super::atomic_json::write_atomic_json(&path, contents)
-            .map_err(|_| "Unable to write app storage file.".to_string());
+            .map_err(|error| format!("Unable to write app storage file: {error}"));
     }
     write_text_atomic(&path, contents)
 }
@@ -110,7 +110,7 @@ fn write_text_atomic(path: &std::path::Path, contents: &str) -> Result<(), Strin
         .parent()
         .ok_or_else(|| "Unable to resolve app storage directory.".to_string())?;
     fs::create_dir_all(parent)
-        .map_err(|_| "Unable to create app storage directory.".to_string())?;
+        .map_err(|error| format!("Unable to create app storage directory: {error}"))?;
     let file_name = path
         .file_name()
         .and_then(|value| value.to_str())
@@ -119,22 +119,23 @@ fn write_text_atomic(path: &std::path::Path, contents: &str) -> Result<(), Strin
     let backup_path = path.with_file_name(format!("{file_name}.bak"));
     let _ = fs::remove_file(&temp_path);
     let _ = fs::remove_file(&backup_path);
-    fs::write(&temp_path, contents).map_err(|_| "Unable to stage app storage file.".to_string())?;
+    fs::write(&temp_path, contents)
+        .map_err(|error| format!("Unable to stage app storage file: {error}"))?;
     let had_previous = path.exists();
     if had_previous {
         fs::rename(path, &backup_path)
-            .map_err(|_| "Unable to stage previous app storage file.".to_string())?;
+            .map_err(|error| format!("Unable to stage previous app storage file: {error}"))?;
     }
-    if fs::rename(&temp_path, path).is_err() {
+    if let Err(error) = fs::rename(&temp_path, path) {
         if had_previous {
             let _ = fs::rename(&backup_path, path);
         }
         let _ = fs::remove_file(&temp_path);
-        return Err("Unable to finalize app storage file.".to_string());
+        return Err(format!("Unable to finalize app storage file: {error}"));
     }
     if had_previous {
         fs::remove_file(backup_path)
-            .map_err(|_| "Unable to clean up app storage backup.".to_string())?;
+            .map_err(|error| format!("Unable to clean up app storage backup: {error}"))?;
     }
     Ok(())
 }
@@ -161,7 +162,7 @@ pub(crate) fn quarantine(app: &AppHandle, key: &str) -> Result<(), String> {
         path,
         crate::app::paths::app_storage_dir(app)?.join(quarantine_name),
     )
-    .map_err(|_| "Unable to quarantine malformed app storage file.".to_string())
+    .map_err(|error| format!("Unable to quarantine malformed app storage file: {error}"))
 }
 
 // Creates the allowlisted app log when the user asks to open it.
@@ -170,7 +171,7 @@ pub(crate) fn ensure_app_log(app: &AppHandle, header: &str) -> Result<String, St
     let path = path(app, file)?;
     if !path.exists() {
         validate_size(file, header.len() as u64)?;
-        write_text_atomic(&path, header)?;
+        crate::app::logging::append_app_log_text(app, header)?;
     }
     Ok(path.to_string_lossy().to_string())
 }

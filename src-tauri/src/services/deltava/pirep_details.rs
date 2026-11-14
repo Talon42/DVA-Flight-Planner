@@ -377,30 +377,11 @@ fn build_result_from_parsed(
     })
 }
 
-fn log_parse_summary(parsed: &ParsedPirepDetails) {
-    crate::append_sync_log(&format!(
-        "pirep-details:parse-summary departureRoute={} flightRoute={} arrivalRoute={} takeoffRunway={} landingRunway={} passengersCarriedFound={} passengersParsed={} payloadWeightFound={} cargoParsed={}",
-        parsed.found_departure_route,
-        parsed.found_flight_route,
-        parsed.found_arrival_route,
-        parsed.found_takeoff_runway,
-        parsed.found_landing_runway,
-        parsed.found_passengers_carried,
-        !parsed.payload_passengers.is_empty(),
-        parsed.found_payload_weight,
-        !parsed.payload_cargo.is_empty()
-    ));
-}
-
 pub async fn fetch_delta_virtual_pirep_details(
     client: &reqwest::Client,
     request: DeltaVirtualPirepDetailsRequest,
 ) -> Result<DeltaVirtualPirepDetailsResult, String> {
     let (source_url, numeric_id) = resolve_pirep_url(&request)?;
-    crate::append_sync_log(&format!(
-        "pirep-details:fetch-start id={}",
-        source_url.rsplit('=').next().unwrap_or("")
-    ));
 
     let response =
         client.get(&source_url).send().await.map_err(|error| {
@@ -408,7 +389,6 @@ pub async fn fetch_delta_virtual_pirep_details(
         })?;
 
     let status = response.status().as_u16();
-    let final_url = response.url().to_string();
     if !super::http::is_expected_deltava_endpoint(response.url(), "/pirep.do") {
         return Err(
             "fetch_failed: Delta Virtual PIREP redirect reached an unexpected endpoint.".into(),
@@ -420,10 +400,6 @@ pub async fn fetch_delta_virtual_pirep_details(
         "Delta Virtual PIREP",
     )
     .await?;
-    crate::append_sync_log(&format!(
-        "pirep-details:fetch-status status={status} bytes={} finalUrl={final_url}",
-        html_text.len()
-    ));
 
     if !reqwest::StatusCode::from_u16(status)
         .map(|code| code.is_success())
@@ -435,7 +411,6 @@ pub async fn fetch_delta_virtual_pirep_details(
     }
 
     let parsed = parse_pirep_detail_html(&html_text);
-    log_parse_summary(&parsed);
     build_result_from_parsed(source_url, numeric_id, parsed)
 }
 

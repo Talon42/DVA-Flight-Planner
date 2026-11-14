@@ -47,12 +47,15 @@ pub(crate) fn close_deltava_sync_window(app: &AppHandle) {
 async fn wait_for_sync_window_focus_return(
     app: &AppHandle,
     focus_lost_at: &Arc<Mutex<Option<Instant>>>,
-    _debug_enabled: bool,
+    debug_enabled: bool,
 ) {
-    append_sync_log("sync-focus-return-started");
+    append_sync_log_debug(debug_enabled, "sync-focus-return-started");
 
     let Some(window) = app.get_webview_window(DELTAVA_SYNC_LABEL) else {
-        append_sync_log("sync-focus-return-succeeded reason=window-missing");
+        append_sync_log_debug(
+            debug_enabled,
+            "sync-focus-return-succeeded reason=window-missing",
+        );
         return;
     };
 
@@ -66,7 +69,10 @@ async fn wait_for_sync_window_focus_return(
         .unwrap_or(false);
 
     if !recently_lost_focus {
-        append_sync_log("sync-focus-return-succeeded reason=no-recent-focus-loss");
+        append_sync_log_debug(
+            debug_enabled,
+            "sync-focus-return-succeeded reason=no-recent-focus-loss",
+        );
         return;
     }
 
@@ -81,7 +87,7 @@ async fn wait_for_sync_window_focus_return(
 
         match window.is_focused() {
             Ok(true) => {
-                append_sync_log("sync-focus-return-succeeded");
+                append_sync_log_debug(debug_enabled, "sync-focus-return-succeeded");
                 break;
             }
             Ok(false) => {}
@@ -245,7 +251,7 @@ fn attach_windows_message_handler(
                                         )),
                                     };
                                     if result.is_ok() {
-                                        append_sync_log("sync-result-ready");
+                                        append_sync_log_debug(debug_enabled, "sync-result-ready");
                                         append_sync_log_debug(debug_enabled, "succeeded stage=sync-result");
                                     } else {
                                         append_sync_log_debug(debug_enabled, "failed stage=sync-result");

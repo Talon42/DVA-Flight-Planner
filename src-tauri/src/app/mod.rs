@@ -20,7 +20,8 @@ use tauri::{Manager, WindowEvent};
 
 // Builds and runs the desktop app, wiring the shared state and startup hooks.
 pub fn run() {
-    tauri::Builder::default()
+    logging::install_panic_logging();
+    let result = tauri::Builder::default()
         .manage(DeltaSyncManager::default())
         .manage(crate::services::deltava::session_prepare::SessionPreparation::default())
         .manage(UserDataPersistenceGate::default())
@@ -28,11 +29,16 @@ pub fn run() {
         .manage(DraftSubmitManager::default())
         .manage(SimBriefDispatchManager::default())
         .setup(|app| {
-            let pirep_details_client =
-                DeltaVirtualHttpClient::try_new().map_err(std::io::Error::other)?;
+            let _ = initialize_sync_log_path(app.handle());
+            logging::append_native_log("startup-started");
+            let pirep_details_client = DeltaVirtualHttpClient::try_new().map_err(|error| {
+                logging::append_native_log(&format!(
+                    "startup-failed stage=http-client error={error}"
+                ));
+                std::io::Error::other(error)
+            })?;
             app.manage(pirep_details_client);
             let app_handle = app.handle().clone();
-            let _ = initialize_sync_log_path(&app_handle);
             tauri::async_runtime::spawn(async move {
                 crate::services::webview::profile_cleanup::prune_deltava_storage(
                     &app_handle,
@@ -59,6 +65,7 @@ pub fn run() {
                     _ => {}
                 });
             }
+            logging::append_native_log("startup-ready");
             Ok(())
         })
         .on_page_load(|webview, payload| {
@@ -77,6 +84,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .run(tauri::generate_context!())
-        .expect("error while running flight planner app");
+        .run(tauri::generate_context!());
+    if let Err(error) = &result {
+        logging::append_native_log(&format!("runtime-failed error={error}"));
+    }
+    result.expect("error while running flight planner app");
 }

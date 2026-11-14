@@ -1,3 +1,4 @@
+import { formatLogLine, reportLogWriteFailure } from "../logging/logFormat.client.js";
 import { invoke } from "@tauri-apps/api/core";
 import {
   IMPORT_LOG_FILE,
@@ -81,25 +82,28 @@ const APP_STORAGE_KEYS_BY_FILE = {
   [WHATS_NEW_STATE_FILE]: "whatsNewState"
 };
 
-function logCorruptStorageFileOnce(storageLabel, fileName, error) {
+async function logCorruptStorageFileOnce(storageLabel, fileName, error, recovery = "defaults-used") {
   const warningKey = `${storageLabel}:${fileName}`;
-  if (loggedCorruptStorageFiles.has(warningKey)) {
-    return;
-  }
-
+  if (loggedCorruptStorageFiles.has(warningKey)) return;
   loggedCorruptStorageFiles.add(warningKey);
-  console.warn(`[Storage] Ignoring malformed ${storageLabel}.`, {
-    fileName,
-    message: error instanceof Error ? error.message : String(error || "")
-  });
+  try {
+    await appendImportLog(formatLogLine("WARN", "App Storage", "corrupt-file-recovered", {
+      storageLabel, fileName, recovery
+    }, error));
+  } catch {
+    reportLogWriteFailure();
+  }
 }
 
-async function quarantineCorruptStorageFile(fileName, storageLabel) {
+async function quarantineCorruptStorageFile(fileName, storageLabel, parseError) {
+  let recovery = "quarantined-defaults-used";
   try {
     await quarantineAppStorageFile(APP_STORAGE_KEYS_BY_FILE[fileName]);
-  } catch (error) {
-    logCorruptStorageFileOnce(storageLabel, fileName, error);
+  } catch {
+    // The IPC boundary records the quarantine error; keep the original parse failure too.
+    recovery = "quarantine-failed-defaults-used";
   }
+  await logCorruptStorageFileOnce(storageLabel, fileName, parseError, recovery);
 }
 
 function getDefaultSimBriefSettings() {
@@ -626,8 +630,8 @@ export async function readSavedSchedule() {
     try {
       return await parseSavedScheduleText(text);
     } catch (error) {
-      await quarantineCorruptStorageFile(SAVED_SCHEDULE_FILE, "saved schedule");
-      logCorruptStorageFileOnce("saved schedule", SAVED_SCHEDULE_FILE, error);
+      await quarantineCorruptStorageFile(SAVED_SCHEDULE_FILE, "saved schedule", error);
+      await logCorruptStorageFileOnce("saved schedule", SAVED_SCHEDULE_FILE, error);
       return null;
     }
   }
@@ -640,7 +644,7 @@ export async function readSavedSchedule() {
   try {
     return await parseSavedScheduleText(text);
   } catch (error) {
-    logCorruptStorageFileOnce("saved schedule", "flight-planner.saved-schedule", error);
+    await logCorruptStorageFileOnce("saved schedule", "flight-planner.saved-schedule", error);
     return null;
   }
 }
@@ -666,8 +670,8 @@ export async function readSavedUiState() {
     try {
       return JSON.parse(text);
     } catch (error) {
-      await quarantineCorruptStorageFile(UI_STATE_FILE, "ui state");
-      logCorruptStorageFileOnce("ui state", UI_STATE_FILE, error);
+      await quarantineCorruptStorageFile(UI_STATE_FILE, "ui state", error);
+      await logCorruptStorageFileOnce("ui state", UI_STATE_FILE, error);
       return null;
     }
   }
@@ -680,7 +684,7 @@ export async function readSavedUiState() {
   try {
     return JSON.parse(text);
   } catch (error) {
-    logCorruptStorageFileOnce("ui state", "flight-planner.ui-state", error);
+    await logCorruptStorageFileOnce("ui state", "flight-planner.ui-state", error);
     return null;
   }
 }
@@ -698,8 +702,8 @@ export async function readSavedDevToolsEnabled() {
       const parsed = JSON.parse(text);
       return normalizePersistedBoolean(parsed?.enabled);
     } catch (error) {
-      await quarantineCorruptStorageFile(DEV_TOOLS_STATE_FILE, "dev tools state");
-      logCorruptStorageFileOnce("dev tools state", DEV_TOOLS_STATE_FILE, error);
+      await quarantineCorruptStorageFile(DEV_TOOLS_STATE_FILE, "dev tools state", error);
+      await logCorruptStorageFileOnce("dev tools state", DEV_TOOLS_STATE_FILE, error);
       return null;
     }
   }
@@ -738,8 +742,8 @@ export async function readSimBriefSettings() {
     try {
       return normalizeSimBriefSettingsSnapshot(JSON.parse(text));
     } catch (error) {
-      await quarantineCorruptStorageFile(SIMBRIEF_SETTINGS_FILE, "simbrief settings");
-      logCorruptStorageFileOnce("simbrief settings", SIMBRIEF_SETTINGS_FILE, error);
+      await quarantineCorruptStorageFile(SIMBRIEF_SETTINGS_FILE, "simbrief settings", error);
+      await logCorruptStorageFileOnce("simbrief settings", SIMBRIEF_SETTINGS_FILE, error);
       return defaultSettings;
     }
   }
@@ -752,7 +756,7 @@ export async function readSimBriefSettings() {
   try {
     return normalizeSimBriefSettingsSnapshot(JSON.parse(text));
   } catch (error) {
-    logCorruptStorageFileOnce("simbrief settings", "flight-planner.simbrief-settings", error);
+    await logCorruptStorageFileOnce("simbrief settings", "flight-planner.simbrief-settings", error);
     return defaultSettings;
   }
 }
@@ -920,8 +924,9 @@ async function appendLogFile(relativePath, storageKey, logText) {
       }
 
       await invoke("append_app_log_text", { text: normalized });
-      return resolveAppDataPath(relativePath);
+      return await resolveAppDataPath(relativePath);
     } catch {
+      reportLogWriteFailure();
       // Tauri runtime must never fall back to browser storage for logs.
       return null;
     }

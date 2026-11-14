@@ -447,7 +447,7 @@ export function useAppBootstrap({
         setSavedSimBriefDepartureOffsetMinutes?.(departureOffsetMinutes);
         setSimBriefCustomAirframes?.(customAirframes);
         setSimBriefCustomAirframesDraft?.(customAirframes);
-        await logAppEvent("SimBrief", "settings-loaded", {
+        await logSystemEvent("SimBrief", "settings-loaded", {
           hasUsername: Boolean(username),
           hasPilotId: Boolean(pilotId),
           useCurrentUtcForDispatchTime,
@@ -456,7 +456,7 @@ export function useAppBootstrap({
           customAirframeCount: customAirframes.length
         });
       } else {
-        await logAppError("SimBrief", "settings-hydrate-failed", simBriefResult.reason);
+        await logSystemError("SimBrief", "settings-hydrate-failed", simBriefResult.reason);
       }
     }
 

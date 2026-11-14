@@ -64,6 +64,7 @@ import {
 } from "../features/schedule/scheduleOptions.selectors";
 import { formatNumber } from "../domain/formatting/formatters.js";
 import {
+  logAppDebug,
   logAppError,
   logAppEvent,
   getAppSessionId,
@@ -934,7 +935,7 @@ export default function App() {
       key === "addonFilterEnabled" ||
       key === "addonPriorityEnabled"
     ) {
-      logAppEvent("addon-filter-updated", {
+      logAppDebug("addon-filter-updated", {
         key,
         value,
         addonMatchMode:
@@ -1082,7 +1083,7 @@ export default function App() {
       ).trim();
 
       if (isDevToolsEnabled && clickedRow) {
-        logAppEvent("tour-row-selected", {
+        logAppDebug("tour-row-selected", {
           clickedTourRowId: nextSelectedTourRowId,
           clickedTourRoute: String(clickedRow?.route || "").trim(),
           clickedTourFlight: String(clickedRow?.flightCode || clickedRow?.flightNumber || "").trim(),

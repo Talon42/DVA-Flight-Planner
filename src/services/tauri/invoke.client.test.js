@@ -44,7 +44,8 @@ describe("Tauri invocation boundary", () => {
     expect(invoke.mock.calls[1][0]).toBe("append_app_log_text");
 
     const logLine = invoke.mock.calls[1][1].text;
-    expect(logLine).toContain("[Settings] save-failed error=backend failed");
+    expect(logLine).toContain("[ERROR] [Settings] save-failed");
+    expect(logLine).toContain('error="backend failed"');
     expect(logLine).toContain("commandName=save_sensitive_settings");
     expect(logLine).toContain("pilotId=123");
     expect(logLine).toContain("[REDACTED]");
