@@ -23,9 +23,6 @@
   "unknownAircraftFamilyExceptions": {},
   "aircraftFamilyCoverageExceptions": {},
   "missingAirlineLogoExceptions": {
-    "BTI": "Air Baltic mapping added for schedule and SimBrief identity; no bundled logo is available.",
-    "BCY": "CityJet mapping added for schedule and SimBrief identity; no bundled logo is available.",
-    "LAN": "LATAM Airlines mapping added for schedule and SimBrief identity; no bundled logo is available.",
     "JAI": "Historical airline intentionally uses no bundled logo.",
     "NC": "Historical airline logo is stored under the legacy NCA asset name.",
     "NEE": "Historical airline logo is stored under the legacy NEH asset name.",

@@ -75,7 +75,8 @@ describe("parseScheduleImport", () => {
   it.each([
     ["LA", "LATAM Airlines", "LAN"],
     ["BT", "Air Baltic", "BTI"],
-    ["VG", "CityJet", "BCY"]
+    ["VG", "CityJet", "BCY"],
+    ["NPA", "National Parks Airways", "NPA"]
   ])("resolves %s to its airline name and dispatch ICAO identity", (airline, airlineName, airlineIcao) => {
     const { flight } = parseSingleFlight({ airline });
     expect(flight).toMatchObject({ airline, airlineName, airlineIcao, callsign: `${airlineIcao}103` });
