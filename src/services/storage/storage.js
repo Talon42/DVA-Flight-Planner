@@ -1,3 +1,4 @@
+import { normalizeSimBriefAirlineOverrides } from "../../domain/flights/simBriefAirlineOverrides.model.js";
 import { formatLogLine, reportLogWriteFailure } from "../logging/logFormat.client.js";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -114,6 +115,7 @@ function getDefaultSimBriefSettings() {
     useCurrentUtcForDispatchTime: false,
     dispatchUnits: "LBS",
     departureOffsetMinutes: 0,
+    airlineOverrides: normalizeSimBriefAirlineOverrides(),
     customAirframes: []
   };
 }
@@ -136,6 +138,7 @@ export function normalizeSimBriefSettingsSnapshot(settings) {
       ? "KGS"
       : "LBS",
     departureOffsetMinutes: normalizeSimBriefDepartureOffsetMinutes(settings?.departureOffsetMinutes),
+    airlineOverrides: normalizeSimBriefAirlineOverrides(settings?.airlineOverrides),
     customAirframes: Array.isArray(settings?.customAirframes)
       ? settings.customAirframes.map(normalizeAircraftCustomAirframe).filter(Boolean)
       : []

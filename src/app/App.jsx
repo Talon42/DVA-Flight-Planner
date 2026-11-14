@@ -261,7 +261,9 @@ export default function App() {
     setSimBriefDispatchUnits,
     savedSimBriefDispatchUnits,
     setSavedSimBriefDispatchUnits,
+    simBriefAirlineOverrides,
     simBriefDepartureOffsetMinutes,
+    setSimBriefAirlineOverrides,
     setSimBriefDepartureOffsetMinutes,
     savedSimBriefDepartureOffsetMinutes,
     setSavedSimBriefDepartureOffsetMinutes,
@@ -302,6 +304,7 @@ export default function App() {
     simBriefUsername,
     simBriefUsernameDraft,
     simBriefUseCurrentUtcForDispatchTime,
+    simBriefAirlineOverrides,
     simBriefDepartureOffsetMinutes,
     setDvaFirstName,
     setDvaFirstNameDraft,
@@ -325,6 +328,7 @@ export default function App() {
     setSimBriefUsername,
     setSimBriefUsernameDraft,
     setSimBriefUseCurrentUtcForDispatchTime,
+    setSimBriefAirlineOverrides,
     setSimBriefDepartureOffsetMinutes,
     setStatusMessage
   });
@@ -334,6 +338,7 @@ export default function App() {
     handleSaveSimBriefCredentials,
     handleSimBriefDispatchUnitsChange,
     handleSimBriefDispatchTimeModeChange,
+    handleSimBriefAirlineOverridesChange,
     handleSimBriefDepartureOffsetChange,
     handleAddCustomAirframeDraft,
     handleRemoveCustomAirframeDraft
@@ -383,6 +388,7 @@ export default function App() {
     setSimBriefCustomAirframes,
     setSimBriefCustomAirframesDraft,
     setSimBriefDispatchUnits,
+    setSimBriefAirlineOverrides,
     setSimBriefDepartureOffsetMinutes,
     setSimBriefPilotId,
     setSimBriefPilotIdDraft,
@@ -1142,6 +1148,7 @@ export default function App() {
     setStatusMessage,
     simBriefCustomAirframes,
     simBriefDispatchUnits,
+    simBriefAirlineOverrides,
     simBriefDepartureOffsetMinutes,
     simBriefPilotId,
     simBriefUsername,
@@ -1267,6 +1274,8 @@ export default function App() {
       simBriefPilotIdDraft={simBriefPilotIdDraft}
       simBriefUseCurrentUtcForDispatchTime={simBriefUseCurrentUtcForDispatchTime}
       simBriefDispatchUnits={simBriefDispatchUnits}
+      simBriefAirlineOverrides={simBriefAirlineOverrides}
+      onAirlineOverridesChange={handleSimBriefAirlineOverridesChange}
       simBriefDepartureOffsetMinutes={simBriefDepartureOffsetMinutes}
       simBriefCustomAirframesDraft={simBriefCustomAirframesDraft}
       simBriefCustomAirframeIdDraft={simBriefCustomAirframeIdDraft}
@@ -1484,6 +1493,7 @@ export default function App() {
     simBriefPilotIdDraft,
     simBriefUseCurrentUtcForDispatchTime,
     simBriefDispatchUnits,
+    simBriefAirlineOverrides,
     simBriefDepartureOffsetMinutes,
     simBriefCustomAirframesDraft,
     simBriefCustomAirframeIdDraft,
@@ -1497,6 +1507,7 @@ export default function App() {
     onSimBriefPilotIdDraftChange: setSimBriefPilotIdDraft,
     onSimBriefDispatchUnitsChange: handleSimBriefDispatchUnitsChange,
     onSimBriefDispatchTimeModeChange: handleSimBriefDispatchTimeModeChange,
+    onSimBriefAirlineOverridesChange: handleSimBriefAirlineOverridesChange,
     onSimBriefDepartureOffsetChange: handleSimBriefDepartureOffsetChange,
     onSimBriefCustomAirframeIdDraftChange: setSimBriefCustomAirframeIdDraft,
     onSimBriefCustomAirframeNameDraftChange: setSimBriefCustomAirframeNameDraft,

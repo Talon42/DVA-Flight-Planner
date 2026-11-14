@@ -1,3 +1,4 @@
+import { normalizeSimBriefAirlineOverrides } from "../domain/flights/simBriefAirlineOverrides.model.js";
 import { useState } from "react";
 import { logAppDebug } from "../services/logging/appLog.client.js";
 
@@ -43,6 +44,7 @@ export function useAppSettings({ setIsDevWindowMenuOpen } = {}) {
   const [simBriefDepartureOffsetMinutes, setSimBriefDepartureOffsetMinutes] = useState(0);
   const [savedSimBriefDepartureOffsetMinutes, setSavedSimBriefDepartureOffsetMinutes] =
     useState(0);
+  const [simBriefAirlineOverrides, setSimBriefAirlineOverrides] = useState(normalizeSimBriefAirlineOverrides);
   const [simBriefCustomAirframes, setSimBriefCustomAirframes] = useState([]);
   const [simBriefCustomAirframesDraft, setSimBriefCustomAirframesDraft] = useState([]);
   const [simBriefCustomAirframeIdDraft, setSimBriefCustomAirframeIdDraft] = useState("");
@@ -136,6 +138,8 @@ export function useAppSettings({ setIsDevWindowMenuOpen } = {}) {
     setSimBriefDispatchUnits,
     savedSimBriefDispatchUnits,
     setSavedSimBriefDispatchUnits,
+    simBriefAirlineOverrides,
+    setSimBriefAirlineOverrides,
     simBriefDepartureOffsetMinutes,
     setSimBriefDepartureOffsetMinutes,
     savedSimBriefDepartureOffsetMinutes,

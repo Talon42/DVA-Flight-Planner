@@ -1,3 +1,4 @@
+import { resolveSimBriefAirlineIdentity } from "../../domain/flights/simBriefAirlineOverrides.model.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deriveCallsign, deriveFlightNumber } from "../../domain/flights/flightIdentity";
 import {
@@ -132,6 +133,7 @@ export function useSimBriefDispatch({
   setStatusMessage,
   simBriefCustomAirframes = [],
   simBriefDispatchUnits,
+  simBriefAirlineOverrides,
   simBriefDepartureOffsetMinutes = 0,
   simBriefPilotId,
   simBriefUsername,
@@ -401,8 +403,9 @@ export function useSimBriefDispatch({
               ) || null
             : null;
         const dispatchFlight = sourceTourFlight || currentBoardEntry || selectedShortlistFlight;
-        const flightNumber = deriveFlightNumber(dispatchFlight);
-        const callsign = deriveCallsign(dispatchFlight);
+        const { airline, flightNumber, callsign } = resolveSimBriefAirlineIdentity(
+          dispatchFlight, simBriefAirlineOverrides, Math.random()
+        );
         const { departureTimeUtc, departureDate } = deriveSimBriefDepartureDateTimeUtc(
           dispatchFlight,
           simBriefUseCurrentUtcForDispatchTime,
@@ -468,7 +471,7 @@ export function useSimBriefDispatch({
 
         simBriefPlan = await startSimBriefDispatch({
           flightId: dispatchFlightId,
-          airline: selectedShortlistFlight.airline,
+          airline,
           flightNumber,
           callsign,
           origin: selectedShortlistFlight.from,
@@ -723,6 +726,7 @@ export function useSimBriefDispatch({
     setStatusMessage,
     simBriefCustomAirframes,
     simBriefDispatchUnits,
+    simBriefAirlineOverrides,
     simBriefDepartureOffsetMinutes,
     simBriefPilotId,
     simBriefUsername,

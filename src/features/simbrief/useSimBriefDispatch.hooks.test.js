@@ -353,3 +353,50 @@ describe("useSimBriefDispatch workflow", () => {
     expect(mocks.closeWindow).toHaveBeenCalledOnce();
   });
 });
+
+
+describe("SimBrief airline overrides", () => {
+  it.each([
+    ["DVH", "Delta Historic", "schedule", "default", "DVH"],
+    ["DVH", "Delta Historic", "real", "default", "DAL"],
+    ["KLH", "KLM Historic", "schedule", "default", "KLH"],
+    ["KLH", "KLM Historic", "real", "default", "KLM"],
+    ["AMH", "AeroMexico Historical", "schedule", "default", "AMH"],
+    ["AMH", "AeroMexico Historical", "real", "default", "AMX"],
+    ["DLC", "Delta Connection", "real", "default", "DLC"],
+    ["DLC", "Delta Connection", "real", "DAL", "DAL"],
+    ["DLC", "Delta Connection", "real", "EDV", "EDV"],
+    ["DLC", "Delta Connection", "real", "SKW", "SKW"],
+    ["DLC", "Delta Connection", "real", "RPA", "RPA"],
+    ["Delta Connection", "", "real", "default", "DLC"]
+  ])("dispatches %s with %s using %s / %s as %s", async (airline, airlineName, historicFlights, deltaConnection, expected) => {
+    mocks.startDispatch.mockResolvedValue({ staticId: "new-static", ofpXmlId: "OFP-123" });
+    const flight = createFlight({ airline, airlineName, airlineIcao: "DAL", callsign: "DAL100" });
+    const { result } = renderHook(() => useSimBriefDispatch(createHookOptions({
+      selectedShortlistFlight: flight,
+      simBriefAirlineOverrides: { historicFlights, deltaConnection }
+    })));
+    await act(() => result.current.handleStartSimBriefDispatch());
+    expect(mocks.startDispatch).toHaveBeenCalledWith(expect.objectContaining({
+      airline: expected, flightNumber: "100", callsign: `${expected}100`
+    }), expect.anything());
+    expect(flight.callsign).toBe("DAL100");
+  });
+
+  it.each([[0, "EDV"], [0.5, "SKW"], [0.999, "RPA"]])("chooses a regional carrier for random value %s", async (random, expected) => {
+    const spy = vi.spyOn(Math, "random").mockReturnValue(random);
+    try {
+      mocks.startDispatch.mockResolvedValue({ staticId: "new-static", ofpXmlId: "OFP-123" });
+      const { result } = renderHook(() => useSimBriefDispatch(createHookOptions({
+        selectedShortlistFlight: createFlight({ airline: "DLC" }),
+        simBriefAirlineOverrides: { deltaConnection: "random" }
+      })));
+      await act(() => result.current.handleStartSimBriefDispatch());
+      expect(mocks.startDispatch).toHaveBeenCalledWith(expect.objectContaining({
+        airline: expected, flightNumber: "100", callsign: `${expected}100`
+      }), expect.anything());
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

@@ -1,3 +1,4 @@
+import { historicFlightOptions, deltaConnectionOptions, normalizeSimBriefAirlineOverrides } from "../../domain/flights/simBriefAirlineOverrides.model.js";
 import { useEffect, useState } from "react";
 import Button from "../ui/Button";
 import Panel from "../ui/Panel";
@@ -21,6 +22,8 @@ export function SimBriefSettingsForm({
   pilotId,
   useCurrentUtcForDispatchTime,
   dispatchUnits,
+  airlineOverrides,
+  onAirlineOverridesChange,
   departureOffsetMinutes = 0,
   customAirframes,
   customAirframeDraftId,
@@ -38,6 +41,7 @@ export function SimBriefSettingsForm({
   onSaveCredentials,
   onSaved
 }) {
+  const overrides = normalizeSimBriefAirlineOverrides(airlineOverrides);
   const isOnboardingMode = mode === "onboarding";
   const customAirframeMatchOptions = buildCustomAirframeMatchOptions();
   const departureOffsetOptions = [
@@ -174,6 +178,38 @@ export function SimBriefSettingsForm({
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
+              ))}
+            </SelectField>
+          </div>
+        </div>
+      ) : null}
+
+      {!isOnboardingMode ? (
+        <div className="grid gap-3">
+          <SectionHeader title="Airline Overrides" />
+          <div className={gridClassNames.twoColumn}>
+            <SelectField
+              label="Historic Flights"
+              presentation="anchored"
+              prioritizeSelectedOptions={false}
+              value={overrides.historicFlights}
+              onChange={(event) => onAirlineOverridesChange?.({ historicFlights: event.target.value })}
+              disabled={isSaving}
+            >
+              {historicFlightOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </SelectField>
+            <SelectField
+              label="Delta Connection Flights"
+              presentation="anchored"
+              prioritizeSelectedOptions={false}
+              value={overrides.deltaConnection}
+              onChange={(event) => onAirlineOverridesChange?.({ deltaConnection: event.target.value })}
+              disabled={isSaving}
+            >
+              {deltaConnectionOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </SelectField>
           </div>

@@ -1,3 +1,4 @@
+import { normalizeSimBriefAirlineOverrides } from "../domain/flights/simBriefAirlineOverrides.model.js";
 import { useEffect, useRef, useState } from "react";
 import {
   getDefaultBasicFilterSectionState,
@@ -183,6 +184,7 @@ export function useAppBootstrap({
   setStatusMessage,
   setLogbookAirportProgress,
   setMapOptions,
+  setSimBriefAirlineOverrides,
   setSimBriefDepartureOffsetMinutes,
   setSavedSimBriefDispatchUnits,
   setSavedSimBriefDepartureOffsetMinutes,
@@ -443,6 +445,7 @@ export function useAppBootstrap({
         setSimBriefUseCurrentUtcForDispatchTime?.(useCurrentUtcForDispatchTime);
         setSimBriefDispatchUnits?.(dispatchUnits);
         setSavedSimBriefDispatchUnits?.(dispatchUnits);
+        setSimBriefAirlineOverrides?.(normalizeSimBriefAirlineOverrides(simBriefResult.value?.airlineOverrides));
         setSimBriefDepartureOffsetMinutes?.(departureOffsetMinutes);
         setSavedSimBriefDepartureOffsetMinutes?.(departureOffsetMinutes);
         setSimBriefCustomAirframes?.(customAirframes);
@@ -488,6 +491,7 @@ export function useAppBootstrap({
     setSimBriefCustomAirframes,
     setSimBriefCustomAirframesDraft,
     setSimBriefDispatchUnits,
+    setSimBriefAirlineOverrides,
     setSimBriefDepartureOffsetMinutes,
     setSimBriefPilotId,
     setSimBriefPilotIdDraft,

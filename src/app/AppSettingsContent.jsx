@@ -39,6 +39,8 @@ export default function AppSettingsContent({
   simBriefPilotIdDraft,
   simBriefUseCurrentUtcForDispatchTime,
   simBriefDispatchUnits,
+  simBriefAirlineOverrides,
+  onAirlineOverridesChange,
   simBriefDepartureOffsetMinutes,
   simBriefCustomAirframesDraft,
   simBriefCustomAirframeIdDraft,
@@ -102,6 +104,8 @@ export default function AppSettingsContent({
           pilotId={simBriefPilotIdDraft}
           useCurrentUtcForDispatchTime={simBriefUseCurrentUtcForDispatchTime}
           dispatchUnits={simBriefDispatchUnits}
+          airlineOverrides={simBriefAirlineOverrides}
+          onAirlineOverridesChange={onAirlineOverridesChange}
           departureOffsetMinutes={simBriefDepartureOffsetMinutes}
           customAirframes={simBriefCustomAirframesDraft}
           customAirframeDraftId={simBriefCustomAirframeIdDraft}

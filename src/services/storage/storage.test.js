@@ -79,6 +79,23 @@ describe("storage runtime boundaries", () => {
     );
   });
 
+  it("round-trips airline overrides and supplies compatible defaults for old profiles", async () => {
+    const storage = await loadStorage();
+    await storage.writeSimBriefSettings({ username: "pilot" });
+    expect((await storage.readSimBriefSettings()).airlineOverrides).toEqual({
+      historicFlights: "real", deltaConnection: "default"
+    });
+    await storage.writeSimBriefSettings({ airlineOverrides: {
+      historicFlights: "schedule", deltaConnection: "random"
+    } });
+    expect((await storage.readSimBriefSettings()).airlineOverrides).toEqual({
+      historicFlights: "schedule", deltaConnection: "random"
+    });
+    expect(storage.normalizeSimBriefSettingsSnapshot({ airlineOverrides: {
+      historicFlights: "unknown", deltaConnection: "unknown"
+    } }).airlineOverrides).toEqual({ historicFlights: "real", deltaConnection: "default" });
+  });
+
   it("returns the structured desktop deletion result and clears browser compatibility keys", async () => {
     Object.defineProperty(window, "__TAURI_INTERNALS__", { value: {}, configurable: true });
     window.localStorage.setItem("flight-planner.saved-schedule", "saved");

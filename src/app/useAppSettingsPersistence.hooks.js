@@ -1,3 +1,4 @@
+import { normalizeSimBriefAirlineOverrides } from "../domain/flights/simBriefAirlineOverrides.model.js";
 import {
   logAppError,
   logAppEvent,
@@ -26,6 +27,8 @@ export function useAppSettingsPersistence({
   savedSimBriefDepartureOffsetMinutes,
   savedSimBriefDispatchUnits,
   simBriefCustomAirframes,
+  simBriefAirlineOverrides,
+  setSimBriefAirlineOverrides,
   simBriefDepartureOffsetMinutes,
   setDvaFirstName,
   setDvaFirstNameDraft,
@@ -70,6 +73,7 @@ export function useAppSettingsPersistence({
       pilotId: simBriefPilotIdDraft,
       useCurrentUtcForDispatchTime: Boolean(simBriefUseCurrentUtcForDispatchTime),
       dispatchUnits: simBriefDispatchUnits,
+      airlineOverrides: normalizeSimBriefAirlineOverrides(simBriefAirlineOverrides),
       departureOffsetMinutes: simBriefDepartureOffsetMinutes,
       customAirframes: simBriefCustomAirframesDraft
     };
@@ -113,6 +117,7 @@ export function useAppSettingsPersistence({
       useCurrentUtcForDispatchTime: nextUseCurrentUtcForDispatchTime,
       dispatchUnits: nextDispatchUnits,
       departureOffsetMinutes: nextDepartureOffsetMinutes,
+      airlineOverrides: normalizeSimBriefAirlineOverrides(overrides.airlineOverrides ?? latestSettings.airlineOverrides),
       customAirframes: Array.isArray(nextCustomAirframes)
         ? nextCustomAirframes.map(normalizeSimBriefCustomAirframe).filter(Boolean)
         : []
@@ -507,7 +512,27 @@ export function useAppSettingsPersistence({
     }
   }
 
+  // Persist the complete snapshot through the same ordered writer as other settings.
+  async function handleSimBriefAirlineOverridesChange(patch) {
+    const previous = latestSimBriefSettingsRef.current.airlineOverrides;
+    const next = normalizeSimBriefAirlineOverrides({ ...previous, ...patch });
+    const nextSettings = buildSimBriefSettingsPayload({ airlineOverrides: next });
+    setSimBriefAirlineOverrides(next);
+    beginSimBriefSave();
+    try {
+      await saveSimBriefSettings(nextSettings);
+    } catch (error) {
+      latestSimBriefSettingsRef.current = { ...latestSimBriefSettingsRef.current, airlineOverrides: previous };
+      setSimBriefAirlineOverrides(previous);
+      setStatusMessage(error.message || "Unable to save SimBrief airline overrides.");
+      await logSystemError("SimBrief", "airline-overrides-save-failed", error);
+    } finally {
+      endSimBriefSave();
+    }
+  }
+
   return {
+    handleSimBriefAirlineOverridesChange,
     handleSaveDeltaVirtualCredentials,
     handleClearDeltaVirtualCredentials,
     handleSaveSimBriefCredentials,

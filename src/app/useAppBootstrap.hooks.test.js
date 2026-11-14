@@ -77,6 +77,7 @@ function createSetters() {
       "setStatusMessage",
       "setLogbookAirportProgress",
       "setMapOptions",
+      "setSimBriefAirlineOverrides",
       "setSimBriefDepartureOffsetMinutes",
       "setSavedSimBriefDispatchUnits",
       "setSavedSimBriefDepartureOffsetMinutes",
@@ -246,6 +247,7 @@ describe("useAppBootstrap", () => {
       useCurrentUtcForDispatchTime: true,
       dispatchUnits: "KGS",
       departureOffsetMinutes: 45,
+      airlineOverrides: { historicFlights: "schedule", deltaConnection: "SKW" },
       customAirframes: [{ internalId: "custom-1", matchAircraft: "B737-800" }]
     });
     const addonCache = { status: "complete", airports: ["KATL"], warnings: [] };
@@ -296,6 +298,7 @@ describe("useAppBootstrap", () => {
     expect(setters.setSimBriefUsername).toHaveBeenCalledWith("navigator");
     expect(setters.setSimBriefPilotId).toHaveBeenCalledWith("123456");
     expect(setters.setSimBriefDispatchUnits).toHaveBeenCalledWith("KGS");
+    expect(setters.setSimBriefAirlineOverrides).toHaveBeenCalledWith({ historicFlights: "schedule", deltaConnection: "SKW" });
     expect(setters.setSimBriefDepartureOffsetMinutes).toHaveBeenCalledWith(45);
     expect(setters.setAddonScan).toHaveBeenCalledWith(addonCache);
     expect(setters.setDeltaVirtualAccomplishmentEligibility).toHaveBeenCalledWith(eligibility);
