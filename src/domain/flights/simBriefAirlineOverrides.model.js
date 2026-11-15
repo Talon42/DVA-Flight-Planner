@@ -41,9 +41,18 @@ export function resolveSimBriefAirlineIdentity(flight, overrides, randomValue = 
       ? ["EDV", "SKW", "RPA"][Math.min(2, Math.max(0, Math.floor(randomValue * 3)))]
       : settings.deltaConnection === "default" ? "DLC" : settings.deltaConnection;
   }
-  // SimBrief receives the airline prefix separately from its numeric flight number.
+  // SimBrief combines this airline prefix with the numeric flight number for display.
+  // Schedule codes can be IATA (DL), so resolve ICAO even when no override applies.
+  const callsign = deriveCallsign(flight);
+  const scheduledIcao = String(flight?.airlineIcao || "").trim().toUpperCase();
+  const resolvedAirline = airline || (/^[A-Z]{3}$/.test(scheduledIcao) ? scheduledIcao : "")
+    || row?.ICAO || callsign.match(/^([A-Z]{3})(?=\d)/)?.[1] || code;
   const flightNumber = deriveFlightNumber(flight).replace(/^[A-Z]+(?=\d)/i, "");
-  return airline
-    ? { airline, flightNumber, callsign: flightNumber ? `${airline}${flightNumber}` : "" }
-    : { airline: flight?.airline, flightNumber: deriveFlightNumber(flight), callsign: deriveCallsign(flight) };
+  return {
+    airline: resolvedAirline,
+    flightNumber,
+    callsign: airline
+      ? (flightNumber ? `${airline}${flightNumber}` : "")
+      : callsign.replace(/^[A-Z]+(?=\d)/i, resolvedAirline)
+  };
 }

@@ -357,6 +357,28 @@ describe("useSimBriefDispatch workflow", () => {
 
 describe("SimBrief airline overrides", () => {
   it.each([
+    ["DL", "DAL", "3737", "DAL3737"],
+    ["DL", "", "DL3737", "DAL3737"],
+    ["AF", "", "AF3737", "AFR3737"],
+    ["ZZ", "ZZZ", "ZZ3737", "ZZZ3737"],
+    ["ZZ", "", "3737", "ZZZ3737"]
+  ])("sends an ICAO flight identity for %s / %s / %s", async (airline, airlineIcao, flightNumber, callsign) => {
+    mocks.startDispatch.mockResolvedValue({ staticId: "new-static", ofpXmlId: "OFP-123" });
+    const flight = createFlight({ airline, airlineIcao, flightNumber, callsign });
+    const originalFlight = { ...flight };
+    const { result } = renderHook(() => useSimBriefDispatch(createHookOptions({
+      selectedShortlistFlight: flight
+    })));
+
+    await act(() => result.current.handleStartSimBriefDispatch());
+
+    expect(mocks.startDispatch).toHaveBeenCalledWith(expect.objectContaining({
+      airline: callsign.slice(0, 3), flightNumber: "3737", callsign
+    }), expect.anything());
+    expect(flight).toEqual(originalFlight);
+  });
+
+  it.each([
     ["DVH", "Delta Historic", "schedule", "default", "DVH"],
     ["DVH", "Delta Historic", "real", "default", "DAL"],
     ["KLH", "KLM Historic", "schedule", "default", "KLH"],
