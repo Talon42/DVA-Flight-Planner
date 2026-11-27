@@ -220,7 +220,7 @@ export default function WhatsNewModal({
             {/* Text cards reuse the same fixed frame so the modal does not jump. */}
             {isTextCard ? (
               <div className="grid h-full min-h-0 w-full grid-rows-[auto_auto_minmax(0,1fr)] gap-3 p-6 bp-1024:p-5">
-                <p className={cn("m-0 text-[var(--delta-red)]", labelTextClassName)}>
+                <p className={cn("m-0 text-[var(--delta-red-text)]", labelTextClassName)}>
                   {activeCard.eyebrow}
                 </p>
                 <h3 className={cn("m-0", sectionTitleTextClassName)}>{activeCard.title}</h3>
@@ -257,7 +257,7 @@ export default function WhatsNewModal({
 
           {isTextCard ? null : (
             <div className="grid min-h-0 content-start gap-2 overflow-hidden">
-              <p className={cn("m-0 text-[var(--delta-red)]", labelTextClassName)}>
+              <p className={cn("m-0 text-[var(--delta-red-text)]", labelTextClassName)}>
                 {activeCard.eyebrow}
               </p>
               <h3 className={cn("m-0", sectionTitleTextClassName)}>{activeCard.title}</h3>

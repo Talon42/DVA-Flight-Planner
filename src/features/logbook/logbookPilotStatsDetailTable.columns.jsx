@@ -380,10 +380,6 @@ function buildRecentLandingColumns() {
           void logAppError("logbook-pirep-open-failed", error, { source: "pilot-stats", pirepId: row?.dvaPirepId || row?.id || null }).catch(() => {});
         }
       },
-      cellAriaLabel: (row) => {
-        const pirepId = String(row?.dvaPirepId || row?.rawLogbookId || row?.id || "").trim();
-        return pirepId ? `Open DVA PIREP ${pirepId}` : "Open DVA PIREP";
-      },
       cellTitle: (row) => {
         const pirepId = String(row?.dvaPirepId || row?.rawLogbookId || row?.id || "").trim();
         return pirepId ? `Open DVA PIREP ${pirepId}` : "Open DVA PIREP";
@@ -712,10 +708,6 @@ function buildRecordColumns() {
         } catch (error) {
           void logAppError("logbook-pirep-open-failed", error, { source: "pilot-stats", pirepId: row?.dvaPirepId || row?.id || null }).catch(() => {});
         }
-      },
-      cellAriaLabel: (row) => {
-        const pirepId = String(row?.dvaPirepId || row?.rawLogbookId || row?.id || "").trim();
-        return pirepId ? `Open DVA PIREP ${pirepId}` : "Open DVA PIREP";
       },
       cellTitle: (row) => {
         const pirepId = String(row?.dvaPirepId || row?.rawLogbookId || row?.id || "").trim();

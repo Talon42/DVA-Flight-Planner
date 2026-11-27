@@ -43,7 +43,7 @@ describe("AppOverlayHost flight board repair prompt", () => {
         onResolveRepairPrompt={onResolveRepairPrompt}
       />
     );
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.keyDown(document.activeElement, { key: "Escape" });
     expect(onResolveRepairPrompt).toHaveBeenLastCalledWith(false);
   });
 
@@ -63,5 +63,36 @@ describe("AppOverlayHost flight board repair prompt", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(document.activeElement);
     expect(onResolveRepairPrompt).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("modal dialog focus handling", () => {
+  afterEach(cleanup);
+
+  it("moves focus in, keeps Tab inside, makes the page inert and restores focus on close", () => {
+    const opener = document.createElement("button");
+    opener.textContent = "Open";
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const onResolveRepairPrompt = vi.fn();
+    const { rerender } = render(
+      <AppOverlayHost
+        repairPrompt={{ type: "missing-route", from: "KLGA", to: "KDCA" }}
+        onResolveRepairPrompt={onResolveRepairPrompt}
+      />
+    );
+
+    const close = screen.getByRole("button", { name: "Close" });
+    expect(document.activeElement).toBe(close);
+    expect(opener.closest("[inert]")).toBeTruthy();
+
+    fireEvent.keyDown(close, { key: "Tab" });
+    expect(document.activeElement).toBe(close);
+
+    rerender(<AppOverlayHost repairPrompt={null} onResolveRepairPrompt={onResolveRepairPrompt} />);
+    expect(opener.closest("[inert]")).toBeNull();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
   });
 });

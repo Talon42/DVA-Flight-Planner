@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Button from "./Button";
 import Panel from "./Panel";
@@ -205,6 +205,11 @@ export function SearchableSelect({
   const panelRef = useRef(null);
   const optionsRef = useRef(null);
   const triggerRef = useRef(null);
+  const reactId = useId();
+  const labelId = `${reactId}-label`;
+  const valueId = `${reactId}-value`;
+  const listId = `${reactId}-options`;
+  const wasOpenRef = useRef(false);
   const [overlayLayout, setOverlayLayout] = useState({
     compact: false,
     panelMaxHeight: null,
@@ -272,6 +277,74 @@ export function SearchableSelect({
       document.removeEventListener("touchstart", handlePointerDown);
     };
   }, [isOpen, isPopover]);
+
+  // Move focus into the panel when it opens (the search box autofocuses itself), and return it to
+  // the trigger when the panel closes from inside, so keyboard users are not dropped on <body> (WCAG 2.4.3).
+  useEffect(() => {
+    if (isOpen) {
+      wasOpenRef.current = true;
+      if (!searchable) {
+        const frame = requestAnimationFrame(() => {
+          const options = optionsRef.current?.querySelectorAll("button.multi-select__option");
+          const target =
+            (options && [...options].find((option) => option.getAttribute("aria-pressed") === "true")) ||
+            options?.[0] ||
+            panelRef.current?.querySelector("button, input");
+          target?.focus();
+        });
+        return () => cancelAnimationFrame(frame);
+      }
+      return undefined;
+    }
+
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      const active = typeof document !== "undefined" ? document.activeElement : null;
+      if (!active || active === document.body || panelRef.current?.contains(active)) {
+        triggerRef.current?.focus();
+      }
+    }
+    return undefined;
+  }, [isOpen, searchable]);
+
+  // Arrow keys move between options; Home and End jump to the ends of the list.
+  function handleOptionsKeyDown(event) {
+    const options = [...(optionsRef.current?.querySelectorAll("button.multi-select__option") || [])];
+    if (!options.length) {
+      return;
+    }
+    const index = options.indexOf(document.activeElement);
+    const targets = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: options.length - 1 };
+    if (!(event.key in targets)) {
+      return;
+    }
+    event.preventDefault();
+    if (event.key === "ArrowUp" && index <= 0) {
+      panelRef.current?.querySelector("input.multi-select__search")?.focus();
+      return;
+    }
+    options[Math.max(0, Math.min(options.length - 1, targets[event.key]))]?.focus();
+  }
+
+  // Keeps Tab inside the open panel; Escape (handled above) or Close leaves it.
+  function handlePanelKeyDown(event) {
+    if (event.key !== "Tab") {
+      return;
+    }
+    const focusable = [...(panelRef.current?.querySelectorAll("button:not([disabled]), input:not([disabled])") || [])];
+    if (!focusable.length) {
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   // Keep dropdown search results driven by the local search box only.
   const filteredOptions = useMemo(() => {
@@ -545,7 +618,15 @@ export function SearchableSelect({
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown") {
+              event.preventDefault();
+              optionsRef.current?.querySelector("button.multi-select__option")?.focus();
+            }
+          }}
           placeholder={placeholder}
+          aria-label={`Search ${label}`}
+          aria-controls={listId}
           autoFocus
         />
       ) : null}
@@ -590,6 +671,10 @@ export function SearchableSelect({
       <div
         className="multi-select__options app-scrollbar grid gap-1 overflow-y-auto overflow-x-hidden pr-1"
         ref={optionsRef}
+        id={listId}
+        role="group"
+        aria-label={`${label} options`}
+        onKeyDown={handleOptionsKeyDown}
         style={{
           maxHeight:
             overlayLayout.optionsMaxHeight != null
@@ -620,6 +705,7 @@ export function SearchableSelect({
                   selected && "bg-[var(--surface-option-selected)] text-[var(--text-heading)]"
                 )}
                 type="button"
+                aria-pressed={selected}
                 onClick={() => toggleValue(optionValue)}
               >
                 <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -671,10 +757,14 @@ export function SearchableSelect({
       )}
       ref={rootRef}
     >
-      {hideLabel ? null : (
+      {hideLabel ? (
+        <span id={labelId} className="sr-only">
+          {label}
+        </span>
+      ) : (
         <span className="grid min-w-0 gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5 leading-none">
-            <span className={cn("block leading-none", fieldTitleClassName)}>{label}</span>
+            <span id={labelId} className={cn("block leading-none", fieldTitleClassName)}>{label}</span>
             {labelSuffix ? <span className="inline-flex shrink-0 items-center leading-none">{labelSuffix}</span> : null}
           </span>
           {helper ? <p className={fieldHelperTextClassName}>{helper}</p> : null}
@@ -692,8 +782,11 @@ export function SearchableSelect({
         type="button"
           onClick={() => !disabled && setIsOpen((current) => !current)}
           disabled={disabled}
+          aria-labelledby={`${labelId} ${valueId}`}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
         >
-          <span className="multi-select__value inline-flex min-w-0 flex-1 items-center">
+          <span id={valueId} className="multi-select__value inline-flex min-w-0 flex-1 items-center">
             {selectedTriggerContent}
           </span>
           <span
@@ -729,7 +822,8 @@ export function SearchableSelect({
                 onClick={() => removeValue(value)}
               >
                 <span>{value}</span>
-                <span>x</span>
+                <span aria-hidden="true">x</span>
+                <span className="sr-only">, remove</span>
               </button>
             ))}
           </div>
@@ -749,6 +843,7 @@ export function SearchableSelect({
                   aria-modal="false"
                   aria-label={`Select ${label}`}
                   onClick={(event) => event.stopPropagation()}
+                  onKeyDown={handlePanelKeyDown}
                   style={{
                     ...(overlayLayout.popoverStyle || {}),
                     ...(overlayLayout.panelMaxHeight != null
@@ -772,6 +867,7 @@ export function SearchableSelect({
                   aria-modal={overlayHost ? "false" : "true"}
                   aria-label={`Select ${label}`}
                   onClick={(event) => event.stopPropagation()}
+                  onKeyDown={handlePanelKeyDown}
                   style={
                     overlayLayout.panelMaxHeight != null
                       ? { maxHeight: `${overlayLayout.panelMaxHeight}px` }

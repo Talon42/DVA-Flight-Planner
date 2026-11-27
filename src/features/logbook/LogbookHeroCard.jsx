@@ -106,7 +106,7 @@ function HeroFlightLabel({ flight, className = "" }) {
       tabIndex={0}
       title={`Open DVA PIREP ${dvaPirepId}`}
       className={cn(
-        "block min-w-0 cursor-pointer truncate text-[var(--text-heading)] hover:underline focus-visible:underline focus-visible:outline-none",
+        "block min-w-0 cursor-pointer truncate text-[var(--text-heading)] hover:underline focus-visible:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]",
         bodyMdTextClassName,
         "font-semibold tracking-[-0.03em]",
         className

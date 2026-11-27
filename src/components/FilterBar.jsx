@@ -100,15 +100,6 @@ export default function FilterBar({
     onTogglePlannerControls();
   }
 
-  function handlePlannerHeaderKeyDown(event) {
-    if (event.key !== "Enter" && event.key !== " ") {
-      return;
-    }
-
-    event.preventDefault();
-    onTogglePlannerControls();
-  }
-
   return (
     <Panel
       data-planner-controls="true"
@@ -121,16 +112,14 @@ export default function FilterBar({
             : "h-full min-h-0 max-h-none overflow-y-auto"
       )}
     >
+      {/* The header row stays clickable for mouse users, but it is not a second button wrapped
+          around Reset and the toggle (WCAG 4.1.2, 2.5.3); the chevron button is the one toggle. */}
       <div
         className="filter-heading filter-heading--planner-toggle flex items-start justify-between gap-3 rounded-none"
         onClick={handlePlannerHeaderClick}
-        onKeyDown={handlePlannerHeaderKeyDown}
-        role="button"
-        tabIndex={0}
-        aria-label={plannerControlsCollapsed ? "Open basic filters" : "Toggle basic filters"}
       >
         <div>
-          <Eyebrow>Basic Filters</Eyebrow>
+          <Eyebrow as="h2" id="basic-filters-heading">Basic Filters</Eyebrow>
         </div>
         <div className="filter-heading__actions flex flex-wrap items-center gap-2">
           <Button
@@ -147,6 +136,8 @@ export default function FilterBar({
             className="h-[34px] w-[34px] rounded-none border-[color:transparent] !bg-[var(--delta-blue)] p-0 !text-white hover:!bg-[var(--delta-blue)] shadow-none dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F] bp-1024:h-8 bp-1024:w-8"
             onClick={onTogglePlannerControls}
             aria-label={plannerControlsCollapsed ? "Show basic filters" : "Hide basic filters"}
+            aria-expanded={!plannerControlsCollapsed}
+            aria-controls={plannerControlsCollapsed ? undefined : "basic-filters-body"}
           >
             <svg viewBox="0 0 16 16" className="h-4 w-4" focusable="false" aria-hidden="true">
               <path
@@ -163,6 +154,7 @@ export default function FilterBar({
       </div>
 
       {plannerControlsCollapsed ? null : (
+        <div id="basic-filters-body" className="contents">
         <BasicScheduleFilters
           filters={filters}
           airlines={airlines}
@@ -174,6 +166,7 @@ export default function FilterBar({
           filterBounds={filterBounds}
           onFilterChange={onFilterChange}
         />
+        </div>
       )}
     </Panel>
   );

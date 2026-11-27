@@ -3,6 +3,7 @@ import Panel from "./ui/Panel";
 import DetailsFlightBoardHeader from "../features/details/DetailsFlightBoardHeader.jsx";
 import DetailsFlightBoardList from "../features/details/DetailsFlightBoardList.jsx";
 import DetailsFlightBoardRenameModal from "../features/details/DetailsFlightBoardRenameModal.jsx";
+import { announce } from "./layout/announcer";
 
 function buildPlaceholderIndex(shortlist, dropTarget, draggedBoardEntryId) {
   if (!dropTarget.boardEntryId) {
@@ -292,6 +293,42 @@ export default function DetailsPanel({
     window.addEventListener("pointercancel", handlePointerCancel);
   }
 
+  // Keyboard and single-pointer alternative to dragging (WCAG 2.1.1, 2.5.7): moves an entry one
+  // place up or down, keeps focus on the control that moved it, and announces the new position.
+  function handleMoveBoardFlight(boardEntryId, offset, focusSelector = "data-reorder-handle") {
+    const index = shortlist.findIndex((flight) => flight.boardEntryId === boardEntryId);
+    const target = shortlist[index + offset];
+    if (index < 0 || !target) {
+      return;
+    }
+
+    onReorderFlightBoard?.(boardEntryId, target.boardEntryId, offset < 0 ? "before" : "after");
+    const moved = shortlist[index];
+    announce(`${moved.flightCode || "Flight"} moved to position ${index + offset + 1} of ${shortlist.length}.`);
+    window.requestAnimationFrame(() => {
+      const preferred = panelRef.current?.querySelector(`[${focusSelector}="${boardEntryId}"]`);
+      // A Move button that became disabled at the end of the list cannot hold focus; use the handle.
+      const fallback = panelRef.current?.querySelector(`[data-reorder-handle="${boardEntryId}"]`);
+      (preferred && !preferred.disabled ? preferred : fallback)?.focus();
+    });
+  }
+
+  // Removing a card destroys the focused button; move focus to the next card (or the previous
+  // one, or the board heading) so keyboard users keep their place (WCAG 2.4.3).
+  function handleRemoveFromFlightBoard(boardEntryId) {
+    const index = shortlist.findIndex((flight) => flight.boardEntryId === boardEntryId);
+    const removed = shortlist[index];
+    const neighbor = shortlist[index + 1] || shortlist[index - 1] || null;
+    onRemoveFromFlightBoard?.(boardEntryId);
+    announce(`${removed?.flightCode || "Flight"} removed from the Flight Board.`);
+    window.requestAnimationFrame(() => {
+      const target = neighbor
+        ? panelRef.current?.querySelector(`[data-board-entry-trigger="${neighbor.boardEntryId}"]`)
+        : panelRef.current?.querySelector("[data-flight-board-heading]");
+      target?.focus();
+    });
+  }
+
   function openRenameModal(board) {
     setRenamingBoardId(board.id);
     setRenameDraft(String(board.name || "").trim());
@@ -323,7 +360,7 @@ export default function DetailsPanel({
   const draggedFlight = shortlist.find((flight) => flight.boardEntryId === draggedBoardEntryId) || null;
 
   return (
-    <aside className="details-panel min-w-0 min-h-0">
+    <aside className="details-panel min-w-0 min-h-0" aria-label="Flight Board">
       <Panel
         ref={panelRef}
         className="details-card relative isolate flex h-full min-h-0 flex-col rounded-none border-2 border-[rgba(160,180,202,0.52)] dark:border-[color:var(--surface-border)] p-4 bp-1024:p-4"
@@ -360,9 +397,10 @@ export default function DetailsPanel({
           simBriefAircraftTypes={simBriefAircraftTypes}
           simBriefCustomAirframes={simBriefCustomAirframes}
           onToggleBoardFlight={onToggleBoardFlight}
-          onRemoveFromFlightBoard={onRemoveFromFlightBoard}
+          onRemoveFromFlightBoard={handleRemoveFromFlightBoard}
           onRepairFlightBoardEntry={onRepairFlightBoardEntry}
           onReorderHandlePointerDown={handleReorderHandlePointerDown}
+          onMoveBoardFlight={handleMoveBoardFlight}
           onSimBriefTypeChange={onSimBriefTypeChange}
           onDraftNetworkChange={onDraftNetworkChange}
           onDispatchWorkflow={onDispatchWorkflow}

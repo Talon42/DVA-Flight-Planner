@@ -10,6 +10,7 @@
     "core:window:allow-unmaximize",
     "core:webview:allow-create-webview-window",
     "core:webview:allow-webview-close",
+    "core:webview:allow-set-webview-zoom",
     "dialog:default",
     "fs:allow-read-text-file",
     "opener:allow-default-urls",

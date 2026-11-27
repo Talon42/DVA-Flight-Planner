@@ -2,12 +2,12 @@ import { Component, useRef } from "react";
 import Button from "./ui/Button";
 import Panel from "./ui/Panel";
 import { cn } from "./ui/cn";
-import { modalBackdropClassName } from "./ui/patterns";
 import SectionHeader from "./ui/SectionHeader";
 import { supportCopyTextClassName } from "./ui/typography";
 import MarkdownHelpContent from "./help/MarkdownHelpContent";
 
 import readmeText from "../../README.md?raw";
+import ModalBackdrop from "./layout/ModalBackdrop";
 
 class ReadmeModalBoundary extends Component {
   constructor(props) {
@@ -56,14 +56,7 @@ export default function ReadmeModal({ isOpen, onClose }) {
   }
 
   return (
-    <div
-      className={cn(
-        "fixed inset-0 z-50 grid place-items-center overflow-auto p-4 bp-1024:p-3",
-        modalBackdropClassName
-      )}
-      role="presentation"
-      onClick={onClose}
-    >
+    <ModalBackdrop onClick={onClose}>
       <ReadmeModalBoundary onClose={onClose}>
         <Panel
           as="section"
@@ -98,13 +91,19 @@ export default function ReadmeModal({ isOpen, onClose }) {
             }
           />
 
-          <div ref={scrollContainerRef} className="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
+          <div
+            ref={scrollContainerRef}
+            className="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
+            tabIndex={0}
+            role="region"
+            aria-label="README contents"
+          >
             <article className="grid gap-4 rounded-none bg-[var(--surface)] p-4">
               <MarkdownHelpContent markdown={readmeText} scrollContainerRef={scrollContainerRef} />
             </article>
           </div>
         </Panel>
       </ReadmeModalBoundary>
-    </div>
+    </ModalBackdrop>
   );
 }

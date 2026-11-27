@@ -54,8 +54,7 @@ function TourSelectorRow({ tour, isSelected, onSelectTour }) {
           ? "bg-[rgba(31,70,110,0.22)] before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-[var(--delta-red)] before:content-[''] dark:bg-[rgba(31,70,110,0.22)]"
           : null
       )}
-      aria-current={isSelected ? "true" : undefined}
-      aria-label={`Select tour ${tour?.label || tour?.name || ""}`}
+      aria-pressed={isSelected}
       title={tour?.label || tour?.name || ""}
       onClick={() => onSelectTour?.(tour?.selectionId)}
     >
@@ -107,22 +106,10 @@ export default function TourSelectorPanel({
     handleToggleCollapsed();
   }
 
-  function handlePanelKeyDown(event) {
-    if (event.key !== "Enter" && event.key !== " ") {
-      return;
-    }
-
-    event.preventDefault();
-    handleToggleCollapsed();
-  }
 
   return (
     <Panel
-      tabIndex={0}
-      role="button"
-      aria-label={isCollapsed ? "Expand tour selector" : "Collapse tour selector"}
       onClick={handlePanelClick}
-      onKeyDown={handlePanelKeyDown}
       className={cn(
         "flex min-h-0 flex-col rounded-none p-4",
         nestedPanelStrongFrameClassName,
@@ -143,6 +130,7 @@ export default function TourSelectorPanel({
             className="h-[34px] w-[34px] rounded-none border-[color:transparent] !bg-[var(--delta-blue)] p-0 !text-white hover:!bg-[var(--delta-blue)] shadow-none dark:!bg-[#1F466E] dark:!text-white dark:hover:!bg-[#27547F] bp-1024:h-8 bp-1024:w-8"
             onClick={handleToggleCollapsed}
             aria-label={isCollapsed ? "Show tour selector" : "Hide tour selector"}
+            aria-expanded={!isCollapsed}
           >
             <svg viewBox="0 0 16 16" className="h-4 w-4" focusable="false" aria-hidden="true">
               <path

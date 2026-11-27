@@ -19,7 +19,8 @@
                                     "minWidth":  1024,
                                     "minHeight":  768,
                                     "resizable":  true,
-                                    "fullscreen":  false
+                                    "fullscreen":  false,
+                                    "zoomHotkeysEnabled":  true
                                 }
                             ],
                 "security":  {

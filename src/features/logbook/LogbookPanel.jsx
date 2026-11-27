@@ -24,12 +24,11 @@ function LogbookPanelHeader({
 }) {
   return (
     <div className="logbook-panel__header flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
-      <div className={cn(plannerTabsListClassName, "logbook-panel__tabs-row")} role="tablist" aria-label="Logbook views">
+      <div className={cn(plannerTabsListClassName, "logbook-panel__tabs-row")} role="group" aria-label="Logbook views">
         <button
           type="button"
           className={cn(plannerTabClassName, getPlannerTabStateClassName(selectedTab === "flights"))}
-          role="tab"
-          aria-selected={selectedTab === "flights"}
+          aria-pressed={selectedTab === "flights"}
           onClick={() => onSelectTab?.("flights")}
         >
           Flights
@@ -40,8 +39,7 @@ function LogbookPanelHeader({
             plannerTabClassName,
             getPlannerTabStateClassName(selectedTab === "pilot-stats")
           )}
-          role="tab"
-          aria-selected={selectedTab === "pilot-stats"}
+          aria-pressed={selectedTab === "pilot-stats"}
           onClick={() => onSelectTab?.("pilot-stats")}
         >
           Pilot Stats
@@ -56,7 +54,7 @@ function LogbookPanelHeader({
             </span>
             <select
               className={cn(
-                "min-h-11 w-auto rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-4 py-2.5 text-[0.88rem] text-[var(--text-primary)] outline-none",
+                "min-h-11 w-auto rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-4 py-2.5 text-[0.88rem] text-[var(--text-primary)] outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)]",
                 buttonTextClassName,
                 "bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
               )}

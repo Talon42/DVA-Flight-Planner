@@ -201,7 +201,7 @@ export default function AppSettingsContent({
             <p className="m-0">
               Repository:{" "}
               <a
-                className="text-[var(--delta-blue)] no-underline hover:underline"
+                className="text-[var(--help-link)] underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
                 href="https://github.com/Talon42/DVA-Flight-Planner.git"
                 target="_blank"
                 rel="noreferrer"
@@ -212,7 +212,7 @@ export default function AppSettingsContent({
             <p className="m-0">
               Email:{" "}
               <a
-                className="text-[var(--delta-blue)] no-underline hover:underline"
+                className="text-[var(--help-link)] underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
                 href="mailto:jaben428@gmail.com"
               >
                 jaben428@gmail.com

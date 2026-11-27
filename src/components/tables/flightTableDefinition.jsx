@@ -25,15 +25,40 @@ function getAirportStatusBoxClassName({ addon, vatsim, missing = false }) {
     ].join(" ");
   }
 
+  // Each status also has its own border style (double, solid, dashed; hatched for unknown)
+  // so the chips are not told apart by hue alone (WCAG 1.4.1); borders are at least 3:1.
   if (addon && vatsim) {
-    return "bg-[rgba(22,132,95,0.14)] border-[rgba(22,132,95,0.35)] dark:bg-[rgba(87,217,163,0.20)] dark:border-[rgba(87,217,163,0.42)]";
+    return "border-[3px] border-double bg-[rgba(22,132,95,0.14)] border-[#16845F] dark:bg-[rgba(87,217,163,0.20)] dark:border-[#57D9A3]";
   }
 
   if (addon) {
-    return "bg-[rgba(47,143,203,0.14)] border-[rgba(47,143,203,0.35)] dark:bg-[rgba(99,179,237,0.18)] dark:border-[rgba(99,179,237,0.40)]";
+    return "border-solid bg-[rgba(47,143,203,0.14)] border-[#2F7DB3] dark:bg-[rgba(99,179,237,0.18)] dark:border-[#63B3ED]";
   }
 
-  return "bg-[rgba(183,121,31,0.14)] border-[rgba(183,121,31,0.35)] dark:bg-[rgba(246,197,109,0.18)] dark:border-[rgba(246,197,109,0.40)]";
+  return "border-dashed bg-[rgba(183,121,31,0.14)] border-[#A86A12] dark:bg-[rgba(246,197,109,0.18)] dark:border-[#F6C56D]";
+}
+
+// Text equivalent of the airport chip colors, used in accessible names (empty when no status applies).
+// eslint-disable-next-line react-refresh/only-export-components -- shared with table definitions
+export function getAirportStatusLabel({ airportCode, addonAirports, vatsimCoverageIndex, missingInDatabase = false }) {
+  const code = String(airportCode || "").trim().toUpperCase();
+  if (!code) {
+    return "";
+  }
+  if (missingInDatabase) {
+    return getAirportStatusTitle({ missing: true });
+  }
+  const addon = Boolean(addonAirports?.has(code));
+  const vatsim = isAirportCoveredByVatsim(code, vatsimCoverageIndex);
+  return addon || vatsim ? getAirportStatusTitle({ addon, vatsim }) : "";
+}
+
+// Accessible name for an airport cell button: starts with the visible code (WCAG 2.5.3) and keeps the chip status.
+// eslint-disable-next-line react-refresh/only-export-components -- shared with table definitions
+export function getAirportCellAriaLabel({ airportCode, side, ...statusArgs }) {
+  const code = String(airportCode || "").trim().toUpperCase();
+  const status = getAirportStatusLabel({ airportCode: code, ...statusArgs });
+  return `${code}${status ? `, ${status}` : ""}. Show ${side} airport info`;
 }
 
 function getAirportStatusTextClassName({ addon, vatsim, missing = false }) {
@@ -70,14 +95,12 @@ function getAirportStatusTitle({ addon, vatsim, missing = false }) {
 
 function AirportStatusChip({ airportCode, addon, vatsim, missing = false, interactive = false }) {
   const statusTitle = getAirportStatusTitle({ addon, vatsim, missing });
-  const ariaLabel = `${airportCode}: ${statusTitle}`;
 
   return (
     <span
-      aria-label={ariaLabel}
       title={statusTitle}
       className={cn(
-        "relative inline-flex items-center justify-center cursor-default select-none font-semibold leading-none tracking-[0.02em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)]"
+        "relative inline-flex items-center justify-center cursor-default select-none font-semibold leading-none tracking-[0.02em]"
       )}
     >
       <span
@@ -96,6 +119,7 @@ function AirportStatusChip({ airportCode, addon, vatsim, missing = false, intera
       >
         {airportCode}
       </span>
+      <span className="sr-only">{`, ${statusTitle}`}</span>
     </span>
   );
 }
@@ -225,7 +249,7 @@ export function getFlightTableColumns({
       onCellClick: (row) =>
         onAirportSelect?.({ airportIcao: row.from, side: "departure", row, sourceView }),
       stopRowSelectOnClick: true,
-      cellAriaLabel: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
+      cellAriaLabel: (row) => getAirportCellAriaLabel({ airportCode: row.from, side: "departure", addonAirports, vatsimCoverageIndex, missingInDatabase: Array.isArray(row?.missingAirportIcaos) && row.missingAirportIcaos.includes(row.from) }),
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.from}
@@ -252,7 +276,7 @@ export function getFlightTableColumns({
       onCellClick: (row) =>
         onAirportSelect?.({ airportIcao: row.to, side: "arrival", row, sourceView }),
       stopRowSelectOnClick: true,
-      cellAriaLabel: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
+      cellAriaLabel: (row) => getAirportCellAriaLabel({ airportCode: row.to, side: "arrival", addonAirports, vatsimCoverageIndex, missingInDatabase: Array.isArray(row?.missingAirportIcaos) && row.missingAirportIcaos.includes(row.to) }),
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.to}

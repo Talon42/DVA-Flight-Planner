@@ -2,8 +2,9 @@ import { Component, useEffect, useMemo, useRef, useState } from "react";
 import Button from "./ui/Button";
 import Panel from "./ui/Panel";
 import { cn } from "./ui/cn";
-import { cardFrameClassName, modalBackdropClassName } from "./ui/patterns";
+import { cardFrameClassName } from "./ui/patterns";
 import SectionHeader from "./ui/SectionHeader";
+import ModalBackdrop from "./layout/ModalBackdrop";
 import { bodySmTextClassName, sectionTitleTextClassName, supportCopyTextClassName } from "./ui/typography";
 import { DeltaVirtualCredentialsForm } from "./settings/DeltaVirtualCredentialsForm";
 import { SimBriefSettingsForm } from "./settings/SimBriefSettingsForm";
@@ -274,13 +275,7 @@ export default function GettingStartedModal({
 
   return (
     <GettingStartedModalErrorBoundary onSkip={handleSkip}>
-      <div
-        className={cn(
-          "fixed inset-0 z-50 grid place-items-center overflow-hidden p-4 bp-1024:p-3",
-          modalBackdropClassName
-        )}
-        role="presentation"
-      >
+      <ModalBackdrop className="overflow-hidden">
         <Panel
           as="section"
           padding="lg"
@@ -376,7 +371,7 @@ export default function GettingStartedModal({
             ) : null}
           </div>
         </Panel>
-      </div>
+      </ModalBackdrop>
     </GettingStartedModalErrorBoundary>
   );
 }

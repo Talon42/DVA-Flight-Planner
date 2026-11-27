@@ -145,7 +145,7 @@ export default function DetailsFlightBoardCardSummary({ flight, selectedAccompli
       <div
         className={cn(
           "route-banner__meta flex flex-wrap items-center justify-between gap-2 bp-1024:gap-1.5",
-          isCompletedFlight && "opacity-45"
+          isCompletedFlight && "opacity-75"
         )}
       >
         <FlightBoardAirline flight={flight} selectedAccomplishment={selectedAccomplishment} />
@@ -155,11 +155,15 @@ export default function DetailsFlightBoardCardSummary({ flight, selectedAccompli
       </div>
       <div className="grid min-w-0 gap-2 bp-1024:gap-1.5">
         <div className="relative">
+          {/* The visual route row is decorative; this text gives the card its route in its accessible name (WCAG 1.3.1). */}
+          <span className="sr-only">
+            {`From ${flight.from} to ${flight.to}${isCompletedFlight ? ", completed" : ""}${flight.isStale ? ", needs repair" : ""}`}
+          </span>
           {/* Keeps the route row centered on the airplane while fading the ends toward each airport code. */}
           <div
             className={cn(
               "grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_auto_minmax(0,1fr)_3.7rem] items-center gap-2.5 bp-1024:gap-2",
-              isCompletedFlight && "opacity-45"
+              isCompletedFlight && "opacity-75"
             )}
             aria-hidden="true"
           >
@@ -203,7 +207,7 @@ export default function DetailsFlightBoardCardSummary({ flight, selectedAccompli
         <div
           className={cn(
             "grid min-w-0 grid-cols-[3.7rem_minmax(0,1fr)_3.7rem] items-start gap-2.5 bp-1024:gap-2 bp-1400:hidden",
-            isCompletedFlight && "opacity-45"
+            isCompletedFlight && "opacity-75"
           )}
         >
           <span aria-hidden="true" />
@@ -231,7 +235,7 @@ export default function DetailsFlightBoardCardSummary({ flight, selectedAccompli
         <div
           className={cn(
             "hidden min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-3 bp-1400:grid",
-            isCompletedFlight && "opacity-45"
+            isCompletedFlight && "opacity-75"
           )}
         >
           <small className={cn("min-w-0 truncate", ROUTE_META_TEXT_CLASS)}>

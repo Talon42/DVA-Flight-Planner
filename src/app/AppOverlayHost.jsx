@@ -1,4 +1,4 @@
-import { Component, useEffect } from "react";
+import { Component } from "react";
 import Button from "../components/ui/Button";
 import Panel from "../components/ui/Panel";
 import ModalBackdrop from "../components/layout/ModalBackdrop";
@@ -17,6 +17,8 @@ import SpinnerStatusModal from "../components/ui/SpinnerStatusModal";
 import { logAppError } from "../services/logging/appLog.client.js";
 import WhatsNewModal from "../features/whatsNew/WhatsNewModal.jsx";
 
+import { handleTabListKeyDown } from "../components/ui/tabListKeyboard";
+
 const SETTINGS_TABS = [
   { id: "general", label: "General" },
   { id: "delta-virtual", label: "Delta Virtual" },
@@ -25,20 +27,8 @@ const SETTINGS_TABS = [
   { id: "about", label: "About" }
 ];
 
+// Focus, Escape, inert background and focus return come from ModalBackdrop.
 function FlightBoardRepairModal({ prompt, onResolve }) {
-  useEffect(() => {
-    const previouslyFocusedElement = document.activeElement;
-    document.getElementById("flight-board-repair-dialog")?.querySelector("button")?.focus();
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") onResolve(false);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      if (previouslyFocusedElement instanceof HTMLElement) previouslyFocusedElement.focus();
-    };
-  }, [onResolve]);
-
   return (
     <ModalBackdrop onClick={() => onResolve(false)}>
       <Panel
@@ -283,6 +273,9 @@ export default function AppOverlayHost({
                 role="tablist"
                 aria-orientation="horizontal"
                 aria-label="Settings sections"
+                onKeyDown={(event) =>
+                  handleTabListKeyDown(event, SETTINGS_TABS.map((tab) => tab.id), settingsTab, onSetSettingsTab)
+                }
               >
                 {SETTINGS_TABS.map((tab) => (
                   <button
@@ -408,7 +401,7 @@ export default function AppOverlayHost({
             as="section"
             padding="lg"
             className="grid w-[min(520px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
-            role="dialog"
+            role="alertdialog"
             aria-modal="true"
             aria-label="Delete User Info"
             onClick={(event) => event.stopPropagation()}
@@ -421,7 +414,7 @@ export default function AppOverlayHost({
             </p>
 
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => onResolveDeleteUserDataConfirmation(false)}>
+              <Button variant="ghost" data-autofocus onClick={() => onResolveDeleteUserDataConfirmation(false)}>
                 Cancel
               </Button>
               <Button
@@ -442,7 +435,7 @@ export default function AppOverlayHost({
             as="section"
             padding="lg"
             className="grid w-[min(560px,100%)] gap-5 rounded-none bg-[var(--modal-shell-bg)] shadow-none bp-1024:gap-4"
-            role="dialog"
+            role="alertdialog"
             aria-modal="true"
             aria-label="Overwrite flight board"
             onClick={(event) => event.stopPropagation()}

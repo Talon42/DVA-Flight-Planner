@@ -25,6 +25,13 @@ function HeaderButton({ column, sort, onSort, activeSortClassName = "" }) {
   const fullLabel = column.fullLabel || column.label;
   const headerTitle = column.ariaLabel || column.title || fullLabel;
   const showsShortLabel = column.label !== fullLabel;
+  // The accessible name must start with the visible label (WCAG 2.5.3) so speech users can say
+  // what they see; the full label follows when the visible one is abbreviated ("FL #, Flight Number").
+  const visibleLabel = String(column.label ?? "");
+  const accessibleName =
+    headerTitle && headerTitle.toLowerCase() !== visibleLabel.toLowerCase()
+      ? `${visibleLabel}, ${headerTitle}`
+      : undefined;
   const content = (
     <span
       className={cn(
@@ -66,12 +73,9 @@ function HeaderButton({ column, sort, onSort, activeSortClassName = "" }) {
 
   if (!sortable) {
     return (
-      <div
-        className={sharedClassName}
-        aria-label={headerTitle}
-        title={showsShortLabel ? headerTitle : undefined}
-      >
+      <div className={sharedClassName} title={showsShortLabel ? headerTitle : undefined}>
         {content}
+        {accessibleName ? <span className="sr-only">{`, ${headerTitle}`}</span> : null}
       </div>
     );
   }
@@ -79,9 +83,9 @@ function HeaderButton({ column, sort, onSort, activeSortClassName = "" }) {
   return (
     <button
       type="button"
-      className={sharedClassName}
+      className={cn(sharedClassName, "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)]")}
       onClick={() => onSort(column.sortKey)}
-      aria-label={headerTitle}
+      aria-label={accessibleName}
       title={showsShortLabel ? headerTitle : undefined}
     >
       {content}
@@ -103,16 +107,34 @@ export default function TableHeader({
     <div
       className="relative z-20 grid w-full min-w-0 border-b border-[color:var(--line)] bg-[var(--surface-raised)]"
       data-layout-mode={layoutMode}
+      role="row"
+      aria-rowindex={1}
       style={{
         gridTemplateColumns: columnTemplate,
         paddingRight: scrollbarOffset ? `${scrollbarOffset}px` : undefined
       }}
     >
-      {columns.map((column) => (
-        <div key={column.key} className="min-w-0">
-          <HeaderButton column={column} sort={sort} onSort={onSort} activeSortClassName={activeSortClassName} />
-        </div>
-      ))}
+      {columns.map((column) => {
+        if (column.filler) {
+          return <div key={column.key} className="min-w-0" aria-hidden="true" />;
+        }
+
+        const isSortable = Boolean(column.sortable && onSort);
+        const isSorted = isSortable && sort?.key === column.sortKey;
+
+        return (
+          <div
+            key={column.key}
+            className="min-w-0"
+            role="columnheader"
+            aria-sort={
+              isSortable ? (isSorted ? (sort?.direction === "asc" ? "ascending" : "descending") : "none") : undefined
+            }
+          >
+            <HeaderButton column={column} sort={sort} onSort={onSort} activeSortClassName={activeSortClassName} />
+          </div>
+        );
+      })}
     </div>
   );
 }

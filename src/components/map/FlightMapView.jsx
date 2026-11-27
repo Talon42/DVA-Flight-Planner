@@ -1629,9 +1629,20 @@ export default function FlightMapView({
     };
   }, [resizeMap]);
 
+  // Live ATC airports also listed in a native select, so their details open without a mouse (WCAG 2.1.1).
+  const liveAtcAirportOptions = liveAtcEnabled
+    ? [...new Set(
+        (vatsimAirportGeoJson?.features || [])
+          .filter((feature) => feature?.properties?.role === "active-airport" && feature?.properties?.airportIcao)
+          .map((feature) => String(feature.properties.airportIcao))
+      )].sort()
+    : [];
+
   return (
     <div
       ref={containerRef}
+      role="region"
+      aria-label="Flight route map"
       className="relative min-h-[24rem] flex-1 overflow-hidden rounded-none border border-[color:var(--line)] bg-[var(--surface)]"
     >
       <Map
@@ -1911,6 +1922,32 @@ export default function FlightMapView({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {liveAtcAirportOptions.length ? (
+        <label className="pointer-events-auto absolute left-[10px] top-[10px] z-[2] flex items-center gap-2 border border-[color:var(--line)] bg-[var(--surface)] px-2 py-1 text-[0.75rem] text-[var(--text-primary)]">
+          <span>Live ATC airport</span>
+          <select
+            className="min-h-6 border border-[color:var(--line)] bg-[var(--input-bg)] px-1 text-[0.75rem] text-[var(--text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
+            value={selectedVatsimAirportIcao || ""}
+            onChange={(event) => {
+              const icao = event.target.value;
+              if (icao) {
+                setSelectedVatsimAirportIcao(icao);
+                clearSelectedVatsimRegions();
+              } else {
+                clearSelectedVatsimAirport();
+              }
+            }}
+          >
+            <option value="">Choose an airport</option>
+            {liveAtcAirportOptions.map((icao) => (
+              <option key={icao} value={icao}>
+                {icao}
+              </option>
+            ))}
+          </select>
+        </label>
       ) : null}
 
       <div className="pointer-events-none absolute right-[10px] top-[78px] z-[2] flex flex-col items-end gap-2">

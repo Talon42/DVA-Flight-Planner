@@ -413,7 +413,7 @@ function RecordTile({ item }) {
     item?.tone === "positive"
       ? "border-[#d8eadf] bg-[#f5fbf7] text-[#126835] dark:border-[#1f4730] dark:bg-[#102218] dark:text-[#8ee3a2]"
       : item?.tone === "negative"
-        ? "border-[#f5d7dd] bg-[#fff6f8] text-[var(--delta-red)] dark:border-[#4a1d28] dark:bg-[#1c0f15] dark:text-[#ff9d9d]"
+        ? "border-[#f5d7dd] bg-[#fff6f8] text-[var(--delta-red-text)] dark:border-[#4a1d28] dark:bg-[#1c0f15] dark:text-[#ff9d9d]"
         : "border-[color:var(--line)] bg-[var(--surface)] text-[var(--text-heading)]";
 
   return (

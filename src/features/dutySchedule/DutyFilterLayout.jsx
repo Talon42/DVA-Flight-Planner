@@ -1,3 +1,4 @@
+import { useId } from "react";
 import Panel from "../../components/ui/Panel";
 import { cn } from "../../components/ui/cn";
 import { nestedPanelStrongFrameClassName } from "../../components/ui/patterns";
@@ -5,12 +6,14 @@ import { labelTextClassName } from "../../components/ui/typography";
 import { toggleButtonClassName } from "../../components/ui/forms";
 
 // Renders a compact below-1400 row with the label on the left and the control on the right.
+// The row is a named group so its controls are announced with the row's label (WCAG 1.3.1).
 export function DutyCompactInlineRow({ label, labelSuffix = null, children }) {
+  const labelId = useId();
   return (
-    <div className="grid grid-cols-1 items-center gap-3 border-b border-[color:var(--panel-border)] py-3 last:border-b-0 bp-1024:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] bp-1024:gap-6">
+    <div role="group" aria-labelledby={labelId} className="grid grid-cols-1 items-center gap-3 border-b border-[color:var(--panel-border)] py-3 last:border-b-0 bp-1024:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] bp-1024:gap-6">
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-1.5 leading-none">
-          <span className={cn(labelTextClassName, "text-[var(--text-muted)]")}>{label}</span>
+          <span id={labelId} className={cn(labelTextClassName, "text-[var(--text-muted)]")}>{label}</span>
           {labelSuffix ? <span className="inline-flex shrink-0 items-center leading-none">{labelSuffix}</span> : null}
         </div>
       </div>

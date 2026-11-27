@@ -103,6 +103,7 @@ export default function LogbookPilotStatsDetailView({ detailView, detailRows, on
           onSort={handleSort}
           getRowId={(row) => getDetailRowId(detailView, row)}
           virtualized={false}
+          ariaLabel={config.title}
           rowHeight={config.rowHeight ?? 46}
           initialVisibleRows={sortedRows.length}
           frameClassName="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden border border-[color:var(--line)] !bg-[var(--surface-raised)]"

@@ -20,6 +20,7 @@ import {
   gridClassNames
 } from "../../../components/ui/forms";
 import { bodySmTextClassName } from "../../../components/ui/typography";
+import { announce } from "../../../components/layout/announcer";
 
 const TIME_WINDOW_OPTIONS = [
   { value: "red-eye", label: "Red Eye" },
@@ -169,6 +170,8 @@ export default function BasicScheduleFilters({
     []
   );
   const [originIcaoInput, setOriginIcaoInput] = useState(filters.origin[0] || "");
+  // Unknown codes used to be erased silently; now the text stays and an error explains why (WCAG 3.3.1, 3.3.3).
+  const [icaoErrors, setIcaoErrors] = useState({});
   const [destinationIcaoInput, setDestinationIcaoInput] = useState(filters.destination[0] || "");
   const [originOrDestinationIcaoInput, setOriginOrDestinationIcaoInput] = useState(
     filters.originOrDestination[0] || ""
@@ -222,11 +225,21 @@ export default function BasicScheduleFilters({
     if (exactMatch) {
       setInputValue(exactMatch.value);
       onFilterChange(key, [exactMatch.value]);
+      setIcaoErrors((current) => ({ ...current, [key]: "" }));
       return;
     }
 
-    setInputValue("");
+    const typed = String(value || "").trim().toUpperCase();
     onFilterChange(key, []);
+    if (!typed) {
+      setInputValue("");
+      setIcaoErrors((current) => ({ ...current, [key]: "" }));
+      return;
+    }
+
+    const message = `"${typed}" is not a known airport code in this schedule, so this filter is not applied.`;
+    setIcaoErrors((current) => ({ ...current, [key]: message }));
+    announce(message, { assertive: true });
   }
 
   function handleIcaoFieldKeyDown(event, key, value, options, setInputValue) {
@@ -409,6 +422,8 @@ export default function BasicScheduleFilters({
         />
         <Field label="ICAO/IATA" className="filter-block filter-block--icao min-w-0">
           <input
+            aria-invalid={icaoErrors.origin ? true : undefined}
+            aria-describedby={icaoErrors.origin ? "icao-error-origin" : undefined}
             className={fieldInputClassName}
             type="text"
             value={originIcaoInput}
@@ -429,6 +444,11 @@ export default function BasicScheduleFilters({
             maxLength={4}
           />
         </Field>
+        {icaoErrors.origin ? (
+          <p id="icao-error-origin" className={cn("col-span-full m-0 text-[var(--delta-red-text)]", bodySmTextClassName)}>
+            {icaoErrors.origin}
+          </p>
+        ) : null}
 
         <SearchableMultiSelect
           label="Arrival"
@@ -449,6 +469,8 @@ export default function BasicScheduleFilters({
         />
         <Field label="ICAO/IATA" className="filter-block filter-block--icao min-w-0">
           <input
+            aria-invalid={icaoErrors.destination ? true : undefined}
+            aria-describedby={icaoErrors.destination ? "icao-error-destination" : undefined}
             className={fieldInputClassName}
             type="text"
             value={destinationIcaoInput}
@@ -476,6 +498,11 @@ export default function BasicScheduleFilters({
             maxLength={4}
           />
         </Field>
+        {icaoErrors.destination ? (
+          <p id="icao-error-destination" className={cn("col-span-full m-0 text-[var(--delta-red-text)]", bodySmTextClassName)}>
+            {icaoErrors.destination}
+          </p>
+        ) : null}
 
         <SearchableMultiSelect
           label="Departure or Arrival"
@@ -496,6 +523,8 @@ export default function BasicScheduleFilters({
         />
         <Field label="ICAO/IATA" className="filter-block filter-block--icao min-w-0">
           <input
+            aria-invalid={icaoErrors.originOrDestination ? true : undefined}
+            aria-describedby={icaoErrors.originOrDestination ? "icao-error-originOrDestination" : undefined}
             className={fieldInputClassName}
             type="text"
             value={originOrDestinationIcaoInput}
@@ -523,6 +552,11 @@ export default function BasicScheduleFilters({
             maxLength={4}
           />
         </Field>
+        {icaoErrors.originOrDestination ? (
+          <p id="icao-error-originOrDestination" className={cn("col-span-full m-0 text-[var(--delta-red-text)]", bodySmTextClassName)}>
+            {icaoErrors.originOrDestination}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-3 bp-1024:grid-cols-2 bp-1400:grid-cols-1">

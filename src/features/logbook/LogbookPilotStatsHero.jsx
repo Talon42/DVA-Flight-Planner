@@ -181,7 +181,7 @@ function KpiMetric({ card, labelToneClassName, valueToneClassName, className = "
                 card.deltaStatus === "positive"
                   ? "text-[#126835] dark:text-[#8ee3a2]"
                   : card.deltaStatus === "negative"
-                    ? "text-[var(--delta-red)] dark:text-[#ff9d9d]"
+                    ? "text-[var(--delta-red-text)] dark:text-[#ff9d9d]"
                     : "text-[var(--text-muted)] dark:text-white/60"
               )}
             >

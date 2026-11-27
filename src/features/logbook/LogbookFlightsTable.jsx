@@ -35,10 +35,10 @@ export function LogbookFlightCell({ row, column }) {
   const flightLabelContent = row.dvaPirepUrl ? (
     <button
       type="button"
-      aria-label={`Open DVA PIREP ${row.dvaPirepId}`}
+      aria-label={`${flightLabel}, open DVA PIREP ${row.dvaPirepId}`}
       title={`Open DVA PIREP ${row.dvaPirepId}`}
       className={cn(
-        "block min-w-0 max-w-full truncate border-0 bg-transparent p-0 text-left font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)]",
+        "block min-w-0 max-w-full truncate border-0 bg-transparent p-0 text-left font-inherit text-[length:inherit] font-normal leading-none tracking-[inherit] text-inherit outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]",
         selectableCellClassName
       )}
       onClick={handleOpenPirep}
@@ -69,6 +69,29 @@ export function LogbookFlightCell({ row, column }) {
   );
 }
 
+const PIREP_STATUS_CUES = {
+  rejected: { glyph: "✕", label: "Rejected" },
+  submitted: { glyph: "…", label: "Submitted, awaiting review" },
+  held: { glyph: "…", label: "Held for review" }
+};
+
+// PIREP status is shown by row color; the glyph and hidden text give it a non-color cue (WCAG 1.4.1, 1.3.1).
+function LogbookDateCell({ row, label }) {
+  const cue = PIREP_STATUS_CUES[String(row?.statusCanonical || "")];
+
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 leading-none">
+      {cue ? (
+        <span aria-hidden="true" title={cue.label} className="shrink-0 font-semibold">
+          {cue.glyph}
+        </span>
+      ) : null}
+      <span className="min-w-0 truncate">{label}</span>
+      {cue ? <span className="sr-only">{`, ${cue.label}`}</span> : null}
+    </span>
+  );
+}
+
 // Logbook columns stay static so shared table measurement can decide the active preset.
 function getLogbookColumns() {
   return [
@@ -84,8 +107,12 @@ function getLogbookColumns() {
       minWidth: 108,
       fr: 0.92,
       truncate: true,
-      renderCell: (row, column) =>
-        column.presetKey === "expanded" ? row.dateDisplay : row.dateDisplayCompact
+      renderCell: (row, column) => (
+        <LogbookDateCell
+          row={row}
+          label={column.presetKey === "expanded" ? row.dateDisplay : row.dateDisplayCompact}
+        />
+      )
     },
     {
       key: "compactFlightLabel",
@@ -220,6 +247,8 @@ export default function LogbookFlightsTable({
       onActivateRow={onActivateRow}
       getRowId={getLogbookRowId}
       getRowClassName={getLogbookRowClassName}
+      ariaLabel="Logbook flights"
+      rowActionHint="Use the up and down arrow keys to move between logbook flights. Press Enter or Space to select the focused flight and show its details."
       initialVisibleRows={25}
       visibleRowPage={25}
       visibleRowThreshold={10}

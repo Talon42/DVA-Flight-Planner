@@ -21,13 +21,13 @@ export const choiceButtonLabelClassName =
 export const fieldShellClassName = cn(
   "min-h-[var(--planner-control-box-min-height)] rounded-[var(--planner-control-box-radius)] border border-[color:transparent] bg-[var(--input-bg)] px-[var(--planner-control-box-padding-x)] py-[var(--planner-control-box-padding-y)] text-[var(--text-primary)] transition-[background,color,outline-color] duration-150 ease-out",
   "hover:bg-[var(--surface-soft)]",
-  "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[rgba(227,27,35,0.22)]"
+  "focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus-ring)]"
 );
 
 const fieldShellCompactClassName = cn(
   "min-h-[var(--planner-control-box-min-height)] rounded-[var(--planner-control-box-radius)] border border-[color:transparent] bg-[var(--input-bg)] px-[var(--planner-control-box-padding-x)] py-2 text-[var(--text-primary)] transition-[background,color,outline-color] duration-150 ease-out",
   "hover:bg-[var(--surface-soft)]",
-  "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[rgba(227,27,35,0.22)]"
+  "focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus-ring)]"
 );
 
 export const fieldBodyClassName =
@@ -49,7 +49,7 @@ export const dropdownPanelClassName =
   "grid gap-4 overflow-hidden rounded-none border-2 border-[rgba(160,180,202,0.52)] bg-[var(--modal-shell-bg)] p-4 shadow-none dark:border-[color:var(--surface-border)]";
 
 export const dropdownOptionRowClassName = cn(
-  "flex min-w-0 items-center justify-between gap-3 rounded-none border border-transparent px-3 py-2 text-left text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-option)] focus-visible:bg-[var(--surface-option)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+  "flex min-w-0 items-center justify-between gap-3 rounded-none border border-transparent px-3 py-2 text-left text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--surface-option)] focus-visible:bg-[var(--surface-option)] focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50",
   bodySmTextClassName
 );
 
