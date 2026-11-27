@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FixedSizeList as List } from "react-window";
 import TableHeader from "./TableHeader";
 import TableRow from "./TableRow";
@@ -41,6 +41,7 @@ const TableListOuter = forwardRef(function TableListOuter(props, ref) {
     <div
       {...rest}
       ref={ref}
+      role="rowgroup"
       className={cn(className, "app-scrollbar relative z-0", tableCanvasClassName)}
       style={{
         ...style,
@@ -66,6 +67,10 @@ function RowRenderer({ index, style, data }) {
     <TableRow
       row={row}
       rowId={rowId}
+      rowIndex={index}
+      isActive={index === data.activeRowIndex}
+      onRowFocus={data.onRowFocus}
+      onRowNavigate={data.onRowNavigate}
       style={style}
       columns={data.columns}
       columnTemplate={data.columnTemplate}
@@ -103,9 +108,15 @@ export default function DataTable({
   virtualized = true,
   initialVisibleRows = INITIAL_VISIBLE_ROWS,
   visibleRowPage = VISIBLE_ROW_PAGE,
-  visibleRowThreshold = VISIBLE_ROW_THRESHOLD
+  visibleRowThreshold = VISIBLE_ROW_THRESHOLD,
+  ariaLabel = "Table",
+  rowActionHint = ""
 }) {
   const tableRef = useRef(null);
+  const listRef = useRef(null);
+  const hintId = useId();
+  const [activeRowIndex, setActiveRowIndex] = useState(0);
+  const pendingFocusIndexRef = useRef(null);
   const [availableWidth, setAvailableWidth] = useState(0);
   // Uses the measured table width when available so label presets follow the panel, not the window.
   const tableLayoutWidth = availableWidth || viewportWidth;
@@ -153,6 +164,85 @@ export default function DataTable({
   useEffect(() => {
     setVisibleRowCount(Math.min(rows.length, initialVisibleRows));
   }, [rows.length, firstRowId, lastRowId, initialVisibleRows]);
+
+  // Keep the single tabbable row inside the current result set when filters shrink it.
+  useEffect(() => {
+    setActiveRowIndex((current) => Math.max(0, Math.min(current, rows.length - 1)));
+  }, [rows.length]);
+
+  // Moves keyboard focus to a row, paging it into the rendered window first when needed.
+  const focusRow = useCallback(
+    (index) => {
+      if (!rows.length) {
+        return;
+      }
+
+      const nextIndex = Math.max(0, Math.min(index, rows.length - 1));
+      setVisibleRowCount((current) => Math.max(current, Math.min(rows.length, nextIndex + 1 + visibleRowThreshold)));
+      setActiveRowIndex(nextIndex);
+      pendingFocusIndexRef.current = nextIndex;
+      listRef.current?.scrollToItem?.(nextIndex);
+    },
+    [rows.length, visibleRowThreshold]
+  );
+
+  useEffect(() => {
+    const pendingIndex = pendingFocusIndexRef.current;
+
+    if (pendingIndex == null) {
+      return undefined;
+    }
+
+    let attempts = 0;
+    let frame = 0;
+    const tryFocus = () => {
+      const rowNode = tableRef.current?.querySelector(`[data-row-index="${pendingIndex}"]`);
+
+      if (rowNode) {
+        pendingFocusIndexRef.current = null;
+        rowNode.focus();
+        return;
+      }
+
+      attempts += 1;
+      if (attempts < 10 && typeof requestAnimationFrame === "function") {
+        frame = requestAnimationFrame(tryFocus);
+      }
+    };
+
+    tryFocus();
+    return () => {
+      if (frame && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(frame);
+      }
+    };
+  }, [activeRowIndex, visibleRowCount]);
+
+  const handleRowNavigate = useCallback(
+    (index, key) => {
+      const page = Math.max(1, Math.floor(listHeight / rowHeight) - 1);
+      const targets = {
+        ArrowDown: index + 1,
+        ArrowUp: index - 1,
+        PageDown: index + page,
+        PageUp: index - page,
+        Home: 0,
+        End: rows.length - 1
+      };
+
+      if (!(key in targets)) {
+        return false;
+      }
+
+      focusRow(targets[key]);
+      return true;
+    },
+    [focusRow, listHeight, rowHeight, rows.length]
+  );
+
+  const handleRowFocus = useCallback((index) => {
+    setActiveRowIndex(index);
+  }, []);
 
   useEffect(() => {
     const tableNode = tableRef.current;
@@ -254,9 +344,15 @@ export default function DataTable({
       enableRowSelection,
       selectedRowClassName,
       getRowClassName,
-      renderRowOverlay
+      renderRowOverlay,
+      activeRowIndex,
+      onRowFocus: handleRowFocus,
+      onRowNavigate: handleRowNavigate
     }),
     [
+      activeRowIndex,
+      handleRowFocus,
+      handleRowNavigate,
       visibleRows,
       displayColumns,
       columnTemplate,
@@ -285,14 +381,24 @@ export default function DataTable({
       <div
         className="app-scrollbar flex min-h-0 w-full min-w-0 flex-1 overflow-x-auto overflow-y-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)]"
         role="region"
-        aria-label="Table columns"
+        aria-label={`${ariaLabel} columns`}
         tabIndex={0}
       >
+        {rowActionHint ? (
+          <p id={hintId} className="sr-only">
+            {rowActionHint}
+          </p>
+        ) : null}
         <div
           className="flex min-h-0 min-w-full flex-1 flex-col"
+          role="grid"
+          aria-label={ariaLabel}
+          aria-describedby={rowActionHint ? hintId : undefined}
+          aria-rowcount={rows.length + 1}
+          aria-readonly="true"
           style={{ minWidth: getResolvedColumnsMinWidth(resolvedColumns) + headerScrollbarOffset }}
         >
-          <div className="w-full min-w-0 flex-none overflow-hidden">
+          <div className="w-full min-w-0 flex-none overflow-hidden" role="rowgroup">
             <TableHeader
               columns={displayColumns}
               columnTemplate={columnTemplate}
@@ -307,6 +413,7 @@ export default function DataTable({
           {virtualized ? (
             <div ref={bodyRef} className="min-h-0 w-full min-w-0 flex-1">
               <List
+                ref={listRef}
                 className="flight-list"
                 height={listHeight}
                 itemCount={visibleRows.length}
@@ -325,18 +432,23 @@ export default function DataTable({
           ) : (
             <div
               ref={scrollContainerRef}
+              role="rowgroup"
               className={cn(
                 "app-scrollbar relative z-0 min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden",
                 tableCanvasClassName
               )}
             >
-              {rows.map((row) => {
+              {rows.map((row, index) => {
                 const rowId = getRowId(row);
                 return (
                   <TableRow
                     key={rowId}
                   row={row}
                   rowId={rowId}
+                  rowIndex={index}
+                  isActive={index === activeRowIndex}
+                  onRowFocus={handleRowFocus}
+                  onRowNavigate={handleRowNavigate}
                   style={{ height: rowHeight }}
                   columns={displayColumns}
                   columnTemplate={columnTemplate}

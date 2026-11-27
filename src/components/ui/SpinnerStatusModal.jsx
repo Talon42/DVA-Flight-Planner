@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import Panel from "./Panel";
+import { announce } from "../layout/announcer";
 import SectionHeader from "./SectionHeader";
 import { cn } from "./cn";
 import { modalBackdropClassName } from "./patterns";
@@ -12,6 +14,13 @@ export default function SpinnerStatusModal({
   className = "",
   panelClassName = ""
 }) {
+  // A status region created together with its text is often not read; announce through the
+  // app-wide live region, which already exists in the page (WCAG 4.1.3).
+  const spokenText = [title, typeof description === "string" ? description : ""].filter(Boolean).join(". ");
+  useEffect(() => {
+    announce(spokenText);
+  }, [spokenText]);
+
   return (
     <div
       className={cn(
@@ -45,7 +54,7 @@ export default function SpinnerStatusModal({
           <div className="flex w-full justify-center pt-2">
             <svg
               viewBox="0 0 24 24"
-              className="h-11 w-11 shrink-0 animate-spin text-[var(--delta-red)]"
+              className="h-11 w-11 shrink-0 animate-spin text-[var(--delta-red-text)]"
               aria-hidden="true"
             >
               <circle

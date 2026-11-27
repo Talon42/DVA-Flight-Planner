@@ -1,5 +1,5 @@
 // Shared filter field controls used by Basic Filters and Duty Schedule.
-import { Children, isValidElement, useEffect, useMemo, useRef, useState } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react";
 import { getAirlineLogo, getAirlineLogoClassName } from "../../domain/airlines/airlineBranding.js";
 import { SearchableMultiSelect } from "./SearchableSelect";
 import {
@@ -14,7 +14,12 @@ import { bodySmTextClassName } from "./typography";
 
 const SLIDER_COMMIT_DELAY_MS = 500;
 
+const NATIVE_FIELD_TAGS = new Set(["input", "select", "textarea"]);
+
 // Renders a labeled field wrapper used by several filter controls.
+// A lone native input gets a real <label htmlFor>; anything else (custom selects, sliders, toggle
+// groups) is wrapped in a named group. The help icon (labelSuffix) sits outside the label so the
+// label never names or activates it instead of the control (WCAG 1.3.1, 4.1.2).
 export function Field({
   label,
   className = "",
@@ -23,15 +28,44 @@ export function Field({
   helper = null,
   children
 }) {
+  const reactId = useId();
+  const titleId = `${reactId}-title`;
+  const helperId = helper ? `${reactId}-helper` : undefined;
+  const childArray = Children.toArray(children);
+  const nativeChild =
+    childArray.length === 1 && isValidElement(childArray[0]) && NATIVE_FIELD_TAGS.has(childArray[0].type)
+      ? childArray[0]
+      : null;
+  const controlId = nativeChild?.props.id || `${reactId}-control`;
+  const titleClass = cn("block leading-none", titleClassName || fieldTitleClassName);
+
   return (
-    <label className={cn(fieldLabelClassName, className)}>
+    <div
+      className={cn(fieldLabelClassName, className)}
+      role={nativeChild ? undefined : "group"}
+      aria-labelledby={nativeChild ? undefined : titleId}
+      aria-describedby={nativeChild ? undefined : helperId}
+    >
       <span className="flex min-w-0 items-center gap-1.5 leading-none">
-        <span className={cn("block leading-none", titleClassName || fieldTitleClassName)}>{label}</span>
+        {nativeChild ? (
+          <label id={titleId} htmlFor={controlId} className={titleClass}>
+            {label}
+          </label>
+        ) : (
+          <span id={titleId} className={titleClass}>
+            {label}
+          </span>
+        )}
         {labelSuffix ? <span className="inline-flex shrink-0 items-center leading-none">{labelSuffix}</span> : null}
       </span>
-      {helper ? <p className={fieldHelperTextClassName}>{helper}</p> : null}
-      {children}
-    </label>
+      {helper ? <p id={helperId} className={fieldHelperTextClassName}>{helper}</p> : null}
+      {nativeChild
+        ? cloneElement(nativeChild, {
+            id: controlId,
+            "aria-describedby": [nativeChild.props["aria-describedby"], helperId].filter(Boolean).join(" ") || undefined
+          })
+        : children}
+    </div>
   );
 }
 
@@ -133,18 +167,44 @@ export function PillSelectField({
   onChange,
   buttonDensity = "default"
 }) {
+  const groupRef = useRef(null);
+  const activeIndex = Math.max(0, options.findIndex((option) => option.value === value));
+
+  // Radio-group keyboard pattern: one tab stop, arrow keys move and select (WAI-ARIA APG).
+  function handleKeyDown(event, index) {
+    const last = options.length - 1;
+    const targets = { ArrowRight: index + 1, ArrowDown: index + 1, ArrowLeft: index - 1, ArrowUp: index - 1, Home: 0, End: last };
+    if (!(event.key in targets)) {
+      return;
+    }
+    event.preventDefault();
+    let next = targets[event.key];
+    if (next > last) next = 0;
+    if (next < 0) next = last;
+    onChange(options[next].value);
+    groupRef.current?.querySelectorAll('[role="radio"]')[next]?.focus();
+  }
+
   return (
     <Field label={label} className={className} helper={helper} labelSuffix={labelSuffix}>
-      <div className="toggle-row toggle-row--single-line flex flex-nowrap gap-2" role="radiogroup" aria-label={label}>
-        {options.map((option) => {
+      <div
+        ref={groupRef}
+        className="toggle-row toggle-row--single-line flex flex-nowrap gap-2"
+        role="radiogroup"
+        aria-label={label}
+      >
+        {options.map((option, index) => {
           const isActive = value === option.value;
           return (
             <button
               key={option.value}
               className={toggleButtonClassName(isActive, "choice", buttonDensity)}
               type="button"
+              role="radio"
+              aria-checked={isActive}
+              tabIndex={index === activeIndex ? 0 : -1}
               onClick={() => onChange(option.value)}
-              aria-pressed={isActive}
+              onKeyDown={(event) => handleKeyDown(event, index)}
             >
               {option.label}
             </button>

@@ -1,5 +1,5 @@
 import { formatDuration, formatNumber } from "../../domain/formatting/formatters.js";
-import { AirlineCell, AirportIndicatorContent } from "./flightTableDefinition";
+import { AirlineCell, AirportIndicatorContent, getAirportCellAriaLabel } from "./flightTableDefinition";
 
 // Falls back through the tour row's duration fields and keeps the display compact.
 function getDurationLabel(row) {
@@ -33,7 +33,16 @@ export function getTourTableColumns({
       align: "left",
       required: true,
       truncate: true,
-      renderCell: (row) => row.tourLeg
+      // Completed legs are shown visually by a strike line and muted text; say it in text too (WCAG 1.3.1).
+      renderCell: (row) =>
+        row?.isCompleted ? (
+          <span className="block min-w-0 truncate leading-none">
+            {row.tourLeg}
+            <span className="sr-only">, completed</span>
+          </span>
+        ) : (
+          row.tourLeg
+        )
     },
     {
       key: "airlineName",
@@ -88,7 +97,7 @@ export function getTourTableColumns({
       onCellClick: (row) =>
         onAirportSelect?.({ airportIcao: row.from, side: "departure", row, sourceView }),
       stopRowSelectOnClick: true,
-      cellAriaLabel: (row) => `Show departure airport info for ${String(row.from || "").trim().toUpperCase()}`,
+      cellAriaLabel: (row) => getAirportCellAriaLabel({ airportCode: row.from, side: "departure", addonAirports, vatsimCoverageIndex, missingInDatabase: Array.isArray(row?.missingAirportIcaos) && row.missingAirportIcaos.includes(row.from) }),
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.from}
@@ -115,7 +124,7 @@ export function getTourTableColumns({
       onCellClick: (row) =>
         onAirportSelect?.({ airportIcao: row.to, side: "arrival", row, sourceView }),
       stopRowSelectOnClick: true,
-      cellAriaLabel: (row) => `Show arrival airport info for ${String(row.to || "").trim().toUpperCase()}`,
+      cellAriaLabel: (row) => getAirportCellAriaLabel({ airportCode: row.to, side: "arrival", addonAirports, vatsimCoverageIndex, missingInDatabase: Array.isArray(row?.missingAirportIcaos) && row.missingAirportIcaos.includes(row.to) }),
       renderCell: (row) => (
         <AirportIndicatorContent
           airportCode={row.to}

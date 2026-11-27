@@ -143,7 +143,7 @@ export default function AccomplishmentsPanel({
             <span aria-hidden="true">{"\u2022"}</span>
             <span className="inline-flex items-baseline gap-2">
               <span>Completed</span>
-              <strong className="font-semibold text-[#22b77a]">{completedCount}</strong>
+              <strong className="font-semibold text-[#0f6b4b] dark:text-[#57D9A3]">{completedCount}</strong>
               <strong className="font-semibold text-[var(--text-heading)]">/ {totalCount}</strong>
             </span>
           </div>

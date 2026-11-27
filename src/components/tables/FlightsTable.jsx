@@ -37,6 +37,12 @@ export default function FlightsTable({
       onSelectRow={onSelectRow}
       onActivateRow={onActivateRow}
       getRowId={(row) => row.flightId}
+      ariaLabel={sourceView === "accomplishments" ? "Accomplishment flights" : "Flight schedule"}
+      rowActionHint={
+        onActivateRow
+          ? "Use the up and down arrow keys to move between flights. Press Enter, or double-click, to add the focused flight to the active Flight Board."
+          : ""
+      }
     />
   );
 }

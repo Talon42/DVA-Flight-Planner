@@ -73,7 +73,7 @@ function FooterDateStat({ label, value, isCurrent, className = "" }) {
       )}
     >
       <span>{label}:</span>
-      <span className={cn("font-normal", isCurrent ? "text-[var(--text-heading)]" : "text-[var(--delta-red)]")}>
+      <span className={cn("font-normal", isCurrent ? "text-[var(--text-heading)]" : "text-[var(--delta-red-text)]")}>
         {displayValue}
       </span>
     </p>
@@ -86,7 +86,7 @@ function FooterLinkStat({ label, value, onClick, className = "" }) {
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-baseline gap-1.5 whitespace-nowrap border-0 bg-transparent p-0 text-left text-[var(--delta-red)] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--delta-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-panel)] bp-1024:text-[0.76rem]",
+        "inline-flex items-baseline gap-1.5 whitespace-nowrap border-0 bg-transparent p-0 text-left text-[var(--delta-red-text)] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--delta-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-panel)] bp-1024:text-[0.76rem]",
         bodySmTextClassName,
         className
       )}
@@ -204,7 +204,7 @@ export default function AppFooter({
         >
           <span>Copyright &copy; 2026</span>
           <a
-            className="text-[var(--delta-blue)] no-underline hover:underline dark:text-[rgb(255,255,255)]"
+            className="text-[var(--delta-blue)] underline underline-offset-2 dark:text-[rgb(255,255,255)]"
             href="https://github.com/Talon42/DVA-Flight-Planner"
             target="_blank"
             rel="noreferrer"

@@ -25,10 +25,10 @@ describe("SimBrief airline override controls", () => {
     render(<Settings />);
     const headings = screen.getAllByRole("heading").map((heading) => heading.textContent);
     expect(headings.indexOf("Airline Overrides")).toBe(headings.indexOf("Dispatch Defaults") + 1);
-    fireEvent.click(screen.getByRole("button", { name: "Use Real Name" }));
+    fireEvent.click(screen.getByRole("button", { name: /Use Real Name$/ }));
     fireEvent.click(screen.getByRole("button", { name: "Use Schedule Name" }));
     expect(changed).toHaveBeenLastCalledWith({ historicFlights: "schedule" });
-    fireEvent.click(screen.getByRole("button", { name: "Default" }));
+    fireEvent.click(screen.getByRole("button", { name: /Default$/ }));
     for (const label of ["Delta", "Endeavor", "Skywest", "Republic", "Random"]) {
       expect(screen.getByRole("button", { name: label })).toBeTruthy();
     }

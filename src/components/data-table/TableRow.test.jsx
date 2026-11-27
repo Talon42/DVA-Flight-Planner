@@ -44,15 +44,46 @@ describe("TableRow interaction semantics", () => {
     expect(screen.getByText("Flight one").closest("button")).toBeNull();
   });
 
-  it("selects the row with Enter and Space", () => {
-    const { onSelectRow } = renderRow();
+  it("activates with Enter, the keyboard equivalent of double-click, and selects with Space", () => {
+    const { onSelectRow, onActivateRow } = renderRow();
     const row = screen.getByRole("row");
 
     fireEvent.keyDown(row, { key: "Enter" });
     fireEvent.keyDown(row, { key: " " });
 
-    expect(onSelectRow).toHaveBeenCalledTimes(2);
+    expect(onActivateRow).toHaveBeenCalledTimes(1);
+    expect(onActivateRow).toHaveBeenCalledWith("row-1", expect.any(Object));
+    expect(onSelectRow).toHaveBeenCalledTimes(1);
     expect(onSelectRow).toHaveBeenCalledWith("row-1", expect.any(Object));
+  });
+
+  it("selects with Enter when the row has no activation", () => {
+    const { onSelectRow } = renderRow({ onActivateRow: undefined });
+
+    fireEvent.keyDown(screen.getByRole("row"), { key: "Enter" });
+
+    expect(onSelectRow).toHaveBeenCalledTimes(1);
+  });
+
+  it("is a focusable grid row even without selection, so the add-to-board action is reachable", () => {
+    const { onActivateRow } = renderRow({ enableRowSelection: false });
+    const row = screen.getByRole("row");
+
+    expect(row.getAttribute("tabindex")).toBe("0");
+    expect(row.hasAttribute("aria-selected")).toBe(false);
+    expect(screen.getAllByRole("gridcell")).toHaveLength(2);
+
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(onActivateRow).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands arrow keys to the table for row navigation", () => {
+    const onRowNavigate = vi.fn(() => true);
+    renderRow({ onRowNavigate, rowIndex: 3 });
+
+    fireEvent.keyDown(screen.getByRole("row"), { key: "ArrowDown" });
+
+    expect(onRowNavigate).toHaveBeenCalledWith(3, "ArrowDown");
   });
 
   it("selects on row click and activates once on double click", () => {

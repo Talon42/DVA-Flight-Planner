@@ -78,6 +78,7 @@ import {
   DEFAULT_MAP_OPTIONS,
 } from "../components/map/mapOptions.model.js";
 import { DEFAULT_DERIVED_TOUR_PROGRESS } from "../features/tours/tours.constants";
+import { announceStatus } from "../components/layout/announcer";
 import {
   buildFooterDateLabel,
   buildScheduleDateInfo
@@ -142,7 +143,15 @@ export default function App() {
   const [gettingStartedState, setGettingStartedState] = useState(DEFAULT_GETTING_STARTED_STATE);
   const [hasLoadedGettingStartedState, setHasLoadedGettingStartedState] = useState(false);
   const [shouldRunDeferredStartupDvaSync, setShouldRunDeferredStartupDvaSync] = useState(false);
-  const [, setStatusMessage] = useState("Ready");
+  const [, setStatusMessageState] = useState("Ready");
+  // Status messages were stored but never shown; route them to the shared live region so
+  // sync, dispatch, board and error results reach screen reader users (WCAG 4.1.3).
+  const setStatusMessage = useCallback((value) => {
+    setStatusMessageState(value);
+    if (typeof value === "string") {
+      announceStatus(value);
+    }
+  }, []);
   const [logbookAirportProgress, setLogbookAirportProgress] = useState({
     dateIso: null,
     lastSyncAt: null,
@@ -903,7 +912,7 @@ export default function App() {
     ]);
   const handleUiStatePersistenceError = useCallback((error) => {
     setStatusMessage(error instanceof Error ? error.message : "Unable to persist the current planner state.");
-  }, []);
+  }, [setStatusMessage]);
   const appUiStatePersistence = useAppUiStatePersistence({
     snapshot: uiStateSnapshot,
     isHydrating,

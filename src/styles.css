@@ -46,14 +46,16 @@
   --delta-blue: #003a70;
   --delta-blue-deep: #0b1f36;
   --delta-red: #c8102e;
-  --eyebrow: var(--delta-red);
+  /* Red used as text: darker in light mode and lighter in dark mode so it reaches 4.5:1 (WCAG 1.4.3). */
+  --delta-red-text: #b00e28;
+  --eyebrow: var(--delta-red-text);
   --app-bg:
     radial-gradient(circle at top left, rgba(11, 31, 54, 0.34), transparent 22%),
     radial-gradient(circle at top right, rgba(0, 58, 112, 0.24), transparent 24%),
     linear-gradient(155deg, #e4ebf4 0%, #dbe4ef 48%, #d1dce9 100%);
   --text-primary: #102136;
   --text-heading: var(--delta-blue-deep);
-  --text-muted: #64758a;
+  --text-muted: #4e5d70;
   --line: rgba(16, 33, 54, 0.08);
   --line-strong: rgba(16, 33, 54, 0.14);
   --surface: rgba(246, 250, 253, 0.98);
@@ -70,8 +72,8 @@
   --logbook-row-selected-bg: #0064bf;
   --logbook-row-selected-hover-bg: #0057a8;
   --logbook-row-selected-text: #ffffff;
-  --logbook-row-status-rejected-bg: rgba(200, 16, 46, 0.52);
-  --logbook-row-status-rejected-hover-bg: rgba(200, 16, 46, 0.6);
+  --logbook-row-status-rejected-bg: #b00e28;
+  --logbook-row-status-rejected-hover-bg: #a50d27;
   --logbook-row-status-rejected-text: #ffffff;
   --logbook-row-status-pending-bg: rgba(246, 197, 109, 0.34);
   --logbook-row-status-pending-hover-bg: rgba(246, 197, 109, 0.48);
@@ -94,8 +96,10 @@
   --slider-track: rgba(16, 33, 54, 0.1);
   --shadow: none;
   --menu-shadow: none;
-  --focus-outline: rgba(0, 58, 112, 0.18);
-  --focus-border: rgba(0, 58, 112, 0.28);
+  /* Focus indicators are solid so they reach 3:1 against every surface (WCAG 1.4.11, 2.4.7). */
+  --focus-ring: #003a70;
+  --focus-outline: var(--focus-ring);
+  --focus-border: #0057a8;
   --route-banner:
     linear-gradient(140deg, color-mix(in srgb, var(--delta-red) 92%, white 8%), #7d0f24),
     var(--delta-red);
@@ -123,6 +127,7 @@
   --text-primary: #ecf3fb;
   --text-heading: #f4f8fc;
   --text-muted: #99afc7;
+  --delta-red-text: #ff8a9a;
   --line: rgba(182, 204, 229, 0.08);
   --line-strong: rgba(221, 233, 245, 0.12);
   --surface: rgba(10, 24, 43, 0.96);
@@ -163,8 +168,9 @@
   --slider-track: rgba(186, 209, 234, 0.2);
   --shadow: none;
   --menu-shadow: none;
-  --focus-outline: rgba(120, 166, 214, 0.28);
-  --focus-border: rgba(150, 192, 235, 0.36);
+  --focus-ring: #8cc4ff;
+  --focus-outline: var(--focus-ring);
+  --focus-border: #8cc4ff;
   --route-banner:
     linear-gradient(140deg, color-mix(in srgb, var(--delta-red) 88%, white 6%), #5f0c1d),
     var(--delta-red);
@@ -296,6 +302,11 @@
 
   .logbook-row-selected:hover {
     background: var(--logbook-row-selected-hover-bg) !important;
+  }
+
+  /* Completed tour legs: muted text that still meets 4.5:1, plus the strike line and "completed" text. */
+  .tour-row--completed {
+    --table-row-text: var(--text-muted);
   }
 
   .logbook-pilot-stats__layout-compact {
@@ -452,4 +463,16 @@
 body.flight-board-reordering,
 body.flight-board-reordering * {
   cursor: grabbing !important;
+}
+
+/* Respect the system reduced-motion setting for spinners, transitions and smooth scrolling (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

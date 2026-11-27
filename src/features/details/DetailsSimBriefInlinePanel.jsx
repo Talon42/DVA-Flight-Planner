@@ -304,23 +304,6 @@ export default function SimBriefInlinePanel({
     }
   }, [actionErrorSignature, dismissedErrorSignature]);
 
-  useEffect(() => {
-    if (!isDeleteDraftConfirmOpen) {
-      return undefined;
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        setIsDeleteDraftConfirmOpen(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isDeleteDraftConfirmOpen]);
-
   const isActionErrorVisible =
     Boolean(actionErrorSignature) && dismissedErrorSignature !== actionErrorSignature;
 
@@ -366,7 +349,7 @@ export default function SimBriefInlinePanel({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Button
-              className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
+              className="min-w-0 w-full !bg-[#237347] !text-white hover:!bg-[#1f6b42] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
               variant={flight.isCompleted ? "ghost" : "success"}
               size="sm"
               onClick={() => onCompleteTourFlight(flight.boardEntryId)}
@@ -410,7 +393,7 @@ export default function SimBriefInlinePanel({
 
           <div className="grid gap-2 bp-1400:hidden">
             <Button
-              className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
+              className="min-w-0 w-full !bg-[#237347] !text-white hover:!bg-[#1f6b42] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
               variant={flight.isCompleted ? "ghost" : "success"}
               size="sm"
               onClick={() => onCompleteTourFlight(flight.boardEntryId)}
@@ -445,7 +428,7 @@ export default function SimBriefInlinePanel({
 
           <div className={generatedDesktopFinalActionRowClassName}>
             <Button
-              className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
+              className="min-w-0 w-full !bg-[#237347] !text-white hover:!bg-[#1f6b42] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
               variant={flight.isCompleted ? "ghost" : "success"}
               size="sm"
               onClick={() => onCompleteTourFlight(flight.boardEntryId)}
@@ -530,7 +513,7 @@ export default function SimBriefInlinePanel({
 
           <div className="grid gap-2 bp-1400:hidden">
             <Button
-              className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
+              className="min-w-0 w-full !bg-[#237347] !text-white hover:!bg-[#1f6b42] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
               variant={flight.isCompleted ? "ghost" : "success"}
               size="sm"
               onClick={() => onCompleteTourFlight(flight.boardEntryId)}
@@ -567,7 +550,7 @@ export default function SimBriefInlinePanel({
 
           <div className={generatedDesktopFinalActionRowClassName}>
             <Button
-              className="min-w-0 w-full !bg-[#2D8C5A] !text-white hover:!bg-[#25774C] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
+              className="min-w-0 w-full !bg-[#237347] !text-white hover:!bg-[#1f6b42] dark:!bg-[#1F7A4D] dark:hover:!bg-[#25945D]"
               variant={flight.isCompleted ? "ghost" : "success"}
               size="sm"
               onClick={() => onCompleteTourFlight(flight.boardEntryId)}
@@ -602,9 +585,9 @@ export default function SimBriefInlinePanel({
         </>
       )}
       {isDeleteDraftConfirmOpen ? (
-        <div
-          className="absolute inset-0 z-[70] flex items-center justify-center overflow-hidden p-4 bp-1024:p-3"
-          role="presentation"
+        <ModalBackdrop
+          variant="embedded"
+          className="z-[70] bg-transparent"
           onClick={() => setIsDeleteDraftConfirmOpen(false)}
         >
           <div
@@ -616,17 +599,18 @@ export default function SimBriefInlinePanel({
               modalPanelClassName,
               "relative z-[71] w-[min(520px,calc(100%-1.5rem))] p-5 bp-1024:w-[min(500px,calc(100%-1rem))] bp-1024:p-4"
             )}
-            role="dialog"
+            role="alertdialog"
             aria-modal="true"
-            aria-label="Delete DVA draft confirmation"
+            aria-labelledby={`${flight.boardEntryId}-delete-draft-title`}
+            aria-describedby={`${flight.boardEntryId}-delete-draft-description`}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <p className="m-0 text-[var(--text-heading)] text-[1rem] font-semibold">
+                <p id={`${flight.boardEntryId}-delete-draft-title`} className="m-0 text-[var(--text-heading)] text-[1rem] font-semibold">
                   Delete DVA draft?
                 </p>
-                <p className={cn("m-0", bodySmTextClassName)}>
+                <p id={`${flight.boardEntryId}-delete-draft-description`} className={cn("m-0", bodySmTextClassName)}>
                   This will delete the draft from the Delta Virtual website and remove it from your
                   logbook. It will not remove the flight board entry.
                 </p>
@@ -635,6 +619,7 @@ export default function SimBriefInlinePanel({
                 <Button
                   variant="board"
                   size="sm"
+                  data-autofocus
                   onClick={() => setIsDeleteDraftConfirmOpen(false)}
                 >
                   Cancel
@@ -653,7 +638,7 @@ export default function SimBriefInlinePanel({
               </div>
             </div>
           </Panel>
-        </div>
+        </ModalBackdrop>
       ) : null}
       {isActionErrorVisible && actionErrorOverlayHost
         ? createPortal(
@@ -666,13 +651,14 @@ export default function SimBriefInlinePanel({
                   modalPanelClassName,
                   "relative z-[61] w-[min(520px,calc(100%-2rem))] p-5 bp-1024:w-[min(500px,calc(100%-1.5rem))] bp-1024:p-4"
                 )}
-                role="dialog"
+                role="alertdialog"
                 aria-modal="true"
                 aria-label="Dispatch error"
+                aria-describedby={`${flight.boardEntryId}-dispatch-error`}
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className="grid gap-4">
-                  <p className={cn("m-0 text-[var(--danger)]", bodySmTextClassName)}>
+                  <p id={`${flight.boardEntryId}-dispatch-error`} className={cn("m-0 text-[var(--danger)]", bodySmTextClassName)}>
                     {actionErrorMessage}
                   </p>
                   <div className="flex justify-end gap-2">

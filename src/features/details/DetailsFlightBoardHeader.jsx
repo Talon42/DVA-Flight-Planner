@@ -253,7 +253,7 @@ function FlightBoardSelectorActions({
       </button>
       <button
         type="button"
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-none text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--delta-red)] disabled:cursor-not-allowed disabled:opacity-45"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-none text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--delta-red-text)] disabled:cursor-not-allowed disabled:opacity-45"
         aria-label={activeBoard ? `Delete ${activeBoard.name}` : "Delete flight board"}
         onClick={onDeleteFlightBoard}
         disabled={!activeBoard}

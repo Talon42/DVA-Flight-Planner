@@ -32,6 +32,10 @@ function normalizeCellContent(content, truncate) {
 export default function TableRow({
   row,
   rowId,
+  rowIndex = 0,
+  isActive = true,
+  onRowFocus,
+  onRowNavigate,
   style,
   columns,
   columnTemplate,
@@ -64,17 +68,32 @@ export default function TableRow({
     }
   }
 
+  // Rows are a single roving tab stop: arrows move between rows, Enter does what double-click does
+  // (add to the Flight Board, or open the row), and Space selects where selection exists.
   function handleRowKeyDown(event) {
-    if (
-      !enableRowSelection ||
-      (event.key !== "Enter" && event.key !== " ") ||
-      event.target !== event.currentTarget
-    ) {
+    if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) {
       return;
     }
 
-    event.preventDefault();
-    onSelectRow?.(rowId, row);
+    if (onRowNavigate?.(rowIndex, event.key)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (onActivateRow) {
+        onActivateRow(rowId, row);
+      } else if (enableRowSelection) {
+        onSelectRow?.(rowId, row);
+      }
+      return;
+    }
+
+    if (event.key === " " && enableRowSelection) {
+      event.preventDefault();
+      onSelectRow?.(rowId, row);
+    }
   }
 
   function handleCellClick(column, event) {
@@ -93,16 +112,23 @@ export default function TableRow({
   return (
     <div
       className={cn(
-        "relative grid h-full w-full min-w-0 items-stretch border-b border-[color:var(--line)] bg-[var(--surface-table-row)] transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[var(--surface-table-row-hover)]",
+        "relative grid h-full w-full min-w-0 items-stretch border-b border-[color:var(--line)] bg-[var(--surface-table-row)] transition-colors duration-150 even:bg-[var(--surface-table-row-alt)] hover:bg-[var(--surface-table-row-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)]",
         getRowClassName?.(row),
         isSelectableSelected && selectedRowClassName
       )}
       data-layout-mode={layoutMode}
+      data-row-index={rowIndex}
       onClick={handleRowClick}
       onDoubleClick={handleRowDoubleClick}
       onKeyDown={handleRowKeyDown}
-      tabIndex={enableRowSelection ? 0 : undefined}
-      role={enableRowSelection ? "row" : undefined}
+      onFocus={(event) => {
+        if (event.target === event.currentTarget) {
+          onRowFocus?.(rowIndex);
+        }
+      }}
+      tabIndex={isActive ? 0 : -1}
+      role="row"
+      aria-rowindex={rowIndex + 2}
       aria-selected={enableRowSelection ? Boolean(isSelected) : undefined}
       style={{
         ...style,
@@ -123,6 +149,7 @@ export default function TableRow({
         return (
           <div
             key={column.key}
+            role="gridcell"
             className={cn(
               "flex min-w-0 self-stretch items-center px-3 text-[color:var(--table-row-text,var(--text-primary))] bp-1024:px-2 dark:text-[rgb(255,255,255)]",
               overflowClassName,
@@ -134,7 +161,7 @@ export default function TableRow({
               <button
                 type="button"
                 className={cn(
-                  "inline-flex max-w-full appearance-none border-0 bg-transparent p-0 text-left text-[color:var(--table-row-text,var(--text-primary))] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-outline)] dark:text-[rgb(255,255,255)]",
+                  "inline-flex max-w-full appearance-none border-0 bg-transparent p-0 text-left text-[color:var(--table-row-text,var(--text-primary))] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)] dark:text-[rgb(255,255,255)]",
                   "cursor-pointer",
                   selectableCellClassName
                 )}

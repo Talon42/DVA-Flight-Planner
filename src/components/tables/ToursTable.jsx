@@ -45,8 +45,14 @@ export default function ToursTable({
       onSelectRow={onSelectRow}
       onActivateRow={onActivateRow}
       getRowId={(row) => row.tourRowId}
-      getRowClassName={(row) => (row?.isCompleted ? "opacity-45" : "")}
+      getRowClassName={(row) => (row?.isCompleted ? "tour-row--completed" : "")}
       renderRowOverlay={renderCompletedRowOverlay}
+      ariaLabel="Tour legs"
+      rowActionHint={
+        onActivateRow
+          ? "Use the up and down arrow keys to move between tour legs. Press Enter, or double-click, to add the focused leg to the active Flight Board."
+          : ""
+      }
     />
   );
 }

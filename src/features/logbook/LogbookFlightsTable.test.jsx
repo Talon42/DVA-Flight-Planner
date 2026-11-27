@@ -32,7 +32,7 @@ describe("LogbookFlightCell", () => {
       </div>
     );
 
-    const action = screen.getByRole("button", { name: "Open DVA PIREP 123" });
+    const action = screen.getByRole("button", { name: /open DVA PIREP 123$/ });
     expect(screen.getAllByRole("button")).toHaveLength(1);
 
     fireEvent.click(action);
@@ -61,7 +61,7 @@ describe("LogbookFlightCell", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Open DVA PIREP 0x123" }));
+    fireEvent.click(screen.getByRole("button", { name: /open DVA PIREP 0x123$/ }));
 
     await waitFor(() =>
       expect(logAppError).toHaveBeenCalledWith("logbook-pirep-open-failed", error, {

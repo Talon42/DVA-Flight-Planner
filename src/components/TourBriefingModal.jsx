@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import Button from "./ui/Button";
 import Panel from "./ui/Panel";
 import { cn } from "./ui/cn";
-import { modalBackdropClassName } from "./ui/patterns";
 import SectionHeader from "./ui/SectionHeader";
 import { bodySmTextClassName, supportCopyTextClassName } from "./ui/typography";
 import { fetchDeltaVirtualTourBriefing } from "../services/tauri/deltaVirtual.client.js";
 import { openDesktopUrl } from "../services/tauri/desktopShell.client.js";
+import ModalBackdrop from "./layout/ModalBackdrop";
 
 function decodeBase64ToBlobUrl(base64, contentType) {
   const normalizedBase64 = String(base64 || "").trim();
@@ -229,14 +229,7 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
   }
 
   return (
-    <div
-      className={cn(
-        "fixed inset-0 z-50 grid place-items-center overflow-auto p-4 bp-1024:p-3",
-        modalBackdropClassName
-      )}
-      role="presentation"
-      onClick={onClose}
-    >
+    <ModalBackdrop onClick={onClose}>
       <Panel
         as="section"
         padding="lg"
@@ -272,7 +265,7 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
               <div className="grid justify-items-center gap-3">
                 <svg
                   viewBox="0 0 24 24"
-                  className="h-10 w-10 animate-spin text-[var(--delta-red)]"
+                  className="h-10 w-10 animate-spin text-[var(--delta-red-text)]"
                   aria-hidden="true"
                 >
                   <circle
@@ -326,6 +319,6 @@ export default function TourBriefingModal({ isOpen, briefingUrl, tourName, onClo
           )}
         </div>
       </Panel>
-    </div>
+    </ModalBackdrop>
   );
 }

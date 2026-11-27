@@ -1,4 +1,5 @@
-import { Component, lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { announce } from "./layout/announcer";
 import Panel from "./ui/Panel";
 import Button from "./ui/Button";
 import SectionHeader from "./ui/SectionHeader";
@@ -133,6 +134,30 @@ export default function ScheduleTablePanel({
     Boolean(selectedTourOption?.briefingAvailable) &&
     isAllowedDvaTourBriefingUrl(selectedTourBriefingUrl);
   const [isTourBriefingOpen, setIsTourBriefingOpen] = useState(false);
+  // Filters re-render the table silently; announce the new result count once typing settles (WCAG 4.1.3).
+  const flightRowCount = Array.isArray(flightRows) ? flightRows.length : 0;
+  const lastAnnouncedCountRef = useRef(null);
+  useEffect(() => {
+    if (scheduleView !== "flights") {
+      return undefined;
+    }
+    if (lastAnnouncedCountRef.current === null) {
+      lastAnnouncedCountRef.current = flightRowCount;
+      return undefined;
+    }
+    if (lastAnnouncedCountRef.current === flightRowCount) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      lastAnnouncedCountRef.current = flightRowCount;
+      announce(
+        flightRowCount === 0
+          ? "No flights match the current filters."
+          : `${flightRowCount.toLocaleString()} ${flightRowCount === 1 ? "flight matches" : "flights match"} the current filters.`
+      );
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [flightRowCount, scheduleView]);
   const selectedTourStartDate = formatTourDateLabel(selectedTourOption?.startDate);
   const selectedTourEndDate = formatTourDateLabel(selectedTourOption?.endDate);
   const selectedTourCompletionDateLabel = getTourCompletionDateLabel(selectedTourOption?.rows || []);
@@ -356,7 +381,7 @@ export default function ScheduleTablePanel({
             <div className="flex h-full min-h-0 px-5 pb-5 pt-0 bp-1024:px-4 bp-1024:pb-4">
               <div className="flex h-full min-h-0 w-full items-center justify-center rounded-none border border-dashed border-[color:var(--line)] bg-[rgba(255,255,255,0.45)] px-6 py-8 text-center dark:bg-[rgba(4,12,22,0.35)]">
                 <div className="grid max-w-xl justify-items-center gap-3 text-center">
-                  <p className={cn("m-0 text-[var(--delta-red)] dark:text-white", labelTextClassName)}>
+                  <p className={cn("m-0 text-[var(--delta-red-text)] dark:text-white", labelTextClassName)}>
                     TOURS
                   </p>
                   <h2 className={cn("m-0", sectionTitleTextClassName)}>No synced tours available</h2>

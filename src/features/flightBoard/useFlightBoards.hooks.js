@@ -8,6 +8,20 @@ import {
 import { buildTourFlightLookupKey } from "../tours/tourIds.model.js";
 import { deriveFlightNumber } from "../../domain/flights/flightIdentity.js";
 import { logAppEvent } from "../../services/logging/appLog.client.js";
+import { announce } from "../../components/layout/announcer";
+
+// Speaks the result of an add so keyboard and screen reader users know whether it worked (WCAG 4.1.3).
+function announceBoardAdd(result, flightLabel, boardName) {
+  const label = String(flightLabel || "This flight").trim();
+  const board = String(boardName || "the Flight Board").trim();
+  if (result === "added") {
+    announce(`${label} added to ${board}.`);
+  } else if (result === "duplicate") {
+    announce(`${label} is already on ${board}.`);
+  } else if (result === "completed") {
+    announce(`${label} is already completed in your Delta Virtual logbook, so it was not added.`);
+  }
+}
 import {
   DEFAULT_FLIGHT_BOARD_NAME,
   MAX_FLIGHT_BOARDS,
@@ -517,6 +531,7 @@ export function useFlightBoards({
         String(matchedTourFlight.completionSource || "").trim().toLowerCase() ===
           "deltava-logbook"
       ) {
+        announceBoardAdd("completed", matchedTourFlight.flightCode || matchedTourFlight.route, activeFlightBoard?.name);
         return false;
       }
 
@@ -593,6 +608,12 @@ export function useFlightBoards({
         }).catch(() => {});
       }
 
+      announceBoardAdd(
+        didAddTourRow ? "added" : "duplicate",
+        nextBoardEntry.flightCode || nextBoardEntry.route,
+        activeFlightBoard?.name
+      );
+
       if (!didAddTourRow) {
         return false;
       }
@@ -609,6 +630,7 @@ export function useFlightBoards({
       return false;
     }
 
+    const alreadyOnBoard = flightBoard.some((entry) => entry.linkedFlightId === flightId);
     let didAddFlightRow = false;
     updateActiveFlightBoardEntries((current) => {
       if (current.some((entry) => entry.linkedFlightId === flightId)) {
@@ -618,6 +640,12 @@ export function useFlightBoards({
       didAddFlightRow = true;
       return [...current, buildBoardEntryFromFlight(matchedFlight)];
     });
+
+    announceBoardAdd(
+      didAddFlightRow || !alreadyOnBoard ? "added" : "duplicate",
+      matchedFlight.flightCode,
+      activeFlightBoard?.name
+    );
 
     if (didAddFlightRow && isScheduleCurrent === false) {
       onOpenStaleScheduleBlocked?.();

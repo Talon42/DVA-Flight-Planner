@@ -56,7 +56,7 @@ function LogbookPanelHeader({
             </span>
             <select
               className={cn(
-                "min-h-11 w-auto rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-4 py-2.5 text-[0.88rem] text-[var(--text-primary)] outline-none",
+                "min-h-11 w-auto rounded-none border border-[color:transparent] bg-[var(--input-bg)] px-4 py-2.5 text-[0.88rem] text-[var(--text-primary)] outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:-outline-offset-2 focus-visible:outline-[var(--focus-ring)]",
                 buttonTextClassName,
                 "bp-1024:min-h-9 bp-1024:px-3 bp-1024:py-2 bp-1024:text-[0.82rem]"
               )}

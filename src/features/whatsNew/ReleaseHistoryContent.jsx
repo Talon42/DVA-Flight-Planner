@@ -23,7 +23,7 @@ export default function ReleaseHistoryContent({ releases }) {
               <span className={cn(
                 "border border-[color:var(--line)] bg-[var(--surface)] px-2 py-1 text-[var(--text-muted)]",
                 labelTextClassName,
-                index === 0 && "border-[color:var(--delta-red)] text-[var(--delta-red)]"
+                index === 0 && "border-[color:var(--delta-red)] text-[var(--delta-red-text)]"
               )}>
                 {index === 0 ? "Latest release" : "Previous release"}
               </span>
