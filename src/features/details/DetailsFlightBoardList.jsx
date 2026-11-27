@@ -1,6 +1,7 @@
 import DetailsFlightBoardCardSummary from "./DetailsFlightBoardCardSummary.jsx";
 import DetailsFlightBoardRepairPanel from "./DetailsFlightBoardRepairPanel.jsx";
 import SimBriefInlinePanel from "./DetailsSimBriefInlinePanel.jsx";
+import Button from "../../components/ui/Button";
 import { cn } from "../../components/ui/cn";
 import { mutedTextClassName, nestedPanelStrongFrameClassName } from "../../components/ui/patterns";
 
@@ -29,6 +30,7 @@ export default function DetailsFlightBoardList({
   onRemoveFromFlightBoard,
   onRepairFlightBoardEntry,
   onReorderHandlePointerDown,
+  onMoveBoardFlight,
   onSimBriefTypeChange,
   onDraftNetworkChange,
   onDispatchWorkflow,
@@ -48,6 +50,9 @@ export default function DetailsFlightBoardList({
 
   return (
     <>
+      <p id="flight-board-reorder-hint" className="sr-only">
+        Press the up or down arrow key to move this flight one place.
+      </p>
       <div
         className="shortlist app-scrollbar grid min-h-0 gap-3 overflow-x-hidden overflow-y-auto pr-1"
         ref={shortlistRef}
@@ -78,10 +83,19 @@ export default function DetailsFlightBoardList({
               }
             >
               <button
-                className="shortlist-item__handle absolute left-1/2 top-0 z-10 flex h-4 w-10 -translate-x-1/2 -translate-y-[2px] cursor-grab items-center justify-center rounded-b-[2px] border-x-2 border-b-2 border-[rgba(160,180,202,0.52)] bg-[var(--surface-raised)] text-[var(--text-muted)] opacity-95 shadow-none transition-colors hover:text-[var(--text-heading)] active:cursor-grabbing dark:border-[color:var(--surface-border)] dark:bg-[var(--surface-raised)] dark:text-[var(--route-banner-muted)] dark:hover:text-white"
+                className="shortlist-item__handle absolute left-1/2 top-0 z-10 flex h-6 w-10 -translate-x-1/2 -translate-y-[2px] cursor-grab items-center justify-center rounded-b-[2px] border-x-2 border-b-2 border-[rgba(160,180,202,0.52)] bg-[var(--surface-raised)] text-[var(--text-muted)] opacity-95 shadow-none transition-colors hover:text-[var(--text-heading)] active:cursor-grabbing dark:border-[color:var(--surface-border)] dark:bg-[var(--surface-raised)] dark:text-[var(--route-banner-muted)] dark:hover:text-white"
                 type="button"
                 aria-label={`Reorder ${flight.flightCode}`}
+                aria-describedby="flight-board-reorder-hint"
+                data-reorder-handle={flight.boardEntryId}
+                title="Drag, or press the up and down arrow keys, to reorder"
                 onPointerDown={(event) => onReorderHandlePointerDown(flight.boardEntryId, event)}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+                    event.preventDefault();
+                    onMoveBoardFlight?.(flight.boardEntryId, event.key === "ArrowUp" ? -1 : 1);
+                  }
+                }}
               >
                 <span className="grid gap-0.5">
                   <span className="block h-px w-3 rounded-none bg-current/70" />
@@ -90,6 +104,7 @@ export default function DetailsFlightBoardList({
               </button>
               <div
                 className="shortlist-item__trigger min-w-0"
+                data-board-entry-trigger={flight.boardEntryId}
                 role="button"
                 tabIndex={0}
                 onClick={() => {
@@ -115,6 +130,33 @@ export default function DetailsFlightBoardList({
                   selectedAccomplishment={selectedAccomplishment}
                 />
               </div>
+              {flight.isStale ? (
+                <p className="m-0 text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-[var(--delta-red-text)]">
+                  Needs repair
+                </p>
+              ) : null}
+              {expandedBoardFlightId === flight.boardEntryId && visibleShortlist.length > 1 ? (
+                <div className="flex justify-end gap-2" role="group" aria-label={`Move ${flight.flightCode}`}>
+                  <Button
+                    variant="board"
+                    size="sm"
+                    data-move-up={flight.boardEntryId}
+                    disabled={index === 0}
+                    onClick={() => onMoveBoardFlight?.(flight.boardEntryId, -1, "data-move-up")}
+                  >
+                    Move up
+                  </Button>
+                  <Button
+                    variant="board"
+                    size="sm"
+                    data-move-down={flight.boardEntryId}
+                    disabled={index === visibleShortlist.length - 1}
+                    onClick={() => onMoveBoardFlight?.(flight.boardEntryId, 1, "data-move-down")}
+                  >
+                    Move down
+                  </Button>
+                </div>
+              ) : null}
               {expandedBoardFlightId === flight.boardEntryId ? (
                 flight.isStale ? (
                   <DetailsFlightBoardRepairPanel

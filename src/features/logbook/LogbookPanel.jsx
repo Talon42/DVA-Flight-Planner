@@ -24,12 +24,11 @@ function LogbookPanelHeader({
 }) {
   return (
     <div className="logbook-panel__header flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
-      <div className={cn(plannerTabsListClassName, "logbook-panel__tabs-row")} role="tablist" aria-label="Logbook views">
+      <div className={cn(plannerTabsListClassName, "logbook-panel__tabs-row")} role="group" aria-label="Logbook views">
         <button
           type="button"
           className={cn(plannerTabClassName, getPlannerTabStateClassName(selectedTab === "flights"))}
-          role="tab"
-          aria-selected={selectedTab === "flights"}
+          aria-pressed={selectedTab === "flights"}
           onClick={() => onSelectTab?.("flights")}
         >
           Flights
@@ -40,8 +39,7 @@ function LogbookPanelHeader({
             plannerTabClassName,
             getPlannerTabStateClassName(selectedTab === "pilot-stats")
           )}
-          role="tab"
-          aria-selected={selectedTab === "pilot-stats"}
+          aria-pressed={selectedTab === "pilot-stats"}
           onClick={() => onSelectTab?.("pilot-stats")}
         >
           Pilot Stats

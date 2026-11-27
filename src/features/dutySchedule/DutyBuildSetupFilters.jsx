@@ -211,6 +211,7 @@ export default function DutyBuildSetupFilters({
                 )
               }
               placeholder="KATL"
+              aria-label="Starting airport ICAO or IATA code"
               maxLength={4}
             />
           </div>
@@ -401,6 +402,7 @@ export default function DutyBuildSetupFilters({
                 )
               }
               placeholder="KATL"
+              aria-label="Starting airport ICAO or IATA code"
               maxLength={4}
             />
           </div>

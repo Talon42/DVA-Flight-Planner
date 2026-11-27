@@ -118,6 +118,7 @@ export function SimBriefSettingsForm({
             onBlur={isOnboardingMode ? undefined : commitCredentials}
             onKeyDown={handleCredentialKeyDown}
             placeholder="Enter Alias"
+            autoComplete="username"
           />
         </Field>
 

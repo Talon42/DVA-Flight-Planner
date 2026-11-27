@@ -5,9 +5,9 @@ import {
   supportCopyTextClassName
 } from "./typography";
 
-export function Eyebrow({ className = "", children, ...props }) {
+export function Eyebrow({ as: Tag = "p", className = "", children, ...props }) {
   return (
-    <p
+    <Tag
       className={cn(
         "mb-2.5 mt-0 text-[var(--eyebrow)]",
         labelTextClassName,
@@ -16,7 +16,7 @@ export function Eyebrow({ className = "", children, ...props }) {
       {...props}
     >
       {children}
-    </p>
+    </Tag>
   );
 }
 
@@ -39,7 +39,8 @@ export default function SectionHeader({
       {...props}
     >
       <div className={cn("min-w-0", bodyClassName)}>
-        {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
+        {/* Without a title the eyebrow is the section's only heading, so it becomes the h2 (WCAG 1.3.1, 2.4.6). */}
+        {eyebrow ? <Eyebrow as={title ? "p" : "h2"}>{eyebrow}</Eyebrow> : null}
         {title ? (
           <h2 className={cn("m-0", sectionTitleTextClassName, titleClassName)}>
             {title}

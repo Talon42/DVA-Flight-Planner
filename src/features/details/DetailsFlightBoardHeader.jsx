@@ -45,7 +45,7 @@ export default function DetailsFlightBoardHeader({
 
   return (
     <div className="details-card__header mb-3">
-      <Eyebrow>Flight Board</Eyebrow>
+      <Eyebrow as="h2" tabIndex={-1} data-flight-board-heading="">Flight Board</Eyebrow>
       <div className="mt-2 grid gap-2 border-b border-[color:var(--line)] pb-1">
         <div className="hidden bp-1400:flex items-center gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-2">

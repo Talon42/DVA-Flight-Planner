@@ -75,6 +75,7 @@ export function DeltaVirtualCredentialsForm({
             value={firstName}
             onChange={(event) => onFirstNameChange?.(event.target.value)}
             placeholder="Enter first name"
+            autoComplete="given-name"
           />
         </label>
 
@@ -86,6 +87,7 @@ export function DeltaVirtualCredentialsForm({
             value={lastName}
             onChange={(event) => onLastNameChange?.(event.target.value)}
             placeholder="Enter last name"
+            autoComplete="family-name"
           />
         </label>
       </div>
@@ -99,7 +101,7 @@ export function DeltaVirtualCredentialsForm({
           onFocus={onPasswordFocus}
           onBlur={onPasswordBlur}
           onChange={(event) => onPasswordChange?.(event.target.value)}
-          autoComplete="new-password"
+          autoComplete="current-password"
         />
       </label>
 

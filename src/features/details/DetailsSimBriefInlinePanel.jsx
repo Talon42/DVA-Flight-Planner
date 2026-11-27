@@ -77,8 +77,9 @@ function FlightCardNetworkSelector({ value, onChange }) {
   const selectedValue = normalizeDraftNetwork(value);
 
   return (
-    <label className={cn(fieldLabelClassName, "min-w-0")}>
-      <span className={fieldTitleClassName}>Network</span>
+    // A group, not a <label>: a label around two buttons names and activates only the first (WCAG 1.3.1).
+    <div className={cn(fieldLabelClassName, "min-w-0")} role="group" aria-label="Network">
+      <span className={fieldTitleClassName} aria-hidden="true">Network</span>
       <div className="grid w-full grid-cols-2 gap-2">
         <button
           className={cn(
@@ -103,7 +104,7 @@ function FlightCardNetworkSelector({ value, onChange }) {
           VATSIM
         </button>
       </div>
-    </label>
+    </div>
   );
 }
 
@@ -322,6 +323,12 @@ export default function SimBriefInlinePanel({
           onChange={(value) => onDraftNetworkChange(flight.boardEntryId, value || "Offline")}
         />
       </div>
+      {/* Why the draft buttons are disabled, shown as text rather than only in a tooltip (WCAG 3.3.1). */}
+      {draftDisabledTitle ? (
+        <p id={`${flight.boardEntryId}-draft-hint`} className={cn("m-0 text-[var(--text-muted)]", bodySmTextClassName)}>
+          {draftDisabledTitle}
+        </p>
+      ) : null}
 
       {isNoPlanState ? (
         <>
@@ -343,6 +350,7 @@ export default function SimBriefInlinePanel({
               onClick={() => onDraftOnlySubmit(flight.boardEntryId)}
               disabled={draftDisabled}
               title={draftDisabledTitle}
+              aria-describedby={draftDisabledTitle ? `${flight.boardEntryId}-draft-hint` : undefined}
             >
               {draftLabel}
             </Button>
@@ -386,6 +394,7 @@ export default function SimBriefInlinePanel({
               onClick={() => onDraftOnlySubmit(flight.boardEntryId)}
               disabled={draftDisabled}
               title={draftDisabledTitle}
+              aria-describedby={draftDisabledTitle ? `${flight.boardEntryId}-draft-hint` : undefined}
             >
               {draftLabel}
             </Button>

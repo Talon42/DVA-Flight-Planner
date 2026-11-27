@@ -255,7 +255,7 @@ export function RangeSlider({
         <span className="font-normal">{formatValue(safeHighValue)}</span>
       </div>
 
-      <div className="relative h-4.5">
+      <div className="relative h-6">
         <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-none bg-[var(--slider-track)]" />
         <div
           className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-none bg-[var(--range-track-active)]"

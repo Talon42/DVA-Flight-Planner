@@ -17,6 +17,8 @@ import SpinnerStatusModal from "../components/ui/SpinnerStatusModal";
 import { logAppError } from "../services/logging/appLog.client.js";
 import WhatsNewModal from "../features/whatsNew/WhatsNewModal.jsx";
 
+import { handleTabListKeyDown } from "../components/ui/tabListKeyboard";
+
 const SETTINGS_TABS = [
   { id: "general", label: "General" },
   { id: "delta-virtual", label: "Delta Virtual" },
@@ -271,6 +273,9 @@ export default function AppOverlayHost({
                 role="tablist"
                 aria-orientation="horizontal"
                 aria-label="Settings sections"
+                onKeyDown={(event) =>
+                  handleTabListKeyDown(event, SETTINGS_TABS.map((tab) => tab.id), settingsTab, onSetSettingsTab)
+                }
               >
                 {SETTINGS_TABS.map((tab) => (
                   <button

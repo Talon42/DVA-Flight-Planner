@@ -155,6 +155,10 @@ export default function DetailsFlightBoardCardSummary({ flight, selectedAccompli
       </div>
       <div className="grid min-w-0 gap-2 bp-1024:gap-1.5">
         <div className="relative">
+          {/* The visual route row is decorative; this text gives the card its route in its accessible name (WCAG 1.3.1). */}
+          <span className="sr-only">
+            {`From ${flight.from} to ${flight.to}${isCompletedFlight ? ", completed" : ""}${flight.isStale ? ", needs repair" : ""}`}
+          </span>
           {/* Keeps the route row centered on the airplane while fading the ends toward each airport code. */}
           <div
             className={cn(
