@@ -11,6 +11,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  accessibility:
+    name: Accessibility (WCAG 2.2 AA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # axe-core checks of the shared components plus the keyboard, focus and
+      # announcement behavior tests. The same tests also run inside `npm run validate`;
+      # this job reports accessibility regressions on their own, quickly.
+      - name: Run accessibility tests
+        run: npm run test:a11y
+
   validate-windows:
     name: Validate Windows
     runs-on: windows-latest
